@@ -346,9 +346,7 @@ contains
     this%log_extra_size = 0
     this%log_include_constraints = .true.
 
-    ! Reset the log file's write state so a free()-then-init() cycle on the
-    ! same optimizer object does not carry a stale `header_is_written`/
-    ! `overwrite` flag into what init_log() will treat as a brand-new file.
+    ! Most files have no "free" method, must be done manually here
     this%log_file%header = ''
     this%log_file%header_is_written = .false.
     call this%log_file%set_overwrite(.false.)
@@ -442,19 +440,12 @@ contains
     ! Prepare the problem state before starting the optimization
     call this%initialize(problem, design, simulation)
 
-    ! Only log the initial state on a fresh start. On a restart, this
-    ! iteration was already logged (with real design-change/KKT values) by
-    ! the previous run right before the checkpoint was taken; the log's CSV
-    ! file is append-only, so re-writing it here would append a conflicting
-    ! duplicate row with reset (zero) design-change values, since those are
-    ! not part of the checkpoint.
+    ! Log the initial state of the problem.
     if (this%current_iteration .eq. 0) then
        call this%write(this%current_iteration, problem)
     end if
-    ! Unlike the CSV log above, design output is overwrite-per-index rather
-    ! than append-only, so re-emitting the already-checkpointed iteration's
-    ! design here on a restart is harmless and intentionally left
-    ! unconditional.
+
+    ! Save the current design state.
     call design%write(this%current_iteration)
 
     call neko_log%section('Optimization Loop')
