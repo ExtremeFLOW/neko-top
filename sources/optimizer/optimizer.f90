@@ -590,10 +590,8 @@ contains
   !! @param[in] extra_headers Header labels for extra log entries.
   !! @param[in] include_constraints Include constraints in the log.
   !! @param[in] filename Output filename for the log.
-  !! @note If the target log file already exists with content, this is
-  !! treated as a restart appending to it: no header is (re-)written and no
-  !! existing rows are overwritten. Otherwise it is treated as a fresh
-  !! start: any stale/leftover file at that path is overwritten.
+  !! @note An optimizer at iteration 0 overwrites the target log file and
+  !! writes a fresh header. Otherwise, logging appends to the existing file.
   subroutine optimizer_init_log(this, problem, extra_headers, &
        include_constraints, filename)
     class(optimizer_t), intent(inout) :: this
@@ -605,8 +603,6 @@ contains
     character(len=4096) :: header
     integer :: total_size, base_size, i, n_cont
     character(len=256) :: log_name
-    logical :: log_file_exists
-    integer :: log_file_size
 
     if (present(include_constraints)) then
        this%log_include_constraints = include_constraints
@@ -648,26 +644,6 @@ contains
     end do
     call this%log_file%set_header(trim(header))
 
-    ! Whether this is a restart cannot be inferred from `current_iteration`
-    ! here: `init_log` runs from the optimizer constructor, which executes
-    ! before `optimizer_run` calls `load_checkpoint` -- `current_iteration`
-    ! is therefore always still 0 at this point, restart or not. Instead,
-    ! detect a restart directly from the log file itself: if it already
-    ! exists with content, a previous run already wrote its header, and the
-    ! CSV file is append-only, so writing the header again here would
-    ! insert a duplicate header row in the middle of the file. Otherwise
-    ! (missing, or a leftover empty/partial file) this is a fresh start,
-    ! so any stale content is overwritten and a fresh header is written.
-    inquire(file = trim(log_name), exist = log_file_exists, &
-         size = log_file_size)
-    if (log_file_exists .and. log_file_size .gt. 0) then
-       call this%log_file%set_overwrite(.false.)
-       this%log_file%header_is_written = .true.
-    else
-       call this%log_file%set_overwrite(.true.)
-       this%log_file%header_is_written = .false.
-    end if
-
     this%log_initialized = .true.
   end subroutine optimizer_init_log
 
@@ -684,6 +660,16 @@ contains
     integer :: base_size, offset, n_cont, i
 
     if (.not. this%log_initialized) return
+
+    ! Iteration 0 starts a new log; later iterations append to the existing
+    ! log without writing its header again.
+    if (this%current_iteration .eq. 0) then
+       call this%log_file%set_overwrite(.true.)
+       this%log_file%header_is_written = .false.
+    else
+       call this%log_file%set_overwrite(.false.)
+       this%log_file%header_is_written = .true.
+    end if
 
     ! Number of continuation parameters
     n_cont = nekotop_continuation%get_n_params()
