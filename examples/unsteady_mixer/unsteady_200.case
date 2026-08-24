@@ -198,7 +198,6 @@
             {
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
-                "end_time": 12.0,
                 "phi_ref": 0.5,
                 "weight": 10.8336275609
             },

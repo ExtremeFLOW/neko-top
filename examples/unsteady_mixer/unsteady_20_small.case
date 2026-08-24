@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 200.0,
+            "Re": 20.0,
             "output_control": "never",
             "output_format": "vtkhdf",
             "strict_convergence": true,
@@ -143,15 +143,13 @@
                 "y_bounds": [ 0.2, 0.5 ],
                 "z_bounds": [ 0.2, 0.5 ]
             }
-        ],
-        "simulation_components": [
-            {
-                "type": "steady",
-                "tol": 1e-6,
-                "compute_control": "tsteps",
-                "compute_value": 5
-            }
         ]
+    },
+    "unsteady": true,
+    "checkpoints": {
+        "enabled": true,
+        "format": "chkp",
+        "n_memory": 200
     },
     "optimization": {
         "design": {
@@ -201,18 +199,15 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "weight": 10.8336275609,
-                "start_time": 8.0
+                "weight": 10.8336275609
             },
             {
                 "type": "viscous_dissipation",
-                "weight": 1.19703784706,
-                "start_time": 8.0
+                "weight": 1.19703784706
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 45.10107562188,
-                "start_time": 8.0
+                "weight": 45.10107562188
             }
         ]
     }

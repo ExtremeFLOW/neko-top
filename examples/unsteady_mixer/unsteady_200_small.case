@@ -182,7 +182,7 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 25,
+            "max_iterations": 200,
             "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
             "mma": {
@@ -199,7 +199,6 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "end_time": 12.0,
                 "weight": 10.8336275609
             },
             {
