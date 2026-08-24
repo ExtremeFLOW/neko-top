@@ -359,7 +359,7 @@ contains
     call json_get_or_default(solver_params, 'max_runtime', read_str, "")
     call read_duration(read_str, this%max_runtime)
     call json_get_or_default(solver_params, 'stop_design_change', &
-         this%stop_design_change, -1.0_rp)
+         this%stop_design_change, this%stop_design_change)
 
     call json_get_or_default(solver_params, 'restart_file', read_str, &
          this%checkpoint_file)
