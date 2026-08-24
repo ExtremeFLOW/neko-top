@@ -1,6 +1,6 @@
-!> @file neko.f90
+!> @file nekotop_logger.f90
 !! @copyright
-!! Copyright (c) 2023-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -32,19 +32,33 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 
-program plainneko
-  use neko, only: neko_init, neko_solve, neko_finalize
-  use case, only: case_t
-  use neko_top, only: neko_top_register_types
-  use nekotop_logger, only: nekotop_log
+!> @brief Neko-TOP logging.
+!! @details
+!! This module declares the global Neko-TOP log object, reusing Neko's
+!! `log_t` type. The log levels of Neko are re-exported here, such that a
+!! `use nekotop_logger` alone provides both the log object and the levels.
+module nekotop_logger
+  use logger, only: log_t, LOG_SIZE, SEC_HEAD_SIZE, NEKO_LOG_QUIET, &
+       NEKO_LOG_INFO, NEKO_LOG_VERBOSE, NEKO_LOG_DEPRECATION, NEKO_LOG_DEBUG
+  implicit none
+  private
 
-  type(case_t), target :: C
+  public :: log_t, LOG_SIZE, SEC_HEAD_SIZE, NEKO_LOG_QUIET, NEKO_LOG_INFO, &
+       NEKO_LOG_VERBOSE, NEKO_LOG_DEPRECATION, NEKO_LOG_DEBUG
 
-  call neko_top_register_types()
-  call neko_init(C)
-  call nekotop_log%init(env_prefix = "NEKO_TOP")
-  call neko_solve(C)
-  call nekotop_log%free()
-  call neko_finalize(C)
+  !------------------------------------------------------------------
+  ! Global log object
+  !------------------------------------------------------------------
 
-end program plainneko
+  !> Global Neko-TOP log stream.
+  !! @details
+  !! This is Neko-TOP's own log stream, independent of Neko's `neko_log`.
+  !! It is initialized with `call nekotop_log%init(env_prefix = "NEKO_TOP")`,
+  !! which reads `NEKO_TOP_LOG_LEVEL`, `NEKO_TOP_LOG_FILE` and
+  !! `NEKO_TOP_LOG_TAB_SIZE`. These are separate from Neko's `NEKO_LOG_*`
+  !! variables, so the verbosity and output destination of Neko-TOP can be
+  !! controlled independently of Neko. It is freed with
+  !! `call nekotop_log%free()`.
+  type(log_t), public, target :: nekotop_log
+
+end module nekotop_logger
