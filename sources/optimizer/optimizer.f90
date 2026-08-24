@@ -347,6 +347,11 @@ contains
     this%log_extra_size = 0
     this%log_include_constraints = .true.
 
+    ! Most files have no "free" method, must be done manually here
+    this%log_file%header = ''
+    this%log_file%header_is_written = .false.
+    call this%log_file%set_overwrite(.false.)
+
   end subroutine optimizer_free_base
 
   !> Read settings from JSON parameters file.
@@ -436,7 +441,12 @@ contains
     ! Prepare the problem state before starting the optimization
     call this%initialize(problem, design, simulation)
 
-    call this%write(this%current_iteration, problem)
+    ! Log the initial state of the problem.
+    if (this%current_iteration .eq. 0) then
+       call this%write(this%current_iteration, problem)
+    end if
+
+    ! Save the current design state.
     call design%write(this%current_iteration)
 
     call neko_log%section('Optimization Loop')
@@ -581,6 +591,8 @@ contains
   !! @param[in] extra_headers Header labels for extra log entries.
   !! @param[in] include_constraints Include constraints in the log.
   !! @param[in] filename Output filename for the log.
+  !! @note An optimizer at iteration 0 overwrites the target log file and
+  !! writes a fresh header. Otherwise, logging appends to the existing file.
   subroutine optimizer_init_log(this, problem, extra_headers, &
        include_constraints, filename)
     class(optimizer_t), intent(inout) :: this
@@ -649,6 +661,16 @@ contains
     integer :: base_size, offset, n_cont, i
 
     if (.not. this%log_initialized) return
+
+    ! Iteration 0 starts a new log; later iterations append to the existing
+    ! log without writing its header again.
+    if (this%current_iteration .eq. 0) then
+       call this%log_file%set_overwrite(.true.)
+       this%log_file%header_is_written = .false.
+    else
+       call this%log_file%set_overwrite(.false.)
+       this%log_file%header_is_written = .true.
+    end if
 
     ! Number of continuation parameters
     n_cont = nekotop_continuation%get_n_params()
