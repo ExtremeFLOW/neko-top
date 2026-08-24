@@ -92,16 +92,6 @@ contains
 
   subroutine tearDown(this)
     class(test_pde_filter), intent(inout) :: this
-    ! Free any fields cached by the previous test's build_fixture() call
-    ! while the device context that mapped them is still alive. Without
-    ! this, device_finalize() below destroys that context first, and the
-    ! *next* test's build_fixture() -> neko_scratch_registry%init() (which
-    ! frees stale entries itself) tries to device_unmap fields against a
-    ! freshly re-initialised, mismatched device context -- "Inconsistent
-    ! host/device mapping state in device_unmap". neko_scratch_registry is
-    ! a module-level singleton that outlives any single @test method, so
-    ! this ordering matters. See known-bugs-backlog.md item #11.
-    call neko_scratch_registry%free()
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_finalize
     end if
@@ -408,6 +398,7 @@ contains
     call dof%free()
     call Xh%free()
     call msh%free()
+    call neko_scratch_registry%free()
 
   end subroutine test_pde_filter_linearity
 
@@ -437,6 +428,7 @@ contains
     call dof%free()
     call Xh%free()
     call msh%free()
+    call neko_scratch_registry%free()
 
   end subroutine test_pde_filter_adjoint
 
@@ -474,6 +466,7 @@ contains
     call dof%free()
     call Xh%free()
     call msh%free()
+    call neko_scratch_registry%free()
 
   end subroutine test_pde_filter_regression
 
