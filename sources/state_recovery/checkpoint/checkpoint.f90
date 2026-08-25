@@ -34,18 +34,15 @@
 !
 !> @brief Checkpoint-based state recovery for adjoint runs.
 module simulation_checkpoint
-  use num_types, only: rp, sp, dp
+  use num_types, only: rp
   use case, only: case_t
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
-  use scalar_scheme, only: scalar_scheme_t
   use time_state, only: time_state_t
   use chkp_output, only: chkp_output_t
   use field, only: field_t
   use field_list, only: field_list_t
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use mpi_f08, only: MPI_WTIME, MPI_Barrier
-  use comm, only: NEKO_COMM, pe_rank
   use utils, only: neko_error
   use math, only: copy, rzero
   use profiler, only: profiler_start_region, profiler_end_region

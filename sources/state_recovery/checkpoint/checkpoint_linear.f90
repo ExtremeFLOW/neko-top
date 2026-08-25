@@ -43,8 +43,8 @@
 !! This algorithm is the simplest one and do a minimum of re-computation. But
 !! requires large amounts of memory and disk space.
 submodule (simulation_checkpoint) checkpoint_linear
+  use num_types, only: dp
   use simulation, only: simulation_step, simulation_restart
-  use file, only: file_t, file_free
   use time_step_controller, only: time_step_controller_t
   use profiler, only: profiler_start_region, profiler_end_region
 

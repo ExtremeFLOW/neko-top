@@ -55,7 +55,6 @@ module problem
   use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
   use time_step_controller, only: time_step_controller_t
-  use time_state, only: time_state_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize
