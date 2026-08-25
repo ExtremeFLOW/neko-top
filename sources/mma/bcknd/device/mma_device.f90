@@ -46,13 +46,15 @@ submodule (mma) mma_device
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
-       device_prepare_hessian, device_prepare_aa_matrix, device_update_hessian_z
+       device_prepare_hessian, device_prepare_aa_matrix, device_update_hessian_z, &
+       device_unconstrained_kkt
 
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_DEVICE_MPI
   use device, only: DEVICE_TO_HOST
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
+  use math, only: NEKO_EPS
 
   implicit none
 
@@ -82,7 +84,10 @@ contains
 
     !solve the approximation problem using interior point method
     call profiler_start_region("MMA subsolve")
-    if (this%subsolver .eq. "dip") then
+
+    if (this%unconstrained_problem) then
+       call mma_subsolve_unconstrained_device(this, x)
+    elseif (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_device(this, x)
     else if (this%subsolver .eq. "dpip") then
        call mma_subsolve_dpip_device(this, x)
@@ -98,12 +103,50 @@ contains
     class(mma_t), intent(inout) :: this
     type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
-    if (this%subsolver .eq. "dip") then
+    if (this%unconstrained_problem) then
+       call mma_unconstrained_KKT_device(this, x, df0dx)
+    elseif (this%subsolver .eq. "dip") then
        call mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
-    else
+    elseif (this%subsolver .eq. "dpip") then
        call mma_dpip_KKT_device(this, x, df0dx, fval, dfdx)
+    else
+       call neko_error("MMA subsolver is not recognised (NOT dip or dpip).")
     end if
   end subroutine mma_KKT_device
+
+  module subroutine mma_unconstrained_KKT_device(this, x, df0dx)
+    class(mma_t), intent(inout) :: this
+    type(c_ptr), intent(in) :: x, df0dx
+
+    type(vector_t), pointer :: rex
+    integer :: ind
+    real(kind=rp) :: re_sq_norm
+    integer :: ierr
+
+    ! Request temporary scratch space for rex on the device
+    call this%scratch%request(rex, ind, this%n, .false.)
+
+    ! Launch the custom element-wise KKT kernel via our abstraction layer
+    call device_unconstrained_kkt(rex%x_d, x, this%xmin%x_d, this%xmax%x_d, &
+         df0dx, NEKO_EPS, this%n)
+
+    ! Compute global metrics using your existing library routines
+    ! (Assuming device_maxval returns maxval(abs(a)) and device_norm returns sum(a^2))
+    this%residumax = device_maxval(rex%x_d, this%n)
+    re_sq_norm = device_norm(rex%x_d, this%n)
+
+    ! Global MPI Reductions across nodes
+    call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
+         mpi_real_precision, MPI_MAX, neko_comm, ierr)
+
+    call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+    this%residunorm = sqrt(re_sq_norm)
+
+    ! Release scratch memory
+    call this%scratch%relinquish(ind)
+  end subroutine mma_unconstrained_KKT_device
 
   !> Implementation of the KKT residual computation for dual interior
   ! point method (dip) subsolve of MMA algorithm.
@@ -1052,5 +1095,28 @@ contains
 
     call this%scratch%relinquish(ind)
   end subroutine mma_subsolve_dip_device
+
+  subroutine mma_subsolve_unconstrained_device(this, designx_d)
+    class(mma_t), intent(inout) :: this
+    type(c_ptr), intent(in) :: designx_d
+    type(vector_t), pointer :: x
+    integer :: ind
+
+    call this%scratch%request(x, ind, this%n, .false.)
+    associate(p0j => this%p0j, q0j => this%q0j, &
+         low => this%low, upp => this%upp, &
+         alpha => this%alpha, beta => this%beta)
+      call device_mma_dipsolvesub1(x%x_d, p0j%x_d, q0j%x_d, &
+           low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
+      ! Closed-form primal solution for unconstrained MMA subproblem
+
+    end associate
+
+    ! Save the new designx
+    call device_copy(this%xold2%x_d, this%xold1%x_d, this%n)
+    call device_copy(this%xold1%x_d, designx_d, this%n)
+    call device_copy(designx_d, x%x_d, this%n)
+    call this%scratch%relinquish(ind)
+  end subroutine mma_subsolve_unconstrained_device
 
 end submodule mma_device

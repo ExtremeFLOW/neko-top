@@ -166,7 +166,7 @@ contains
     this%unconstrained_problem = problem%get_n_constraints() .eq. 0
     if (this%unconstrained_problem) then
        call neko_log%message('Unconstrained problem detected. ' // &
-            'Adding a dummy constraint to enable MMA optimization.')
+            'Switching to explicit closed-form MMA subsolver and KKT.')
 
        allocate(dummy_constraint_t::dummy_con)
        select type (con => dummy_con)
@@ -184,7 +184,8 @@ contains
 
     call design%get_values(x)
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
-         solver_parameters, this%scale, this%auto_scale)
+         solver_parameters, this%scale, this%auto_scale, &
+         this%unconstrained_problem)
 
     call neko_scratch_registry%relinquish(ind)
 

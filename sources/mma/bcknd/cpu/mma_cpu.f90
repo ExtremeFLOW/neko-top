@@ -70,10 +70,14 @@ contains
 
     !solve the approximation problem using interior point method
     call profiler_start_region("MMA subsolve")
-    if (this%subsolver .eq. "dip") then
+    if (this%unconstrained_problem) then
+       call mma_subsolve_unconstrained_cpu(this, x)
+    elseif (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_cpu(this, x)
-    else
+    elseif (this%subsolver .eq. "dpip") then
        call mma_subsolve_dpip_cpu(this, x)
+    else
+       call neko_error("MMA subsolver is not recognised (NOT dip or dpip).")
     end if
     call profiler_end_region("MMA subsolve")
 
@@ -111,14 +115,58 @@ contains
 
     call profiler_start_region("MMA KKT computation")
 
-    if (this%subsolver .eq. "dip") then
+    if (this%unconstrained_problem) then
+       call mma_unconstrained_KKT_cpu(this, x, df0dx)
+    else if (this%subsolver .eq. "dip") then
        call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
-    else
+    elseif (this%subsolver .eq. "dpip") then
        call mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
+    else
+       call neko_error("MMA subsolver is not recognised (NOT dip or dpip).")
     end if
 
     call profiler_end_region("MMA KKT computation")
   end subroutine mma_KKT_cpu
+
+  !> Implementation of the KKT residual for unconstrained problems with box bounds.
+  module subroutine mma_unconstrained_KKT_cpu(this, x, df0dx)
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+
+    real(kind=rp), dimension(this%n) :: rex
+    real(kind=rp) :: re_sq_norm
+    integer :: j, ierr
+
+    ! Compute the stationarity residual projected onto the box bounds
+    do j = 1, this%n
+       if (x(j) - this%xmin%x(j) .le. NEKO_EPS) then
+          ! At lower bound: residual is non-zero only if gradient is negative
+          ! (trying to decrease x further)
+          rex(j) = min(0.0_rp, df0dx(j))
+       else if (this%xmax%x(j) - x(j) .le. NEKO_EPS) then
+          ! At upper bound: residual is non-zero only if gradient is positive
+          ! (trying to increase x further)
+          rex(j) = max(0.0_rp, df0dx(j))
+       else
+          ! Strictly internal: standard unconstrained derivative must be zero
+          rex(j) = df0dx(j)
+       end if
+    end do
+
+    ! Calculate global metrics across elements/processors
+    this%residumax = maxval(abs(rex))
+    re_sq_norm = norm2(rex)**2
+
+    call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
+         mpi_real_precision, MPI_MAX, neko_comm, ierr)
+
+    call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+    this%residunorm = sqrt(re_sq_norm)
+
+  end subroutine mma_unconstrained_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual primal interior
   ! point method (dpip) subsolve of MMA algorithm.
@@ -1083,5 +1131,28 @@ contains
     this%lambda%x = lambda
     this%mu%x = mu
   end subroutine mma_subsolve_dip_cpu
+
+  subroutine mma_subsolve_unconstrained_cpu(this, designx)
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(inout) :: designx
+    real(kind=rp), dimension(this%n) :: x
+
+    associate(p0j => this%p0j%x, q0j => this%q0j%x, &
+         low => this%low%x, upp => this%upp%x, &
+         alpha => this%alpha%x, beta => this%beta%x)
+
+      ! Closed-form primal solution for unconstrained MMA subproblem
+      x = (sqrt(p0j) * low + sqrt(q0j) * upp) / &
+           (sqrt(p0j) + sqrt(q0j))
+
+      x = merge(alpha, x, x .lt. alpha)
+      x = merge(beta, x, x .gt. beta)
+    end associate
+
+    ! Update history
+    this%xold2%x = this%xold1%x
+    this%xold1%x = designx
+    designx = x
+  end subroutine mma_subsolve_unconstrained_cpu
 
 end submodule mma_cpu

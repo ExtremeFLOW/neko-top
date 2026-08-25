@@ -46,7 +46,7 @@ module device_mma_math
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
        cuSOLVER_wrapper, mma_prepare_hessian_cuda, mma_prepare_aa_matrix_cuda, &
-       cuda_custom_solver, mma_update_hessian_z_cuda
+       cuda_custom_solver, mma_update_hessian_z_cuda, mma_unconstrained_kkt_cuda
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -55,7 +55,8 @@ module device_mma_math
        mma_gensub3_hip, mma_gensub4_hip, mattrans_v_mul_hip, &
        mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess, delta_1dbeam_hip, &
        hip_custom_solver, mma_prepare_hessian_hip, &
-       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper, mma_update_hessian_z_hip
+       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper, mma_update_hessian_z_hip, &
+       mma_unconstrained_kkt_hip
 
   implicit none
   private
@@ -70,9 +71,25 @@ module device_mma_math
        device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, &
        device_solve_linear_system, device_prepare_hessian, &
-       device_prepare_aa_matrix, device_update_hessian_z
+       device_prepare_aa_matrix, device_update_hessian_z, device_unconstrained_kkt
 
 contains
+  !> Compute the stationarity residual projected onto the box bounds on device
+  subroutine device_unconstrained_kkt(rex_d, x_d, xmin_d, xmax_d, df0dx_d, eps, n)
+    type(c_ptr), intent(in) :: rex_d, x_d, xmin_d, xmax_d, df0dx_d
+    real(c_rp), intent(in) :: eps
+    integer, value :: n
+#if HAVE_HIP
+    call mma_unconstrained_kkt_hip(rex_d, x_d, xmin_d, xmax_d, df0dx_d, eps, n)
+#elif HAVE_CUDA
+    call mma_unconstrained_kkt_cuda(rex_d, x_d, xmin_d, xmax_d, df0dx_d, eps, n)
+#elif HAVE_OPENCL
+    call neko_error('Unconstrained KKT not implemented for OpenCL')
+#else
+    call neko_error('No device backend configured for Unconstrained KKT')
+#endif
+  end subroutine device_unconstrained_kkt
+
   !> Update Hessian for dual solver with z-term contribution: Hess -= a * a^T
   subroutine device_update_hessian_z(Hess_d, a_d, m)
     use iso_c_binding

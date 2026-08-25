@@ -40,6 +40,14 @@ module hip_mma_math
   public
 
   interface
+     subroutine mma_unconstrained_kkt_hip(rex, x, xmin, xmax, df0dx, eps, n) &
+          bind(c, name="mma_unconstrained_kkt_hip")
+       import c_rp, c_ptr, c_int
+       type(c_ptr), value :: rex, x, xmin, xmax, df0dx
+       real(c_rp) :: eps
+       integer(c_int) :: n
+     end subroutine mma_unconstrained_kkt_hip
+
      subroutine mma_update_hessian_z_hip(Hess_d, a_d, m) &
           bind(C, name="mma_update_hessian_z_hip")
        use iso_c_binding
