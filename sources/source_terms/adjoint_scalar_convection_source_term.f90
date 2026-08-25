@@ -44,13 +44,16 @@ module adjoint_scalar_convection_source_term
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use field_math, only: field_subcol3, field_sub2, field_col3
+  use field_math, only: field_subcol3, field_sub2, field_col3, field_cmult
   use operators, only: grad, dudxyz
   use utils, only: neko_error
+  use gather_scatter, only: GS_OP_ADD
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: col2, invcol2
-  use device_math, only: device_col2, device_invcol2
+  use math, only: col2, glsc2
+  use device_math, only: device_col2
+  use comm, only: pe_rank
+  use iso_fortran_env, only: error_unit
   implicit none
   private
   public :: adjoint_scalar_convection_source_term_allocate
@@ -213,7 +216,30 @@ contains
     type(field_t), pointer :: accumulate, fld_GL, s_GL, s_adj_GL
     integer :: temp_indices_GL(4)
     integer :: n_GL, nel
+    real(kind=rp) :: dbg_s, dbg_sadj, dbg_work, dbg_fu
+    ! DEBUG (temporary): env-controlled scale on this coupling term, so a
+    ! single build can test many hypotheses. NEKO_TOP_DBG_CONV_SCALE=0
+    ! removes the term entirely; =514 tests the observed magnitude deficit.
+    real(kind=rp), save :: dbg_scale = 1.0_rp
+    logical, save :: dbg_scale_read = .false.
+    character(len=64) :: dbg_env
+    integer :: dbg_stat
 
+
+    ! DEBUG (temporary): read the scale knob once.
+    if (.not. dbg_scale_read) then
+       call get_environment_variable('NEKO_TOP_DBG_CONV_SCALE', dbg_env, &
+            status = dbg_stat)
+       if (dbg_stat .eq. 0) then
+          read(dbg_env, *, iostat = dbg_stat) dbg_scale
+          if (dbg_stat .ne. 0) dbg_scale = 1.0_rp
+       end if
+       dbg_scale_read = .true.
+       if (pe_rank .eq. 0) then
+          write(error_unit, '(A,E15.6)') 'DEBUG conv_scale=', dbg_scale
+          flush(error_unit)
+       end if
+    end if
 
     call neko_scratch_registry%request_field(dsdx, temp_indices(1), .false.)
     call neko_scratch_registry%request_field(dsdy, temp_indices(2), .false.)
@@ -244,12 +270,44 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+          ! Sum contributions from adjoining elements at shared dofs before
+          ! normalizing -- coef%B (unlike coef%Binv) is per-element/local
+          ! and never gather-scattered, so dividing by it directly here
+          ! (as this branch previously did) silently drops the neighbouring
+          ! element's contribution at every inter-element dof. Matches the
+          ! map -> gs_h%op(ADD) -> col2(Binv) pattern already used for the
+          ! (non-adjoint) dealiased scalar convection term, see
+          ! src/math/bcknd/cpu/convect_scalar.f90.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call invcol2(work%x, this%coef%B, work%size())
+          ! See comment in the device branch above.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call col2(work%x, this%coef%Binv, work%size())
        end if
+       ! DEBUG (temporary, for investigate-passive-scalar-dealias diagnosis)
+       ! NOTE: glsc2 is collective (MPI_Allreduce) -- it must be called on
+       ! EVERY rank, outside the pe_rank guard, or rank 0 deadlocks waiting
+       ! for the others to join the reduction. Only the write() is guarded.
+       if (mod(time%tstep, 200) .eq. 0) then
+          dbg_sadj = sqrt(glsc2(this%s_adj%x, this%s_adj%x, this%s_adj%size()))
+          dbg_s = sqrt(glsc2(this%s%x, this%s%x, this%s%size()))
+          dbg_work = sqrt(glsc2(work%x, work%x, work%size()))
+          dbg_fu = sqrt(glsc2(fu%x, fu%x, fu%size()))
+          if (pe_rank .eq. 0) then
+             write(error_unit, '(A,I0,A,E15.6,A,E15.6,A,E15.6,A,E15.6)') &
+                  'DEBUG scalar_conv_src tstep=', time%tstep, &
+                  ' |s|=', dbg_s, &
+                  ' |s_adj|=', dbg_sadj, &
+                  ' |work_u|=', dbg_work, &
+                  ' |fu_before|=', dbg_fu
+             flush(error_unit)
+          end if
+       end if
+
+       call field_cmult(work, dbg_scale)
        call field_sub2(fu, work)
 
        ! v
@@ -260,12 +318,24 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+          ! Sum contributions from adjoining elements at shared dofs before
+          ! normalizing -- coef%B (unlike coef%Binv) is per-element/local
+          ! and never gather-scattered, so dividing by it directly here
+          ! (as this branch previously did) silently drops the neighbouring
+          ! element's contribution at every inter-element dof. Matches the
+          ! map -> gs_h%op(ADD) -> col2(Binv) pattern already used for the
+          ! (non-adjoint) dealiased scalar convection term, see
+          ! src/math/bcknd/cpu/convect_scalar.f90.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call invcol2(work%x, this%coef%B, work%size())
+          ! See comment in the device branch above.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call col2(work%x, this%coef%Binv, work%size())
        end if
+       call field_cmult(work, dbg_scale)
        call field_sub2(fv, work)
 
        ! w
@@ -276,12 +346,24 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+          ! Sum contributions from adjoining elements at shared dofs before
+          ! normalizing -- coef%B (unlike coef%Binv) is per-element/local
+          ! and never gather-scattered, so dividing by it directly here
+          ! (as this branch previously did) silently drops the neighbouring
+          ! element's contribution at every inter-element dof. Matches the
+          ! map -> gs_h%op(ADD) -> col2(Binv) pattern already used for the
+          ! (non-adjoint) dealiased scalar convection term, see
+          ! src/math/bcknd/cpu/convect_scalar.f90.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call invcol2(work%x, this%coef%B, work%size())
+          ! See comment in the device branch above.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call col2(work%x, this%coef%Binv, work%size())
        end if
+       call field_cmult(work, dbg_scale)
        call field_sub2(fw, work)
 
        call this%scratch_GL%relinquish_field(temp_indices_GL)

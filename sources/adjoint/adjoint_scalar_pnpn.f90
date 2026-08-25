@@ -35,7 +35,7 @@
 !> Contains the `adjoint_scalar_pnpn_t` type.
 
 module adjoint_scalar_pnpn
-  use comm, only: NEKO_COMM
+  use comm, only: NEKO_COMM, pe_rank
   use utils, only: neko_error
   use num_types, only: rp
   use, intrinsic :: iso_fortran_env, only: error_unit
@@ -58,7 +58,7 @@ module adjoint_scalar_pnpn
   use time_scheme_controller, only : time_scheme_controller_t
   use projection, only : projection_t
   use math, only : glsc2, col2, add2s2
-  use field_math, only : field_col3
+  use field_math, only : field_col3, field_col2
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use advection_adjoint, only : advection_adjoint_t, advection_adjoint_factory
   use profiler, only : profiler_start_region, profiler_end_region
@@ -381,11 +381,19 @@ contains
 
       ! Logs extra information the log level is NEKO_LOG_DEBUG or above.
       call print_debug(this)
+
+      ! Update material properties and their pointwise product.
+      ! This MUST happen before rho_cp is used below (by makebdf and by the
+      ! source/advection scaling). It used to sit after those uses, which left
+      ! makebdf reading an uninitialised scratch field while res%compute used
+      ! the correct value -- so the BDF mass terms could not cancel at steady
+      ! state and the converged adjoint scalar came out proportional to dt.
+      ! Mirrors the ordering in Neko's forward scalar_pnpn.
+      call this%update_material_properties(time)
+      call field_col3(rho_cp, rho, cp)
+
       ! Compute the source terms
       call this%source_term%compute(time)
-
-      ! Apply weak boundary conditions, that contribute to the source terms.
-      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), time, .false.)
 
       ! if (oifs) then
       !    call neko_error("oifs not implemented for adjoint scalar")
@@ -401,6 +409,16 @@ contains
       ! Add the advection operators to the right-hans-side.
       call this%adv%compute_adjoint_scalar(u, v, w, s_adj, f_Xh, &
            Xh, this%c_Xh, dm_Xh%size())
+
+      ! Scale the volumetric source and advection terms by rho * cp, then add
+      ! the weak boundary fluxes without that scaling -- same split as the
+      ! forward scalar. (The weak BC application was previously done before
+      ! the advection term and never scaled, so it could not follow this
+      ! convention.)
+      call field_col2(f_Xh, rho_cp)
+
+      ! Apply weak boundary conditions, that contribute to the source terms.
+      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), time, .false.)
 
       ! At this point the RHS contains the sum of the advection operator,
       ! Neumann boundary sources and additional source terms, evaluated using
@@ -420,10 +438,6 @@ contains
       !> Apply strong boundary conditions.
       call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), time, &
            .true.)
-
-      ! Update material properties if necessary
-      call this%update_material_properties(time)
-      call field_col3(rho_cp, rho, cp)
 
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual')
@@ -468,8 +482,24 @@ contains
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
     ! character(len=LOG_SIZE) :: log_buf
     integer :: n
+    ! DEBUG (temporary, investigate-passive-scalar-dealias): are the BDF lag
+    ! arrays actually being populated? If both stay 0 the BDF coefficients
+    ! cannot cancel at steady state, leaving a spurious (b0/dt)*B*s_adj mass
+    ! term and hence s_adj proportional to dt (which is what we measure).
+    ! glsc2 is collective -> call on every rank, guard only the write.
+    real(kind=rp) :: d_s, d_l1, d_l2
 
     n = this%dm_Xh%size()
+
+    d_s = glsc2(this%s_adj%x, this%s_adj%x, n)
+    d_l1 = glsc2(this%s_adj_lag%lf(1)%x, this%s_adj_lag%lf(1)%x, n)
+    d_l2 = glsc2(this%s_adj_lag%lf(2)%x, this%s_adj_lag%lf(2)%x, n)
+    if (pe_rank .eq. 0) then
+       write(error_unit, '(A,E15.6,A,E15.6,A,E15.6)') &
+            'DEBUG adj_scalar_lag |s_adj|^2=', d_s, &
+            ' |lag1|^2=', d_l1, ' |lag2|^2=', d_l2
+       flush(error_unit)
+    end if
     ! TODO come back to this
     !write(log_buf,'(A,A,E15.7,A,E15.7,A,E15.7)') 'Adjoint scalar debug', &
     !   ' l2norm s_adj', glsc2(this%s_adj%x, this%s_adj%x, n), &
