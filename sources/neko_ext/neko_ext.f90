@@ -50,13 +50,12 @@ module neko_ext
   use field, only: field_t
   use chkp_output, only: chkp_output_t
   use output_controller, only: output_controller_t
-  ! for vector/field math
   use math, only: copy
   use device_math, only: device_copy
   use neko_config, only : NEKO_BCKND_DEVICE
   use vector, only: vector_t
   use field, only: field_t
-  use utils, only: neko_error, filename_suffix_pos
+  use utils, only: neko_error, filename_suffix_pos, filename_suffix
   use json_module, only : json_file
   use scalars, only: scalars_t
   use adjoint_scalars, only: adjoint_scalars_t
@@ -139,6 +138,12 @@ contains
 
     ! Reset the time step counter
     call neko_case%output_controller%set_counter(neko_case%time)
+
+    ! Keep per-design-iteration output numbering anchored at 0.
+    ! output_controller%set_counter sets start_counter based on controller
+    ! executions (typically 1 at reset), so override it for this stream.
+    call neko_case%f_out%set_start_counter(0)
+    call neko_case%f_out%set_counter(-1)
 
     ! Restart the fields
     call neko_case%fluid%restart(neko_case%chkp)
@@ -312,6 +317,10 @@ contains
     if (adjoint_case%norm_output_enabled) then
        call adjoint_case%norm_output_ctrl%set_counter(adjoint_case%time)
     end if
+
+    ! Keep per-design-iteration output numbering anchored at 0.
+    call adjoint_case%f_out%set_start_counter(0)
+    call adjoint_case%f_out%set_counter(-1)
 
     ! Reset the external BDF coefficients
     do i = 1, size(adjoint_case%time%dtlag)
@@ -526,9 +535,8 @@ contains
   !!   series file, one such series per design iteration.
   !! - `vtkhdf_file_t` builds its name from the base name plus its own
   !!   `start_counter`-based suffix, so this yields e.g.
-  !!   `field_iter00003__0.vtkhdf` (note the doubled underscore - one from
-  !!   this tag, one from vtkhdf's own naming) plus a companion
-  !!   `field_iter00003__0.data/` directory it uses for external HDF5
+  !!   `field_iter00003_0.vtkhdf` plus a companion
+  !!   `field_iter00003_0.data/` directory it uses for external HDF5
   !!   datasets, one such pair per design iteration.
   !!
   !! @param[in] base_fname The pristine base filename, before any
@@ -539,11 +547,20 @@ contains
     character(len=*), intent(in) :: base_fname
     integer, intent(in) :: design_iteration
     character(len=1024) :: fname
+    character(len=80) :: suffix
     integer :: suffix_pos
     character(len=32) :: tag
 
+    call filename_suffix(base_fname, suffix)
     suffix_pos = filename_suffix_pos(base_fname)
-    write(tag, '(a,i5.5,a)') '_iter', design_iteration, '_'
+    write(tag, '(a,i5.5)') '_iter', design_iteration
+
+    ! Add extra underscore to the tag if the suffix is `fld` or `nek5000`, so that
+    ! the file's own per-write numeric identifier is visually separated from the
+    ! design-iteration tag.
+    if (trim(suffix) .eq. 'fld' .or. trim(suffix) .eq. 'nek5000') then
+       tag = trim(tag) // '_'
+    end if
 
     if (suffix_pos .eq. 0) then
        fname = trim(base_fname) // trim(tag)
