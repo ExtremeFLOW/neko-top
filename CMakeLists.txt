@@ -160,12 +160,9 @@ endif()
 
 find_package(HDF5 QUIET COMPONENTS Fortran)
 if (HDF5_FOUND AND NOT HDF5_IS_PARALLEL)
-    message(STATUS "Ignoring HDF5 without MPI support at "
-        "${HDF5_INCLUDE_DIRS}")
-    set(HDF5_FOUND FALSE)
-endif()
-
-if (HDF5_FOUND)
+    message(ERROR "Found HDF5 library is not built with parallel support. "
+        "Please install a parallel version of HDF5.")
+elseif (HDF5_FOUND)
     set(HAVE_HDF5 TRUE)
     add_compile_definitions(HAVE_HDF5=1)
 endif()
