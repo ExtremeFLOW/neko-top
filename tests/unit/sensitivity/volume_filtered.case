@@ -76,12 +76,12 @@
         ]
     },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
+            },
             "mapping": [
                 {
                     "type": "RAMP",
