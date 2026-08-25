@@ -565,7 +565,7 @@ contains
     if (.not. allocated(simulation%state_recover)) then
        call neko_error("State recovery not initialized.")
     end if
-    n_timesteps = simulation%state_recover%get_n_timesteps()
+    n_timesteps = simulation%n_timesteps
 
     ! this is a bit sketchy if dt is not a perfect multiple, to be looked at
     ! more closely!

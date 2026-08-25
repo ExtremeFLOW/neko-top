@@ -42,7 +42,7 @@ module state_recover
   !> Abstract base type for state recovery implementations.
   type, abstract, public :: state_recover_t
      private
-     !> number of time steps in the forward simulation
+     !> Number of states recorded by this recovery strategy.
      integer :: n_timesteps = 0
    contains
      procedure(state_recover_init), pass(this), public, deferred :: init
@@ -105,7 +105,7 @@ module state_recover
 
 contains
 
-  !> Get number of forward time steps.
+  !> Get the number of states recorded by this recovery strategy.
   !! @param[in] this State recovery instance.
   pure function state_recover_get_n_timesteps(this) result(n)
     class(state_recover_t), intent(in) :: this
@@ -114,15 +114,14 @@ contains
     n = this%n_timesteps
   end function state_recover_get_n_timesteps
 
-  !> Set number of forward time steps.
+  !> Set the number of states recorded by this recovery strategy.
   !! @param[inout] this State recovery instance.
-  !! @param[in] n Number of time steps.
+  !! @param[in] n Number of recorded states.
   subroutine state_recover_set_n_timesteps(this, n)
     class(state_recover_t), intent(inout) :: this
     integer, intent(in) :: n
 
     this%n_timesteps = n
   end subroutine state_recover_set_n_timesteps
-
 
 end module state_recover
