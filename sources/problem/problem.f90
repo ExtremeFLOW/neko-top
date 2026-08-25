@@ -523,7 +523,9 @@ contains
 
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
+    simulation%n_timesteps = 0
     do while (simulation%neko_case%time%t .lt. simulation%neko_case%time%end_time)
+       simulation%n_timesteps = simulation%n_timesteps + 1
        ! step forward
        call simulation_step(simulation%neko_case, dt_controller, loop_start)
        ! accumulate objective value
@@ -549,7 +551,7 @@ contains
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
     real(kind=rp) :: total_time
-    integer :: i, n_timesteps
+    integer :: i
     type(time_state_t) :: accumulation_time
 
     call dt_controller%init(simulation%neko_case%params)
@@ -565,15 +567,13 @@ contains
     if (.not. allocated(simulation%state_recover)) then
        call neko_error("State recovery not initialized.")
     end if
-    n_timesteps = simulation%n_timesteps
 
-    ! this is a bit sketchy if dt is not a perfect multiple, to be looked at
-    ! more closely!
-    total_time = simulation%neko_case%time%end_time
+    ! Total time of the forward simulation
+    total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
 
     call profiler_start_region("Adjoint simulation")
 
-    do i = n_timesteps, 1, -1
+    do i = simulation%n_timesteps, 1, -1
        ! restore primal field
        call simulation%state_recover%restore(simulation%neko_case, i)
        ! accumulate objective sensitivity
