@@ -4,7 +4,6 @@ module simulation_POD_state_recover
   use case, only: case_t
   use json_file_module, only: json_file
   use state_recover, only: state_recover_t
-  use time_state, only: time_state_t
   use utils, only: neko_error
   implicit none
   private
@@ -71,10 +70,10 @@ contains
     call POD_state_recover_unavailable()
   end subroutine POD_state_recover_save
 
-  subroutine POD_state_recover_restore(this, neko_case, time)
+  subroutine POD_state_recover_restore(this, neko_case, i)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
+    integer, intent(in) :: i
 
     call POD_state_recover_unavailable()
   end subroutine POD_state_recover_restore

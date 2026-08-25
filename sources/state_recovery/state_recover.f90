@@ -36,7 +36,6 @@
 module state_recover
   use case, only: case_t
   use json_file_module, only: json_file
-  use time_state, only: time_state_t
   implicit none
   private
 
@@ -95,12 +94,12 @@ module state_recover
      !> Restore forward state for adjoint.
      !! @param[inout] this State recovery instance.
      !! @param[inout] neko_case Case data structure.
-     !! @param[in] time Target time state.
-     subroutine state_recover_restore(this, neko_case, time)
-       import state_recover_t, case_t, time_state_t
+     !! @param[in] i Forward-state index to restore.
+     subroutine state_recover_restore(this, neko_case, i)
+       import state_recover_t, case_t
        class(state_recover_t), intent(inout) :: this
        class(case_t), target, intent(inout) :: neko_case
-       type(time_state_t), intent(in) :: time
+       integer, intent(in) :: i
      end subroutine state_recover_restore
   end interface
 

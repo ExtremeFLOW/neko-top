@@ -549,7 +549,6 @@ contains
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
     real(kind=rp) :: total_time
-    type(time_state_t) :: time
     integer :: i, n_timesteps
     type(time_state_t) :: accumulation_time
 
@@ -576,10 +575,7 @@ contains
 
     do i = n_timesteps, 1, -1
        ! restore primal field
-       time = simulation%neko_case%time
-       time%tstep = i
-       time%t = time%start_time + real(i, rp) * time%dt
-       call simulation%state_recover%restore(simulation%neko_case, time)
+       call simulation%state_recover%restore(simulation%neko_case, i)
        ! accumulate objective sensitivity
        accumulation_time = simulation%adjoint_case%time
        accumulation_time%t = total_time - simulation%adjoint_case%time%t

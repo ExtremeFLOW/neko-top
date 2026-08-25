@@ -5,7 +5,6 @@ module test_checkpoint_end_of_run_gating
   use simulation_m, only: simulation_t
   use simulation_checkpoint, only: simulation_checkpoint_t
   use simulation, only: simulation_init, simulation_step, simulation_finalize
-  use time_state, only: time_state_t
   use time_step_controller, only: time_step_controller_t
   use design, only: design_t
   use problem, only: problem_t
@@ -68,7 +67,6 @@ contains
     type(field_t), pointer :: p_ref, u_ref, v_ref, w_ref
     type(field_t), pointer :: scalar_ref, scalar
     type(field_t), pointer :: p, u, v, w
-    type(time_state_t) :: restore_time
 
     p => sim%neko_case%fluid%p
     u => sim%neko_case%fluid%u
@@ -80,9 +78,7 @@ contains
     v_ref => v_refs%get(tstep)
     w_ref => w_refs%get(tstep)
 
-    restore_time = sim%neko_case%time
-    restore_time%tstep = tstep
-    call chkp%restore(sim%neko_case, restore_time)
+    call chkp%restore(sim%neko_case, tstep)
 
     err_p = rmse(p_ref, p)
     err_u = rmse(u_ref, u)

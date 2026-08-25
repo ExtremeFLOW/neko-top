@@ -45,7 +45,6 @@ module simulation_m
   use scalars, only: scalars_t
   use fluid_pnpn, only: fluid_pnpn_t
   use time_step_controller, only: time_step_controller_t
-  use time_state, only: time_state_t
   use field_output, only: field_output_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
@@ -359,7 +358,6 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
-    type(time_state_t) :: time
     integer :: i
 
     call dt_controller%init(this%neko_case%params)
@@ -370,13 +368,11 @@ contains
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
     do i = this%n_timesteps, 1, -1
-       time = this%neko_case%time
-       time%tstep = i
        if (this%unsteady) then
           if (.not. allocated(this%state_recover)) then
              call neko_error("State recovery not initialized.")
           end if
-          call this%state_recover%restore(this%neko_case, time)
+          call this%state_recover%restore(this%neko_case, i)
        end if
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &

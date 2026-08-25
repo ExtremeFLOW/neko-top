@@ -38,7 +38,6 @@ module simulation_checkpoint
   use case, only: case_t
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
-  use time_state, only: time_state_t
   use chkp_output, only: chkp_output_t
   use field, only: field_t
   use field_list, only: field_list_t
@@ -398,28 +397,26 @@ contains
   !> Restore forward state for adjoint.
   !! @param[inout] this Checkpointing implementation.
   !! @param[inout] neko_case Case data structure.
-  !! @param[in] time Target time state.
-  subroutine checkpoint_restore(this, neko_case, time)
+  !! @param[in] i Forward-state index to restore.
+  subroutine checkpoint_restore(this, neko_case, i)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
+    integer, intent(in) :: i
     character(len=256) :: msg
-    integer :: tstep
 
     if (.not. this%enabled) return
 
     call profiler_start_region("Checkpoint restore")
 
-    tstep = time%tstep
-    if (tstep .lt. 1 .or. tstep .gt. this%get_n_timesteps()) then
-       write(msg, '(A,I0,A,I0,A)') "Requested timestep ", tstep, &
+    if (i .lt. 1 .or. i .gt. this%get_n_timesteps()) then
+       write(msg, '(A,I0,A,I0,A)') "Requested timestep ", i, &
             " is out of range [1, ", this%get_n_timesteps(), "]"
        call neko_error(trim(msg))
     end if
 
     select case (this%algorithm)
     case ("linear")
-       call checkpoint_restore_linear(this, neko_case, tstep)
+       call checkpoint_restore_linear(this, neko_case, i)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
