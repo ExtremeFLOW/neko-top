@@ -508,6 +508,7 @@ contains
   subroutine checkpoint_reset(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i, j
+    character(len=256) :: msg
 
     if (.not. this%enabled) return
 
@@ -521,6 +522,10 @@ contains
           if (this%state_storage(i, j)%is_allocated()) then
              call rzero(this%state_storage(i, j)%data, &
                   this%state_storage(i, j)%size)
+          else
+             write(msg, '(A,I0,A,I0,A)') "Checkpoint state storage (", i, &
+                  ", ", j, ") is not allocated during reset."
+             call neko_error(trim(msg))
           end if
        end do
     end do
