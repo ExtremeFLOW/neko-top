@@ -64,7 +64,7 @@
             "enable_output": true,
             "mma": {
                 "max_iter": 100,
-                "subsolver": "dpip",
+                "subsolver": "pdip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
