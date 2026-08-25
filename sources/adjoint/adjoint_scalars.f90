@@ -52,7 +52,7 @@ module adjoint_scalars
   use registry, only: neko_registry
   use checkpoint, only: chkp_t
   use krylov, only: ksp_t
-  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
+  use nekotop_logger, only: nekotop_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use user_intf, only: user_t
   use utils, only: neko_error
   use coefs, only : coef_t

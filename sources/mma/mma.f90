@@ -79,7 +79,7 @@ module mma
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
-  use logger, only: neko_log
+  use nekotop_logger, only: nekotop_log
   use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
   use scratch_registry, only: scratch_registry_t
 
@@ -482,51 +482,51 @@ contains
     if (present(bcknd)) this%bcknd = bcknd
     if (present(subsolver)) this%subsolver = subsolver
 
-    call neko_log%section('MMA Parameters')
+    call nekotop_log%section('MMA Parameters')
 
     write(log_msg, '(A10,1X,A)') 'backend   ', trim(this%bcknd)
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
     write(log_msg, '(A10,1X,A)') 'subsolver ', trim(this%subsolver)
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
 
     write(log_msg, '(A10,1X,I0)') 'n         ', this%n_global
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
     write(log_msg, '(A10,1X,I0)') 'm         ', this%m
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
     write(log_msg, '(A10,1X,I0)') 'max_iter  ', this%max_iter
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
 
     write(log_msg, '(A10,1X,E11.5)') 'epsimin   ', this%epsimin
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
 
     write(log_msg, '(A10,1X,E11.5)') 'asyinit   ', this%asyinit
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
     write(log_msg, '(A10,1X,E11.5)') 'asyincr   ', this%asyincr
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
     write(log_msg, '(A10,1X,E11.5)') 'asydecr   ', this%asydecr
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
     write(log_msg, '(A10,1X,E11.5)') 'a0        ', this%a0
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
     write(log_msg, '(A10,1X,E11.5)') 'movelimit ', this%move_limit
-    call neko_log%message(log_msg)
+    call nekotop_log%message(log_msg)
 
-    call neko_log%message('Parameters a')
+    call nekotop_log%message('Parameters a')
     do i = 1, this%m
        write(log_msg, '(3X,A,I2,A,E11.5)') 'a(', i, ') = ', this%a%x(i)
-       call neko_log%message(log_msg)
+       call nekotop_log%message(log_msg)
     end do
-    call neko_log%message('Parameters c')
+    call nekotop_log%message('Parameters c')
     do i = 1, this%m
        write(log_msg, '(3X,A,I2,A,E11.5)') 'c(', i, ') = ', this%c%x(i)
-       call neko_log%message(log_msg)
+       call nekotop_log%message(log_msg)
     end do
-    call neko_log%message('Parameters d')
+    call nekotop_log%message('Parameters d')
     do i = 1, this%m
        write(log_msg, '(3X,A,I2,A,E11.5)') 'd(', i, ') = ', this%d%x(i)
-       call neko_log%message(log_msg)
+       call nekotop_log%message(log_msg)
     end do
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
     ! The object is correctly initialized
     this%is_initialized = .true.

@@ -52,7 +52,7 @@ module adjoint_case
        json_get_or_lookup
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
-  use logger, only : neko_log
+  use nekotop_logger, only : nekotop_log
   use time_state, only : time_state_t
   use utils, only: neko_error
   use adjoint_scalar_convection_source_term, only: &
@@ -252,7 +252,7 @@ contains
     ! Setup initial conditions
     !
 
-    call neko_log%section("Adjoint initial condition")
+    call nekotop_log%section("Adjoint initial condition")
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
@@ -271,7 +271,7 @@ contains
             neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
     if (this%have_scalar) then
 
@@ -282,7 +282,7 @@ contains
           call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition', ic_json)
 
-          !call neko_log%section("Adjoint scalar initial condition ")
+          !call nekotop_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
              if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
@@ -306,7 +306,7 @@ contains
              !      this%usr%scalar_user_ic, neko_case%params)
           end if
 
-          ! call neko_log%end_section()
+          ! call nekotop_log%end_section()
        else
 
           ! Handle multiple scalars
@@ -429,7 +429,7 @@ contains
             'case.adjoint_fluid.output_value', real_val)
        call this%output_controller%add(this%f_out, real_val, string_val)
     else
-       call neko_log%error('Unknown output control type for the fluid: ' // &
+       call nekotop_log%error('Unknown output control type for the fluid: ' // &
             trim(string_val))
     end if
 

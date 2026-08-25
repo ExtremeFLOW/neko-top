@@ -57,7 +57,7 @@ module adjoint_scalar_scheme
   use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
   use facet_zone, only : facet_zone_t
   use time_scheme_controller, only : time_scheme_controller_t
-  use logger, only : neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
+  use nekotop_logger, only : nekotop_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use registry, only : neko_registry
   use json_utils, only : json_get, json_get_or_default, json_extract_item
   use json_module, only : json_file
@@ -286,7 +286,7 @@ contains
     call json_get_or_default(params_adjoint, 'name', this%name, &
          this%primal_name // '_adj')
 
-    call neko_log%section('Adjoint scalar')
+    call nekotop_log%section('Adjoint scalar')
     params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.type')
     call json_get(params_selected, 'solver.type', solver_type)
@@ -319,13 +319,13 @@ contains
 
 
     write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
     write(log_buf, '(A, A)') 'Name       : ', trim(this%name)
-    call neko_log%message(log_buf)
-    call neko_log%message('Ksp adjoint scalar : ('// trim(solver_type) // &
+    call nekotop_log%message(log_buf)
+    call nekotop_log%message('Ksp adjoint scalar : ('// trim(solver_type) // &
          ', ' // trim(solver_precon) // ')')
     write(log_buf, '(A,ES13.6)') ' `-abs tol :', solver_abstol
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
 
     this%Xh => this%u%Xh
     this%dm_Xh => this%u%dof
@@ -361,7 +361,7 @@ contains
     end if
 
     write(log_buf, '(A,L1)') 'LES        : ', this%variable_material_properties
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
 
     !
     ! Setup right-hand side field.
@@ -391,7 +391,7 @@ contains
          this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs, &
          solver_precon, precon_params)
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
   end subroutine adjoint_scalar_scheme_init
 
@@ -605,7 +605,7 @@ contains
 
        write(log_buf, '(A)') "Material properties must be set in the user " // &
             "file!"
-       call neko_log%message(log_buf)
+       call nekotop_log%message(log_buf)
        this%user_material_properties => user%material_properties
        call user%material_properties(this%name, this%material_properties, time)
     else
@@ -619,16 +619,16 @@ contains
        else if (params_primal%valid_path('Pe')) then
           write(log_buf, '(A)') 'Non-dimensional scalar material properties' //&
                ' input.'
-          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+          call nekotop_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
           write(log_buf, '(A)') 'Specific heat capacity will be set to 1,'
-          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+          call nekotop_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
           write(log_buf, '(A)') 'conductivity to 1/Pe. Assumes density is 1.'
-          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+          call nekotop_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
 
           ! Read Pe into lambda for further manipulation.
           call json_get(params_primal, 'Pe', const_lambda)
           write(log_buf, '(A,ES13.6)') 'Pe         :', const_lambda
-          call neko_log%message(log_buf)
+          call nekotop_log%message(log_buf)
 
           ! Set cp and rho to 1 since the setup is non-dimensional.
           const_cp = 1.0_rp
@@ -648,9 +648,9 @@ contains
        call field_cfill(this%cp, const_cp)
 
        write(log_buf, '(A,ES13.6)') 'lambda     :', const_lambda
-       call neko_log%message(log_buf)
+       call nekotop_log%message(log_buf)
        write(log_buf, '(A,ES13.6)') 'cp         :', const_cp
-       call neko_log%message(log_buf)
+       call nekotop_log%message(log_buf)
     end if
 
     ! Since cp is a field and we use the %x(1,1,1,1) of the

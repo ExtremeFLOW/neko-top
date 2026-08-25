@@ -50,7 +50,7 @@ module problem
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
-  use logger, only: neko_log
+  use nekotop_logger, only: nekotop_log
   use math, only: copy
   use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
@@ -322,7 +322,7 @@ contains
     integer :: n_objectives, i
     logical :: dealias
 
-    call neko_log%section("Reading objectives")
+    call nekotop_log%section("Reading objectives")
 
     ! Get the number of objectives.
     path = "optimization.objectives"
@@ -333,7 +333,7 @@ contains
        do i = 1, n_objectives
           call json_extract_item(parameters, path, i, objective_json)
           call json_get(objective_json, "type", type)
-          call neko_log%message(type)
+          call nekotop_log%message(type)
 
           call objective_factory(objective, objective_json, design, simulation)
           call this%add_objective(objective)
@@ -354,7 +354,7 @@ contains
        call this%add_objective(objective)
     end if
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
   end subroutine problem_read_objectives
 
@@ -371,7 +371,7 @@ contains
     type(json_file) :: constraint_json
     integer :: n_constraints, i
 
-    call neko_log%section("Reading constraints")
+    call nekotop_log%section("Reading constraints")
 
     ! Get the number of constraints.
     path = "optimization.constraints"
@@ -383,14 +383,14 @@ contains
        do i = 1, n_constraints
           call json_extract_item(parameters, path, i, constraint_json)
           call json_get(constraint_json, "type", type)
-          call neko_log%message(type)
+          call nekotop_log%message(type)
 
           call constraint_factory(constraint, constraint_json, design, simulation)
           call this%add_constraint(constraint)
        end do
     end if
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
   end subroutine problem_read_constraints
 

@@ -43,7 +43,7 @@ module optimizer
   use problem, only: problem_t
   use design, only: design_t
   use num_types, only: rp
-  use logger, only: neko_log, LOG_SIZE
+  use nekotop_logger, only: nekotop_log, LOG_SIZE
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX
   use utils, only: neko_error, filename_suffix, read_duration
@@ -436,7 +436,7 @@ contains
     call this%write(this%current_iteration, problem)
     call design%write(this%current_iteration)
 
-    call neko_log%section('Optimization Loop')
+    call nekotop_log%section('Optimization Loop')
 
     do while (this%current_iteration .lt. this%max_iterations)
        this%current_iteration = this%current_iteration + 1
@@ -490,7 +490,7 @@ contains
     call this%validate(problem, design)
     call this%print_status(stop_flag, this%current_iteration)
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
   end subroutine optimizer_run
 
@@ -516,11 +516,11 @@ contains
     case (0)
        write(msg, '(A,I0,A)') 'Optimizer converged successfully after ', &
             iter, ' iterations.'
-       call neko_log%message(msg)
+       call nekotop_log%message(msg)
     case (1)
        write(msg, '(A,I0,A)') 'Optimizer did not converge in ', &
             this%max_iterations, ' iterations.'
-       call neko_log%warning(msg)
+       call nekotop_log%warning(msg)
     case (2)
        write(msg, '(A,A,F8.2,A)') 'Optimizer stopped after reaching the ', &
             'maximum runtime of ', this%max_runtime, ' seconds.'
@@ -753,7 +753,7 @@ contains
     real(kind=rp) :: t_start, t_total
     logical :: exist
 
-    call neko_log%section('Optimizer checkpoint')
+    call nekotop_log%section('Optimizer checkpoint')
     t_start = MPI_Wtime()
 
     ! Set default behaviour
@@ -795,7 +795,7 @@ contains
             trim(file_path), trim(file_base), "_", iter, ".", trim(file_ext)
     end if
 
-    call neko_log%message('Save general optimizer components')
+    call nekotop_log%message('Save general optimizer components')
     select case (trim(file_ext))
     case ('h5', 'hdf5', 'hf5')
        call optimizer_save_checkpoint_hdf5(this, file_full, iter, overwrite)
@@ -804,15 +804,15 @@ contains
             trim(file_ext) // '"')
     end select
 
-    call neko_log%message('Saving components of ' // this%optimizer_type)
+    call nekotop_log%message('Saving components of ' // this%optimizer_type)
     call this%save_checkpoint_components(file_full, overwrite)
 
-    call neko_log%message('Save design checkpoint')
+    call nekotop_log%message('Save design checkpoint')
     call design%save_checkpoint(file_full, overwrite)
 
     t_total = MPI_Wtime() - t_start
     write(msg, '(A,F6.2)') "Checkpoint time: ", t_total
-    call neko_log%end_section(msg)
+    call nekotop_log%end_section(msg)
 
   end subroutine optimizer_save_checkpoint
 

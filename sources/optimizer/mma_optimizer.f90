@@ -51,7 +51,7 @@ module mma_optimizer
   use matrix, only: matrix_t
   use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
-  use logger, only: neko_log
+  use nekotop_logger, only: nekotop_log
   use vector_math, only: vector_cmult, vector_absval, vector_sub2, vector_glmax
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
@@ -160,12 +160,12 @@ contains
     character(len=32) :: extra_headers(3)
     class(constraint_t), allocatable :: dummy_con
 
-    call neko_log%section('Optimizer Initialization')
+    call nekotop_log%section('Optimizer Initialization')
 
     ! Check if the problem is unconstrained
     this%unconstrained_problem = problem%get_n_constraints() .eq. 0
     if (this%unconstrained_problem) then
-       call neko_log%message('Unconstrained problem detected. ' // &
+       call nekotop_log%message('Unconstrained problem detected. ' // &
             'Adding a dummy constraint to enable MMA optimization.')
 
        allocate(dummy_constraint_t::dummy_con)
@@ -205,7 +205,7 @@ contains
 
     call this%init_base('MMA', max_iterations)
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
   end subroutine mma_optimizer_init_from_components
 
