@@ -5,6 +5,7 @@ module test_checkpoint_restore_consistency
   use simulation_m, only: simulation_t
   use simulation_checkpoint, only: simulation_checkpoint_t
   use simulation, only: simulation_init, simulation_step, simulation_finalize
+  use time_state, only: time_state_t
   use time_step_controller, only: time_step_controller_t
   use design, only: design_t
   use problem, only: problem_t
@@ -67,6 +68,7 @@ contains
     real(kind=rp) :: err_p, err_u, err_v, err_w, err_scalar
     character(len=256) :: failing_scalar_name
     character(len=256) :: msg
+    type(time_state_t) :: restore_time
 
     call initialize_case_from_file('checkpoint.case', sim, des, prob)
 
@@ -85,7 +87,7 @@ contains
        n_scalars = 0
     end if
 
-    call chkp%init(sim%neko_case, 'linear', &
+    call chkp%init_from_components(sim%neko_case, 'linear', &
          n_saves_memory = checkpoint_saves_in_memory, &
          path = 'checkpoint_restore_consistency', &
          filename = 'checkpoint', &
@@ -117,7 +119,7 @@ contains
           call field_copy(scalar_snapshot, scalar)
        end do
 
-       call chkp%save(sim%neko_case)
+       call chkp%save(sim%neko_case, sim%neko_case%time)
     end do
 
     call simulation_finalize(sim%neko_case)
@@ -136,7 +138,9 @@ contains
     failing_scalar_name = ''
 
     do i = n_forward_steps, 1, -1
-       call chkp%restore(sim%neko_case, i)
+       restore_time = sim%neko_case%time
+       restore_time%tstep = i
+       call chkp%restore(sim%neko_case, restore_time)
 
        p_snapshot => p_fields%get(i)
        u_snapshot => u_fields%get(i)
