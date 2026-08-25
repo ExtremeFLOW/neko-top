@@ -176,7 +176,7 @@ contains
           end do
        end if
 
-       call chkp%save(sim%neko_case, sim%neko_case%time)
+       call chkp%save(sim%neko_case)
     end do
 
     call simulation_finalize(sim%neko_case)

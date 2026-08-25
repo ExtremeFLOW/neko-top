@@ -64,10 +64,9 @@ contains
     class(POD_state_recover_t), intent(inout) :: this
   end subroutine POD_state_recover_reset
 
-  subroutine POD_state_recover_save(this, neko_case, time)
+  subroutine POD_state_recover_save(this, neko_case)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
 
     call POD_state_recover_unavailable()
   end subroutine POD_state_recover_save

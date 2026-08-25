@@ -86,12 +86,10 @@ module state_recover
      !> Save forward state for recovery.
      !! @param[inout] this State recovery instance.
      !! @param[inout] neko_case Case data structure.
-     !! @param[in] time Current time state.
-     subroutine state_recover_save(this, neko_case, time)
-       import state_recover_t, case_t, time_state_t
+     subroutine state_recover_save(this, neko_case)
+       import state_recover_t, case_t
        class(state_recover_t), intent(inout) :: this
        class(case_t), intent(inout) :: neko_case
-       type(time_state_t), intent(in) :: time
      end subroutine state_recover_save
 
      !> Restore forward state for adjoint.

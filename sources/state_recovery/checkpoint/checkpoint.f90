@@ -373,18 +373,17 @@ contains
   !> Save forward state.
   !! @param[inout] this Checkpointing implementation.
   !! @param[inout] neko_case Case data structure.
-  !! @param[in] time Current time state.
-  subroutine checkpoint_save(this, neko_case, time)
+  subroutine checkpoint_save(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
 
     if (.not. this%enabled) return
 
     call profiler_start_region("Checkpoint save")
 
     ! Update the number of recorded timesteps
-    call this%set_n_timesteps(max(this%get_n_timesteps(), time%tstep))
+    call this%set_n_timesteps(max(this%get_n_timesteps(), &
+         neko_case%time%tstep))
 
     select case (this%algorithm)
     case ("linear")

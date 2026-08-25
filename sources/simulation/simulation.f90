@@ -344,7 +344,7 @@ contains
           if (.not. allocated(this%state_recover)) then
              call neko_error("State recovery not initialized.")
           end if
-          call this%state_recover%save(this%neko_case, this%neko_case%time)
+          call this%state_recover%save(this%neko_case)
        end if
     end do
     call profiler_end_region("Forward simulation")
