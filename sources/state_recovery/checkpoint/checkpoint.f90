@@ -382,8 +382,7 @@ contains
     call profiler_start_region("Checkpoint save")
 
     ! Update the number of recorded timesteps
-    call this%set_n_timesteps(max(this%get_n_timesteps(), &
-         neko_case%time%tstep))
+    call this%set_n_timesteps(this%get_n_timesteps() + 1)
 
     select case (this%algorithm)
     case ("linear")
