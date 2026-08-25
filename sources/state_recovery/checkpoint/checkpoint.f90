@@ -204,9 +204,11 @@ contains
   !! @param[inout] neko_case Case data structure.
   !! @param[in] algorithm Checkpointing algorithm identifier.
   !! @param[in] n_saves_memory Number of checkpoints in memory.
+  !! @param[in] path Output directory for checkpoint files.
   !! @param[in] filename Checkpoint base filename.
   !! @param[in] fmt Checkpoint file format.
   !! @param[in] keep_checkpoints Whether to keep checkpoint files on disk.
+  !! @param[inout] extra_fields Additional fields to include in checkpoints.
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
        n_saves_memory, path, filename, fmt, keep_checkpoints, extra_fields)
     class(simulation_checkpoint_t), intent(inout), target :: this
