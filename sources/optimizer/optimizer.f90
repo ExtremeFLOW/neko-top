@@ -431,6 +431,9 @@ contains
     end if
 
     ! Prepare the problem state before starting the optimization
+    if (present(simulation)) then
+       call simulation%set_design_iteration(this%current_iteration)
+    end if
     call this%initialize(problem, design, simulation)
 
     call this%write(this%current_iteration, problem)
@@ -450,6 +453,9 @@ contains
        ! Update the parameters in continuation scheduler
        call nekotop_continuation%update(this%current_iteration)
 
+       if (present(simulation)) then
+          call simulation%set_design_iteration(this%current_iteration)
+       end if
        converged = this%step(this%current_iteration, problem, design, &
             simulation)
 

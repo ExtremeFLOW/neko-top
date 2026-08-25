@@ -56,7 +56,7 @@ module neko_ext
   use neko_config, only : NEKO_BCKND_DEVICE
   use vector, only: vector_t
   use field, only: field_t
-  use utils, only: neko_error
+  use utils, only: neko_error, filename_suffix_pos
   use json_module, only : json_file
   use scalars, only: scalars_t
   use adjoint_scalars, only: adjoint_scalars_t
@@ -87,8 +87,16 @@ contains
   !> and scalar fields, and the simulation components.
   !>
   !> @param[inout] neko_case Case data structure.
-  subroutine reset(neko_case)
+  !> @param[in] design_iteration The current design iteration. Spliced into
+  !> `neko_case%f_out`'s filename so each design iteration's field output is
+  !> kept, rather than every iteration overwriting the same numbered files.
+  !> @param[in] output_base_fname `neko_case%f_out`'s pristine base filename,
+  !> as configured from the case file (i.e. before any design-iteration tag
+  !> has ever been spliced into it).
+  subroutine reset(neko_case, design_iteration, output_base_fname)
     type(case_t), intent(inout) :: neko_case
+    integer, intent(in) :: design_iteration
+    character(len=*), intent(in) :: output_base_fname
     real(kind=rp) :: t
     integer :: i
     character(len=:), allocatable :: string_val
@@ -119,6 +127,15 @@ contains
     do i = 1, size(neko_case%time%tlag)
        neko_case%time%tlag(i) = t - i*neko_case%time%dtlag(i)
     end do
+
+    ! Tag the field output filename with the design iteration, so this
+    ! iteration's forward field output does not overwrite the previous one.
+    ! Calling the base `generic_file_t%init` directly (rather than the
+    ! reallocating `file_t%init` wrapper) only touches the filename and
+    ! write counter, leaving the case-file-configured precision/layout/
+    ! subdivide/overwrite settings on the underlying `fld_file_t` untouched.
+    call neko_case%f_out%file_%file_type%init( &
+         trim(design_iteration_fname(output_base_fname, design_iteration)))
 
     ! Reset the time step counter
     call neko_case%output_controller%set_counter(neko_case%time)
@@ -239,9 +256,19 @@ contains
   !!
   !! @param[inout] adjoint_case Adjoint case data structure.
   !! @param[in] neko_case Primal case.
-  subroutine reset_adjoint(adjoint_case, neko_case)
+  !! @param[in] design_iteration The current design iteration. Spliced into
+  !! `adjoint_case%f_out`'s filename so each design iteration's adjoint
+  !! output is kept, rather than every iteration overwriting the same
+  !! numbered files.
+  !! @param[in] output_base_fname `adjoint_case%f_out`'s pristine base
+  !! filename, as configured from the case file (i.e. before any
+  !! design-iteration tag has ever been spliced into it).
+  subroutine reset_adjoint(adjoint_case, neko_case, design_iteration, &
+       output_base_fname)
     type(adjoint_case_t), intent(inout) :: adjoint_case
     type(case_t), intent(inout) :: neko_case
+    integer, intent(in) :: design_iteration
+    character(len=*), intent(in) :: output_base_fname
     real(kind=rp) :: t
     integer :: i
     character(len=:), allocatable :: string_val
@@ -272,6 +299,13 @@ contains
     do i = 1, size(adjoint_case%time%tlag)
        adjoint_case%time%tlag(i) = t - i*adjoint_case%time%dtlag(i)
     end do
+
+    ! Tag the field output filename with the design iteration, so this
+    ! iteration's adjoint field output does not overwrite the previous one.
+    ! See the equivalent call in `reset` for why the base
+    ! `generic_file_t%init` is called directly here.
+    call adjoint_case%f_out%file_%file_type%init( &
+         trim(design_iteration_fname(output_base_fname, design_iteration)))
 
     ! Reset the time step counter
     call adjoint_case%output_controller%set_counter(adjoint_case%time)
@@ -471,5 +505,53 @@ contains
     end if
 
   end subroutine get_scalar_indicies
+
+  ! ========================================================================= !
+  ! Private routines
+  ! ========================================================================= !
+
+  !> @brief Splice a design-iteration tag into a base output filename,
+  !! immediately before its suffix.
+  !!
+  !! @details E.g. `design_iteration_fname("field.fld", 3)` returns
+  !! `"field_iter00003_.fld"`. The trailing underscore keeps the file's own
+  !! per-write numeric identifier visually separated from the
+  !! design-iteration tag, but each `output_format` backend builds its
+  !! on-disk name from the resulting base name differently:
+  !! - `fld_file_t` (the default `output_format`) does not splice its
+  !!   counter into the suffix the way `generic_file_get_fname` does for
+  !!   other formats - it builds nek5000-style names from the base name
+  !!   instead, so this yields e.g. `field_iter00003_0.f00000`,
+  !!   `field_iter00003_0.f00001`, ... plus a `field_iter00003_0.nek5000`
+  !!   series file, one such series per design iteration.
+  !! - `vtkhdf_file_t` builds its name from the base name plus its own
+  !!   `start_counter`-based suffix, so this yields e.g.
+  !!   `field_iter00003__0.vtkhdf` (note the doubled underscore - one from
+  !!   this tag, one from vtkhdf's own naming) plus a companion
+  !!   `field_iter00003__0.data/` directory it uses for external HDF5
+  !!   datasets, one such pair per design iteration.
+  !!
+  !! @param[in] base_fname The pristine base filename, before any
+  !! design-iteration tag has been spliced into it.
+  !! @param[in] design_iteration The design iteration to tag it with.
+  !! @return The base filename with the design-iteration tag spliced in.
+  function design_iteration_fname(base_fname, design_iteration) result(fname)
+    character(len=*), intent(in) :: base_fname
+    integer, intent(in) :: design_iteration
+    character(len=1024) :: fname
+    integer :: suffix_pos
+    character(len=32) :: tag
+
+    suffix_pos = filename_suffix_pos(base_fname)
+    write(tag, '(a,i5.5,a)') '_iter', design_iteration, '_'
+
+    if (suffix_pos .eq. 0) then
+       fname = trim(base_fname) // trim(tag)
+    else
+       fname = base_fname(1:suffix_pos - 1) // trim(tag) // &
+            base_fname(suffix_pos:len_trim(base_fname))
+    end if
+
+  end function design_iteration_fname
 
 end module neko_ext
