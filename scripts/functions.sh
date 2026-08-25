@@ -18,6 +18,9 @@ function run {
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
 
+    # Neko-TOP logs to its own stream, next to the Neko log file.
+    nekotop_logfile=${logfile%.log}_nekotop.log
+
     # Check for recoverable errors in the error log
     if [ -s error.log ]; then
         grep "ERROR: Optimizer stopped after reaching the maximum runtime" \
@@ -47,7 +50,9 @@ function run {
     # Run the example
     printf "Executing Neko.\n" > ./output.log
     printf "See $logfile for the status output.\n"
+    printf "See $nekotop_logfile for the Neko-TOP status output.\n"
     export NEKO_LOG_FILE=$logfile
+    export NEKO_TOP_LOG_FILE=$nekotop_logfile
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
