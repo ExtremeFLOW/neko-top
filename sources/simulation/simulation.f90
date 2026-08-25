@@ -100,6 +100,18 @@ module simulation_m
      !> An output sampler for the adjoint problem.
      !! This should probably be an output controller at some point instead.
      type(field_output_t), public :: output_adjoint
+     !> Base output filename for Neko's own forward field output
+     !! (`neko_case%f_out`), captured before any design-iteration tag is
+     !! spliced into it, so that tag can be rebuilt fresh on every reset.
+     character(len=:), allocatable :: forward_field_base_fname
+     !> Base output filename for Neko's own adjoint field output
+     !! (`adjoint_case%f_out`), captured before any design-iteration tag is
+     !! spliced into it, so that tag can be rebuilt fresh on every reset.
+     character(len=:), allocatable :: adjoint_field_base_fname
+     !> The current design iteration. Used so that `reset` can keep Neko's
+     !! own field output (`neko_case%f_out` / `adjoint_case%f_out`) from
+     !! overwriting the previous design iteration's output.
+     integer :: current_design_iteration = 0
      !> Whether the simulation is steady or unsteady
      logical :: unsteady = .false.
 
@@ -126,6 +138,9 @@ module simulation_m
      !> Set simulation output counters.
      procedure, pass(this) :: set_output_counter => &
           simulation_set_output_counter
+     !> Set the current design iteration.
+     procedure, pass(this) :: set_design_iteration => &
+          simulation_set_design_iteration
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
      !> Write current state of the forward simulation to disk
@@ -156,6 +171,13 @@ contains
 
     ! initialize the adjoint
     call this%adjoint_case%init(this%neko_case)
+
+    ! Capture Neko's own field output filenames before any design-iteration
+    ! tag ever gets spliced into them (see `reset`/`neko_ext::reset`).
+    this%forward_field_base_fname = &
+         trim(this%neko_case%f_out%file_%get_base_fname())
+    this%adjoint_field_base_fname = &
+         trim(this%adjoint_case%f_out%file_%get_base_fname())
 
     ! Start the profiler
     call profiler_start
@@ -303,6 +325,13 @@ contains
     this%unsteady = .false.
     this%have_scalar = .false.
     this%n_timesteps = 0
+    this%current_design_iteration = 0
+    if (allocated(this%forward_field_base_fname)) then
+       deallocate(this%forward_field_base_fname)
+    end if
+    if (allocated(this%adjoint_field_base_fname)) then
+       deallocate(this%adjoint_field_base_fname)
+    end if
 
     ! Close global objects
     call neko_simcomps%free()
@@ -367,11 +396,26 @@ contains
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
 
-    call reset(this%neko_case)
-    call reset_adjoint(this%adjoint_case, this%neko_case)
+    call reset(this%neko_case, this%current_design_iteration, &
+         this%forward_field_base_fname)
+    call reset_adjoint(this%adjoint_case, this%neko_case, &
+         this%current_design_iteration, this%adjoint_field_base_fname)
     call this%checkpoint%reset()
 
   end subroutine simulation_reset
+
+  !> Set the current design iteration, so that the next `reset` tags Neko's
+  !! own field output (forward and adjoint) with it instead of overwriting
+  !! the previous design iteration's output.
+  !! @param this The simulation object.
+  !! @param iteration The current design iteration.
+  subroutine simulation_set_design_iteration(this, iteration)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: iteration
+
+    this%current_design_iteration = iteration
+
+  end subroutine simulation_set_design_iteration
 
   subroutine simulation_set_output_counter(this, idx)
     class(simulation_t), intent(inout) :: this
