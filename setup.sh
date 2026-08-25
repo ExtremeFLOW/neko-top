@@ -7,6 +7,7 @@ function help() {
     echo -e "Options:"
     echo -e "\t-h, --help        Show this help message and exit"
     echo -e "\t-t, --tests       Run the tests after the installation"
+    echo -e "\t    --test-neko   Run the Neko tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
@@ -71,15 +72,23 @@ while true; do
     # Purely long settings
     "--docs") DOCS="ON" && shift ;;             # Build the documentation
     "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
+    "--test-neko") NEKO_TEST="true" && shift ;; # Test Neko
 
     # End of options
     "--") shift && break ;;
     esac
 done
 
+# Set Dependent Variables
 [ "$CLEAN_NEKO" == true ] && CLEAN=true
 
-export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
+export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE NEKO_TEST
+
+# Check for valid settings
+
+if [[ "$TEST" == "ON" || "$NEKO_TEST" == "true" ]] && [ -z "$PFUNIT_DIR" ]; then
+    export PFUNIT_DIR="$EXTERNAL_DIR/pfunit"
+fi
 
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
@@ -116,11 +125,11 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Setting up external dependencies\n"
 
-check_system_dependencies                      # Check for system dependencies.
-find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
-find_adios2 $ADIOS2_DIR                        # Re-defines the ADIOS2_DIR variable.
-find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
-[ "$TEST" == "ON" ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
+check_system_dependencies           # Check for system dependencies.
+find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
+find_adios2 $ADIOS2_DIR             # Re-defines the ADIOS2_DIR variable.
+find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
+find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
 
 # Done setting up external dependencies
 # ============================================================================ #

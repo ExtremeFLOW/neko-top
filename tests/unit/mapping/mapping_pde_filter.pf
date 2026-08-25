@@ -398,6 +398,7 @@ contains
     call dof%free()
     call Xh%free()
     call msh%free()
+    call neko_scratch_registry%free()
 
   end subroutine test_pde_filter_linearity
 
@@ -427,6 +428,7 @@ contains
     call dof%free()
     call Xh%free()
     call msh%free()
+    call neko_scratch_registry%free()
 
   end subroutine test_pde_filter_adjoint
 
@@ -464,6 +466,7 @@ contains
     call dof%free()
     call Xh%free()
     call msh%free()
+    call neko_scratch_registry%free()
 
   end subroutine test_pde_filter_regression
 
