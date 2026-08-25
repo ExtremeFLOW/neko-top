@@ -49,7 +49,7 @@ module simulation_m
   use field_output, only: field_output_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
-  use utils, only: neko_warning, neko_error
+  use utils, only: neko_error
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
@@ -273,10 +273,8 @@ contains
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_create(this%state_recover, this%neko_case, &
             state_recovery_params)
-    else
-       if ("state_recovery" .in. parameters) then
-          call neko_warning("Ignoring state_recovery for steady simulation.")
-       end if
+    else if ("state_recovery" .in. parameters) then
+       call neko_error("state_recovery is only supported for unsteady simulations.")
     end if
 
 
@@ -342,7 +340,10 @@ contains
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       if (allocated(this%state_recover)) then
+       if (this%unsteady) then
+          if (.not. allocated(this%state_recover)) then
+             call neko_error("State recovery not initialized.")
+          end if
           call this%state_recover%save(this%neko_case, this%neko_case%time)
        end if
     end do
@@ -371,7 +372,10 @@ contains
     do i = this%n_timesteps, 1, -1
        time = this%neko_case%time
        time%tstep = i
-       if (allocated(this%state_recover)) then
+       if (this%unsteady) then
+          if (.not. allocated(this%state_recover)) then
+             call neko_error("State recovery not initialized.")
+          end if
           call this%state_recover%restore(this%neko_case, time)
        end if
 
@@ -392,7 +396,10 @@ contains
          this%forward_field_base_fname)
     call reset_adjoint(this%adjoint_case, this%neko_case, &
          this%current_design_iteration, this%adjoint_field_base_fname)
-    if (allocated(this%state_recover)) then
+    if (this%unsteady) then
+       if (.not. allocated(this%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
        call this%state_recover%reset()
     end if
 
