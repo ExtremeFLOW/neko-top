@@ -8,5 +8,4 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/state_recover_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint_linear.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover_stub.f90
 )

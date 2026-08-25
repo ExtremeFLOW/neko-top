@@ -18,11 +18,8 @@ top level of the case file:
 }
 ```
 
-Currently supported implementations are:
-
-- `checkpoint`: restart the forward problem from stored checkpoints
-- `pod`: stream forward snapshots to a Python POD driver and reconstruct the
-  state from a reduced basis
+The available implementation is `checkpoint`, which restarts the forward
+problem from stored checkpoints.
 
 ## Checkpoint state recovery
 

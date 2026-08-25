@@ -39,7 +39,6 @@ module state_recover_factory
   use json_utils, only: json_get_or_default
   use state_recover, only: state_recover_t
   use simulation_checkpoint, only: simulation_checkpoint_t
-  use simulation_POD_state_recover, only: POD_state_recover_t
   use utils, only: neko_error
   implicit none
   private
@@ -68,8 +67,6 @@ contains
     select case (trim(recover_type))
     case ("checkpoint", "simulation_checkpoint")
        allocate(simulation_checkpoint_t :: recover)
-    case ("pod", "POD", "pod_state_recover")
-       allocate(POD_state_recover_t :: recover)
     case default
        call neko_error("Unknown state recover type: " // trim(recover_type))
     end select
