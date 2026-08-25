@@ -35,7 +35,7 @@
 !> Contains the `adjoint_scalar_pnpn_t` type.
 
 module adjoint_scalar_pnpn
-  use comm, only: NEKO_COMM, pe_rank
+  use comm, only: NEKO_COMM
   use utils, only: neko_error
   use num_types, only: rp
   use, intrinsic :: iso_fortran_env, only: error_unit
@@ -482,24 +482,8 @@ contains
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
     ! character(len=LOG_SIZE) :: log_buf
     integer :: n
-    ! DEBUG (temporary, investigate-passive-scalar-dealias): are the BDF lag
-    ! arrays actually being populated? If both stay 0 the BDF coefficients
-    ! cannot cancel at steady state, leaving a spurious (b0/dt)*B*s_adj mass
-    ! term and hence s_adj proportional to dt (which is what we measure).
-    ! glsc2 is collective -> call on every rank, guard only the write.
-    real(kind=rp) :: d_s, d_l1, d_l2
 
     n = this%dm_Xh%size()
-
-    d_s = glsc2(this%s_adj%x, this%s_adj%x, n)
-    d_l1 = glsc2(this%s_adj_lag%lf(1)%x, this%s_adj_lag%lf(1)%x, n)
-    d_l2 = glsc2(this%s_adj_lag%lf(2)%x, this%s_adj_lag%lf(2)%x, n)
-    if (pe_rank .eq. 0) then
-       write(error_unit, '(A,E15.6,A,E15.6,A,E15.6)') &
-            'DEBUG adj_scalar_lag |s_adj|^2=', d_s, &
-            ' |lag1|^2=', d_l1, ' |lag2|^2=', d_l2
-       flush(error_unit)
-    end if
     ! TODO come back to this
     !write(log_buf,'(A,A,E15.7,A,E15.7,A,E15.7)') 'Adjoint scalar debug', &
     !   ' l2norm s_adj', glsc2(this%s_adj%x, this%s_adj%x, n), &
