@@ -90,7 +90,7 @@
             }
         ]
     },
-    "unsteady" : true,
+    "unsteady": true,
     "state_recovery": {
         "type": "checkpoint",
         "enabled": true,
