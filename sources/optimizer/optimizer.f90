@@ -457,11 +457,9 @@ contains
 
     do while (this%current_iteration .lt. this%max_iterations)
        this%current_iteration = this%current_iteration + 1
-       if (pe_rank .eq. 0) then
-          write(msg, '(A,I0,A)') 'Iteration ', this%current_iteration, ' of ', &
-               this%max_iterations
-          call nekotop_log%section(trim(msg))
-       end if
+       write(msg, '(A,I0,A,I0)') 'Iteration ', this%current_iteration, &
+            ' of ', this%max_iterations
+       call nekotop_log%section(trim(msg))
 
        call profiler_start_region('Optimizer iteration')
        iteration_time = MPI_Wtime()
@@ -873,6 +871,7 @@ contains
     character(len=*), intent(in), optional :: format
     character(len=256) :: file_full
     character(len=12) :: suffix
+    character(len=LOG_SIZE) :: msg
 
     call nekotop_log%section('Optimizer loading checkpoint')
 

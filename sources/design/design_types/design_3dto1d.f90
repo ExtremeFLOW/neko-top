@@ -53,6 +53,7 @@ module design_3dto1d
   use json_module, only: json_file
   use json_utils, only: json_get
   use utils, only: neko_error
+  use nekotop_logger, only: nekotop_log, LOG_SIZE
 
   use vector, only: vector_t
   use math, only: copy
@@ -174,6 +175,7 @@ contains
     real(rp) :: L_total
     integer, allocatable :: recvcounts(:), displs(:)
     integer :: root_rank = 0
+    character(len=LOG_SIZE) :: msg
 
     L_total = 2.0_rp
 
@@ -236,7 +238,8 @@ contains
        close(iunit)
 
        deallocate(global_values, global_x, recvcounts, displs)
-       call nekotop_log%message("Design written to " // trim(filename))
+       write(msg, '(A,A)') 'Design written to ', trim(filename)
+       call nekotop_log%message(msg)
     else
        deallocate(global_values, recvcounts, displs)
     endif
