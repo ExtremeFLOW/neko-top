@@ -55,7 +55,7 @@ module adjoint_fluid_scheme_incompressible
   use bc_list, only: bc_list_t
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
   use operators, only: cfl
-  use nekotop_logger, only: nekotop_log, LOG_SIZE, NEKO_LOG_VERBOSE
+  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use registry, only: neko_registry
   use json_utils, only: json_get, json_get_or_default
   use json_module, only: json_file
@@ -200,11 +200,11 @@ contains
     ! First section of fluid log
     !
 
-    call nekotop_log%section('Adjoint fluid')
+    call neko_log%section('Adjoint fluid')
     write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A, A)') 'Name       : ', trim(this%name)
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     ! Assign velocity fields
     call neko_registry%add_field(this%dm_Xh, 'u_adj')
@@ -264,28 +264,28 @@ contains
     else
        write(log_buf, '(A, I3)') 'Poly order : ', lx-1
     end if
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     this%glb_n_points = int(this%msh%glb_nelv, i8)*int(this%Xh%lxyz, i8)
     this%glb_unique_points = int(glsum(this%c_Xh%mult, this%dm_Xh%size()), i8)
 
     write(log_buf, '(A, I0)') 'GLL points : ', this%glb_n_points
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A, I0)') 'Unique pts.: ', this%glb_unique_points
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     call json_get(params, 'case.numerics.dealias', logical_val)
     write(log_buf, '(A, L1)') 'Dealias    : ', logical_val
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     call json_get_or_default(params, 'case.output_boundary', logical_val, &
          .false.)
     write(log_buf, '(A, L1)') 'Save bdry  : ', logical_val
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     call json_get_or_default(params, "case.fluid.full_stress_formulation", &
          logical_val, .false.)
     write(log_buf, '(A, L1)') 'Full stress: ', logical_val
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     !
     ! Setup right-hand side fields.
@@ -315,7 +315,7 @@ contains
     ! so for now we'll just initialize two of them...
     !  Initialize velocity solver
     if (kspv_init) then
-       call nekotop_log%section("Adjoint Velocity solver")
+       call neko_log%section("Adjoint Velocity solver")
 
        json_key = json_key_fallback(params, &
             'case.adjoint_fluid.velocity_solver.max_iterations', &
@@ -347,17 +347,17 @@ contains
             'case.fluid.velocity_solver.monitor')
        call json_get_or_default(params, json_key, logical_val, .false.)
 
-       call nekotop_log%message('Type       : (' // trim(string_val1) // &
+       call neko_log%message('Type       : (' // trim(string_val1) // &
             ', ' // trim(string_val2) // ')')
 
        write(log_buf, '(A,ES13.6)') 'Abs tol    :', real_val
-       call nekotop_log%message(log_buf)
+       call neko_log%message(log_buf)
        call this%solver_factory(this%ksp_vel, this%dm_Xh%size(), &
             string_val1, integer_val, real_val, logical_val)
        call this%precon_factory_(this%pc_vel, this%ksp_vel, &
             this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_vel, &
             string_val2, json_subdict)
-       call nekotop_log%end_section()
+       call neko_log%end_section()
     end if
 
     ! Strict convergence for the velocity solver
@@ -381,7 +381,7 @@ contains
          this%c_Xh, user, this%name)
     call this%source_term%add(params, 'case.adjoint_fluid.source_term')
 
-    call nekotop_log%end_section()
+    call neko_log%end_section()
 
   end subroutine adjoint_fluid_scheme_init_base
 
@@ -719,7 +719,7 @@ contains
 
        write(log_buf, '(A)') "Material properties must be set in the user&
        & file!"
-       call nekotop_log%message(log_buf)
+       call neko_log%message(log_buf)
        this%user_material_properties => user%material_properties
 
        call user%material_properties(this%name, &
@@ -738,17 +738,17 @@ contains
           ! Non-dimensional case
           write(log_buf, '(A)') 'Non-dimensional fluid material properties &
           & input.'
-          call nekotop_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
           write(log_buf, '(A)') 'Density will be set to 1, dynamic viscosity to&
           & 1/Re.'
-          call nekotop_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
 
           ! Read Re into mu for further manipulation.
           call json_get(params, 'case.fluid.Re', const_mu)
           write(log_buf, '(A)') 'Read non-dimensional material properties'
-          call nekotop_log%message(log_buf)
+          call neko_log%message(log_buf)
           write(log_buf, '(A,ES13.6)') 'Re         :', const_mu
-          call nekotop_log%message(log_buf)
+          call neko_log%message(log_buf)
 
           ! Set rho to 1 since the setup is non-dimensional.
           const_rho = 1.0_rp
@@ -770,9 +770,9 @@ contains
 
 
        write(log_buf, '(A,ES13.6)') 'rho        :', const_rho
-       call nekotop_log%message(log_buf)
+       call neko_log%message(log_buf)
        write(log_buf, '(A,ES13.6)') 'mu         :', const_mu
-       call nekotop_log%message(log_buf)
+       call neko_log%message(log_buf)
     end if
 
     ! Since mu, rho is a field_t, and we use the %x(1,1,1,1)

@@ -279,7 +279,7 @@ contains
     call this%pc_filt%update()
 
     ! write it all out
-    call nekotop_log%message('Filter')
+    call nekotop_log%section('PDE Filter Mapping')
 
     write(log_buf, '(A,A,A)') 'Iterations:   ',&
          'Start residual:     ', 'Final residual:'
@@ -287,6 +287,7 @@ contains
     write(log_buf, '(I11,3x, E15.7,5x, E15.7)') this%ksp_results%iter, &
          this%ksp_results%res_start, this%ksp_results%res_final
     call nekotop_log%message(log_buf)
+    call nekotop_log%end_section()
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -379,7 +380,7 @@ contains
     call this%pc_filt%update()
 
     ! write it all out
-    call nekotop_log%message('Filter')
+    call nekotop_log%section('PDE Filter Backward Mapping')
 
     write(log_buf, '(A,A,A)') 'Iterations:   ',&
          'Start residual:     ', 'Final residual:'
@@ -387,6 +388,7 @@ contains
     write(log_buf, '(I11,3x, E15.7,5x, E15.7)') this%ksp_results%iter, &
          this%ksp_results%res_start, this%ksp_results%res_final
     call nekotop_log%message(log_buf)
+    call nekotop_log%end_section()
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

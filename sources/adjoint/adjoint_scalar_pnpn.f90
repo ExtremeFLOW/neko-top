@@ -59,7 +59,7 @@ module adjoint_scalar_pnpn
   use projection, only : projection_t
   use math, only : glsc2, col2, add2s2
   use field_math, only : field_col3
-  use nekotop_logger, only : nekotop_log, LOG_SIZE, NEKO_LOG_DEBUG
+  use logger, only : neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use advection_adjoint, only : advection_adjoint_t, advection_adjoint_factory
   use profiler, only : profiler_start_region, profiler_end_region
   use json_utils, only : json_get, json_get_or_default, json_extract_item
@@ -475,11 +475,11 @@ contains
     !   ' l2norm s_adj', glsc2(this%s_adj%x, this%s_adj%x, n), &
     !   ' slag1', glsc2(this%s_adj_lag%lf(1)%x, this%s_adj_lag%lf(1)%x, n), &
     !   ' slag2', glsc2(this%s_adj_lag%lf(2)%x, this%s_adj_lag%lf(2)%x, n)
-    !call nekotop_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
+    !call neko_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
     !write(log_buf,'(A,A,E15.7,A,E15.7)') 'Adjoint scalar debug2', &
     !   ' l2norm abx1', glsc2(this%abx1%x, this%abx1%x, n), &
     !   ' abx2', glsc2(this%abx2%x, this%abx2%x, n)
-    !call nekotop_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
+    !call neko_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
   end subroutine print_debug
 
   !> Initialize boundary conditions

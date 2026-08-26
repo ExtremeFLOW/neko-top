@@ -39,7 +39,7 @@ module develop
   use case, only: case_t
   use global_interpolation, only: global_interpolation_t
   use json_utils, only: json_get_or_default
-  use nekotop_logger, only: nekotop_log, LOG_SIZE
+  use logger, only: neko_log, LOG_SIZE
   use num_types, only: rp
   use tuple, only: tuple4_i4_t
   use utils, only: neko_error
@@ -330,7 +330,7 @@ contains
     write (log_buf, '(a,f15.7)') &
          "Outlet area-weighted average temperature deviation: ", &
          temperature_mean
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     call interpolator%free()
 

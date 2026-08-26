@@ -38,7 +38,7 @@ module adjoint_fluid_pnpn
   use coefs, only: coef_t
   use symmetry, only: symmetry_t
   use registry, only: neko_registry
-  use nekotop_logger, only: nekotop_log, LOG_SIZE, NEKO_LOG_DEBUG
+  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use num_types, only: rp
   use krylov, only: ksp_monitor_t
   use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
@@ -418,7 +418,7 @@ contains
     end if
 
     ! Setup pressure solver
-    call nekotop_log%section("Pressure solver")
+    call neko_log%section("Pressure solver")
 
     call json_get_or_default(params, &
          'case.fluid.pressure_solver.max_iterations', &
@@ -432,20 +432,20 @@ contains
          abs_tol)
     call json_get_or_default(params, 'case.fluid.pressure_solver.monitor', &
          monitor, .false.)
-    call nekotop_log%message('Type       : ('// trim(solver_type) // &
+    call neko_log%message('Type       : ('// trim(solver_type) // &
          ', ' // trim(precon_type) // ')')
     write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     call this%solver_factory(this%ksp_prs, this%dm_Xh%size(), &
          solver_type, solver_maxiter, abs_tol, monitor)
     call this%precon_factory_(this%pc_prs, this%ksp_prs, &
          this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, &
          precon_type, precon_params)
-    call nekotop_log%end_section()
+    call neko_log%end_section()
 
     ! Initialize the advection factory
-    call nekotop_log%section("Advection factory")
+    call neko_log%section("Advection factory")
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
     call json_get(params, 'case.numerics', numerics_params)
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
@@ -466,7 +466,7 @@ contains
     this%chkp%abz2 => this%abz2
     call this%chkp%add_lag(this%ulag, this%vlag, this%wlag)
 
-    call nekotop_log%end_section()
+    call neko_log%end_section()
 
     ! ------------------------------------------------------------------------ !
     ! Handling the rescaling and baseflow
@@ -1232,35 +1232,35 @@ contains
     class(bc_t), pointer :: bci
     character(len=LOG_SIZE) :: log_buf
 
-    call nekotop_log%section("Adjoint boundary conditions")
+    call neko_log%section("Adjoint boundary conditions")
     write(log_buf, '(A)') &
          'Marking using integer keys in boundary_adjoint0.f00000'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') 'Condition-value pairs: '
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  no_slip                         = 1'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  velocity_value                  = 2'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  outflow, normal_outflow (+dong) = 3'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  symmetry                        = 4'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  user_velocity_pointwise         = 5'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  periodic                        = 6'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  user_velocity                   = 7'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  user_pressure                   = 8'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  shear_stress                    = 9'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  wall_modelling                  = 10'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A)') '  blasius_profile                 = 11'
-    call nekotop_log%message(log_buf)
-    call nekotop_log%end_section()
+    call neko_log%message(log_buf)
+    call neko_log%end_section()
 
     call neko_scratch_registry%request_field(bdry_field, temp_index, .true.)
 
@@ -1539,21 +1539,21 @@ contains
     end if
 
     ! Log the results
-    !call nekotop_log%section('Power Iterations', lvl = NEKO_LOG_DEBUG)
-    call nekotop_log%section('Power Iterations')
+    !call neko_log%section('Power Iterations', lvl = NEKO_LOG_DEBUG)
+    call neko_log%section('Power Iterations')
 
     write (log_message, '(A7,E20.14)') 'Norm: ', norm_l2
-    call nekotop_log%message(log_message, lvl = NEKO_LOG_DEBUG)
+    call neko_log%message(log_message, lvl = NEKO_LOG_DEBUG)
     write (log_message, '(A7,E20.14)') 'Scaling: ', scaling_factor
-    call nekotop_log%message(log_message, lvl = NEKO_LOG_DEBUG)
+    call neko_log%message(log_message, lvl = NEKO_LOG_DEBUG)
 
     ! Save to file
     call data_line%init(2)
     data_line%x = [norm_l2, scaling_factor]
     call this%file_output%write(data_line, t)
 
-    !call nekotop_log%end_section('Power Iterations', lvl = NEKO_LOG_DEBUG)
-    call nekotop_log%end_section('Power Iterations')
+    !call neko_log%end_section('Power Iterations', lvl = NEKO_LOG_DEBUG)
+    call neko_log%end_section('Power Iterations')
   end subroutine power_iterations_compute
 
 end module adjoint_fluid_pnpn
