@@ -32,13 +32,17 @@ add_pfunit_ctest(mapping_pde_filter
 # Set test properties
 set_tests_properties(mapping_finite_difference PROPERTIES
     LABELS "unit;mapping"
-    ENVIRONMENT "NEKO_LOG_FILE=mapping_finite_difference.log"
+    ENVIRONMENT
+        "NEKO_LOG_FILE=mapping_finite_difference.log;\
+NEKO_TOP_LOG_FILE=mapping_finite_difference_nekotop.log"
     TIMEOUT 120
 )
 
 set_tests_properties(mapping_pde_filter PROPERTIES
     LABELS "unit;mapping"
-    ENVIRONMENT "NEKO_LOG_FILE=mapping_pde_filter.log"
+    ENVIRONMENT
+        "NEKO_LOG_FILE=mapping_pde_filter.log;\
+NEKO_TOP_LOG_FILE=mapping_pde_filter_nekotop.log"
     TIMEOUT 120
 )
 

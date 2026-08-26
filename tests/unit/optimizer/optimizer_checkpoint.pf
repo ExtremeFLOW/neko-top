@@ -10,6 +10,7 @@ module optimizer_checkpoint
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
   use neko, only: neko_init, neko_finalize
+  use nekotop_logger, only: nekotop_log
   use neko_top, only: neko_top_register_types
   use vector, only: vector_t
   use vector_math, only: vector_glsubnorm
@@ -38,6 +39,7 @@ contains
     initialized_lock = .true.
 
     call neko_init()
+    call nekotop_log%init(env_prefix = "NEKO_TOP")
     call neko_top_register_types()
 
   end subroutine setUp
@@ -53,6 +55,7 @@ contains
     if (.not. initialized_lock) return
     initialized_lock = .false.
 
+    call nekotop_log%free()
     call neko_finalize()
 
   end subroutine finalize_test

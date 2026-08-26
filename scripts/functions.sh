@@ -30,7 +30,7 @@ function run {
         echo "" > error.log
     fi
 
-    if [ -f "$logfile" ]; then
+    if [ -f "$logfile" ] || [ -f "$nekotop_logfile" ]; then
         # Move old log files to folder with counter padded to 2 digits
 
         old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)

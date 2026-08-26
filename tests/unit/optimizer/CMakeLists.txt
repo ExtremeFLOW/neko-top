@@ -77,7 +77,9 @@ add_pfunit_ctest(optimizer_checkpoint
 # Set test properties
 set_tests_properties(optimizer_checkpoint PROPERTIES
     LABELS "unit;optimizer;hdf5"
-    ENVIRONMENT "NEKO_LOG_FILE=optimizer_checkpoint.log"
+    ENVIRONMENT
+        "NEKO_LOG_FILE=optimizer_checkpoint.log;\
+NEKO_TOP_LOG_FILE=optimizer_checkpoint_nekotop.log"
     TIMEOUT 300
 )
 

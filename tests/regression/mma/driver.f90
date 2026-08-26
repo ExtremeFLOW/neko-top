@@ -16,6 +16,7 @@ program usrneko
 
   use design_3dto1d , only: design_3dto1d_t
   use neko, only: neko_init, neko_finalize, neko_solve
+  use nekotop_logger, only: nekotop_log
   use case, only: case_t
   use field, only: field_t
   use num_types, only: rp
@@ -92,6 +93,7 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
   call neko_init(neko_case)
+  call nekotop_log%init(env_prefix = "NEKO_TOP")
   call neko_field%init(neko_case%msh, neko_case%fluid%Xh, "neko_field")
   nloc = neko_field%dof%size()
 
@@ -219,6 +221,7 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
+  call nekotop_log%free()
   call neko_finalize(neko_case)
   call initdesign%free()
   call all_objectives%free()
