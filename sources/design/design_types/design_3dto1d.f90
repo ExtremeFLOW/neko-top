@@ -236,7 +236,7 @@ contains
        close(iunit)
 
        deallocate(global_values, global_x, recvcounts, displs)
-       print *, "Design written to ", trim(filename)
+       call nekotop_log%message("Design written to " // trim(filename))
     else
        deallocate(global_values, recvcounts, displs)
     endif

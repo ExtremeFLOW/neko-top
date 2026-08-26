@@ -39,7 +39,7 @@ module simulation_adjoint
   use num_types, only: rp, dp
   use time_scheme_controller, only: time_scheme_controller_t
   use file, only: file_t
-  use nekotop_logger, only: LOG_SIZE, nekotop_log
+  use logger, only: LOG_SIZE, neko_log
   use profiler, only: profiler_start_region, profiler_end_region
   use json_utils, only: json_get_or_default
   use time_state, only : time_state_t
@@ -65,25 +65,25 @@ contains
     character(len=LOG_SIZE) :: log_buf
 
     ! Write the initial logging message
-    call nekotop_log%section('Adjoint Starting simulation')
+    call neko_log%section('Adjoint Starting simulation')
     write(log_buf, '(A, E15.7,A,E15.7,A)') &
          'T  : [', C%time%t, ',', C%time%end_time, ']'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     if (.not. dt_controller%is_variable_dt) then
        write(log_buf, '(A, E15.7)') 'dt :  ', C%time%dt
     else
        write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%cfl_trg
     end if
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     ! Call stats, samplers and user-init before time loop
-    call nekotop_log%section('Postprocessing')
+    call neko_log%section('Postprocessing')
     call C%output_controller%execute(C%time)
     call simulation_adjoint_norm_output(C, C%time)
 
     call C%case%user%initialize(C%time)
-    call nekotop_log%end_section()
-    call nekotop_log%newline()
+    call neko_log%end_section()
+    call neko_log%newline()
 
   end subroutine simulation_adjoint_init
 
@@ -104,7 +104,7 @@ contains
     ! Finalize the user modules
     call C%case%user%finalize(C%time)
 
-    call nekotop_log%end_section('Normal end.')
+    call neko_log%end_section('Normal end.')
 
   end subroutine simulation_adjoint_finalize
 
@@ -145,34 +145,34 @@ contains
     end if
     call C%time%status()
 
-    call nekotop_log%begin()
+    call neko_log%begin()
 
     write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', C%time%dt
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
     ! Scalar step
     ! (Note that for the adjoint we should the adjoint_scalars first)
     if (allocated(C%adjoint_scalars)) then
        start_time = MPI_WTIME()
-       call nekotop_log%section('Adjoint scalar')
+       call neko_log%section('Adjoint scalar')
        call C%adjoint_scalars%step(C%time, &
             C%case%fluid%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7)') &
             'Scalar step time:      ', end_time-start_time
-       call nekotop_log%end_section(log_buf)
+       call neko_log%end_section(log_buf)
     end if
 
     ! Fluid step
-    call nekotop_log%section('Adjoint fluid')
+    call neko_log%section('Adjoint fluid')
     call C%fluid_adj%step(C%time, dt_controller)
     end_time = MPI_WTIME()
     write(log_buf, '(A,E15.7)') &
          'Fluid step time (s):   ', end_time-start_time
-    call nekotop_log%end_section(log_buf)
+    call neko_log%end_section(log_buf)
 
     ! Postprocessing
-    call nekotop_log%section('Postprocessing')
+    call neko_log%section('Postprocessing')
 
     ! Correct the time so the output fields are the same as the primal
     if (present(final_time)) then
@@ -183,21 +183,21 @@ contains
     call C%output_controller%execute(C%time)
     call simulation_adjoint_norm_output(C, C%time)
 
-    call nekotop_log%end_section()
+    call neko_log%end_section()
 
     ! End the step and print summary
     end_time = MPI_WTIME()
-    call nekotop_log%section('Step summary')
+    call neko_log%section('Step summary')
     write(log_buf, '(A,I8,A,E15.7)') &
          'Total time for step ', C%time%tstep, ' (s): ', &
          end_time - tstep_start_time
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A,E15.7)') &
          'Total elapsed time (s):           ', end_time-tstep_loop_start_time
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
-    call nekotop_log%end_section()
-    call nekotop_log%end()
+    call neko_log%end_section()
+    call neko_log%end()
     call profiler_end_region
 
 
@@ -268,12 +268,12 @@ contains
     end if
 
     C%time%t = real(C%case%fluid%chkp%restart_time(), kind=rp)
-    call nekotop_log%section('Restarting from checkpoint')
+    call neko_log%section('Restarting from checkpoint')
     write(log_buf, '(A,A)') 'File :   ', trim(restart_file)
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
     write(log_buf, '(A,E15.7)') 'Time : ', C%time%t
-    call nekotop_log%message(log_buf)
-    call nekotop_log%end_section()
+    call neko_log%message(log_buf)
+    call neko_log%end_section()
 
     call C%output_controller%set_counter(C%time)
     if (C%norm_output_enabled) then
@@ -338,7 +338,7 @@ contains
     call chkpf%init(C%case%output_directory // 'joblimit' // trim(format_str))
     call chkpf%write(C%case%fluid%chkp, t)
     write(log_buf, '(A)') '! saving checkpoint >>>'
-    call nekotop_log%message(log_buf)
+    call neko_log%message(log_buf)
 
   end subroutine simulation_adjoint_joblimit_chkp
 
