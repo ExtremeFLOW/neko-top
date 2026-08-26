@@ -198,7 +198,6 @@ contains
 
     ! append to RHS with scaling and mask volume
     call field_add2s2(fs, work, this%obj_scale / this%mask_volume)
-
     call neko_scratch_registry%relinquish_field(temp_indices)
 
 

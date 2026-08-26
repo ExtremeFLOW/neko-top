@@ -246,13 +246,7 @@ contains
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           ! Sum contributions from adjoining elements at shared dofs before
-          ! normalizing -- coef%B (unlike coef%Binv) is per-element/local
-          ! and never gather-scattered, so dividing by it directly here
-          ! (as this branch previously did) silently drops the neighbouring
-          ! element's contribution at every inter-element dof. Matches the
-          ! map -> gs_h%op(ADD) -> col2(Binv) pattern already used for the
-          ! (non-adjoint) dealiased scalar convection term, see
-          ! src/math/bcknd/cpu/convect_scalar.f90.
+          ! normalizing.
           call this%coef%gs_h%op(work, GS_OP_ADD)
           call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
@@ -273,13 +267,7 @@ contains
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           ! Sum contributions from adjoining elements at shared dofs before
-          ! normalizing -- coef%B (unlike coef%Binv) is per-element/local
-          ! and never gather-scattered, so dividing by it directly here
-          ! (as this branch previously did) silently drops the neighbouring
-          ! element's contribution at every inter-element dof. Matches the
-          ! map -> gs_h%op(ADD) -> col2(Binv) pattern already used for the
-          ! (non-adjoint) dealiased scalar convection term, see
-          ! src/math/bcknd/cpu/convect_scalar.f90.
+          ! normalizing.
           call this%coef%gs_h%op(work, GS_OP_ADD)
           call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
@@ -300,13 +288,7 @@ contains
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           ! Sum contributions from adjoining elements at shared dofs before
-          ! normalizing -- coef%B (unlike coef%Binv) is per-element/local
-          ! and never gather-scattered, so dividing by it directly here
-          ! (as this branch previously did) silently drops the neighbouring
-          ! element's contribution at every inter-element dof. Matches the
-          ! map -> gs_h%op(ADD) -> col2(Binv) pattern already used for the
-          ! (non-adjoint) dealiased scalar convection term, see
-          ! src/math/bcknd/cpu/convect_scalar.f90.
+          ! normalizing.
           call this%coef%gs_h%op(work, GS_OP_ADD)
           call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
