@@ -49,21 +49,6 @@ add_custom_target(optimizer_checkpoint_prepare
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
 )
 
-# Clear old log and temporary files before running the test
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
-    COMMENT "Cleaning up old log and temporary files"
-    COMMAND ${CMAKE_COMMAND} -E rm -f
-        ${CMAKE_CURRENT_BINARY_DIR}/optimizer_checkpoint.h5
-        ${CMAKE_CURRENT_BINARY_DIR}/optimizer_checkpoint.log
-    COMMAND ${CMAKE_COMMAND} -E touch
-        ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-add_custom_target(optimizer_checkpoint_cleanup
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
-)
-
 # ============================================================================ #
 # Define the test itself
 
@@ -85,9 +70,38 @@ NEKO_TOP_LOG_FILE=optimizer_checkpoint_nekotop.log"
 
 # Add dependencies to ensure preparation is done before the test runs
 add_dependencies(optimizer_checkpoint
-    optimizer_checkpoint_cleanup
     optimizer_checkpoint_prepare
     optimizer_checkpoint_case
+)
+
+# Clear old log and temporary files before running the test. This is a CTest
+# fixture, not a build-time custom command: a build-time step only runs once
+# per configure (its OUTPUT file makes it look up to date on every later
+# rebuild), so it would not clean up state left behind by the *previous test
+# run* -- which is exactly when cleanup is needed, e.g. so that a repeat
+# `ctest -R optimizer_checkpoint` in an existing build directory does not
+# see leftover checkpoint files and abort with `save_checkpoint`'s
+# already-contains-group ERROR STOP.
+add_test(NAME optimizer_checkpoint_cleanup
+    COMMAND ${CMAKE_COMMAND} -E rm -f
+        ${CMAKE_CURRENT_BINARY_DIR}/optimizer_checkpoint.h5
+        ${CMAKE_CURRENT_BINARY_DIR}/optimizer_checkpoint.log
+        ${CMAKE_CURRENT_BINARY_DIR}/optimization_data.csv
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+set_tests_properties(optimizer_checkpoint_cleanup PROPERTIES
+    FIXTURES_SETUP optimizer_checkpoint_fixture
+)
+add_test(NAME optimizer_checkpoint_cleanup_checkpoints
+    COMMAND ${CMAKE_COMMAND} -E rm -rf
+        ${CMAKE_CURRENT_BINARY_DIR}/checkpoints
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+set_tests_properties(optimizer_checkpoint_cleanup_checkpoints PROPERTIES
+    FIXTURES_SETUP optimizer_checkpoint_fixture
+)
+set_tests_properties(optimizer_checkpoint PROPERTIES
+    FIXTURES_REQUIRED optimizer_checkpoint_fixture
 )
 
 # Disable treating unused-variable as error for pfunit tests

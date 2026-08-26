@@ -52,6 +52,7 @@ module optimizer
   use json_utils, only: json_get_or_default
   use comm, only: pe_rank, MPI_REAL_PRECISION, NEKO_COMM
   use continuation_scheduler, only: nekotop_continuation
+  use math, only: Neko_EPS
 
   implicit none
   private
@@ -66,9 +67,11 @@ module optimizer
      !> The current iteration number
      integer, private :: current_iteration = 0
      !> The smallest change in design variables.
-     real(kind=rp), private :: stop_design_change = -1.0_rp
+     real(kind=rp), private :: stop_design_change = NEKO_EPS
      !> The maximum observed design change.
      real(kind=rp), public :: max_design_change = 0.0_rp
+     !> The L2 norm of the design change.
+     real(kind=rp), public :: norm2_design_change = 0.0_rp
 
      ! ----------------------------------------------------------------------- !
      ! Restart related members
@@ -344,6 +347,11 @@ contains
     this%log_extra_size = 0
     this%log_include_constraints = .true.
 
+    ! Most files have no "free" method, must be done manually here
+    this%log_file%header = ''
+    this%log_file%header_is_written = .false.
+    call this%log_file%set_overwrite(.false.)
+
   end subroutine optimizer_free_base
 
   !> Read settings from JSON parameters file.
@@ -358,7 +366,7 @@ contains
     call json_get_or_default(solver_params, 'max_runtime', read_str, "")
     call read_duration(read_str, this%max_runtime)
     call json_get_or_default(solver_params, 'stop_design_change', &
-         this%stop_design_change, -1.0_rp)
+         this%stop_design_change, NEKO_EPS)
 
     call json_get_or_default(solver_params, 'restart_file', read_str, &
          this%checkpoint_file)
@@ -431,9 +439,17 @@ contains
     end if
 
     ! Prepare the problem state before starting the optimization
+    if (present(simulation)) then
+       call simulation%set_design_iteration(this%current_iteration)
+    end if
     call this%initialize(problem, design, simulation)
 
-    call this%write(this%current_iteration, problem)
+    ! Log the initial state of the problem.
+    if (this%current_iteration .eq. 0) then
+       call this%write(this%current_iteration, problem)
+    end if
+
+    ! Save the current design state.
     call design%write(this%current_iteration)
 
     call nekotop_log%section('Optimization Loop')
@@ -450,6 +466,9 @@ contains
        ! Update the parameters in continuation scheduler
        call nekotop_continuation%update(this%current_iteration)
 
+       if (present(simulation)) then
+          call simulation%set_design_iteration(this%current_iteration)
+       end if
        converged = this%step(this%current_iteration, problem, design, &
             simulation)
 
@@ -522,9 +541,9 @@ contains
             this%max_iterations, ' iterations.'
        call nekotop_log%warning(msg)
     case (2)
-       write(msg, '(A,A,F8.2,A)') 'Optimizer stopped after reaching the ', &
-            'maximum runtime of ', this%max_runtime, ' seconds.'
-       call neko_error(trim(msg))
+       write(msg, '(A,A,F8.2,A)') 'Optimizer stopped, design change ', &
+            'below threshold of: ', this%stop_design_change, '.'
+       call neko_log%warning(msg)
     case (3)
        write(msg, '(A)') 'Optimizer stopped due to runtime limit.'
        call neko_error(msg)
@@ -578,6 +597,8 @@ contains
   !! @param[in] extra_headers Header labels for extra log entries.
   !! @param[in] include_constraints Include constraints in the log.
   !! @param[in] filename Output filename for the log.
+  !! @note An optimizer at iteration 0 overwrites the target log file and
+  !! writes a fresh header. Otherwise, logging appends to the existing file.
   subroutine optimizer_init_log(this, problem, extra_headers, &
        include_constraints, filename)
     class(optimizer_t), intent(inout) :: this
@@ -599,7 +620,7 @@ contains
     this%log_extra_size = 0
     if (present(extra_headers)) this%log_extra_size = size(extra_headers)
 
-    total_size = 1 + base_size + this%log_extra_size + 1 + n_cont
+    total_size = 1 + base_size + this%log_extra_size + 2 + n_cont
     call this%log_data%init(total_size)
 
     if (present(filename)) then
@@ -621,7 +642,7 @@ contains
        end do
     end if
 
-    header = trim(header) // ', max_design_change'
+    header = trim(header) // ', max_design_change, norm2_design_change'
 
     ! continuation parameters
     do i = 1, n_cont
@@ -647,6 +668,16 @@ contains
 
     if (.not. this%log_initialized) return
 
+    ! Iteration 0 starts a new log; later iterations append to the existing
+    ! log without writing its header again.
+    if (this%current_iteration .eq. 0) then
+       call this%log_file%set_overwrite(.true.)
+       this%log_file%header_is_written = .false.
+    else
+       call this%log_file%set_overwrite(.false.)
+       this%log_file%header_is_written = .true.
+    end if
+
     ! Number of continuation parameters
     n_cont = nekotop_continuation%get_n_params()
 
@@ -668,9 +699,10 @@ contains
     ! Save maximum design change
     offset = offset + this%log_extra_size
     this%log_data%x(offset:offset + 1 - 1) = this%max_design_change
+    this%log_data%x(offset + 1:offset + 2 - 1) = this%norm2_design_change
 
     ! Continuation parameter values
-    offset = offset + 1
+    offset = offset + 2
     do i = 1, n_cont
        this%log_data%x(offset + i) = &
             nekotop_continuation%params(i)%target

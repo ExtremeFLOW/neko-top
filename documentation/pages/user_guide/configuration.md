@@ -51,7 +51,7 @@ with MMA-specific settings under `optimization.solver.mma`.
 | `asydecr`    | Asymptote decrease factor.                              | Real, `> 0`           | `0.65`                                             |
 | `move_limit` | Per-iteration move cap around current design variables. | Real                  | `0.2`                                              |
 | `backend`    | MMA execution backend.                                  | `"cpu"` or `"device"` | `"cpu"` (or `"device"` when `NEKO_BCKND_DEVICE=1`) |
-| `subsolver`  | Interior-point variant used in MMA subproblems.         | `"dip"` or `"dpip"`   | `"dip"`                                            |
+| `subsolver`  | Interior-point variant used in MMA subproblems.         | `"dip"` or `"pdip"`   | `"dip"`                                            |
 | `xmin`       | Global lower bound applied to all design variables.     | Real                  | `0.0`                                              |
 | `xmax`       | Global upper bound applied to all design variables.     | Real                  | `1.0`                                              |
 | `a0`         | MMA scalar coefficient \f$a_0\f$.                       | Real                  | `1.0`                                              |
@@ -62,7 +62,7 @@ with MMA-specific settings under `optimization.solver.mma`.
 | `auto_scale` | Enable adaptive scaling of constraints each iteration.  | `.true.` or `.false.` | `.false.`                                          |
 
 #### MMA configuration options
-- `subsolver` selects the interior-point variant used inside MMA (`dip`/`dpip`).
+- `subsolver` selects the interior-point variant used inside MMA (`dip`/`pdip`).
 - `backend` selects whether MMA update/KKT operations run on CPU or device
   routines.
 
