@@ -202,6 +202,7 @@ contains
          trim(mode_name(mode)), ' phase=', trim(phase_name(phase)), &
          ' step=', int(step), ' t=', real(time, kind=real64)
     call ctrl_dbg_print(this, msg)
+    ! MPI_COMM_WORLD intentionally crosses from the Neko group to Python.
     call MPI_Send(state_i, size(state_i), MPI_INTEGER4, this%peer_root, &
          CTRL_TAG_STATE_INT, MPI_COMM_WORLD, ierr)
     call MPI_Send(time, 1, MPI_REAL8, this%peer_root, &
@@ -227,6 +228,7 @@ contains
 
     if (rank == 0) then
        call ctrl_dbg_print(this, 'ctrl_recieve: rank0 waiting on MPI cmd')
+       ! Only the Neko root receives from Python; the reply is broadcast below.
        call MPI_Recv(cmd_i, size(cmd_i), MPI_INTEGER4, this%peer_root, &
             CTRL_TAG_CMD, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
        mode_i = cmd_i(1)

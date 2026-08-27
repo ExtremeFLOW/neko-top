@@ -65,6 +65,12 @@ def get_peer_root() -> int:
 
 
 def make_local_comm(world: MPI.Comm) -> MPI.Comm:
+    """Create this application's communicator in an ADIOS2-enabled MPMD run.
+
+    This matches Neko's first MPI_COMM_WORLD split when Neko is compiled with
+    ADIOS2. A non-ADIOS2 Neko build duplicates MPI_COMM_WORLD before splitting,
+    so its Python peer must make that matching Dup call first.
+    """
     comm_color = get_comm_color()
     if comm_color is None:
         return world.Dup()

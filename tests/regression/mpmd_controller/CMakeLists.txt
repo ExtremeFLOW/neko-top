@@ -28,6 +28,7 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${NEKO_TOP_MOD_DIR} CACHE PATH
 find_program(MPMD_PYTHON_EXECUTABLE NAMES python3 python)
 
 if(MPMD_PYTHON_EXECUTABLE)
+    # This local-only regression requires mpi4py and is not run by CI.
     add_test(NAME mpmd_controller_build
         COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}
             --target reg_mpmd_controller_bin

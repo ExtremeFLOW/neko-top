@@ -109,6 +109,9 @@ function mpmd_launch_shared() {
     launcher=$(mpmd_selected_launcher) || return 1
     startup_delay=${NEKO_STARTUP_DELAY:-0}
 
+    # The launcher assigns MPMD roles; it does not split communicators. Neko
+    # and the Python peer must perform matching MPI collectives after startup.
+    # Python ranks are placed first, so the first Neko world rank is py_ranks.
     printf -v py_cmd \
         'cd %q && exec /usr/bin/env NEKO_COMM_ID=1 NEKO_CTRL_PEER_ROOT=%q ' \
         "${abs_case_dir}" "${py_ranks}"
