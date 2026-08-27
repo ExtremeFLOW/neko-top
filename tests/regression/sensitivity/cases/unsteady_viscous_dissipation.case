@@ -84,7 +84,8 @@
         ]
     },
     "unsteady": true,
-    "checkpoints": {
+    "state_recovery": {
+        "type": "checkpoint",
         "enabled": true,
         "n_memory": 20
     },

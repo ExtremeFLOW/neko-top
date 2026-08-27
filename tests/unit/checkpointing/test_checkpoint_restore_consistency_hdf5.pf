@@ -85,7 +85,7 @@ contains
        n_scalars = 0
     end if
 
-    call chkp%init(sim%neko_case, 'linear', &
+    call chkp%init_from_components(sim%neko_case, 'linear', &
          n_saves_memory = checkpoint_saves_in_memory, &
          path = 'checkpoint_restore_consistency_hdf5', &
          filename = 'checkpoint', &
