@@ -492,22 +492,23 @@ function write_mpmd_runtime_env() {
 }
 
 function validate_neko_adios2() {
-    local config_header
+    local neko_makefile
 
     if [ -z "${NEKO_DIR:-}" ]; then
         error "Cannot validate ADIOS2 support: NEKO_DIR is not set."
         return 1
     fi
 
-    config_header="${NEKO_DIR}/config.h"
-    if [ ! -f "${config_header}" ]; then
-        error "Cannot validate ADIOS2 support: Neko config.h was not found."
-        error "\t${config_header}"
+    # Neko records enabled optional backends in its generated Makefile, not config.h.
+    neko_makefile="${NEKO_DIR}/src/Makefile"
+    if [ ! -f "${neko_makefile}" ]; then
+        error "Cannot validate ADIOS2 support: Neko build Makefile was not found."
+        error "\t${neko_makefile}"
         return 1
     fi
 
-    if ! grep -Eq '^[[:space:]]*#define[[:space:]]+HAVE_ADIOS2([[:space:]]|$)' \
-        "${config_header}"
+    if ! grep -Eq '^[[:space:]]*io/nek_adios2\.lo([[:space:]]|$)' \
+        "${neko_makefile}"
     then
         error "Neko was not built with ADIOS2 support."
         error "Rebuild Neko after setting ADIOS2_DIR."

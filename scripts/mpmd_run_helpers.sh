@@ -103,12 +103,13 @@ function mpmd_validate_python_runtime() {
 }
 
 function mpmd_validate_neko_adios2() {
-    local config_header
+    local neko_makefile
 
-    config_header="${NEKO_DIR:-}/config.h"
-    if [ ! -f "${config_header}" ] ||
-        ! grep -Eq '^[[:space:]]*#define[[:space:]]+HAVE_ADIOS2([[:space:]]|$)' \
-            "${config_header}"
+    # Neko records enabled optional backends in its generated Makefile, not config.h.
+    neko_makefile="${NEKO_DIR:-}/src/Makefile"
+    if [ ! -f "${neko_makefile}" ] ||
+        ! grep -Eq '^[[:space:]]*io/nek_adios2\.lo([[:space:]]|$)' \
+            "${neko_makefile}"
     then
         echo "Error: Neko was not built with ADIOS2 support." >&2
         echo "Rebuild Neko after setting ADIOS2_DIR." >&2
