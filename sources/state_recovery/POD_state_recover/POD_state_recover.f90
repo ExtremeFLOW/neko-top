@@ -61,7 +61,7 @@ module simulation_POD_state_recover
        MODE_IDLE, MODE_FORWARD, MODE_ADJOINT, MODE_STOP, &
        PHASE_INIT, PHASE_FWD_RUNNING, PHASE_FWD_DONE, &
        PHASE_ADJ_RUNNING, PHASE_ADJ_DONE
-  use, intrinsic :: iso_c_binding, only: c_int, c_double
+  use, intrinsic :: iso_fortran_env, only: int32, real64
 
   implicit none
   private
@@ -428,7 +428,7 @@ contains
     call this%ctrl%init()
 
     ! Fire an init tick (python might miss it; harmless)
-    call this%ctrl%send(MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)
+    call this%ctrl%send(MODE_IDLE, PHASE_INIT, 0_int32, 0.0_real64)
     call this%set_n_timesteps(0)
 
   end subroutine POD_state_recover_init_from_components
@@ -441,8 +441,8 @@ contains
     integer :: i
 
     if (this%ctrl%inited) then
-       call this%ctrl%send(MODE_STOP, PHASE_ADJ_DONE, 0_c_int, &
-            0.0_c_double)
+       call this%ctrl%send(MODE_STOP, PHASE_ADJ_DONE, 0_int32, &
+            0.0_real64)
     end if
 
     if (allocated(this%u_modes)) then
@@ -493,8 +493,8 @@ contains
 
     ! If we were in adjoint previously, emit ADJ_DONE once on reset
     if (this%ctrl%inited .and. this%adjoint_started) then
-       call this%ctrl%send(MODE_ADJOINT, PHASE_ADJ_DONE, 0_c_int, &
-            0.0_c_double)
+       call this%ctrl%send(MODE_ADJOINT, PHASE_ADJ_DONE, 0_int32, &
+            0.0_real64)
     end if
 
     this%have_received_modes = .false.
@@ -563,8 +563,8 @@ contains
 
     if (this%ctrl%inited) then
        call this%ctrl%send(MODE_FORWARD, PHASE_FWD_RUNNING, &
-            int(this%pod_tstep, c_int), &
-            real(neko_case%time%t - neko_case%time%start_time, c_double))
+            int(this%pod_tstep, int32), &
+            real(neko_case%time%t - neko_case%time%start_time, real64))
     end if
 
     call POD_state_recover_stream_fields(this, neko_case)
@@ -603,7 +603,7 @@ contains
     ! Emit ADJ_RUNNING only once (avoid flooding SST)
     if (this%ctrl%inited .and. .not. this%adj_running_sent) then
        call this%ctrl%send(MODE_ADJOINT, PHASE_ADJ_RUNNING, &
-            int(time%tstep, c_int), real(time%t, c_double))
+            int(time%tstep, int32), real(time%t, real64))
        this%adj_running_sent = .true.
     end if
 
@@ -626,13 +626,13 @@ contains
     class(POD_state_recover_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
     integer :: i, ierr, n_lines, nrows, ncols, n
-    integer(c_int) :: mode_cmd, phase_cmd
+    integer(int32) :: mode_cmd, phase_cmd
 
     call profiler_start_region("POD recieve modes")
 
     if (this%ctrl%inited) then
       call this%ctrl%send(MODE_FORWARD, PHASE_FWD_DONE, &
-           int(time%tstep, c_int), real(time%t, c_double))
+           int(time%tstep, int32), real(time%t, real64))
 
       mode_cmd  = MODE_FORWARD
       phase_cmd = PHASE_FWD_DONE
