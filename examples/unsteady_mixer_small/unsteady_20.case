@@ -198,15 +198,15 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "weight": 10.8336275609
+                "weight": 10.9888250294
             },
             {
                 "type": "viscous_dissipation",
-                "weight": 1.19703784706
+                "weight": 1.1343089706
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 45.10107562188
+                "weight": 53.4034868334
             }
         ]
     }

@@ -199,15 +199,15 @@
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
                 "start_time": 4.0,
-                "weight": 10.8336275609
+                "weight": 17.0203615626
             },
             {
                 "type": "viscous_dissipation",
-                "weight": 1.19703784706
+                "weight": 1.0333348346
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 45.10107562188
+                "weight": 4.0102088269
             }
         ]
     }
