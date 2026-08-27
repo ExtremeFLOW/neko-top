@@ -1,9 +1,17 @@
 #!/bin/bash
 
-# Generic helpers for coupled Neko/Python MPMD launches. This includes
-# additional flags to be passed;
-# PYTHON_BIN     The directory where python is installed
-# NEKO_LAUNCHER  The mpmd launcher, options are mpirun or srun
+# Generic helpers for coupled Neko/Python ADIOS2 MPMD launches.
+#
+# This layer locates and validates the runtime recorded by setup.sh, then runs
+# a mixed Python/Neko job through mpirun or srun --multi-prog. Cluster-specific
+# placement remains separate so that it can build on this portable path.
+
+_mpmd_helper_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+if [ -f "${_mpmd_helper_dir}/mpmd_slurm_helpers.sh" ]; then
+    # shellcheck disable=SC1091
+    source "${_mpmd_helper_dir}/mpmd_slurm_helpers.sh"
+fi
+unset _mpmd_helper_dir
 
 # Find which python should be used
 function mpmd_python_exe() {
@@ -25,30 +33,127 @@ function mpmd_python_exe() {
     command -v python3 2>/dev/null || command -v python 2>/dev/null
 }
 
-# Make sure the python being used contains mpi4py
-function mpmd_validate_mpi4py() {
+function mpmd_find_repo_root() {
+    local start_dir=$1
+    local root_dir
+
+    root_dir=$(realpath "${start_dir}")
+    while [ ! -d "${root_dir}/sources" ] && [ "${root_dir}" != "/" ]; do
+        root_dir="$(dirname "${root_dir}")"
+    done
+
+    if [ ! -d "${root_dir}/sources" ]; then
+        echo "Error: could not locate repo root from ${start_dir}" >&2
+        return 1
+    fi
+
+    printf '%s\n' "${root_dir}"
+}
+
+function mpmd_runtime_env_file() {
+    local root_dir=$1
+    local repo_root
+
+    repo_root=$(mpmd_find_repo_root "${root_dir}") || return 1
+    printf '%s\n' "${repo_root}/build/mpmd_runtime.env"
+}
+
+function mpmd_source_runtime_env() {
+    local root_dir=$1
+    local runtime_env
+
+    runtime_env=$(mpmd_runtime_env_file "${root_dir}") || return 1
+    if [ ! -f "${runtime_env}" ]; then
+        echo "Error: MPMD runtime env not found: ${runtime_env}" >&2
+        echo "Run setup.sh after activating the target Python environment." >&2
+        return 1
+    fi
+
+    # shellcheck disable=SC1090
+    source "${runtime_env}"
+    export MPMD_RUNTIME_ENV_FILE="${runtime_env}"
+}
+
+function mpmd_validate_python_runtime() {
+    local root_dir=$1
+    local repo_root
+    local validator
     local pyexe
+
+    repo_root=$(mpmd_find_repo_root "${root_dir}") || return 1
+    validator="${repo_root}/scripts/python/validate_mpmd_runtime.py"
+    if [ ! -f "${validator}" ]; then
+        echo "Error: Python runtime validator not found: ${validator}" >&2
+        return 1
+    fi
 
     pyexe=$(mpmd_python_exe) || {
         echo "Error: could not find python3 or python in PATH." >&2
         return 1
     }
 
-    if ! "${pyexe}" -c 'from mpi4py import MPI; print(MPI.Get_version())'
-    then
-        echo "Error: mpi4py is not usable with ${pyexe}." >&2
+    if ! "${pyexe}" "${validator}"; then
+        echo "Error: the active Python runtime is not valid." >&2
+        echo "Python: ${pyexe}" >&2
+        echo "Runtime env: ${MPMD_RUNTIME_ENV_FILE:-<unset>}" >&2
         return 1
     fi
 
     export PYTHON_BIN="${pyexe}"
 }
 
-# Select between mpirun or srun
+function mpmd_validate_neko_adios2() {
+    local config_header
+
+    config_header="${NEKO_DIR:-}/config.h"
+    if [ ! -f "${config_header}" ] ||
+        ! grep -Eq '^[[:space:]]*#define[[:space:]]+HAVE_ADIOS2([[:space:]]|$)' \
+            "${config_header}"
+    then
+        echo "Error: Neko was not built with ADIOS2 support." >&2
+        echo "Rebuild Neko after setting ADIOS2_DIR." >&2
+        return 1
+    fi
+}
+
+function mpmd_prepare_python_runtime() {
+    local root_dir=$1
+
+    mpmd_source_runtime_env "${root_dir}" || return 1
+    mpmd_validate_python_runtime "${root_dir}" || return 1
+    mpmd_validate_neko_adios2
+}
+
+function mpmd_ensure_python_runtime() {
+    local root_dir=${1:-${MAIN_DIR:-.}}
+
+    mpmd_prepare_python_runtime "${root_dir}"
+}
+
+function mpmd_ensure_adios2_python() {
+    mpmd_ensure_python_runtime "$@"
+}
+
+function mpmd_startup_delay() {
+    if [ -n "${NEKO_STARTUP_DELAY:-}" ]; then
+        printf '%s\n' "${NEKO_STARTUP_DELAY}"
+        return 0
+    fi
+
+    printf '%s\n' "${MPMD_NEKO_STARTUP_DELAY:-20}"
+}
+
 function mpmd_selected_launcher() {
     local requested=${NEKO_LAUNCHER:-auto}
 
     case "${requested}" in
         auto)
+            if [ -n "${SLURM_JOB_ID:-}" ] && command -v srun >/dev/null 2>&1
+            then
+                printf 'srun\n'
+                return 0
+            fi
+
             if command -v mpirun >/dev/null 2>&1; then
                 printf 'mpirun\n'
                 return 0
@@ -62,20 +167,41 @@ function mpmd_selected_launcher() {
             echo "Error: neither mpirun nor srun was found in PATH." >&2
             return 1
             ;;
-        mpirun|srun)
+        srun|mpirun)
             if ! command -v "${requested}" >/dev/null 2>&1; then
-                echo "Error: ${requested} was requested via NEKO_LAUNCHER" >&2
-                echo "but is not available in PATH." >&2
+                echo "Error: ${requested} was requested via" >&2
+                echo "NEKO_LAUNCHER but is not available in PATH." >&2
                 return 1
             fi
 
             printf '%s\n' "${requested}"
+            return 0
             ;;
         *)
-            echo "Error: NEKO_LAUNCHER must be one of: auto, mpirun, srun." >&2
+            echo "Error: NEKO_LAUNCHER must be one of:" >&2
+            echo "auto, srun, mpirun." >&2
             return 1
             ;;
     esac
+}
+
+function mpmd_print_runtime_env() {
+    echo "Using Python:       $(mpmd_python_exe 2>/dev/null || echo \
+'<not found>')"
+    echo "Using mpicc:        $(command -v mpicc 2>/dev/null || echo \
+'<not found>')"
+    echo "Using mpirun:       $(command -v mpirun 2>/dev/null || echo \
+'<not found>')"
+    echo "Using srun:         $(command -v srun 2>/dev/null || echo \
+'<not found>')"
+    echo "NEKO_LAUNCHER:      ${NEKO_LAUNCHER:-auto}"
+    echo "Selected launcher:  $(mpmd_selected_launcher 2>/dev/null || echo \
+'<unavailable>')"
+    echo "Python runtime env: ${MPMD_RUNTIME_ENV_FILE:-<unset>}"
+    echo "ADIOS2_PATH:        ${ADIOS2_PATH:-<unset>}"
+    echo "PYTHONPATH:         ${PYTHONPATH:-<unset>}"
+    echo "LD_LIBRARY_PATH:    ${LD_LIBRARY_PATH:-<unset>}"
+    echo "---------------------------------------------------------"
 }
 
 function mpmd_launch_shared() {

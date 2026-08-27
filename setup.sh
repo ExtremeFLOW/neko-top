@@ -141,6 +141,13 @@ printf "Compiling the example codes and Neko-TOP\n"
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
 
+# Validate and persist the runtime used by ADIOS2-backed local MPMD runs.
+if { [ "$TEST" == "ON" ] || [ "$EXAMPLES" == "ON" ]; } && \
+    [ -n "${ADIOS2_DIR:-}" ]
+then
+    find_mpmd_python_runtime "$MAIN_DIR"
+fi
+
 # If CMAKE_VARIABLES is a string, convert it to an array
 if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
