@@ -601,11 +601,9 @@ contains
   !> Stream forward state for POD updates.
   !! @param[inout] this POD state recovery instance.
   !! @param[inout] neko_case Case data structure.
-  !! @param[in] time Current time state.
-  subroutine POD_state_recover_save(this, neko_case, time)
+  subroutine POD_state_recover_save(this, neko_case)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
     if (.not. this%enabled) return
 
     if (.not. this%transience_applied) then
@@ -617,7 +615,7 @@ contains
        return
     end if
 
-    if (time%t .le. this%time_shift) return
+    if (neko_case%time%t .le. this%time_shift) return
 
     this%pod_tstep = this%pod_tstep + 1
     call this%set_n_timesteps(max(this%get_n_timesteps(), this%pod_tstep))
@@ -646,15 +644,24 @@ contains
   !> Reconstruct and restore state from POD during adjoint.
   !! @param[inout] this POD state recovery instance.
   !! @param[inout] neko_case Case data structure.
-  !! @param[in] time Target time state.
-  subroutine POD_state_recover_restore(this, neko_case, time)
+  !! @param[in] tstep Forward-state index to restore.
+  subroutine POD_state_recover_restore(this, neko_case, tstep)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
+    integer, intent(in) :: tstep
+    type(time_state_t) :: time
     type(time_state_t) :: time_out
     real(kind=rp) :: t_pod
+    integer :: n_case_timesteps
 
     if (.not. this%enabled) return
+
+    n_case_timesteps = nint((neko_case%time%end_time - &
+         neko_case%time%start_time) / neko_case%time%dt)
+    time = neko_case%time
+    time%tstep = tstep
+    time%t = neko_case%time%end_time - &
+         real(n_case_timesteps - tstep, rp) * neko_case%time%dt
 
     ! First restore() call is the phase boundary forward->adjoint
     if (.not. this%have_received_modes) then
@@ -669,7 +676,7 @@ contains
     end if
 
     call profiler_start_region("POD restore")
-    t_pod = time%t
+    t_pod = time%t - this%time_shift
     call interpolate_time_coeffs_vec(this%a_interp, this%time_coefs, t_pod)
     call reconstruct_from_coeffs(this, neko_case, this%a_interp)
     if (this%output_reconstruction) then
