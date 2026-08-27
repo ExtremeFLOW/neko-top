@@ -16,6 +16,7 @@ from neko_communicator import (  # noqa: E402
     PHASE_FWD_DONE,
     CtrlClient,
     get_peer_root,
+    make_local_comm,
 )
 
 
@@ -24,12 +25,9 @@ def main() -> int:
     if world.Get_size() != 2 or world.Get_rank() != 0:
         raise RuntimeError("Expected one Python rank at world rank 0.")
 
-    # mpmd_launch_shared assigns Python color 1 and Neko color 0. The launcher
-    # does not perform these collectives on behalf of either application.
-    # Match Neko's non-ADIOS2 initialization: duplicate the world communicator
-    # before splitting it into the Neko and Python color groups.
-    neko_global_comm = world.Dup()
-    neko_local_comm = neko_global_comm.Split(1, world.Get_rank())
+    # mpmd_launch_shared assigns Python color 1 and Neko color 0. This matches
+    # Neko's ADIOS2 communicator split; the launcher does not do it for us.
+    python_comm = make_local_comm(world)
 
     # Control traffic intentionally stays on world so it can cross from the
     # Neko group to this Python group. POD data uses local communicators later.
@@ -43,8 +41,8 @@ def main() -> int:
     client.send_cmd(MODE_ADJOINT, PHASE_ADJ_RUNNING)
     print("MPMD controller regression passed", flush=True)
 
-    # Keep both communicators alive until Neko has completed its matching setup.
-    _ = (neko_global_comm, neko_local_comm)
+    # Keep the application communicator alive until Neko completes its setup.
+    _ = python_comm
     return 0
 
 
