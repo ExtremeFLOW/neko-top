@@ -139,7 +139,7 @@ contains
          p_fields, u_fields, v_fields, w_fields)
     call allocate_scalar_snapshot_fields(sim, n_forward_steps, scalar_fields)
 
-    call chkp%init(sim%neko_case, 'linear', &
+    call chkp%init_from_components(sim%neko_case, 'linear', &
          n_saves_memory = checkpoint_saves_in_memory, &
          path = 'checkpoint_end_of_run_gating', &
          filename = 'checkpoint', &
