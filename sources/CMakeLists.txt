@@ -106,6 +106,9 @@ target_link_libraries(neko-top PUBLIC
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
+    neko_cxx_support  # ADIOS2/MPI C++/stdc++ must come after libneko
+    $<$<BOOL:${HDF5_PKG_FOUND}>:PkgConfig::HDF5>
+    $<$<BOOL:${HDF5_FOUND}>:HDF5::HDF5>
 )
 
 # ============================================================================ #
@@ -116,6 +119,9 @@ add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
 # Install the neko-top library and its modules.
 # These should adhere to the CMake installation conventions.
 
+install(TARGETS neko_cxx_support
+    EXPORT neko-top-targets
+)
 install(TARGETS neko-top
     EXPORT neko-top-targets
     ARCHIVE DESTINATION lib/neko-top
