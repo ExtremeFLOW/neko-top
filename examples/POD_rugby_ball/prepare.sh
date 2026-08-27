@@ -57,9 +57,9 @@ if [ -z "${NEKO_DIR:-}" ]; then
     fi
 fi
 
-if [ -n "${MAIN_DIR:-}" ] && [ -f "${MAIN_DIR}/build/pod_runtime.env" ]; then
+if [ -n "${MAIN_DIR:-}" ] && [ -f "${MAIN_DIR}/build/mpmd_runtime.env" ]; then
     # shellcheck disable=SC1090
-    source "${MAIN_DIR}/build/pod_runtime.env"
+    source "${MAIN_DIR}/build/mpmd_runtime.env"
 fi
 
 if [ -n "${NEKO_DIR:-}" ]; then
