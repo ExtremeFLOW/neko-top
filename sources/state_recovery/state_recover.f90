@@ -94,12 +94,12 @@ module state_recover
      !> Restore forward state for adjoint.
      !! @param[inout] this State recovery instance.
      !! @param[inout] neko_case Case data structure.
-     !! @param[in] i Forward-state index to restore.
-     subroutine state_recover_restore(this, neko_case, i)
+     !! @param[in] tstep Timestep to restore.
+     subroutine state_recover_restore(this, neko_case, tstep)
        import state_recover_t, case_t
        class(state_recover_t), intent(inout) :: this
        class(case_t), target, intent(inout) :: neko_case
-       integer, intent(in) :: i
+       integer, intent(in) :: tstep
      end subroutine state_recover_restore
   end interface
 

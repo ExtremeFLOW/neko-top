@@ -397,26 +397,26 @@ contains
   !> Restore forward state for adjoint.
   !! @param[inout] this Checkpointing implementation.
   !! @param[inout] neko_case Case data structure.
-  !! @param[in] i Forward-state index to restore.
-  subroutine checkpoint_restore(this, neko_case, i)
+  !! @param[in] tstep Timestep to restore.
+  subroutine checkpoint_restore(this, neko_case, tstep)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    integer, intent(in) :: i
+    integer, intent(in) :: tstep
     character(len=256) :: msg
 
     if (.not. this%enabled) return
 
     call profiler_start_region("Checkpoint restore")
 
-    if (i .lt. 1 .or. i .gt. this%get_n_timesteps()) then
-       write(msg, '(A,I0,A,I0,A)') "Requested timestep ", i, &
+    if (tstep .lt. 1 .or. tstep .gt. this%get_n_timesteps()) then
+       write(msg, '(A,I0,A,I0,A)') "Requested timestep ", tstep, &
             " is out of range [1, ", this%get_n_timesteps(), "]"
        call neko_error(trim(msg))
     end if
 
     select case (this%algorithm)
     case ("linear")
-       call checkpoint_restore_linear(this, neko_case, i)
+       call checkpoint_restore_linear(this, neko_case, tstep)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -508,7 +508,6 @@ contains
   subroutine checkpoint_reset(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i, j
-    character(len=256) :: msg
 
     if (.not. this%enabled) return
 
@@ -522,10 +521,6 @@ contains
           if (this%state_storage(i, j)%is_allocated()) then
              call rzero(this%state_storage(i, j)%data, &
                   this%state_storage(i, j)%size)
-          else
-             write(msg, '(A,I0,A,I0,A)') "Checkpoint state storage (", i, &
-                  ", ", j, ") is not allocated during reset."
-             call neko_error(trim(msg))
           end if
        end do
     end do
