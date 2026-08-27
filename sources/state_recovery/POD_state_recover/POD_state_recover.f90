@@ -47,11 +47,9 @@ module simulation_POD_state_recover
   use profiler, only: profiler_start_region, profiler_end_region
   use state_recover, only: state_recover_t
   use time_state, only: time_state_t
-  use simulation, only: simulation_step
-  use time_step_controller, only: time_step_controller_t
   use logger, only : neko_log
   use comm, only: neko_comm, mpi_real_precision
-  use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_SUM, MPI_WTIME
+  use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_SUM
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: DEVICE_TO_HOST, device_memcpy, HOST_TO_DEVICE
@@ -92,9 +90,6 @@ module simulation_POD_state_recover
      integer :: pod_tstep = 0
      logical :: include_scalar = .false.
      character(len=16) :: dtype = "double"
-     real(kind=rp) :: transience_time = 0.0_rp
-     real(kind=rp) :: time_shift = 0.0_rp
-
      type(coef_t), pointer :: coef => null()
 
      ! SINGLE lifetime streamer (both directions)
@@ -131,8 +126,6 @@ module simulation_POD_state_recover
      logical :: have_received_modes = .false.
      logical :: adjoint_started = .false.
      logical :: adj_running_sent = .false.
-     logical :: transience_applied = .true.
-
    contains
      procedure, public, pass(this) :: init => POD_state_recover_init_from_json
      procedure, public, pass(this) :: init_from_json => &
@@ -159,7 +152,6 @@ contains
     logical :: write_modes
     logical :: debug
     logical :: output_reconstruction
-    real(kind=rp) :: transience_time
     character(len=:), allocatable :: recon_output_precision_str
     character(len=:), allocatable :: output_control
     real(kind=rp) :: output_value
@@ -174,12 +166,6 @@ contains
 
     call json_get(params, "i_stream", i_stream)
     call json_get(params, "n_modes", n_modes)
-    call json_get_or_default(params, "transience_time", transience_time, &
-         0.0_rp)
-    if (transience_time .lt. 0.0_rp) then
-       call neko_error("transience_time must be non-negative.")
-    end if
-    this%transience_time = transience_time
     call json_get_or_default(params, "dtype", dtype, "double")
     call json_get_or_default(params, "write_modes", write_modes, .false.)
     call json_get_or_default(params, "debug", debug, .false.)
@@ -292,9 +278,6 @@ contains
     this%enabled = .true.
     this%i_stream = i_stream
     this%n_modes = n_modes
-    if (this%transience_time .lt. 0.0_rp) then
-       call neko_error("transience_time must be non-negative.")
-    end if
     this%dtype = adjustl(dtype)
     this%write_modes = write_modes
     this%output_reconstruction = output_reconstruction
@@ -310,8 +293,6 @@ contains
     this%mode_file_name = 'POD_modes'
     this%n_flds = 3
     this%pod_tstep = 0
-    this%time_shift = 0.0_rp
-    this%transience_applied = this%transience_time .le. 0.0_rp
     this%coef => neko_case%fluid%c_Xh
 
     this%include_scalar = allocated(neko_case%scalars)
@@ -437,10 +418,8 @@ contains
     call this%dstream%stream(this%coef%dof%y)
     call this%dstream%stream(this%coef%dof%z)
 
-    ! Stream the initial condition only when sampling starts immediately.
-    if (this%transience_applied) then
-       call POD_state_recover_stream_fields(this, neko_case)
-    end if
+    ! Stream the initial condition before the forward time loop begins.
+    call POD_state_recover_stream_fields(this, neko_case)
 
     ! Control init for root-to-root MPI coordination with Python.
     if (present(debug)) then
@@ -493,9 +472,6 @@ contains
 
     this%include_scalar = .false.
     this%pod_tstep = 0
-    this%time_shift = 0.0_rp
-    this%transience_time = 0.0_rp
-    this%transience_applied = .true.
     this%mode_output_precision = sp
     this%mode_output_format = 'fld'
     this%mode_file_name = 'POD_modes'
@@ -537,39 +513,6 @@ contains
 
   end subroutine POD_state_recover_reset
 
-  subroutine POD_state_recover_apply_transience(this, neko_case)
-    class(POD_state_recover_t), intent(inout) :: this
-    class(case_t), intent(inout) :: neko_case
-    type(time_step_controller_t) :: dt_controller
-    real(kind=dp) :: loop_start
-    real(kind=rp) :: target_time
-
-    if (this%transience_applied) return
-
-    call neko_log%message(" ")
-    call neko_log%message("------------------------------")
-    call neko_log%message("Advancing POD transience phase")
-    call neko_log%message("------------------------------")
-    call neko_log%message(" ")
-
-    call profiler_start_region("POD transience")
-
-    call dt_controller%init(neko_case%params)
-    target_time = neko_case%time%start_time + this%transience_time
-    loop_start = MPI_WTIME()
-
-    do while (neko_case%time%t .lt. target_time)
-       call simulation_step(neko_case, dt_controller, loop_start)
-    end do
-
-    this%time_shift = neko_case%time%t
-    this%pod_tstep = 0
-    call this%set_n_timesteps(0)
-    this%transience_applied = .true.
-
-    call profiler_end_region("POD transience")
-  end subroutine POD_state_recover_apply_transience
-
   subroutine POD_state_recover_stream_fields(this, neko_case)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
@@ -606,17 +549,6 @@ contains
     class(case_t), intent(inout) :: neko_case
     if (.not. this%enabled) return
 
-    if (.not. this%transience_applied) then
-       call POD_state_recover_apply_transience(this, neko_case)
-       ! Python blocks on the initial field snapshot before it enters the
-       ! control loop, so we delay that first snapshot until the transience
-       ! has been skipped.
-       call POD_state_recover_stream_fields(this, neko_case)
-       return
-    end if
-
-    if (neko_case%time%t .le. this%time_shift) return
-
     this%pod_tstep = this%pod_tstep + 1
     call this%set_n_timesteps(max(this%get_n_timesteps(), this%pod_tstep))
     if (mod(this%pod_tstep, this%i_stream) .ne. 0) return
@@ -632,7 +564,7 @@ contains
     if (this%ctrl%inited) then
        call this%ctrl%send(MODE_FORWARD, PHASE_FWD_RUNNING, &
             int(this%pod_tstep, c_int), &
-            real(neko_case%time%t - this%time_shift, c_double))
+            real(neko_case%time%t - neko_case%time%start_time, c_double))
     end if
 
     call POD_state_recover_stream_fields(this, neko_case)
@@ -676,7 +608,7 @@ contains
     end if
 
     call profiler_start_region("POD restore")
-    t_pod = time%t - this%time_shift
+    t_pod = time%t - time%start_time
     call interpolate_time_coeffs_vec(this%a_interp, this%time_coefs, t_pod)
     call reconstruct_from_coeffs(this, neko_case, this%a_interp)
     if (this%output_reconstruction) then
