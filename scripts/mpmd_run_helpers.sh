@@ -1,9 +1,11 @@
 #!/bin/bash
 
-# Generic helpers for coupled Neko/Python MPMD launches. These helpers only
-# require a common MPI implementation and mpi4py; POD runtime setup is kept
-# separate because it additionally requires ADIOS2 and pysemtools.
+# Generic helpers for coupled Neko/Python MPMD launches. This includes
+# additional flags to be passed;
+# PYTHON_BIN     The directory where python is installed
+# NEKO_LAUNCHER  The mpmd launcher, options are mpirun or srun
 
+# Find which python should be used
 function mpmd_python_exe() {
     if [ -n "${PYTHON_BIN:-}" ]; then
         if [ -x "${PYTHON_BIN}" ]; then
@@ -23,6 +25,7 @@ function mpmd_python_exe() {
     command -v python3 2>/dev/null || command -v python 2>/dev/null
 }
 
+# Make sure the python being used contains mpi4py
 function mpmd_validate_mpi4py() {
     local pyexe
 
@@ -40,6 +43,7 @@ function mpmd_validate_mpi4py() {
     export PYTHON_BIN="${pyexe}"
 }
 
+# Select between mpirun or srun
 function mpmd_selected_launcher() {
     local requested=${NEKO_LAUNCHER:-auto}
 
