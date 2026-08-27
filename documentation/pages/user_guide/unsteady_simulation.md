@@ -74,6 +74,8 @@ used to reconstruct the forward state when it is needed.
 This reduces the amount of stored state substantially, but it introduces extra
 software requirements compared with checkpoint recovery and it changes the
 runtime model from a Neko-only MPI job to a coupled Neko + Python MPI launch.
+POD recovery always includes the initial condition and does not skip an initial
+transient phase.
 
 At the case-file level, POD recovery looks like:
 
