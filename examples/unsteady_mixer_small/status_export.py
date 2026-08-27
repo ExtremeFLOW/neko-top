@@ -1,0 +1,127 @@
+#!/usr/bin/env python3
+"""Export a status notebook to markdown with embedded image files.
+
+This script provide a pure Python entrypoint:
+1. load notebook,
+2. drop export cells to avoid recursion,
+3. execute notebook,
+4. export markdown with code inputs hidden,
+5. store output images in a dedicated folder and rewrite markdown links.
+"""
+
+from __future__ import annotations
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=
+        "Execute a Jupyter notebook and export markdown with images.", )
+    parser.add_argument(
+        "--notebook",
+        default=None,
+        help=("Notebook file to export. If omitted, uses status.ipynb next to "
+              "this script."),
+    )
+    parser.add_argument(
+        "--input-dir",
+        default=".",
+        help="Directory for the notebook input (default: notebook directory).",
+    )
+    parser.add_argument(
+        "--markdown",
+        default="status.md",
+        help="Output markdown filename (default: status.md)",
+    )
+    parser.add_argument(
+        "--image-dir",
+        default="status",
+        help="Directory (relative to notebook directory) for extracted images.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=600,
+        help="Per-cell execution timeout in seconds (default: 600)",
+    )
+    return parser.parse_args()
+
+
+def _replace_markdown_image_links(markdown: str, filename: str,
+                                  image_dir: str) -> str:
+    """Rewrite markdown links for extracted files to point under image_dir."""
+    escaped = re.escape(filename)
+    return re.sub(rf"\(({escaped})\)", f"({image_dir}/{filename})", markdown)
+
+
+def main() -> int:
+    try:
+        import nbformat
+        from nbclient import NotebookClient
+        from nbconvert import MarkdownExporter
+    except ImportError as exc:
+        print(
+            "Missing dependency for notebook export. "
+            "Install with: pip install nbformat nbconvert nbclient",
+            file=sys.stderr,
+        )
+        print(f"Import error: {exc}", file=sys.stderr)
+        return 2
+
+    args = _parse_args()
+
+    script_dir = Path(__file__).resolve().parent
+    if args.notebook is None:
+        notebook_path = (script_dir / "status.ipynb").resolve()
+    else:
+        notebook_path = Path(args.notebook).expanduser().resolve()
+    if not notebook_path.exists():
+        print(f"Notebook not found: {notebook_path}", file=sys.stderr)
+        return 1
+
+    if args.input_dir != ".":
+        workdir = Path(args.input_dir).expanduser().resolve()
+    else:
+        workdir = notebook_path.parent
+
+    markdown_path = workdir / args.markdown
+    image_dir = workdir / args.image_dir
+    image_dir.mkdir(parents=True, exist_ok=True)
+
+    with notebook_path.open(encoding="utf-8") as f:
+        notebook_node = nbformat.read(f, as_version=nbformat.NO_CONVERT)
+
+    client = NotebookClient(
+        notebook_node,
+        timeout=args.timeout,
+        kernel_name="python3",
+        resources={"metadata": {
+            "path": str(workdir)
+        }},
+    )
+    client.execute()
+
+    exporter = MarkdownExporter(exclude_input=True, exclude_input_prompt=True)
+    markdown, resources = exporter.from_notebook_node(notebook_node)
+
+    for filename, data in resources.get("outputs", {}).items():
+        out_path = image_dir / filename
+        with out_path.open("wb") as f:
+            f.write(data)
+        markdown = _replace_markdown_image_links(markdown, filename,
+                                                 args.image_dir)
+
+    with markdown_path.open("w", encoding="utf-8") as f:
+        f.write(markdown)
+
+    print(f"Exported markdown: {markdown_path}")
+    print(f"Exported images dir: {image_dir}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
