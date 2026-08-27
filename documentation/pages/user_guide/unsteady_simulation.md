@@ -120,7 +120,7 @@ POD state recovery depends on ADIOS2. The Fortran side uses the Neko-TOP
 streaming layer, and the Python side imports ADIOS2-backed
 [`pySEMTools`](https://github.com/ExtremeFLOW/pySEMTools) streaming support.
 The POD build requires ADIOS2; CMake reports a configuration error when it is
-unavailable. There is no POD stub fallback.
+unavailable.
 
 The build and runtime helpers try to locate ADIOS2 from:
 
