@@ -10,9 +10,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint_linear.f90
 )
 
-find_package(ADIOS2 REQUIRED COMPONENTS CXX MPI)
-
 target_sources(neko-top
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover.f90
+        $<$<BOOL:${HAVE_ADIOS2}>:${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover.f90>
 )

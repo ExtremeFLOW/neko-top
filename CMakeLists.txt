@@ -123,12 +123,35 @@ pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 # Interface target to collect all C++/ADIOS2 deps needed by libneko
 add_library(neko_cxx_support INTERFACE)
 
+# ADIOS2 Support
+
+if (NOT DEFINED ADIOS2_DIR)
+    if (DEFINED ENV{ADIOS2_DIR} AND IS_ABSOLUTE $ENV{ADIOS2_DIR})
+        set(ADIOS2_DIR $ENV{ADIOS2_DIR} CACHE STRING
+            "Path to the ADIOS2 installation")
+    elseif(DEFINED ENV{ADIOS2_DIR})
+        set(ADIOS2_DIR ${EXTERNAL_DIR}/$ENV{ADIOS2_DIR}
+            CACHE STRING "Path to the ADIOS2 installation")
+    endif()
+endif()
+
+if (DEFINED ADIOS2_DIR)
+    set(CMAKE_PREFIX_PATH ${ADIOS2_DIR} ${CMAKE_PREFIX_PATH})
+endif()
+
+find_package(ADIOS2 QUIET COMPONENTS CXX MPI)
+
+if (ADIOS2_FOUND)
+    set(HAVE_ADIOS2 TRUE)
+    add_compile_definitions(HAVE_ADIOS2=1)
+endif()
+
 # --- ADIOS2 C++ libs (C++ interface that nek_adios2.cpp uses) ---
 
 # Try to locate adios2-config either via ADIOS2_DIR or in PATH
 find_program(ADIOS2_CONFIG_EXECUTABLE
     NAMES adios2-config
-    HINTS $ENV{ADIOS2_DIR}/bin
+    HINTS ${ADIOS2_DIR}/bin $ENV{ADIOS2_DIR}/bin
 )
 
 if(ADIOS2_CONFIG_EXECUTABLE)

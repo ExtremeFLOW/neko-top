@@ -119,8 +119,9 @@ from `case.fluid.output_control` and `case.fluid.output_value`.
 POD state recovery depends on ADIOS2. The Fortran side uses the Neko-TOP
 streaming layer, and the Python side imports ADIOS2-backed
 [`pySEMTools`](https://github.com/ExtremeFLOW/pySEMTools) streaming support.
-The POD build requires ADIOS2; CMake reports a configuration error when it is
-unavailable.
+When ADIOS2 is unavailable, Neko-TOP builds with checkpoint state recovery
+only. A case that requests `"type": "pod"` then reports that POD recovery
+requires ADIOS2.
 
 The build and runtime helpers try to locate ADIOS2 from:
 
