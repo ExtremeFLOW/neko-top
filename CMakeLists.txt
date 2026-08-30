@@ -35,7 +35,7 @@
 # ============================================================================ #
 
 cmake_minimum_required(VERSION 3.21)
-project(Neko-TOP VERSION 0.0.1 LANGUAGES C Fortran CXX)
+project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
@@ -133,6 +133,8 @@ find_program(ADIOS2_CONFIG_EXECUTABLE
 
 if(ADIOS2_CONFIG_EXECUTABLE)
     message(STATUS "Found adios2-config: ${ADIOS2_CONFIG_EXECUTABLE}")
+    enable_language(C CXX)
+
     execute_process(
         COMMAND ${ADIOS2_CONFIG_EXECUTABLE} --cxx-libs
         OUTPUT_VARIABLE ADIOS2_CXX_LIBS
@@ -143,20 +145,19 @@ if(ADIOS2_CONFIG_EXECUTABLE)
         separate_arguments(ADIOS2_CXX_LIBS)
         target_link_libraries(neko_cxx_support INTERFACE ${ADIOS2_CXX_LIBS})
     endif()
+
+    # MPI C++ and the standard C++ runtime are needed by Neko's ADIOS2 code.
+    find_package(MPI REQUIRED COMPONENTS CXX)
+    target_link_libraries(neko_cxx_support INTERFACE MPI::MPI_CXX stdc++)
+
+    # Some MPI wrappers (e.g., mpifort) do not link libmpi_cxx automatically.
+    # Add it explicitly when available so libneko's C++ MPI symbols resolve.
+    find_library(MPI_CXX_LIB NAMES mpi_cxx)
+    if(MPI_CXX_LIB)
+        target_link_libraries(neko_cxx_support INTERFACE ${MPI_CXX_LIB})
+    endif()
 else()
     message(STATUS "adios2-config not found; ADIOS2 C++ support will not be linked.")
-endif()
-
-
-# --- MPI C++ and standard C++ runtime ---
-find_package(MPI REQUIRED COMPONENTS CXX)
-target_link_libraries(neko_cxx_support INTERFACE MPI::MPI_CXX stdc++)
-
-# Some MPI wrappers (e.g., mpifort) do not link libmpi_cxx automatically.
-# Add it explicitly when available so libneko's C++ MPI symbols resolve.
-find_library(MPI_CXX_LIB NAMES mpi_cxx)
-if(MPI_CXX_LIB)
-    target_link_libraries(neko_cxx_support INTERFACE ${MPI_CXX_LIB})
 endif()
 
 # ............................................................................ #
