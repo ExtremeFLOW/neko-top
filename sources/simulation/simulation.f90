@@ -272,7 +272,8 @@ contains
        call state_recover_create(this%state_recover, this%neko_case, &
             state_recovery_params)
     else if ("state_recovery" .in. parameters) then
-       call neko_error("state_recovery is only supported for unsteady simulations.")
+       call neko_error( &
+            "state_recovery is only supported for unsteady simulations.")
     end if
 
 
@@ -330,6 +331,12 @@ contains
     call this%neko_case%time%reset()
     call simulation_init(this%neko_case, dt_controller)
 
+    if (this%unsteady) then
+       if (.not. allocated(this%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+    end if
+
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
     this%n_timesteps = 0
@@ -339,10 +346,7 @@ contains
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
        if (this%unsteady) then
-          if (.not. allocated(this%state_recover)) then
-             call neko_error("State recovery not initialized.")
-          end if
-          call this%state_recover%save(this%neko_case)
+          call this%state_recover%save()
        end if
     end do
     call profiler_end_region("Forward simulation")
@@ -363,15 +367,18 @@ contains
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
+    if (this%unsteady) then
+       if (.not. allocated(this%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+    end if
+
     call profiler_start_region("Adjoint simulation")
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
     do i = this%n_timesteps, 1, -1
        if (this%unsteady) then
-          if (.not. allocated(this%state_recover)) then
-             call neko_error("State recovery not initialized.")
-          end if
-          call this%state_recover%restore(this%neko_case, i)
+          call this%state_recover%restore(i)
        end if
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &

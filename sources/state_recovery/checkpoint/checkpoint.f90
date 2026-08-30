@@ -222,6 +222,7 @@ contains
     logical :: exists
 
     call this%free()
+    this%neko_case => neko_case
 
     ! Assign parameters from arguments or defaults
     this%enabled = .true.
@@ -343,7 +344,7 @@ contains
           inquire(file = trim(file_name), exist = exists)
           if (exists) then
              open(newunit = unit, file = trim(file_name), iostat = stat, &
-                  status='old')
+                  status = 'old')
              if (stat .eq. 0) close(unit, status = 'delete')
           end if
        end do
@@ -362,6 +363,7 @@ contains
     call this%set_n_timesteps(0)
     this%first_valid_timestep = 2
     this%loaded_checkpoint = -1
+    nullify(this%neko_case)
 
   end subroutine checkpoint_free
 
@@ -371,10 +373,8 @@ contains
   !> Save the current state of the simulation to disk
   !> Save forward state.
   !! @param[inout] this Checkpointing implementation.
-  !! @param[inout] neko_case Case data structure.
-  subroutine checkpoint_save(this, neko_case)
+  subroutine checkpoint_save(this)
     class(simulation_checkpoint_t), intent(inout) :: this
-    class(case_t), intent(inout) :: neko_case
 
     if (.not. this%enabled) return
 
@@ -385,7 +385,7 @@ contains
 
     select case (this%algorithm)
     case ("linear")
-       call checkpoint_save_linear(this, neko_case)
+       call checkpoint_save_linear(this, this%neko_case)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -396,11 +396,9 @@ contains
   !> Restore the forward simulation state
   !> Restore forward state for adjoint.
   !! @param[inout] this Checkpointing implementation.
-  !! @param[inout] neko_case Case data structure.
   !! @param[in] tstep Timestep to restore.
-  subroutine checkpoint_restore(this, neko_case, tstep)
+  subroutine checkpoint_restore(this, tstep)
     class(simulation_checkpoint_t), intent(inout) :: this
-    class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: tstep
     character(len=256) :: msg
 
@@ -416,7 +414,7 @@ contains
 
     select case (this%algorithm)
     case ("linear")
-       call checkpoint_restore_linear(this, neko_case, tstep)
+       call checkpoint_restore_linear(this, this%neko_case, tstep)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select

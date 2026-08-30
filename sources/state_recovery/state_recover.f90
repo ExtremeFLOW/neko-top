@@ -42,6 +42,8 @@ module state_recover
   !> Abstract base type for state recovery implementations.
   type, abstract, public :: state_recover_t
      private
+     !> Case associated with this recovery strategy at initialization.
+     class(case_t), pointer, public :: neko_case => null()
      !> Number of states recorded by this recovery strategy.
      integer :: n_timesteps = 0
    contains
@@ -84,21 +86,17 @@ module state_recover
 
      !> Save forward state for recovery.
      !! @param[inout] this State recovery instance.
-     !! @param[inout] neko_case Case data structure.
-     subroutine state_recover_save(this, neko_case)
-       import state_recover_t, case_t
+     subroutine state_recover_save(this)
+       import state_recover_t
        class(state_recover_t), intent(inout) :: this
-       class(case_t), intent(inout) :: neko_case
      end subroutine state_recover_save
 
      !> Restore forward state for adjoint.
      !! @param[inout] this State recovery instance.
-     !! @param[inout] neko_case Case data structure.
      !! @param[in] tstep Timestep to restore.
-     subroutine state_recover_restore(this, neko_case, tstep)
-       import state_recover_t, case_t
+     subroutine state_recover_restore(this, tstep)
+       import state_recover_t
        class(state_recover_t), intent(inout) :: this
-       class(case_t), target, intent(inout) :: neko_case
        integer, intent(in) :: tstep
      end subroutine state_recover_restore
   end interface
