@@ -60,7 +60,7 @@ module simulation_m
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
   use state_recover, only: state_recover_t
-  use state_recover_factory, only: state_recover_create
+  use state_recover_fctry, only: state_recover_factory
   use runtime_stats, only: neko_rt_stats
   implicit none
   private
@@ -269,7 +269,7 @@ contains
        end if
 
        call json_get(parameters, 'state_recovery', state_recovery_params)
-       call state_recover_create(this%state_recover, this%neko_case, &
+       call state_recover_factory(this%state_recover, this%neko_case, &
             state_recovery_params)
     else if ("state_recovery" .in. parameters) then
        call neko_error( &

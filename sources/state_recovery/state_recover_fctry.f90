@@ -1,4 +1,4 @@
-!> @file state_recover_factory.f90
+!> @file state_recover_fctry.f90
 !! @copyright
 !! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,8 +32,8 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> @brief Factory for state recovery implementations.
-module state_recover_factory
+!> @brief Factories for state recovery implementations.
+module state_recover_fctry
   use case, only: case_t
   use json_file_module, only: json_file
   use json_utils, only: json_get_or_default
@@ -43,21 +43,33 @@ module state_recover_factory
   implicit none
   private
 
-  public :: state_recover_create
+  public :: state_recover_factory, state_recover_allocator
 
 contains
 
-  !> Create and initialize a state recovery object from JSON parameters.
+  !> Construct and initialize a state recovery object from JSON parameters.
   !! @param[inout] recover Allocatable state recovery instance.
   !! @param[inout] neko_case Case data structure.
   !! @param[inout] params JSON parameters for state recovery.
-  subroutine state_recover_create(recover, neko_case, params)
+  subroutine state_recover_factory(recover, neko_case, params)
     class(state_recover_t), allocatable, intent(inout) :: recover
     class(case_t), target, intent(inout) :: neko_case
     type(json_file), intent(inout) :: params
     character(len=:), allocatable :: recover_type
 
     call json_get_or_default(params, "type", recover_type, "checkpoint")
+
+    call state_recover_allocator(recover, recover_type)
+
+    call recover%init(neko_case, params)
+  end subroutine state_recover_factory
+
+  !> Allocate a state recovery implementation.
+  !! @param[inout] recover Allocatable state recovery instance.
+  !! @param[in] recover_type State recovery implementation identifier.
+  subroutine state_recover_allocator(recover, recover_type)
+    class(state_recover_t), allocatable, intent(inout) :: recover
+    character(len=*), intent(in) :: recover_type
 
     if (allocated(recover)) then
        call recover%free()
@@ -71,7 +83,6 @@ contains
        call neko_error("Unknown state recover type: " // trim(recover_type))
     end select
 
-    call recover%init(neko_case, params)
-  end subroutine state_recover_create
+  end subroutine state_recover_allocator
 
-end module state_recover_factory
+end module state_recover_fctry
