@@ -386,8 +386,8 @@ contains
           call json_get(constraint_json, "type", type)
           call neko_log%message(type)
 
-             call constraint_factory(constraint, constraint_json, design, &
-                  simulation)
+          call constraint_factory(constraint, constraint_json, design, &
+               simulation)
           call this%add_constraint(constraint)
        end do
     end if
