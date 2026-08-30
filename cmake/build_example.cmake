@@ -118,7 +118,6 @@ function(build_example)
         PkgConfig::neko
         PkgConfig::json-fortran
         MPI::MPI_Fortran
-        MPI::MPI_CXX
         $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
         $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
         neko_cxx_support
