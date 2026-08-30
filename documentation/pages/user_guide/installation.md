@@ -71,6 +71,7 @@ custom install locations for the given dependencies.
 | ------------------ | -------------------------------------------------------------------- | --------------------- |
 | `NEKO_DIR`         | Location of the Neko library.                                        | external/neko         |
 | `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                   | external/json-fortran |
+| `ADIOS2_DIR`       | ADIOS2 installation; setting it enables ADIOS2 support.              | -                     |
 | `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000      |
 | `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                     |
 | `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                     |
@@ -95,6 +96,40 @@ export CUDA_ARCH=80
 export NEKO_DIR=$HOME/neko
 ```
 
+### ADIOS2-enabled Python workflow
+
+For the ADIOS2-enabled Python workflow, the build order matters. The intended
+order is:
+
+1. Create and activate a fresh Python environment.
+2. Install `mpi4py` into that environment with the MPI compiler wrapper that
+   will be used for the rest of the build.
+3. Build ADIOS2 against that same active Python environment.
+4. Build Neko against that ADIOS2 installation.
+5. Build Neko-TOP on top of that Neko build.
+
+In practice, `./setup.sh` performs steps 3-5, so the critical requirement is
+that steps 1-2 are done first in the shell where setup is invoked. This avoids
+mixing one Python environment for `mpi4py` with another Python environment for
+ADIOS2 and the runtime scripts.
+
+The recommended workflow is therefore:
+
+```sh
+python -m venv PATH_TO_ENV
+source PATH_TO_ENV/bin/activate
+MPICC=mpicc python -m pip install --no-binary=mpi4py mpi4py
+export ADIOS2_DIR=adios2
+./setup.sh
+```
+
+The relative value `adios2` installs ADIOS2 in `external/adios2`; an absolute
+path can be used to install it elsewhere.
+
+If the active Python environment or MPI toolchain changes after ADIOS2 has been
+built, rebuild from ADIOS2 onward so that `mpi4py`, ADIOS2, Neko, and
+Neko-TOP all agree on the same Python and MPI stack.
+
 For CUDA builds, `CUDA_ARCH` must be explicitly specified before running
 `setup.sh` (for example `export CUDA_ARCH=80`).
 
@@ -114,4 +149,3 @@ Link 1 is the microsoft description of getting started with WSL 2. Link 2 is the
 NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
-

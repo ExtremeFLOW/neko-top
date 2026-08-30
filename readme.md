@@ -50,36 +50,6 @@ export CUDA_ARCH=80
 ./setup.sh -d CUDA
 ```
 
-## Python and MPI build order
-
-For the ADIOS2-enabled Python workflow, the build order matters. The intended
-order is:
-
-1. Create and activate a fresh Python environment.
-2. Install `mpi4py` into that environment with the MPI compiler wrapper that
-   will be used for the rest of the build.
-3. Build ADIOS2 against that same active Python environment.
-4. Build Neko against that ADIOS2 installation.
-5. Build Neko-TOP on top of that Neko build.
-
-In practice, `./setup.sh` performs steps 3-5, so the critical requirement is
-that steps 1-2 are done first in the shell where setup is invoked. This avoids
-mixing one Python environment for `mpi4py` with another Python environment for
-ADIOS2 and the runtime scripts.
-
-The recommended workflow is therefore:
-
-```sh
-python -m venv PATH_TO_ENV
-source PATH_TO_ENV/bin/activate
-MPICC=mpicc python -m pip install --no-binary=mpi4py mpi4py
-./setup.sh
-```
-
-If the active Python environment or MPI toolchain changes after ADIOS2 has been
-built, rebuild from ADIOS2 onward so that `mpi4py`, ADIOS2, Neko, and
-Neko-TOP all agree on the same Python and MPI stack.
-
 ## Example execution
 
 The run.sh script is the main driver for managing example execution. The run
