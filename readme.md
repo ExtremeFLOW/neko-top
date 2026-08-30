@@ -73,7 +73,7 @@ The recommended workflow is therefore:
 python -m venv PATH_TO_ENV
 source PATH_TO_ENV/bin/activate
 MPICC=mpicc python -m pip install --no-binary=mpi4py mpi4py
-./setup.sh -e
+./setup.sh
 ```
 
 If the active Python environment or MPI toolchain changes after ADIOS2 has been
