@@ -344,16 +344,17 @@ function find_adios2() {
     local pyver
     local cmake_args=()
 
-    pyexe=$(find_python_executable 2>/dev/null || true)
-    if [ -n "${pyexe}" ]; then
-        pyver=$("${pyexe}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    fi
-
     if [[ $# -ge 1 && -n "$1" ]]; then
         ADIOS2_DIR="$1"
     elif [ -z "${ADIOS2_DIR:-}" ]; then
         return
     fi
+
+    if ! pyexe=$(find_python_executable); then
+        echo "Error: could not find python3 or python in PATH." >&2
+        return 1
+    fi
+    pyver=$("${pyexe}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 
     if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
         ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
@@ -366,11 +367,6 @@ function find_adios2() {
         [ -z "${ADIOS2_ENABLE_FORTRAN:-}" ] && ADIOS2_ENABLE_FORTRAN="ON"
         [ -z "${ADIOS2_ENABLE_PYTHON:-}" ] && ADIOS2_ENABLE_PYTHON="ON"
         [ -z "${ADIOS2_ENABLE_SST:-}" ] && ADIOS2_ENABLE_SST="ON"
-
-        if [ -z "${pyexe}" ]; then
-            echo "Error: could not find python3 or python in PATH." >&2
-            return 1
-        fi
 
         if [ ! -d "$ADIOS2_DIR/.git" ]; then
             git clone --depth 1 --branch "v${ADIOS2_VERSION}" \
