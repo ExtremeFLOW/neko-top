@@ -34,6 +34,7 @@ function check_system_dependencies() {
 
 }
 
+# Print the resolved executable path for command-substitution callers.
 function find_python_executable() {
     local candidate
     local python_path
