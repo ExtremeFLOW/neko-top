@@ -380,7 +380,7 @@ function find_adios2() {
         if [ ! -d ADIOS2/.git ]; then
             rm -rf ADIOS2
             git clone --depth 1 --branch "v${ADIOS2_VERSION}" \
-                https://github.com/ornladios/ADIOS2.git ADIOS2
+                https://github.com/ornladios/ADIOS2.git $ADIOS2_dir
         fi
 
         cmake_args=(
