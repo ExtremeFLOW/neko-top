@@ -38,7 +38,7 @@ module state_recover_fctry
   use json_file_module, only: json_file
   use json_utils, only: json_get_or_default
   use state_recover, only: state_recover_t
-  use simulation_checkpoint, only: simulation_checkpoint_t
+  use state_recover_checkpoint, only: state_recover_checkpoint_t
   use utils, only: neko_error
   implicit none
   private
@@ -78,7 +78,7 @@ contains
 
     select case (trim(recover_type))
     case ("checkpoint", "simulation_checkpoint")
-       allocate(simulation_checkpoint_t :: recover)
+       allocate(state_recover_checkpoint_t :: recover)
     case default
        call neko_error("Unknown state recover type: " // trim(recover_type))
     end select

@@ -33,7 +33,7 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 !
 !> @brief Checkpoint-based state recovery for adjoint runs.
-module simulation_checkpoint
+module state_recover_checkpoint
   use num_types, only: rp
   use case, only: case_t
   use json_file_module, only: json_file
@@ -54,7 +54,7 @@ module simulation_checkpoint
   implicit none
   private
 
-  type, public, extends(state_recover_t) :: simulation_checkpoint_t
+  type, public, extends(state_recover_t) :: state_recover_checkpoint_t
      private
 
      ! ----------------------------------------------------------------------- !
@@ -108,7 +108,7 @@ module simulation_checkpoint
      procedure, pass(this) :: save_data => checkpoint_save_data
      !> Restore data from the ram checkpoint at index to the current state
      procedure, pass(this) :: load_data => checkpoint_load_data
-  end type simulation_checkpoint_t
+  end type state_recover_checkpoint_t
 
   type :: host_array
      real(kind=rp), allocatable :: data(:)
@@ -125,13 +125,13 @@ module simulation_checkpoint
   interface
      !> Save the current state of the simulation in a linear fashion
      module subroutine checkpoint_save_linear(this, neko_case)
-       class(simulation_checkpoint_t), intent(inout) :: this
+       class(state_recover_checkpoint_t), intent(inout) :: this
        class(case_t), intent(inout) :: neko_case
      end subroutine checkpoint_save_linear
 
      !> Restore the forward simulation state in a linear fashion
      module subroutine checkpoint_restore_linear(this, neko_case, tstep)
-       class(simulation_checkpoint_t), intent(inout) :: this
+       class(state_recover_checkpoint_t), intent(inout) :: this
        class(case_t), target, intent(inout) :: neko_case
        integer, intent(in) :: tstep
      end subroutine checkpoint_restore_linear
@@ -148,7 +148,7 @@ contains
   !! @param[inout] neko_case Case data structure.
   !! @param[inout] params JSON parameters.
   subroutine checkpoint_init_from_json(this, neko_case, params)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
     type(json_file), target, intent(inout) :: params
     integer :: n_saves_memory
@@ -207,7 +207,7 @@ contains
   !! @param[inout] extra_fields Additional fields to include in checkpoints.
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
        n_saves_memory, path, filename, fmt, keep_checkpoints, extra_fields)
-    class(simulation_checkpoint_t), intent(inout), target :: this
+    class(state_recover_checkpoint_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     character(len=*), optional, intent(in) :: algorithm
     integer, optional, intent(in) :: n_saves_memory
@@ -318,7 +318,7 @@ contains
   !> Free checkpointing resources.
   !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_free(this)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     integer :: i, j
     character(len=1024) :: file_name
     logical :: exists
@@ -374,7 +374,7 @@ contains
   !> Save forward state.
   !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_save(this)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
 
     if (.not. this%enabled) return
 
@@ -398,7 +398,7 @@ contains
   !! @param[inout] this Checkpointing implementation.
   !! @param[in] tstep Timestep to restore.
   subroutine checkpoint_restore(this, tstep)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     integer, intent(in) :: tstep
     character(len=256) :: msg
 
@@ -426,7 +426,7 @@ contains
   !! @param this The checkpoint object.
   !! @param index The index in the RAM checkpoint to save to.
   subroutine checkpoint_save_data(this, index)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     integer, intent(in) :: index
     type(field_t), pointer :: si !< Pointer to the i'th state field
     integer :: i
@@ -468,7 +468,7 @@ contains
   !! @param this The checkpoint object.
   !! @param index The index in the RAM checkpoint to restore from.
   subroutine checkpoint_load_data(this, index)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     integer, intent(in) :: index
     type(field_t), pointer :: si
     character(len=1024) :: msg
@@ -504,7 +504,7 @@ contains
   !> Reset checkpointing state.
   !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_reset(this)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     integer :: i, j
 
     if (.not. this%enabled) return
@@ -555,4 +555,4 @@ contains
 
   end function host_array_is_allocated
 
-end module simulation_checkpoint
+end module state_recover_checkpoint

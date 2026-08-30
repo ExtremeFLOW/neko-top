@@ -3,7 +3,7 @@ module test_checkpoint_restore_consistency_hdf5
   use num_types, only: dp, rp
   use math, only: abscmp
   use simulation_m, only: simulation_t
-  use simulation_checkpoint, only: simulation_checkpoint_t
+  use state_recover_checkpoint, only: state_recover_checkpoint_t
   use simulation, only: simulation_init, simulation_step, simulation_finalize
   use time_step_controller, only: time_step_controller_t
   use design, only: design_t
@@ -51,7 +51,7 @@ contains
     class(test_checkpoint_restore_consistency_hdf5_case), intent(inout) :: this
 
     type(simulation_t), target :: sim
-    type(simulation_checkpoint_t) :: chkp
+    type(state_recover_checkpoint_t) :: chkp
     class(design_t), allocatable :: des
     type(problem_t) :: prob
     type(time_step_controller_t) :: dt_controller

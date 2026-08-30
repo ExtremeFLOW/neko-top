@@ -42,7 +42,7 @@
 !!
 !! This algorithm is the simplest one and do a minimum of re-computation. But
 !! requires large amounts of memory and disk space.
-submodule (simulation_checkpoint) checkpoint_linear
+submodule (state_recover_checkpoint) checkpoint_linear
   use num_types, only: dp
   use simulation, only: simulation_step, simulation_restart
   use time_step_controller, only: time_step_controller_t
@@ -54,7 +54,7 @@ contains
   !! We save every `n_saves_memory` time steps to disc and we always save
   !! any timestep leading up to the `first_valid_timestep` time steps to disc.
   module subroutine checkpoint_save_linear(this, neko_case)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
     integer :: index, tstep, counter, n_total
     real(kind=rp) :: time
@@ -96,7 +96,7 @@ contains
   !! checkpoint from disc and then we step forward in time to fill our cache.
   !! Finally, we copy the requested time step from our cache.
   module subroutine checkpoint_restore_linear(this, neko_case, tstep)
-    class(simulation_checkpoint_t), intent(inout) :: this
+    class(state_recover_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: tstep
     type(time_step_controller_t) :: dt_controller

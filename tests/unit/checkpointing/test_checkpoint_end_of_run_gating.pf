@@ -3,7 +3,7 @@ module test_checkpoint_end_of_run_gating
   use num_types, only: dp, rp
   use math, only: abscmp, NEKO_EPS
   use simulation_m, only: simulation_t
-  use simulation_checkpoint, only: simulation_checkpoint_t
+  use state_recover_checkpoint, only: state_recover_checkpoint_t
   use simulation, only: simulation_init, simulation_step, simulation_finalize
   use time_step_controller, only: time_step_controller_t
   use design, only: design_t
@@ -52,7 +52,7 @@ contains
   subroutine restore_errors_for_tstep(chkp, sim, p_refs, u_refs, v_refs, &
        w_refs, scalar_refs, tstep, err_p, err_u, err_v, err_w, err_scalar, &
        scalar_restore_ok, failing_scalar, failing_scalar_name)
-    type(simulation_checkpoint_t), intent(inout) :: chkp
+    type(state_recover_checkpoint_t), intent(inout) :: chkp
     type(simulation_t), intent(inout) :: sim
     type(field_array_t), intent(inout) :: p_refs, u_refs, v_refs, w_refs
     type(field_array_t), allocatable, intent(inout) :: scalar_refs(:)
@@ -111,7 +111,7 @@ contains
     class(test_checkpoint_end_of_run_gating_case), intent(inout) :: this
 
     type(simulation_t), target :: sim
-    type(simulation_checkpoint_t) :: chkp
+    type(state_recover_checkpoint_t) :: chkp
     class(design_t), allocatable :: des
     type(problem_t) :: prob
     type(time_step_controller_t) :: dt_controller
