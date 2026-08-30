@@ -522,46 +522,6 @@ function find_parmetis() {
 }
 
 # ============================================================================ #
-# Convert ADIOS2 link flags into standard -L/-l entries so they can be passed
-# through LIBS and remain after libneko.a during the final Neko link step.
-function adios2_neko_link_libs() {
-    local adios2_config
-    local flag
-    local lib_dir
-    local lib_name
-    local link_flags=""
-
-    adios2_config="${ADIOS2_CONFIG:-}"
-    if [ -z "${adios2_config}" ]; then
-        adios2_config=$(command -v adios2-config 2>/dev/null || true)
-    fi
-
-    if [ -z "${adios2_config}" ] || [ ! -x "${adios2_config}" ]; then
-        return 1
-    fi
-
-    for flag in $("${adios2_config}" --fortran-libs) $("${adios2_config}" --cxx-libs); do
-        case "${flag}" in
-            */lib*.so*|*/lib*.a)
-                lib_dir=$(dirname "${flag}")
-                lib_name=$(basename "${flag}")
-                lib_name=${lib_name#lib}
-                lib_name=${lib_name%%.so*}
-                lib_name=${lib_name%%.a}
-                link_flags+=" -L${lib_dir} -l${lib_name}"
-                ;;
-            -Wl,-rpath,*|-Wl,-rpath-link,*)
-                ;;
-            *)
-                link_flags+=" ${flag}"
-                ;;
-        esac
-    done
-
-    printf '%s -lstdc++' "${link_flags}"
-}
-
-# ============================================================================ #
 # Ensure Neko is installed, if not install it.
 function find_neko() {
     check_external_dir
@@ -585,8 +545,6 @@ function find_neko() {
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
-        local neko_libs=""
-
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
             [ -z "$NEKO_VERSION" ] && NEKO_VERSION="neko-top"
@@ -665,13 +623,6 @@ function find_neko() {
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
 
-        if [ -n "$ADIOS2_DIR" ]; then
-            neko_libs=$(adios2_neko_link_libs) || {
-                error "Failed to derive ADIOS2 link flags for Neko."
-                exit 1
-            }
-        fi
-
         if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then
             ./regen.sh
         fi
@@ -680,7 +631,6 @@ function find_neko() {
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
                 CC=$CC MPICC=$MPICC CFLAGS="$NEKO_CFLAGS" \
                 CXX=$CXX MPICXX=$MPICXX CXXFLAGS="$NEKO_CXXFLAGS" \
-                LIBS="$neko_libs" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
                 CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
