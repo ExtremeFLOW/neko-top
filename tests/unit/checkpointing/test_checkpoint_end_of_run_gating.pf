@@ -78,7 +78,7 @@ contains
     v_ref => v_refs%get(tstep)
     w_ref => w_refs%get(tstep)
 
-    call chkp%restore(sim%neko_case, tstep)
+    call chkp%restore(tstep)
 
     err_p = rmse(p_ref, p)
     err_u = rmse(u_ref, u)
@@ -172,7 +172,7 @@ contains
           end do
        end if
 
-       call chkp%save(sim%neko_case)
+       call chkp%save()
     end do
 
     call simulation_finalize(sim%neko_case)

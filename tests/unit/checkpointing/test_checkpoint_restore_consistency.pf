@@ -117,7 +117,7 @@ contains
           call field_copy(scalar_snapshot, scalar)
        end do
 
-       call chkp%save(sim%neko_case)
+       call chkp%save()
     end do
 
     call simulation_finalize(sim%neko_case)
@@ -136,7 +136,7 @@ contains
     failing_scalar_name = ''
 
     do i = n_forward_steps, 1, -1
-       call chkp%restore(sim%neko_case, i)
+       call chkp%restore(i)
 
        p_snapshot => p_fields%get(i)
        u_snapshot => u_fields%get(i)
