@@ -21,7 +21,7 @@ top level of the case file:
 The available implementation is `checkpoint`, which restarts the forward
 problem from stored checkpoints.
 
-## Checkpoint state recovery
+## Checkpoint based state recovery
 
 A straight forward approach is to simply store the entire forward state at each
 timestep, and then restore it when needed by the adjoint simulation. However,
