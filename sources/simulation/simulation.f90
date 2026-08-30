@@ -263,11 +263,6 @@ contains
 
     ! State recovery is only needed for unsteady runs.
     if (this%unsteady) then
-       if (.not. ("state_recovery" .in. parameters)) then
-          call neko_error("please provide a means of recovering the forward \\ &
-          & state under state_recovery. Current option is checkpoint.")
-       end if
-
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_factory(this%state_recover, this%neko_case, &
             state_recovery_params)
