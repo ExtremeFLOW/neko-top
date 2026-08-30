@@ -106,10 +106,14 @@ target_link_libraries(neko-top PUBLIC
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
-    neko_cxx_support  # ADIOS2/MPI C++/stdc++ must come after libneko
     $<$<BOOL:${HDF5_PKG_FOUND}>:PkgConfig::HDF5>
     $<$<BOOL:${HDF5_FOUND}>:HDF5::HDF5>
 )
+
+if(ADIOS2_CONFIG_EXECUTABLE)
+    # ADIOS2/MPI C++/stdc++ must come after libneko.
+    target_link_libraries(neko-top PUBLIC neko_cxx_support)
+endif()
 
 # ============================================================================ #
 # Specify installation instructions
