@@ -341,7 +341,6 @@ function find_adios2() {
     find_hdf5 $HDF5_DIR
     local pyexe
     local pyver
-    local current_dir
     local cmake_args=()
 
     pyexe=$(find_python_executable 2>/dev/null || true)
@@ -359,8 +358,6 @@ function find_adios2() {
         ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
     fi
 
-    mkdir -p "$ADIOS2_DIR"
-    ADIOS2_DIR=$(realpath "$ADIOS2_DIR")
     ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
 
     if [[ ! -x "${ADIOS2_CONFIG}" ]]; then
@@ -374,13 +371,9 @@ function find_adios2() {
             return 1
         fi
 
-        current_dir=$(pwd)
-        cd "$ADIOS2_DIR" || return 1
-
-        if [ ! -d ADIOS2/.git ]; then
-            rm -rf ADIOS2
+        if [ ! -d "$ADIOS2_DIR/.git" ]; then
             git clone --depth 1 --branch "v${ADIOS2_VERSION}" \
-                https://github.com/ornladios/ADIOS2.git ADIOS2
+                https://github.com/ornladios/ADIOS2.git "$ADIOS2_DIR"
         fi
 
         cmake_args=(
@@ -414,12 +407,11 @@ function find_adios2() {
             )
         fi
 
-        cmake -S ADIOS2 -B build "${cmake_args[@]}"
-        cmake --build build --parallel
-        cmake --install build
-        rm -rf build
+        cmake -S "$ADIOS2_DIR" -B "$ADIOS2_DIR/build" "${cmake_args[@]}"
+        cmake --build "$ADIOS2_DIR/build" --parallel
+        cmake --install "$ADIOS2_DIR/build"
+        rm -rf "$ADIOS2_DIR/build"
 
-        cd "$current_dir" || return 1
         ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
     fi
 
