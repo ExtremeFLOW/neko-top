@@ -222,7 +222,7 @@ contains
   !      already-existing log file.
 
   @test(npes=[2])
-  subroutine restart_via_run_has_no_duplicate_log_rows(this)
+  subroutine restart_via_run(this)
     class(test_optimizer_checkpoint), intent(inout) :: this
     type(json_file) :: parameters, design_parameters
 
@@ -388,7 +388,7 @@ contains
        end do
     end if
 
-  end subroutine restart_via_run_has_no_duplicate_log_rows
+  end subroutine restart_via_run
 
   ! ========================================================================== !
   ! Utility function to compute RMSE between two vectors
