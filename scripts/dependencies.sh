@@ -364,7 +364,6 @@ function find_adios2() {
 
     if [[ ! -x "${ADIOS2_CONFIG}" ]]; then
         [ -z "${ADIOS2_VERSION:-}" ] && ADIOS2_VERSION="2.10.1"
-        [ -z "${ADIOS2_ENABLE_FORTRAN:-}" ] && ADIOS2_ENABLE_FORTRAN="ON"
         [ -z "${ADIOS2_ENABLE_PYTHON:-}" ] && ADIOS2_ENABLE_PYTHON="ON"
         [ -z "${ADIOS2_ENABLE_SST:-}" ] && ADIOS2_ENABLE_SST="ON"
 
@@ -381,7 +380,7 @@ function find_adios2() {
             -DADIOS2_USE_MPI=ON
             -DADIOS2_USE_SST="$ADIOS2_ENABLE_SST"
             -DADIOS2_USE_Python="$ADIOS2_ENABLE_PYTHON"
-            -DADIOS2_USE_Fortran="$ADIOS2_ENABLE_FORTRAN"
+            -DADIOS2_USE_Fortran=OFF
             -DADIOS2_USE_BZip2=OFF
             -DBUILD_TESTING=OFF
             -DPython3_EXECUTABLE="$pyexe"
@@ -422,7 +421,6 @@ function find_adios2() {
 
     export ADIOS2_DIR="$(realpath "$ADIOS2_DIR")"
     export ADIOS2_PATH="$ADIOS2_DIR"
-    export ADIOS2_FORTRAN_DIR="$ADIOS2_DIR"
     export PATH="$ADIOS2_DIR/bin:$PATH"
 
     [ -d "$ADIOS2_DIR/lib/pkgconfig" ] && \
@@ -564,7 +562,6 @@ function find_neko() {
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         if [ -n "$ADIOS2_DIR" ]; then
             FEATURES+=" --with-adios2=$ADIOS2_DIR"
-            FEATURES+=" --with-adios2-fortran=$ADIOS2_DIR"
         fi
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
         [ -n "$PFUNIT_DIR" ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
