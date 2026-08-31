@@ -60,7 +60,7 @@ module adjoint_fluid_pnpn
   use profiler, only: profiler_start_region, profiler_end_region
   use json_module, only: json_file, json_core, json_value
   use json_utils, only: json_get, json_get_or_default, json_extract_item
-  use ax_product, only: ax_t, ax_helm_factory
+  use ax_product, only: ax_t, ax_helm_allocator
   use field, only: field_t
   use dirichlet, only: dirichlet_t
   use shear_stress, only: shear_stress_t
@@ -329,7 +329,7 @@ contains
        call neko_error( &
             "Full stress formulation is not supported in the adjoint module.")
        !  ! Setup backend dependent Ax routines
-       !  call ax_helm_factory(this%Ax_vel, full_formulation = .true.)
+       !  call ax_helm_allocator(this%Ax_vel, type_name = "full")
 
        !  ! Setup backend dependent prs residual routines
        !  call pnpn_prs_res_stress_factory(this%prs_res)
@@ -338,7 +338,7 @@ contains
        !  call pnpn_vel_res_stress_factory(this%vel_res)
     else
        ! Setup backend dependent Ax routines
-       call ax_helm_factory(this%Ax_vel, full_formulation = .false.)
+       call ax_helm_allocator(this%Ax_vel, type_name = "standard")
 
        ! Setup backend dependent prs residual routines
        call adjoint_pnpn_prs_res_factory(this%prs_res)
@@ -359,7 +359,7 @@ contains
     end if
 
     ! Setup Ax for the pressure
-    call ax_helm_factory(this%Ax_prs, full_formulation = .false.)
+    call ax_helm_allocator(this%Ax_prs, type_name = "standard")
 
 
     ! Setup backend dependent summation of AB/BDF
