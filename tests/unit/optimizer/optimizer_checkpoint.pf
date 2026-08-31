@@ -221,14 +221,6 @@ contains
   !      the header to be written a second time, in the middle of the
   !      already-existing log file.
 
-  ! NOTE: keep this procedure name at or below 37 characters. pFUnit
-  !       registers each test with a single generated line of the form
-  !       `call suite%addTest(makeCustomTest('<name>', <name>, ...))`,
-  !       which repeats the name twice. A longer name pushes that line
-  !       past Fortran's 132-column free-form limit, and the generated
-  !       file then fails to compile under CI's -pedantic-errors. A local
-  !       setup.sh build sets no CMAKE_BUILD_TYPE, so it will not catch
-  !       this.
   @test(npes=[2])
   subroutine restart_via_run(this)
     class(test_optimizer_checkpoint), intent(inout) :: this
