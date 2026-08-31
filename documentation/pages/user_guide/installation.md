@@ -137,8 +137,7 @@ C++ symbols such as `std::`, `__gxx_personality_v0`, or `adios2::`, set
 `NEKO_LIBS` in `prepare.env` before rebuilding Neko. It must include both the
 C++ runtime and ADIOS2 libraries after `libneko.a`. For GNU compilers with an
 ADIOS2 installation selected by `ADIOS2_DIR`, use:
-
-```bash
+\code{.sh}
 adios2_config="$EXTERNAL_DIR/$ADIOS2_DIR/bin/adios2-config"
 adios2_link_libs=""
 for adios2_flag in $("$adios2_config" --cxx-libs); do
@@ -155,8 +154,7 @@ for adios2_flag in $("$adios2_config" --cxx-libs); do
     esac
 done
 NEKO_LIBS="$adios2_link_libs -lstdc++"
-```
-
+\endcode
 `NEKO_LIBS` is passed unchanged to Neko's `configure` script. Use the
 equivalent compiler-runtime flag for a non-GNU toolchain.
 
