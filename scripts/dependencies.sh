@@ -41,13 +41,9 @@ function find_json_fortran() {
 
     # Determine the JSON-Fortran installation directory
     if [[ $# -ge 1 ]]; then
-        JSON_FORTRAN_DIR="$1"
+        JSON_FORTRAN_DIR="$(realpath $1)"
     elif [ -z "$JSON_FORTRAN_DIR" ]; then
-        JSON_FORTRAN_DIR="json-fortran"
-    fi
-
-    if [ "${JSON_FORTRAN_DIR:0:1}" != "/" ]; then
-        JSON_FORTRAN_DIR="$EXTERNAL_DIR/$JSON_FORTRAN_DIR"
+        JSON_FORTRAN_DIR="$(realpath $EXTERNAL_DIR/json-fortran)"
     fi
 
     # Ensure JSON-Fortran is installed, if not install it.
@@ -101,13 +97,14 @@ function find_nek5000() {
 
     # Determine the Nek5000 installation directory
     if [[ $# -ge 1 ]]; then
-        NEK5000_DIR="$1"
-    elif [ -z "$NEK5000_DIR" ]; then
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            NEK5000_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            NEK5000_DIR="$(realpath $1)"
+        fi
+    else
+        export NEK5000_DIR=""
         return
-    fi
-
-    if [ "${NEK5000_DIR:0:1}" != "/" ]; then
-        NEK5000_DIR="$EXTERNAL_DIR/$NEK5000_DIR"
     fi
 
     if [[ ! -d "$NEK5000_DIR" || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
@@ -125,13 +122,14 @@ function find_gslib() {
 
     # Determine the GSLib installation directory
     if [[ $# -ge 1 ]]; then
-        GSLIB_DIR="$1"
-    elif [ -z "$GSLIB_DIR" ]; then
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            GSLIB_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            GSLIB_DIR="$(realpath $1)"
+        fi
+    else
+        export GSLIB_DIR=""
         return
-    fi
-
-    if [ "${GSLIB_DIR:0:1}" != "/" ]; then
-        GSLIB_DIR="$EXTERNAL_DIR/$GSLIB_DIR"
     fi
 
     # Ensure GSLIB is installed, if not install it.
@@ -187,8 +185,8 @@ function find_pfunit() {
         return
     fi
 
-    if [ "${PFUNIT_DIR:0:1}" != "/" ]; then
-        PFUNIT_DIR="$EXTERNAL_DIR/$PFUNIT_DIR"
+    if [[ "${PFUNIT_DIR:0:1}" != "/" && "${PFUNIT_DIR:0:1}" != "~" ]]; then
+        PFUNIT_DIR="$(realpath $EXTERNAL_DIR/$PFUNIT_DIR)"
     fi
 
     # Clone pFUnit from the repository if it does not exist.
@@ -249,16 +247,14 @@ function find_hdf5() {
 
     # Determine the HDF5 installation directory
     check_external_dir
-
-    # Determine the HDF5 installation directory
     if [[ $# -ge 1 ]]; then
         HDF5_DIR="$1"
     elif [ -z "$HDF5_DIR" ]; then
         return
     fi
 
-    if [ "${HDF5_DIR:0:1}" != "/" ]; then
-        HDF5_DIR="$EXTERNAL_DIR/$HDF5_DIR"
+    if [[ "${HDF5_DIR:0:1}" != "/" && "${HDF5_DIR:0:1}" != "~" ]]; then
+        HDF5_DIR="$(realpath $EXTERNAL_DIR/$HDF5_DIR)"
     fi
 
     # Ensure HDF5 is installed, if not install it.
@@ -381,13 +377,9 @@ function find_neko() {
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
-        NEKO_DIR="$1"
+        NEKO_DIR="$(realpath $1)"
     elif [ -z "$NEKO_DIR" ]; then
-        NEKO_DIR="neko"
-    fi
-
-    if [ "${NEKO_DIR:0:1}" != "/" ]; then
-        NEKO_DIR="$EXTERNAL_DIR/$NEKO_DIR"
+        NEKO_DIR="$(realpath $EXTERNAL_DIR/neko)"
     fi
 
     # Check if Neko is installed, if not install it.
@@ -643,8 +635,8 @@ function error() {
 function check_external_dir() {
     if [ -z "$EXTERNAL_DIR" ]; then
         echo "Environment EXTERNAL_DIR is not set."
-        echo "Default path will be used: $HOME/tmp/external"
-        export EXTERNAL_DIR=$HOME/tmp/external
+        echo "Default path will be used: ~/tmp/external"
+        export EXTERNAL_DIR=$(realpath ~/tmp/external)
     fi
 
     mkdir -p $EXTERNAL_DIR
