@@ -617,6 +617,7 @@ function find_neko() {
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
                 CC=$CC MPICC=$MPICC CFLAGS="$NEKO_CFLAGS" \
                 CXX=$CXX MPICXX=$MPICXX CXXFLAGS="$NEKO_CXXFLAGS" \
+                LIBS="$NEKO_LIBS" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
                 CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi

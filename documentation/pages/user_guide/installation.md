@@ -72,6 +72,7 @@ custom install locations for the given dependencies.
 | `NEKO_DIR`         | Location of the Neko library.                                        | external/neko         |
 | `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                   | external/json-fortran |
 | `ADIOS2_DIR`       | ADIOS2 installation; setting it enables ADIOS2 support.              | -                     |
+| `NEKO_LIBS`        | Extra linker flags for Neko, passed to Neko's `configure` script.    | -                     |
 | `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000      |
 | `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                     |
 | `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                     |
@@ -129,6 +130,35 @@ path can be used to install it elsewhere.
 If the active Python environment or MPI toolchain changes after ADIOS2 has been
 built, rebuild from ADIOS2 onward so that `mpi4py`, ADIOS2, Neko, and
 Neko-TOP all agree on the same Python and MPI stack.
+
+\warning Some Fortran MPI wrappers do not automatically link the C++ runtime
+required by Neko's ADIOS2 C++ interface. If the Neko link step reports undefined
+C++ symbols such as `std::`, `__gxx_personality_v0`, or `adios2::`, set
+`NEKO_LIBS` in `prepare.env` before rebuilding Neko. It must include both the
+C++ runtime and ADIOS2 libraries after `libneko.a`. For GNU compilers with an
+ADIOS2 installation selected by `ADIOS2_DIR`, use:
+
+```bash
+adios2_config="$EXTERNAL_DIR/$ADIOS2_DIR/bin/adios2-config"
+adios2_link_libs=""
+for adios2_flag in $("$adios2_config" --cxx-libs); do
+    case "$adios2_flag" in
+    */lib*.so*|*/lib*.a)
+        adios2_lib_dir=$(dirname "$adios2_flag")
+        adios2_lib_name=$(basename "$adios2_flag")
+        adios2_lib_name=${adios2_lib_name#lib}
+        adios2_lib_name=${adios2_lib_name%%.so*}
+        adios2_lib_name=${adios2_lib_name%%.a}
+        adios2_link_libs="$adios2_link_libs -L$adios2_lib_dir -l$adios2_lib_name"
+        ;;
+    *) adios2_link_libs="$adios2_link_libs $adios2_flag" ;;
+    esac
+done
+NEKO_LIBS="$adios2_link_libs -lstdc++"
+```
+
+`NEKO_LIBS` is passed unchanged to Neko's `configure` script. Use the
+equivalent compiler-runtime flag for a non-GNU toolchain.
 
 For CUDA builds, `CUDA_ARCH` must be explicitly specified before running
 `setup.sh` (for example `export CUDA_ARCH=80`).
