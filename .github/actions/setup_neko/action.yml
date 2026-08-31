@@ -100,6 +100,7 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
+        HDF5_DIR: ${{ inputs.hdf5-dir }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
         # Get the GIT sha for the current commit
@@ -107,6 +108,11 @@ runs:
         key="neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
+        # HDF5 must be part of the key: a cached Neko built without HDF5 would
+        # otherwise be restored for an HDF5-requesting run, and Neko-TOP now
+        # follows whatever Neko links, so the result would be a silently
+        # HDF5-less build rather than an error.
+        [ -n "$HDF5_DIR" ] && key="$key-hdf5"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
