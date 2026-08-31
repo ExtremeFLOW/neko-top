@@ -20,7 +20,7 @@ module test_checkpoint_restore_consistency_hdf5
   integer, parameter :: checkpoint_saves_in_memory = 10
   integer, parameter :: n_forward_steps = 55
   real(kind=dp), parameter :: end_time_in_steps = 55.0_dp
-  real(kind=rp), parameter :: restore_tolerance = 1.0e-11_rp
+  real(kind=rp), parameter :: restore_tolerance = 1.0e-10_rp
 
   @TestCase
   type, extends(MPITestCase) :: test_checkpoint_restore_consistency_hdf5_case

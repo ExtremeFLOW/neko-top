@@ -161,3 +161,7 @@ runs:
 
         echo "install-dir=${INSTALL_DIR}"
         echo "install-dir=${INSTALL_DIR}" >> $GITHUB_OUTPUT
+
+        # Store the HDF5 library path in the environment variables for future steps.
+        echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${INSTALL_DIR}/lib/pkgconfig" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}/lib" >> $GITHUB_ENV

@@ -143,7 +143,27 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 
 # ............................................................................ #
 # HDF5 Support
+#
+# Neko-TOP never links HDF5 itself. HAVE_HDF5 only gates which sources are
+# compiled (see sources/IO/CMakeLists.txt) and which tests are registered;
+# every HDF5 include and link flag already arrives transitively through
+# PkgConfig::neko. Searching for HDF5 independently is therefore not merely
+# redundant, it is harmful: Neko discovers HDF5 through pkg-config
+# (m4/ax_hdf5.m4) or, on HPE Cray systems, through the compiler wrapper
+# (m4/ax_cray.m4), and a CMake-side find_package() silently disagrees whenever
+# those mechanisms disagree. On LUMI the cray-hdf5-parallel module ships a
+# pkg-config file but no CMake package config, so find_package() ignored the
+# loaded module and selected an unrelated system-wide installation instead,
+# leaving Neko and Neko-TOP built against different HDF5 libraries.
+#
+# So we do not search. We ask the Neko library we are actually linking against
+# what it uses, then confirm we can compile and link against the same thing.
 
+# HDF5_DIR is retained for reporting only: it names the installation that
+# scripts/dependencies.sh:find_hdf5 provisioned and that Neko was configured
+# `--with-hdf5=` against. It is deliberately not added to CMAKE_PREFIX_PATH --
+# HDF5_DIR is CMake's reserved config-mode variable, and find_package() used to
+# overwrite it with the directory holding hdf5-config.cmake.
 if (NOT DEFINED HDF5_DIR)
     if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
         set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
@@ -154,17 +174,163 @@ if (NOT DEFINED HDF5_DIR)
     endif()
 endif()
 
-if (DEFINED HDF5_DIR)
-    set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
-endif()
+# Determine which flavour of HDF5, if any, the Neko library links against.
+#
+# Neko compiles src/io/hdf5_session.F90, hdf5_file.F90 and vtkhdf_file.F90
+# unconditionally and guards their bodies with `#ifdef HAVE_HDF5`, so libneko
+# carries undefined HDF5 symbols if and only if Neko was built with HDF5. Neko
+# calls the parallel-only h5pset_fapl_mpio/h5pset_dxpl_mpio routines itself, so
+# one scan answers both "has HDF5" and "is it parallel". Symbols are matched on
+# the bare routine name rather than on any compiler's name mangling, so this
+# behaves identically for GNU and Cray-compiled archives.
+#
+# Sets in the caller's scope:
+#   NEKO_HDF5_STATUS  PARALLEL, SERIAL, PRESENT, NONE or UNKNOWN
+#   NEKO_HDF5_ORIGIN  how that conclusion was reached, for diagnostics
+function(neko_top_probe_neko_hdf5)
+    set(status "UNKNOWN")
+    set(origin "no usable evidence")
 
-find_package(HDF5 QUIET COMPONENTS Fortran)
-if (HDF5_FOUND AND NOT HDF5_IS_PARALLEL)
-    message(ERROR "Found HDF5 library is not built with parallel support. "
-        "Please install a parallel version of HDF5.")
-elseif (HDF5_FOUND)
-    set(HAVE_HDF5 TRUE)
-    add_compile_definitions(HAVE_HDF5=1)
+    find_program(NEKO_TOP_NM NAMES nm llvm-nm)
+    mark_as_advanced(NEKO_TOP_NM)
+
+    # Static archive only, matching what scripts/dependencies.sh:find_neko
+    # looks for. A shared libneko would need `nm -D` and could be stripped, so
+    # rather than risk a wrong answer we fall through to the flag fallback.
+    file(GLOB neko_archives "${NEKO_DIR}/lib*/libneko.a")
+
+    if (NEKO_TOP_NM AND neko_archives)
+        list(GET neko_archives 0 archive)
+        execute_process(
+            COMMAND ${NEKO_TOP_NM} --undefined-only "${archive}"
+            OUTPUT_VARIABLE symbols
+            ERROR_VARIABLE nm_stderr
+            RESULT_VARIABLE nm_status
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+        if (nm_status EQUAL 0)
+            string(TOLOWER "${symbols}" symbols)
+            if (symbols MATCHES "h5pset_fapl_mpio")
+                set(status "PARALLEL")
+            elseif (symbols MATCHES "h5open_f")
+                set(status "SERIAL")
+            else()
+                set(status "NONE")
+            endif()
+            set(origin "undefined symbols in ${archive}")
+        endif()
+    endif()
+
+    # Fallback for the case where nm is unavailable or the archive could not be
+    # read. The flags Neko publishes reveal whether it uses HDF5, but not which
+    # flavour, hence PRESENT. Note that this cannot reach a NONE verdict: on
+    # HPE Cray systems the ftn wrapper supplies HDF5 implicitly and neko.pc
+    # mentions it nowhere, so an absence of flags proves nothing.
+    if (status STREQUAL "UNKNOWN")
+        string(TOLOWER "${neko_CFLAGS};${neko_LDFLAGS}" neko_flags)
+        if (neko_flags MATCHES "hdf5")
+            set(status "PRESENT")
+            set(origin "HDF5 flags published in neko.pc")
+        endif()
+    endif()
+
+    set(NEKO_HDF5_STATUS ${status} PARENT_SCOPE)
+    set(NEKO_HDF5_ORIGIN ${origin} PARENT_SCOPE)
+endfunction()
+
+# Confirm that Neko-TOP can actually compile and link the parallel HDF5 calls
+# its own I/O sources make, using nothing but the flags Neko publishes plus
+# MPI. Mirrors the real usage in sources/IO/hdf5/design_hdf5_io.f90. Because
+# check_fortran_source_compiles() builds an executable, this exercises exactly
+# the link step that used to fail with `undefined reference to
+# h5pset_fapl_mpio_f_` long after configure had reported success.
+function(neko_top_check_hdf5_usable result)
+    set(CMAKE_REQUIRED_QUIET TRUE)
+    set(CMAKE_REQUIRED_INCLUDES
+        ${neko_INCLUDE_DIRS}
+        ${MPI_Fortran_INCLUDE_DIRS}
+        ${MPI_Fortran_MODULE_DIR})
+
+    if (neko_LINK_LIBRARIES)
+        set(CMAKE_REQUIRED_LIBRARIES ${neko_LINK_LIBRARIES})
+    else()
+        set(CMAKE_REQUIRED_LIBRARIES ${neko_LDFLAGS})
+    endif()
+    list(APPEND CMAKE_REQUIRED_LIBRARIES ${MPI_Fortran_LIBRARIES})
+
+    check_fortran_source_compiles([==[
+program neko_top_hdf5_probe
+  use hdf5
+  use mpi_f08, only: MPI_COMM_WORLD, MPI_INFO_NULL
+  implicit none
+  integer :: ierr
+  integer(hid_t) :: fapl_id, xfer_id
+  call h5open_f(ierr)
+  call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+  call h5pset_fapl_mpio_f(fapl_id, MPI_COMM_WORLD%mpi_val, &
+       MPI_INFO_NULL%mpi_val, ierr)
+  call h5pcreate_f(H5P_DATASET_XFER_F, xfer_id, ierr)
+  call h5pset_dxpl_mpio_f(xfer_id, H5FD_MPIO_COLLECTIVE_F, ierr)
+  call h5close_f(ierr)
+end program neko_top_hdf5_probe
+]==] ${result} SRC_EXT f90)
+
+    set(${result} ${${result}} PARENT_SCOPE)
+endfunction()
+
+include(CheckFortranSourceCompiles)
+neko_top_probe_neko_hdf5()
+
+set(HAVE_HDF5 FALSE)
+if (NEKO_HDF5_STATUS STREQUAL "NONE")
+
+    # Neko has no HDF5, so neither may we. Compiling our HDF5 I/O against some
+    # other HDF5 the compiler happens to find is what produces two HDF5
+    # libraries in one executable, and with it the teardown crashes seen
+    # previously. Disable quietly; a build without HDF5 is a valid build.
+    message(STATUS "Neko links no HDF5, disabling Neko-TOP HDF5 support "
+        "(determined from ${NEKO_HDF5_ORIGIN})")
+
+elseif (NEKO_HDF5_STATUS STREQUAL "SERIAL")
+
+    # Defensive: no Neko built today can reach here, because everything Neko
+    # compiles under `#ifdef HAVE_HDF5` references h5pset_fapl_mpio_f, so an
+    # HDF5-enabled Neko always classifies as PARALLEL. The branch exists so
+    # that a future Neko growing a serial HDF5 path fails here, at configure
+    # time, rather than at link time in every Neko-TOP executable.
+    message(FATAL_ERROR
+        "Neko links a serial HDF5, but Neko-TOP's HDF5 I/O uses the "
+        "MPI-parallel interface (h5pset_fapl_mpio_f, h5pset_dxpl_mpio_f) "
+        "unconditionally.\n"
+        "  Determined from: ${NEKO_HDF5_ORIGIN}\n"
+        "Rebuild Neko against an MPI-parallel HDF5, or rebuild it without "
+        "HDF5 to build Neko-TOP with HDF5 support disabled.")
+
+else()
+
+    neko_top_check_hdf5_usable(NEKO_TOP_HDF5_USABLE)
+
+    if (NEKO_TOP_HDF5_USABLE)
+        set(HAVE_HDF5 TRUE)
+        add_compile_definitions(HAVE_HDF5=1)
+    elseif (NEKO_HDF5_STATUS STREQUAL "UNKNOWN")
+        message(WARNING
+            "Could not determine whether Neko links HDF5 "
+            "(${NEKO_HDF5_ORIGIN}), and Neko-TOP cannot compile against a "
+            "parallel HDF5 either. Continuing with HDF5 support disabled.")
+    else()
+        message(FATAL_ERROR
+            "Neko links HDF5 but Neko-TOP cannot compile and link against "
+            "it, so the two would disagree about HDF5 support.\n"
+            "  Neko HDF5:       ${NEKO_HDF5_STATUS} "
+            "(from ${NEKO_HDF5_ORIGIN})\n"
+            "  Fortran compiler: ${CMAKE_Fortran_COMPILER}\n"
+            "See the check_fortran_source_compiles entry in "
+            "${CMAKE_BINARY_DIR}/CMakeFiles/CMakeConfigureLog.yaml for the "
+            "compiler output. Build Neko and Neko-TOP in the same "
+            "environment, with the same HDF5 module loaded.")
+    endif()
+
 endif()
 
 # ............................................................................ #
@@ -246,12 +412,14 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
     message(STATUS "- NEKO_DIR:         ${NEKO_DIR}")
     message(STATUS "- PFUNIT_DIR:       ${PFUNIT_DIR}")
-    if (DEFINED HDF5_DIR AND IS_DIRECTORY "${HDF5_DIR}")
-        message(STATUS "- HDF5:             ${HDF5_DIR}")
-    elseif (HDF5_FOUND)
-        message(STATUS "- HDF5:             Found (HDF5 support enabled)")
+    if (HAVE_HDF5)
+        message(STATUS "- HDF5:             Enabled, following Neko "
+            "(${NEKO_HDF5_STATUS})")
     else()
-        message(STATUS "- HDF5:             Not found (HDF5 support disabled)")
+        message(STATUS "- HDF5:             Disabled, Neko links no HDF5")
+    endif()
+    if (DEFINED HDF5_DIR)
+        message(STATUS "- HDF5_DIR:         ${HDF5_DIR}")
     endif()
     message(STATUS ${BARRIER})
     message(STATUS "")

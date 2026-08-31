@@ -222,7 +222,7 @@ contains
   !      already-existing log file.
 
   @test(npes=[2])
-  subroutine restart_via_run_has_no_duplicate_log_rows(this)
+  subroutine restart_via_run(this)
     class(test_optimizer_checkpoint), intent(inout) :: this
     type(json_file) :: parameters, design_parameters
 
@@ -357,9 +357,8 @@ contains
        end do
        close(file_unit)
 
-       write(msg, '(A,I0,A)') 'Found ', n_header_dup, ' duplicate header &
-            &row(s) in optimization_data.csv (a restart re-wrote the header &
-            &into the middle of the already-existing log file)'
+       write(msg, '(A,I0,1X,A)') 'Found ', n_header_dup, &
+            'duplicate header row(s) in optimization_data.csv'
        @assertEqual(0, n_header_dup, trim(msg))
 
        n_dup = 0
@@ -369,9 +368,8 @@ contains
           end do
        end do
 
-       write(msg, '(A,I0,A)') 'Found ', n_dup, ' duplicate iteration &
-            &row(s) in optimization_data.csv (a restart re-logged an &
-            &already-logged iteration)'
+       write(msg, '(A,I0,1X,A)') 'Found ', n_dup, &
+            'duplicate iteration row(s) in optimization_data.csv'
        @assertEqual(0, n_dup, trim(msg))
 
        ! Positive check: the run spans iterations 0..4 (2 from the first
@@ -390,7 +388,7 @@ contains
        end do
     end if
 
-  end subroutine restart_via_run_has_no_duplicate_log_rows
+  end subroutine restart_via_run
 
   ! ========================================================================== !
   ! Utility function to compute RMSE between two vectors
