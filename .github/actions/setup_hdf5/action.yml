@@ -162,10 +162,6 @@ runs:
         echo "install-dir=${INSTALL_DIR}"
         echo "install-dir=${INSTALL_DIR}" >> $GITHUB_OUTPUT
 
-        # Neko's AX_HDF5 finds HDF5 *only* through pkg-config
-        # (PKG_CHECK_MODULES hdf5_fortran >= 1.14.0) and ignores the path
-        # given to --with-hdf5, so without this export its configure reports
-        # "HDF5  yes  no" and exits 1 on "requested but not found". Mirrors
-        # what setup_json-fortran already does.
+        # Store the HDF5 library path in the environment variables for future steps.
         echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${INSTALL_DIR}/lib/pkgconfig" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}/lib" >> $GITHUB_ENV
