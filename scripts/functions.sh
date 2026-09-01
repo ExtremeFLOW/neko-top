@@ -13,10 +13,11 @@ function run {
         return 1
     elif [[ ${#casefile[@]} -eq 1 ]]; then
         casefile=${casefile[0]}
-        logfile=$(basename -- ${casefile%.*}).log
-    else
-        logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
+
+    # Neko-TOP logs to its own stream, next to the Neko log file.
+    logfile=neko.log
+    nekotop_logfile=optimizer.log
 
     # Check for recoverable errors in the error log
     if [ -s error.log ]; then
@@ -27,7 +28,7 @@ function run {
         echo "" > error.log
     fi
 
-    if [ -f "$logfile" ]; then
+    if [ -f "$logfile" ] || [ -f "$nekotop_logfile" ]; then
         # Move old log files to folder with counter padded to 2 digits
 
         old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)
@@ -47,7 +48,9 @@ function run {
     # Run the example
     printf "Executing Neko.\n" > ./output.log
     printf "See $logfile for the status output.\n"
+    printf "See $nekotop_logfile for the Neko-TOP status output.\n"
     export NEKO_LOG_FILE=$logfile
+    export NEKO_TOP_LOG_FILE=$nekotop_logfile
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko

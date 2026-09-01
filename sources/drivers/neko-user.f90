@@ -38,6 +38,7 @@ program usrneko
   use user, only: user_setup
   use user_access_singleton, only: neko_user_access
   use neko_top, only: neko_top_register_types
+  use nekotop_logger, only: nekotop_log
   implicit none
 
   type(case_t), target :: C
@@ -45,8 +46,10 @@ program usrneko
   call neko_top_register_types()
   call user_setup(C%user)
   call neko_init(C)
+  call nekotop_log%init(env_prefix = "NEKO_TOP")
   call neko_user_access%init(C)
   call neko_solve(C)
+  call nekotop_log%free()
   call neko_finalize(C)
 
 

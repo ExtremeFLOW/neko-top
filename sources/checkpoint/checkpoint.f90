@@ -42,7 +42,7 @@ module simulation_checkpoint
   use chkp_output, only: chkp_output_t
   use field, only: field_t
   use field_list, only: field_list_t
-  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
+  use nekotop_logger, only: nekotop_log, LOG_SIZE, NEKO_LOG_DEBUG
   use mpi_f08, only: MPI_WTIME, MPI_Barrier
   use comm, only: NEKO_COMM, pe_rank
   use utils, only: neko_error
@@ -267,32 +267,32 @@ contains
     allocate(this%state_storage(this%n_saves_memory, this%state_list%size()))
 
     ! Write a status message with the parameters set
-    call neko_log%section("Checkpointing")
+    call nekotop_log%section("Checkpointing")
 
     write(msg, '(A, A)') "Algorithm:                    ", trim(this%algorithm)
-    call neko_log%message(trim(msg))
+    call nekotop_log%message(trim(msg))
     write(msg, '(A,I0)') "Number of checkpoints in RAM: ", this%n_saves_memory
-    call neko_log%message(trim(msg))
+    call nekotop_log%message(trim(msg))
     write(msg, '(A, A)') "Checkpoint file path:         ", trim(this%path)
-    call neko_log%message(trim(msg))
+    call nekotop_log%message(trim(msg))
     write(msg, '(A, A)') "Checkpoint file name:         ", trim(this%filename)
-    call neko_log%message(trim(msg))
+    call nekotop_log%message(trim(msg))
     write(msg, '(A, A)') "Checkpoint file format:       ", trim(this%fmt)
-    call neko_log%message(trim(msg))
+    call nekotop_log%message(trim(msg))
 
     if (.not. this%keep_checkpoints) then
-       call neko_log%message("Checkpoint files will be deleted.")
+       call nekotop_log%message("Checkpoint files will be deleted.")
     else
-       call neko_log%message("Checkpoint files will be kept.")
+       call nekotop_log%message("Checkpoint files will be kept.")
     end if
 
-    call neko_log%message("Fields in checkpoint:", NEKO_LOG_DEBUG)
+    call nekotop_log%message("Fields in checkpoint:", NEKO_LOG_DEBUG)
     do i = 1, this%state_list%size()
        si => this%state_list%get(i)
-       call neko_log%message("  - " // trim(si%name), NEKO_LOG_DEBUG)
+       call nekotop_log%message("  - " // trim(si%name), NEKO_LOG_DEBUG)
     end do
 
-    call neko_log%end_section()
+    call nekotop_log%end_section()
 
   end subroutine checkpoint_init_from_components
 

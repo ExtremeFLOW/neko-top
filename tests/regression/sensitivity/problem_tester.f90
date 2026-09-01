@@ -11,6 +11,7 @@ program problem_tester
   use utils, only: neko_error
   use neko_top, only: neko_top_register_types
   use neko, only: neko_init, neko_finalize
+  use nekotop_logger, only: nekotop_log
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST
@@ -60,6 +61,7 @@ program problem_tester
   ! Initialize the Neko environment
 
   call neko_init()
+  call nekotop_log%init(env_prefix = "NEKO_TOP")
   call neko_top_register_types()
 
   ! -------------------------------------------------------------------------- !
@@ -170,6 +172,7 @@ program problem_tester
   call sim%free()
 
   ! Finalize the Neko environment
+  call nekotop_log%free()
   call neko_finalize()
 
 end program problem_tester

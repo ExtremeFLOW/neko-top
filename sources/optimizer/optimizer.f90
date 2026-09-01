@@ -43,7 +43,7 @@ module optimizer
   use problem, only: problem_t
   use design, only: design_t
   use num_types, only: rp
-  use logger, only: neko_log, LOG_SIZE
+  use nekotop_logger, only: nekotop_log, LOG_SIZE
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX
   use utils, only: neko_error, filename_suffix, read_duration
@@ -89,7 +89,7 @@ module optimizer
      real(kind=rp), private :: max_runtime = -1.0_rp
      real(kind=rp), private :: start_time = 0.0_rp
      real(kind=rp), private :: average_time = 0.0_rp
-     real(kind=rp), private :: step_count = 0.0_rp
+     integer, private :: step_count = 0
 
      ! Logging state
      logical, private :: log_initialized = .false.
@@ -409,11 +409,12 @@ contains
     type(simulation_t), optional, intent(inout) :: simulation
     real(kind=rp) :: iteration_time
     character(len=1024) :: checkpoint_file
+    character(len=LOG_SIZE) :: msg
     logical :: converged, file_exists
     integer :: stop_flag
 
     ! Initialize variables
-    stop_flag = 1
+    stop_flag = -1
     converged = .false.
 
     ! Restart from checkpoint if available
@@ -452,13 +453,13 @@ contains
     ! Save the current design state.
     call design%write(this%current_iteration)
 
-    call neko_log%section('Optimization Loop')
+    call nekotop_log%section('Optimization Loop')
 
     do while (this%current_iteration .lt. this%max_iterations)
        this%current_iteration = this%current_iteration + 1
-       if (pe_rank .eq. 0) then
-          write(*,*) 'Starting iteration ', this%current_iteration
-       end if
+       write(msg, '(A,I0,A,I0)') 'Iteration ', this%current_iteration, &
+            ' of ', this%max_iterations
+       call nekotop_log%section(trim(msg))
 
        call profiler_start_region('Optimizer iteration')
        iteration_time = MPI_Wtime()
@@ -490,26 +491,24 @@ contains
 
        if (converged) then
           stop_flag = 0
-          exit
        else if (this%current_iteration .ge. this%max_iterations) then
           stop_flag = 1
-          exit
        else if (this%max_design_change .lt. this%stop_design_change) then
           stop_flag = 2
-          exit
        else if (this%out_of_time(iteration_time)) then
           call this%save_checkpoint(this%current_iteration, design, .true., &
                basename = 'optimizer_rt_checkpoint')
           stop_flag = 3
-          exit
        end if
+
+       call nekotop_log%end_section()
+       if (stop_flag .ne. -1) exit
     end do
+    call nekotop_log%end_section()
 
     ! Check that the final design is valid
     call this%validate(problem, design)
     call this%print_status(stop_flag, this%current_iteration)
-
-    call neko_log%end_section()
 
   end subroutine optimizer_run
 
@@ -535,15 +534,15 @@ contains
     case (0)
        write(msg, '(A,I0,A)') 'Optimizer converged successfully after ', &
             iter, ' iterations.'
-       call neko_log%message(msg)
+       call nekotop_log%message(msg)
     case (1)
        write(msg, '(A,I0,A)') 'Optimizer did not converge in ', &
             this%max_iterations, ' iterations.'
-       call neko_log%warning(msg)
+       call nekotop_log%warning(msg)
     case (2)
        write(msg, '(A,A,F8.2,A)') 'Optimizer stopped, design change ', &
             'below threshold of: ', this%stop_design_change, '.'
-       call neko_log%warning(msg)
+       call nekotop_log%warning(msg)
     case (3)
        write(msg, '(A)') 'Optimizer stopped due to runtime limit.'
        call neko_error(msg)
@@ -576,11 +575,12 @@ contains
          NEKO_COMM)
 
     elapsed_time = MPI_Wtime() - this%start_time
-    this%step_count = this%step_count + 1.0_rp
-    old_avg_weight = (this%step_count - 1) / this%step_count
+    this%step_count = this%step_count + 1
+    old_avg_weight = real(this%step_count - 1, kind=rp) / &
+         real(this%step_count, kind=rp)
 
     ! Estimate Cumulative Average iteration time
-    this%average_time = time / this%step_count + &
+    this%average_time = time / real(this%step_count, kind=rp) + &
          this%average_time * old_avg_weight
 
     ! Determine if next iteration would exceed max runtime
@@ -785,7 +785,7 @@ contains
     real(kind=rp) :: t_start, t_total
     logical :: exist
 
-    call neko_log%section('Optimizer checkpoint')
+    call nekotop_log%section('Optimizer checkpoint')
     t_start = MPI_Wtime()
 
     ! Set default behaviour
@@ -827,7 +827,7 @@ contains
             trim(file_path), trim(file_base), "_", iter, ".", trim(file_ext)
     end if
 
-    call neko_log%message('Save general optimizer components')
+    call nekotop_log%message('Save general optimizer components')
     select case (trim(file_ext))
     case ('h5', 'hdf5', 'hf5')
        call optimizer_save_checkpoint_hdf5(this, file_full, iter, overwrite)
@@ -836,15 +836,15 @@ contains
             trim(file_ext) // '"')
     end select
 
-    call neko_log%message('Saving components of ' // this%optimizer_type)
+    call nekotop_log%message('Saving components of ' // this%optimizer_type)
     call this%save_checkpoint_components(file_full, overwrite)
 
-    call neko_log%message('Save design checkpoint')
+    call nekotop_log%message('Save design checkpoint')
     call design%save_checkpoint(file_full, overwrite)
 
     t_total = MPI_Wtime() - t_start
     write(msg, '(A,F6.2)') "Checkpoint time: ", t_total
-    call neko_log%end_section(msg)
+    call nekotop_log%end_section(msg)
 
   end subroutine optimizer_save_checkpoint
 
@@ -871,6 +871,9 @@ contains
     character(len=*), intent(in), optional :: format
     character(len=256) :: file_full
     character(len=12) :: suffix
+    character(len=LOG_SIZE) :: msg
+
+    call nekotop_log%section('Optimizer loading checkpoint')
 
     if (present(filename)) then
        file_full = trim(filename)
@@ -895,12 +898,14 @@ contains
     ! Set the current iteration to the loaded iteration
     this%current_iteration = iter
 
-    if (pe_rank .eq. 0) then
-       write(*,*) 'Restarted simulation from checkpoint.'
-       write(*,*) '    Checkpoint file: "', trim(file_full), '"'
-       write(*,*) '    Iteration      : ', this%current_iteration
-    end if
+    write(msg, '(A)') 'Restarted simulation from checkpoint.'
+    call nekotop_log%message(trim(msg))
+    write(msg, '(A,A,A)') '    Checkpoint file: "', trim(file_full), '"'
+    call nekotop_log%message(trim(msg))
+    write(msg, '(A,I0)') '    Iteration      : ', this%current_iteration
+    call nekotop_log%message(trim(msg))
 
+    call nekotop_log%end_section()
   end subroutine optimizer_load_checkpoint
 
   ! ========================================================================== !

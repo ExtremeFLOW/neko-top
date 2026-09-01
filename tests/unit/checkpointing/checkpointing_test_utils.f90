@@ -4,6 +4,7 @@ module checkpointing_test_utils
   use design, only: design_t, design_factory
   use problem, only: problem_t
   use neko, only: neko_init
+  use nekotop_logger, only: nekotop_log
   use num_types, only: rp
   use json_module, only: json_file
   use json_utils, only: json_get
@@ -35,6 +36,7 @@ contains
     if (runtime_initialized) return
 
     call neko_init()
+    call nekotop_log%init(env_prefix = "NEKO_TOP")
     call neko_top_register_types()
 
     runtime_initialized = .true.

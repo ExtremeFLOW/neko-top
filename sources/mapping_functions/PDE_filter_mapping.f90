@@ -53,7 +53,7 @@ module PDE_filter_mapping
   use scratch_registry, only: neko_scratch_registry
   use field_math, only: field_copy, field_add3
   use coefs, only: coef_t
-  use logger, only: neko_log, LOG_SIZE
+  use nekotop_logger, only: nekotop_log, LOG_SIZE
   use neko_config, only: NEKO_BCKND_DEVICE
   use dofmap, only: dofmap_t
   use jacobi, only: jacobi_t
@@ -279,14 +279,15 @@ contains
     call this%pc_filt%update()
 
     ! write it all out
-    call neko_log%message('Filter')
+    call nekotop_log%section('PDE Filter Mapping')
 
     write(log_buf, '(A,A,A)') 'Iterations:   ',&
          'Start residual:     ', 'Final residual:'
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
     write(log_buf, '(I11,3x, E15.7,5x, E15.7)') this%ksp_results%iter, &
          this%ksp_results%res_start, this%ksp_results%res_final
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
+    call nekotop_log%end_section()
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -379,14 +380,15 @@ contains
     call this%pc_filt%update()
 
     ! write it all out
-    call neko_log%message('Filter')
+    call nekotop_log%section('PDE Filter Backward Mapping')
 
     write(log_buf, '(A,A,A)') 'Iterations:   ',&
          'Start residual:     ', 'Final residual:'
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
     write(log_buf, '(I11,3x, E15.7,5x, E15.7)') this%ksp_results%iter, &
          this%ksp_results%res_start, this%ksp_results%res_final
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
+    call nekotop_log%end_section()
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
