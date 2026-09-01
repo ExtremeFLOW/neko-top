@@ -143,28 +143,58 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 
 # ............................................................................ #
 # HDF5 Support
+#
+# Neko-TOP's own HDF5 I/O (sources/IO/hdf5/*.f90) requires an MPI-parallel
+# HDF5. The install prefix is HDF5_ROOT, set by scripts/dependencies.sh or by
+# the site's module system.
 
-if (NOT DEFINED HDF5_DIR)
-    if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
-        set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
-            "Path to the HDF5 installation")
-    elseif(DEFINED ENV{HDF5_DIR})
-        set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
-            CACHE STRING "Path to the HDF5 installation")
-    endif()
+# A serial HDF5 is fatal if it was pointed at deliberately, and merely ignored
+# if the default search happened to find one. Record which case this is before
+# find_package(), which sets HDF5_ROOT itself.
+if (DEFINED HDF5_ROOT OR DEFINED ENV{HDF5_ROOT})
+    set(_hdf5_requested TRUE)
+else()
+    set(_hdf5_requested FALSE)
 endif()
 
-if (DEFINED HDF5_DIR)
-    set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
+# Use FindHDF5's module mode; its config-mode branch can select a different
+# installation than the one HDF5_ROOT points at.
+set(HDF5_NO_FIND_PACKAGE_CONFIG_FILE TRUE)
+find_package(HDF5 COMPONENTS Fortran)
+
+# HDF5_IS_PARALLEL is only conclusive when FindHDF5 could determine it: a
+# non-parallel installation sets it FALSE, but one that exposes no way to tell
+# leaves it undefined. Check it when it is defined, and otherwise trust the
+# location we were given rather than guessing.
+if (HDF5_FOUND AND DEFINED HDF5_IS_PARALLEL AND NOT HDF5_IS_PARALLEL)
+    set(_hdf5_known_serial TRUE)
+else()
+    set(_hdf5_known_serial FALSE)
 endif()
 
-find_package(HDF5 QUIET COMPONENTS Fortran)
-if (HDF5_FOUND AND NOT HDF5_IS_PARALLEL)
-    message(ERROR "Found HDF5 library is not built with parallel support. "
-        "Please install a parallel version of HDF5.")
+if (_hdf5_known_serial AND _hdf5_requested)
+
+    message(FATAL_ERROR
+        "Found HDF5 ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}, but it is not "
+        "MPI-parallel. Neko-TOP's HDF5 I/O calls h5pset_fapl_mpio_f and "
+        "h5pset_dxpl_mpio_f unconditionally.\n"
+        "Point HDF5_ROOT at an HDF5 built with -DHDF5_ENABLE_PARALLEL=ON "
+        "-DHDF5_BUILD_FORTRAN=ON, or configure with "
+        "-DCMAKE_DISABLE_FIND_PACKAGE_HDF5=ON to build without HDF5 support.")
+
+elseif (_hdf5_known_serial)
+
+    message(WARNING
+        "Ignoring the HDF5 found at ${HDF5_INCLUDE_DIRS}: it is not "
+        "MPI-parallel, which Neko-TOP's HDF5 I/O requires. Set HDF5_ROOT to "
+        "an MPI-parallel HDF5 to enable HDF5 support.")
+    set(HAVE_HDF5 FALSE CACHE INTERNAL "Neko-TOP HDF5 support disabled")
+
 elseif (HDF5_FOUND)
-    set(HAVE_HDF5 TRUE)
+    set(HAVE_HDF5 TRUE CACHE INTERNAL "Neko-TOP HDF5 support enabled")
     add_compile_definitions(HAVE_HDF5=1)
+else()
+    set(HAVE_HDF5 FALSE CACHE INTERNAL "Neko-TOP HDF5 support disabled")
 endif()
 
 # ............................................................................ #
@@ -246,12 +276,13 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
     message(STATUS "- NEKO_DIR:         ${NEKO_DIR}")
     message(STATUS "- PFUNIT_DIR:       ${PFUNIT_DIR}")
-    if (DEFINED HDF5_DIR AND IS_DIRECTORY "${HDF5_DIR}")
-        message(STATUS "- HDF5:             ${HDF5_DIR}")
-    elseif (HDF5_FOUND)
-        message(STATUS "- HDF5:             Found (HDF5 support enabled)")
+    if (HAVE_HDF5 AND HDF5_IS_PARALLEL)
+        message(STATUS "- HDF5:             ${HDF5_VERSION} (parallel)")
+    elseif (HAVE_HDF5)
+        message(STATUS "- HDF5:             ${HDF5_VERSION} (parallel support "
+            "not verifiable, assumed)")
     else()
-        message(STATUS "- HDF5:             Not found (HDF5 support disabled)")
+        message(STATUS "- HDF5:             Disabled (not found)")
     endif()
     message(STATUS ${BARRIER})
     message(STATUS "")
