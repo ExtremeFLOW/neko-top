@@ -229,6 +229,7 @@ contains
     call h5dcreate_f(grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, object%a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
+    call h5sclose_f(filespace, ierr)
 
     ! The next batch are vectors of size m
     ddim(1) = object%m
@@ -436,14 +437,14 @@ contains
     call h5aopen_f(grp_id, 'bcknd', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, bcknd, ddim, ierr)
+    call h5tclose_f(str_type, ierr)
     call h5aclose_f(attr_id, ierr)
 
     call h5aopen_f(grp_id, 'subsolver', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, subsolver, ddim, ierr)
-    call h5aclose_f(attr_id, ierr)
-
     call h5tclose_f(str_type, ierr)
+    call h5aclose_f(attr_id, ierr)
 
     ! Read array attribute n
     ddim(1) = pe_size
