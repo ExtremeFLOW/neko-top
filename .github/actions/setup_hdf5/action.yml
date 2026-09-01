@@ -161,3 +161,5 @@ runs:
 
         echo "install-dir=${INSTALL_DIR}"
         echo "install-dir=${INSTALL_DIR}" >> $GITHUB_OUTPUT
+        echo "HDF5_ROOT=${INSTALL_DIR}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}/lib" >> $GITHUB_ENV

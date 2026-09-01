@@ -143,37 +143,39 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 
 # ............................................................................ #
 # HDF5 Support
+#
+# Neko-TOP's own HDF5 I/O (sources/IO/hdf5/*.f90) requires an MPI-parallel
+# HDF5. The install prefix is HDF5_ROOT, set by scripts/dependencies.sh or by
+# the site's module system.
 
-if (NOT DEFINED HDF5_DIR)
-    if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
-        set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
-            "Path to the HDF5 installation")
-    elseif(DEFINED ENV{HDF5_DIR})
-        set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
-            CACHE STRING "Path to the HDF5 installation")
-    endif()
+# Record if we explicitly requested HDF5 support.
+if (DEFINED HDF5_ROOT OR DEFINED ENV{HDF5_ROOT})
+    set(_hdf5_requested TRUE)
+else()
+    set(_hdf5_requested FALSE)
 endif()
 
-if (DEFINED HDF5_DIR)
-    set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
+# Use FindHDF5's module mode; its config-mode branch can select a different
+# installation than the one HDF5_ROOT points at.
+set(HDF5_NO_FIND_PACKAGE_CONFIG_FILE TRUE)
+find_package(HDF5 COMPONENTS Fortran)
+
+# Determine if the HDF5 found is serial or parallel.
+if (HDF5_FOUND AND DEFINED HDF5_IS_PARALLEL AND NOT HDF5_IS_PARALLEL)
+    set(_hdf5_known_serial TRUE)
+else()
+    set(_hdf5_known_serial FALSE)
 endif()
 
-find_package(HDF5 QUIET COMPONENTS Fortran)
-if (NOT HDF5_FOUND)
-    pkg_check_modules(HDF5 QUIET IMPORTED_TARGET hdf5)
-    if (NOT HDF5_FOUND)
-        pkg_check_modules(HDF5 QUIET IMPORTED_TARGET hdf5_parallel)
-    endif()
-
-    if (HDF5_FOUND)
-        set(HDF5_PKG_FOUND TRUE)
-        set(HDF5_FOUND FALSE)
-    endif()
-endif()
-
-if (HDF5_FOUND OR HDF5_PKG_FOUND)
-    set(HAVE_HDF5 TRUE)
+if (_hdf5_requested AND _hdf5_known_serial)
+    message(fatal_error "Found HDF5 ${HDF5_VERSION}, but it is not parallel.")
+elseif (_hdf5_requested AND NOT HDF5_FOUND)
+    message(fatal_error "HDF5 support was requested, but HDF5 was not found.")
+elseif (HDF5_FOUND)
+    set(HAVE_HDF5 TRUE CACHE INTERNAL "Neko-TOP HDF5 support enabled")
     add_compile_definitions(HAVE_HDF5=1)
+else()
+    set(HAVE_HDF5 FALSE CACHE INTERNAL "Neko-TOP HDF5 support disabled")
 endif()
 
 # ............................................................................ #
@@ -255,12 +257,12 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
     message(STATUS "- NEKO_DIR:         ${NEKO_DIR}")
     message(STATUS "- PFUNIT_DIR:       ${PFUNIT_DIR}")
-    if (DEFINED HDF5_DIR AND IS_DIRECTORY "${HDF5_DIR}")
-        message(STATUS "- HDF5:             ${HDF5_DIR}")
-    elseif (HDF5_FOUND)
-        message(STATUS "- HDF5:             Found (HDF5 support enabled)")
+    if (HAVE_HDF5 AND HDF5_IS_PARALLEL)
+        message(STATUS "- HDF5:             ${HDF5_VERSION} (parallel)")
+    elseif (HAVE_HDF5)
+        message(STATUS "- HDF5:             ${HDF5_VERSION} (parallel assumed)")
     else()
-        message(STATUS "- HDF5:             Not found (HDF5 support disabled)")
+        message(STATUS "- HDF5:             Disabled (not found)")
     endif()
     message(STATUS ${BARRIER})
     message(STATUS "")

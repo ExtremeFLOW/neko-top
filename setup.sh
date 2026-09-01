@@ -126,6 +126,7 @@ printf "Setting up external dependencies\n"
 
 check_system_dependencies           # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
+find_hdf5 $HDF5_DIR                 # Re-defines the HDF5_DIR variable.
 find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
 find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
 
@@ -171,5 +172,8 @@ printf "\tDevice:        $DEVICE_TYPE\n"
 printf "\tTests:         " && [[ "$TEST" == "ON" ]] && printf "YES\n" || printf "NO\n"
 printf "\tExamples:      " && [[ "$EXAMPLES" == "ON" ]] && printf "YES\n" || printf "NO\n"
 printf "\tDocumentation: " && [[ "$DOCS" == "ON" ]] && printf "YES\n" || printf "NO\n"
-printf "\tHDF5:          " && [[ -d "$HDF5_DIR" ]] && printf "YES\n" || printf "NO\n"
+printf "\tHDF5:          " \
+    && grep -q '^HAVE_HDF5:INTERNAL=TRUE$' "$MAIN_DIR/build/CMakeCache.txt" \
+        2>/dev/null \
+    && printf "YES\n" || printf "NO\n"
 printf "=%.0s" {1..80} && printf "\n"
