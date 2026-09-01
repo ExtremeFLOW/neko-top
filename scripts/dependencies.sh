@@ -258,7 +258,7 @@ function find_hdf5() {
     elif [ -n "$HDF5_DIR" ]; then
         HDF5_ROOT="$HDF5_DIR"
     else
-        return
+        return 0
     fi
 
     if [ "${HDF5_ROOT:0:1}" != "/" ]; then
