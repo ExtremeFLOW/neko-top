@@ -314,7 +314,7 @@ function find_hdf5() {
     fi
 
     export HDF5_ROOT=$(realpath $HDF5_LIB/../)
-    export HDF5_DIR=$HDF5_ROOT   # legacy spelling, consumed by find_neko
+    export HDF5_DIR=$HDF5_ROOT
     export LD_LIBRARY_PATH="$HDF5_LIB:$LD_LIBRARY_PATH"
     export PKG_CONFIG_PATH="$HDF5_LIB/pkgconfig:$PKG_CONFIG_PATH"
 }
@@ -391,7 +391,7 @@ function find_neko() {
     # Find the required dependencies for Neko
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
-    find_hdf5 $HDF5_ROOT
+    find_hdf5 $HDF5_DIR
     find_parmetis $PARMETIS_DIR
     [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
 
@@ -602,7 +602,7 @@ function find_exo2nek() {
 # Ensure Rea2Nbin is installed.
 function find_rea2nbin() {
     find_json_fortran $JSON_FORTRAN_DIR
-    find_hdf5 $HDF5_ROOT
+    find_hdf5 $HDF5_DIR
 
     # Check if rea2nbin is available
     if command -v rea2nbin 2>&1 1>/dev/null; then
