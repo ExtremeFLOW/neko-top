@@ -148,9 +148,7 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 # HDF5. The install prefix is HDF5_ROOT, set by scripts/dependencies.sh or by
 # the site's module system.
 
-# A serial HDF5 is fatal if it was pointed at deliberately, and merely ignored
-# if the default search happened to find one. Record which case this is before
-# find_package(), which sets HDF5_ROOT itself.
+# Record if we explicitly requested HDF5 support.
 if (DEFINED HDF5_ROOT OR DEFINED ENV{HDF5_ROOT})
     set(_hdf5_requested TRUE)
 else()
@@ -162,34 +160,17 @@ endif()
 set(HDF5_NO_FIND_PACKAGE_CONFIG_FILE TRUE)
 find_package(HDF5 COMPONENTS Fortran)
 
-# HDF5_IS_PARALLEL is only conclusive when FindHDF5 could determine it: a
-# non-parallel installation sets it FALSE, but one that exposes no way to tell
-# leaves it undefined. Check it when it is defined, and otherwise trust the
-# location we were given rather than guessing.
+# Determine if the HDF5 found is serial or parallel.
 if (HDF5_FOUND AND DEFINED HDF5_IS_PARALLEL AND NOT HDF5_IS_PARALLEL)
     set(_hdf5_known_serial TRUE)
 else()
     set(_hdf5_known_serial FALSE)
 endif()
 
-if (_hdf5_known_serial AND _hdf5_requested)
-
-    message(FATAL_ERROR
-        "Found HDF5 ${HDF5_VERSION} at ${HDF5_INCLUDE_DIRS}, but it is not "
-        "MPI-parallel. Neko-TOP's HDF5 I/O calls h5pset_fapl_mpio_f and "
-        "h5pset_dxpl_mpio_f unconditionally.\n"
-        "Point HDF5_ROOT at an HDF5 built with -DHDF5_ENABLE_PARALLEL=ON "
-        "-DHDF5_BUILD_FORTRAN=ON, or configure with "
-        "-DCMAKE_DISABLE_FIND_PACKAGE_HDF5=ON to build without HDF5 support.")
-
-elseif (_hdf5_known_serial)
-
-    message(WARNING
-        "Ignoring the HDF5 found at ${HDF5_INCLUDE_DIRS}: it is not "
-        "MPI-parallel, which Neko-TOP's HDF5 I/O requires. Set HDF5_ROOT to "
-        "an MPI-parallel HDF5 to enable HDF5 support.")
-    set(HAVE_HDF5 FALSE CACHE INTERNAL "Neko-TOP HDF5 support disabled")
-
+if (_hdf5_requested AND _hdf5_known_serial)
+    message(fatal_error "Found HDF5 ${HDF5_VERSION}, but it is not parallel.")
+elseif (_hdf5_requested AND NOT HDF5_FOUND)
+    message(fatal_error "HDF5 support was requested, but HDF5 was not found.")
 elseif (HDF5_FOUND)
     set(HAVE_HDF5 TRUE CACHE INTERNAL "Neko-TOP HDF5 support enabled")
     add_compile_definitions(HAVE_HDF5=1)
@@ -279,8 +260,7 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     if (HAVE_HDF5 AND HDF5_IS_PARALLEL)
         message(STATUS "- HDF5:             ${HDF5_VERSION} (parallel)")
     elseif (HAVE_HDF5)
-        message(STATUS "- HDF5:             ${HDF5_VERSION} (parallel support "
-            "not verifiable, assumed)")
+        message(STATUS "- HDF5:             ${HDF5_VERSION} (parallel assumed)")
     else()
         message(STATUS "- HDF5:             Disabled (not found)")
     endif()
