@@ -10,7 +10,7 @@
             "timestep": 1e-3
         },
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": true
         },
@@ -84,7 +84,8 @@
         ]
     },
     "unsteady": true,
-    "checkpoints": {
+    "state_recovery": {
+        "type": "checkpoint",
         "enabled": true,
         "n_memory": 20
     },
