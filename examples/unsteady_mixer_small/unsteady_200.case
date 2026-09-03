@@ -185,7 +185,7 @@
             "max_iterations": 200,
             "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
-            "checkpoints": {
+            "checkpoint": {
                 "interval": 10
             },
             "mma": {
