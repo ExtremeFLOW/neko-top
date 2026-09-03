@@ -17,8 +17,7 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 200.0,
-            "output_control": "nsamples",
-            "output_value": 10,
+            "output_control": "never",
             "output_format": "vtkhdf",
             "strict_convergence": true,
             "pressure_solver": {
@@ -105,8 +104,7 @@
             }
         },
         "adjoint_fluid": {
-            "output_control": "nsamples",
-            "output_value": 10,
+            "output_control": "never",
             "output_format": "vtkhdf",
             "initial_condition": {
                 "type": "uniform",
@@ -186,9 +184,12 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 25,
+            "max_iterations": 200,
             "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
+            "checkpoints": {
+                "interval": 10
+            },
             "mma": {
                 "scale": 1.0,
                 "xmin": 0.0,
