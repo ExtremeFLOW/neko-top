@@ -20,7 +20,7 @@ function run {
 
     # Check for recoverable errors in the error log
     if [ -s error.log ]; then
-        grep "ERROR: Optimizer stopped after reaching the maximum runtime" \
+        grep "*** ERROR: Optimizer stopped due to runtime limit. ***" \
             error.log >/dev/null || return 1
 
         # If the error is recoverable, clear the error log and continue
