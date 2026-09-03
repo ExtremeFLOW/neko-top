@@ -69,14 +69,16 @@ fi
 printf "\n\e[4mTest status.\e[m\n"
 
 for test in ${tests[@]}; do
-    if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
-        printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
-        rm -rf $LPATH/$test
-    fi
-done
+    # Check if there were errors. Print them if there were.
+    if [ -s $LPATH/$test/error.log ]; then
 
-for test in ${tests[@]}; do
-    if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
+        if [ "$(head -n 1 $LPATH/$test/error.log)" = "Interrupted" ]; then
+            printf '\t\e[1;31m%-12s\e[m %-s\n' "Interrupted:" "$test"
+        else
+            printf '\t\e[1;31m%-12s\e[m %-s\n' "Error:" "$test"
+            EXIT_STATUS=1
+        fi
+    elif [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
         file=($(find $LPATH/$test -type f -name "*.case"))
 
         # If more than one file exists
@@ -121,19 +123,9 @@ for test in ${tests[@]}; do
         else
             printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Starting:" "$test"
         fi
-    fi
-done
 
-for test in ${tests[@]}; do
-    # Check if there were errors. Print them if there were.
-    if [ -s $LPATH/$test/error.log ]; then
-
-        if [ "$(head -n 1 $LPATH/$test/error.log)" = "Interrupted" ]; then
-            printf '\t\e[1;31m%-12s\e[m %-s\n' "Interrupted:" "$test"
-        else
-            printf '\t\e[1;31m%-12s\e[m %-s\n' "Error:" "$test"
-            EXIT_STATUS=1
-        fi
+    elif [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
+        printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
     fi
 done
 
