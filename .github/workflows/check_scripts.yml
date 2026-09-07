@@ -27,7 +27,6 @@ env:
   # Set the default versions of the dependencies
   JSON_FORTRAN_VERSION: ${{ inputs.json-fortran-version }}
   NEKO_VERSION: ${{ inputs.neko-version }}
-  HDF5_VERSION: ${{ inputs.hdf5-version }}
   NEKO_TOP_VERSION: ${{ inputs.neko-top-version }}
 
 # ---------------------------------------------------------------------------- #
