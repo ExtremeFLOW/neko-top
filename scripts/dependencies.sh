@@ -247,58 +247,74 @@ _ACEOF
 # Ensure HDF5 is installed, if not install it.
 function find_hdf5() {
 
-    # Determine the HDF5 installation directory
     check_external_dir
 
-    # Determine the HDF5 installation directory
+    # Determine the HDF5 installation directory. HDF5_ROOT is the name CMake
+    # and the module systems use; HDF5_DIR is accepted as a legacy spelling.
     if [[ $# -ge 1 ]]; then
-        HDF5_DIR="$1"
-    elif [ -z "$HDF5_DIR" ]; then
-        return
+        HDF5_ROOT="$1"
+    elif [ -n "$HDF5_ROOT" ]; then
+        : # already set in the environment
+    elif [ -n "$HDF5_DIR" ]; then
+        HDF5_ROOT="$HDF5_DIR"
+    else
+        return 0
     fi
 
-    if [ "${HDF5_DIR:0:1}" != "/" ]; then
-        HDF5_DIR="$EXTERNAL_DIR/$HDF5_DIR"
+    if [ "${HDF5_ROOT:0:1}" != "/" ]; then
+        HDF5_ROOT="$EXTERNAL_DIR/$HDF5_ROOT"
     fi
 
     # Ensure HDF5 is installed, if not install it.
-    HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
+    HDF5_LIB=$(find "$HDF5_ROOT" -type d -name 'lib*' \
         -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
     if [[ ! -d "$HDF5_LIB" ]]; then
 
+        # Never try to build into a read-only prefix, such as one provided by
+        # a module system.
+        if [[ -d "$HDF5_ROOT" && ! -w "$HDF5_ROOT" ]]; then
+            error "HDF5 not found under the read-only prefix:"
+            error "\t$HDF5_ROOT"
+            error "It looks module-provided. Load a module that supplies the"
+            error "Fortran bindings, or set HDF5_ROOT to a writable path to"
+            error "have one built there."
+            exit 1
+        fi
+
         # Clone HDF5 from the repository if it does not exist.
-        if [ ! -d "$HDF5_DIR" ]; then
+        if [[ ! -d "$HDF5_ROOT" || $(ls -A $HDF5_ROOT | wc -l) -eq 0 ]]; then
             [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_2.0.0"
             git clone --depth 1 --branch $HDF5_VERSION \
-                https://github.com/HDFGroup/hdf5.git $HDF5_DIR
+                https://github.com/HDFGroup/hdf5.git $HDF5_ROOT
         fi
 
         # Build and install HDF5
-        cmake -B $HDF5_DIR/build -S $HDF5_DIR \
-            --install-prefix $HDF5_DIR -DCMAKE_BUILD_TYPE=Release \
+        cmake -B $HDF5_ROOT/build -S $HDF5_ROOT \
+            --install-prefix $HDF5_ROOT -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
             -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
             -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF \
             -DHDF5_BUILD_TOOLS:BOOL=ON
-        cmake --build $HDF5_DIR/build/ --config Release --parallel
-        cmake --install $HDF5_DIR/build/ --config Release
-        rm -fr $HDF5_DIR/build
+        cmake --build $HDF5_ROOT/build/ --config Release --parallel
+        cmake --install $HDF5_ROOT/build/ --config Release
+        rm -fr $HDF5_ROOT/build
     fi
 
     # Add HDF5 to the environment variables
-    HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
+    HDF5_LIB=$(find "$HDF5_ROOT" -type d -name 'lib*' \
         -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
-    if [ -z "$HDF5_LIB" ]; then
+    if [[ ! -d "$HDF5_LIB" ]]; then
         error "HDF5 not found at:"
-        error "\t$HDF5_DIR"
-        error "Please set HDF5_DIR to the directory containing"
-        error "the HDF5 source code."
+        error "\t$HDF5_ROOT"
+        error "Please set HDF5_ROOT to the directory containing"
+        error "the HDF5 installation."
         error "You can download the source code from:"
         error "\thttps://github.com/HDFGroup/hdf5.git"
         exit 1
     fi
 
-    export HDF5_DIR=$(realpath $HDF5_LIB/../)
+    export HDF5_ROOT=$(realpath $HDF5_LIB/../)
+    export HDF5_DIR=$HDF5_ROOT
     export LD_LIBRARY_PATH="$HDF5_LIB:$LD_LIBRARY_PATH"
     export PKG_CONFIG_PATH="$HDF5_LIB/pkgconfig:$PKG_CONFIG_PATH"
 }

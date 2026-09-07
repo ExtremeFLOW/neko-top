@@ -100,6 +100,8 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
+        HDF5_DIR: ${{ inputs.hdf5-dir }}
+        PARMETIS_DIR: ${{ inputs.parmetis-dir }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
         # Get the GIT sha for the current commit
@@ -107,6 +109,8 @@ runs:
         key="neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
+        [ -n "$PARMETIS_DIR" ] && key="$key-with-parmetis"
+        [ -n "$HDF5_DIR" ] && key="$key-with-hdf5"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
@@ -172,6 +176,7 @@ runs:
         [ -n "$HDF5_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-hdf5=$HDF5_DIR"
 
         cd $WORKING_DIR
+        [ -n "$HDF5_DIR" ] && export PKG_CONFIG_PATH="$HDF5_DIR/lib/pkgconfig:${PKG_CONFIG_PATH}"
         ./regen.sh
         ./configure FCFLAGS="-w -O2" $CONFIG_FLAGS
         make ${{ inputs.build-options }}

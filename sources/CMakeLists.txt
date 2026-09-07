@@ -98,6 +98,7 @@ target_include_directories(neko-top PUBLIC
 target_link_libraries(neko-top PUBLIC
     PkgConfig::neko
     PkgConfig::json-fortran
+    $<$<BOOL:${HAVE_HDF5}>:HDF5::HDF5>
     MPI::MPI_Fortran
     OpenMP::OpenMP_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>

@@ -83,6 +83,7 @@ jobs:
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
+          HDF5_ROOT: ${{ steps.get-hdf5.outputs.install-dir }}
         run: |
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
