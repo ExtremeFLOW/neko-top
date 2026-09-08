@@ -14,6 +14,10 @@ on:
         description: "The version of Neko to use."
         required: true
         type: string
+      hdf5-version:
+        description: "The version of HDF5 to use."
+        required: true
+        type: string
       neko-top-version:
         description: "The version of Neko-TOP to use."
         required: true
@@ -24,6 +28,8 @@ env:
   JSON_FORTRAN_VERSION: ${{ inputs.json-fortran-version }}
   NEKO_VERSION: ${{ inputs.neko-version }}
   NEKO_TOP_VERSION: ${{ inputs.neko-top-version }}
+  HDF5_VERSION: ${{ inputs.hdf5-version }}
+  HDF5_ROOT: hdf5
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
@@ -48,9 +54,7 @@ jobs:
       - name: Get system cache
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: |
-            openmpi-bin libopenmpi-dev pkg-config liblapack-dev ninja-build
-            libhdf5-mpi-dev
+          packages: openmpi-bin pkg-config liblapack-dev ninja-build
           version: 1.0
 
       - name: Setup non-cache dependencies

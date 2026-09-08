@@ -26,7 +26,7 @@ inputs:
     description: "The directory where the ParMETIS library was installed."
     required: true
 
-  hdf5-dir:
+  hdf5-root:
     description: "The directory where the HDF5 library was installed."
     required: true
 
@@ -100,6 +100,7 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
+        HDF5_ROOT: ${{ inputs.hdf5-root }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
@@ -109,6 +110,7 @@ runs:
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
         [ -n "$PARMETIS_DIR" ] && key="$key-with-parmetis"
+        [ -n "$HDF5_ROOT" ] && key="$key-with-hdf5"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
@@ -126,7 +128,7 @@ runs:
       shell: bash
       run: |
         sudo apt install autotools-dev automake autoconf openmpi-bin \
-          pkg-config liblapack-dev libopenblas-dev libopenmpi-dev libhdf5-mpi-dev
+          pkg-config liblapack-dev libopenblas-dev libopenmpi-dev
 
     # ------------------------------------------------------------------------ #
     # Clone and build the Neko library
@@ -155,6 +157,7 @@ runs:
         BACKEND_PATH: ${{ inputs.backend-path }}
         RP: ${{ inputs.precision }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
+        HDF5_ROOT: ${{ inputs.hdf5-root }}
       run: |
         BACKEND_FLAGS=""
         if [ "$BACKEND" == "CUDA" ]; then
@@ -166,10 +169,11 @@ runs:
           BACKEND_FLAGS="--with-opencl"
         fi
 
-        CONFIG_FLAGS="--prefix=$INSTALL_DIR --with-hdf5"
+        CONFIG_FLAGS="--prefix=$INSTALL_DIR"
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
         [ -n "$PARMETIS_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-parmetis=$PARMETIS_DIR"
+        [ -n "$HDF5_ROOT" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-hdf5=$HDF5_ROOT"
 
         cd $WORKING_DIR
         ./regen.sh
