@@ -37,7 +37,7 @@ program plainneko
   use case, only: case_t
   use neko_top, only: neko_top_register_types
 
-  type(case_t) :: C
+  type(case_t), target :: C
 
   call neko_top_register_types()
   call neko_init(C)

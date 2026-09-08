@@ -42,6 +42,7 @@ add_dependencies(Tests Unit)
 add_subdirectory(sensitivity)
 add_subdirectory(checkpointing)
 add_subdirectory(optimizer)
+add_subdirectory(mapping)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
@@ -49,7 +50,7 @@ add_subdirectory(optimizer)
 # Create a file list of the pFUnit test sources. These should be relative paths.
 set(PFUNIT_TEST_SOURCES "" CACHE INTERNAL "List of pFUnit test source files.")
 
-if (hdf5_FOUND)
+if (HAVE_HDF5)
     list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
 endif()
 

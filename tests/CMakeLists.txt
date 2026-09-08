@@ -14,6 +14,10 @@ set_target_properties(Tests PROPERTIES
     FOLDER "Tests"
 )
 
+# Set the shared test sources directory. This is where modules and other shared
+# test files are located.
+set(SHARED_TEST_SOURCES ${CMAKE_SOURCE_DIR}/tests/shared)
+
 # ============================================================================ #
 # Add subdirectories for unit and regression tests.
 

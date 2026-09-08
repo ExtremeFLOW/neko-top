@@ -5,6 +5,8 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 set(test_list
     "volume.case"
     "volume_filtered.case"
+    "viscous_dissipation.case"
+    "brinkman_dissipation.case"
 )
 
 # Path to the common driver source
@@ -49,7 +51,7 @@ add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
 # ============================================================================ #
 # Build the single driver executable
 add_executable(problem_tester_sensitivity_bin EXCLUDE_FROM_ALL
-    ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
+    ${SHARED_TEST_SOURCES}/sensitivity.f90
     ${SENSITIVITY_DRIVER}
 )
 target_link_libraries(problem_tester_sensitivity_bin

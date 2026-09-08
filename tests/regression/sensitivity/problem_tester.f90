@@ -6,7 +6,7 @@ program problem_tester
 
   ! Standard modules shared by most of our tests
   use json_module, only: json_file
-  use json_utils, only: json_get
+  use json_utils, only: json_get, json_get_or_default
   use json_utils_ext, only: json_read_file
   use utils, only: neko_error
   use neko_top, only: neko_top_register_types
@@ -37,8 +37,10 @@ program problem_tester
   !> The problem type
   type(problem_t) :: prob
 
-  ! Test specific variables
-  real(kind=rp) :: tolerance = 1e-5_rp
+  ! Test specific variables. The tolerance may be overridden per case via the
+  ! optional JSON key `optimization.fd_test_tolerance`; it defaults to a value
+  ! appropriate for the fully steady-state-converged regression cases.
+  real(kind=rp) :: tolerance
   real(kind=rp), parameter :: perturbations(4) = [ &
        1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp]
 
@@ -70,6 +72,8 @@ program problem_tester
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
   call json_get(parameters, 'optimization.design', design_parameters)
+  call json_get_or_default(parameters, 'optimization.fd_test_tolerance', &
+       tolerance, 1e-3_rp)
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components

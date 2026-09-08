@@ -42,6 +42,14 @@ cd neko-top
 ./setup.sh
 ```
 
+For CUDA builds, `CUDA_ARCH` must be set explicitly before running setup, for
+example:
+
+```sh
+export CUDA_ARCH=80
+./setup.sh -d CUDA
+```
+
 ## Example execution
 
 The run.sh script is the main driver for managing example execution. The run

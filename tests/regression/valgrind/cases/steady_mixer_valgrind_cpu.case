@@ -162,8 +162,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 1.0e3,
-                    "q": 3.0,
-                    "convex_up": true
+                    "q": 3.0
                 }
             ],
             "initial_distribution": {

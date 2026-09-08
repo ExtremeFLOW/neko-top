@@ -145,7 +145,7 @@ module adjoint_fluid_pnpn
      type(normal_vec_bcs_t) :: bc_curl_curl
 
      !
-     ! Boundary conditions and  lists for residuals and solution increments
+     ! Boundary conditions and lists for residuals and solution increments
      !
 
      !> A dummy bc for marking strong velocity bcs. Used for vel_res.
@@ -159,7 +159,7 @@ module adjoint_fluid_pnpn
      !> A dummy bc for marking strong pressure bcs. Used for dp.
      type(zero_dirichlet_t) :: bc_dp
 
-     !> Lists for holding the corresponding dummy bc, e.g. bclst_du holds bc_du
+     !> Lists for holding the corresponding dummy boundary conditions.
      type(bc_list_t) :: bclst_vel_res
      type(bc_list_t) :: bclst_du
      type(bc_list_t) :: bclst_dv
@@ -808,9 +808,8 @@ contains
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-              u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
-              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n, &
-              c_Xh%Blag, c_Xh%Blaglag)
+              u, v, w, c_Xh%B, c_Xh%Blag, c_Xh%Blaglag, rho%x(1,1,1,1), dt, &
+              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
 
       call ulag%update()
@@ -1103,9 +1102,9 @@ contains
               ext_bdf%advection_coeffs%x, n)
 
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-              u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
-              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n, &
-              c_Xh%Blag, c_Xh%Blaglag)
+              u, v, w, c_Xh%B, c_Xh%Blag, c_Xh%Blaglag, &
+              rho%x(1,1,1,1), dt, &
+              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
 
       call ulag%update()
@@ -1181,8 +1180,9 @@ contains
 
       call profiler_start_region('Linearized_velocity_solve')
       ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
-           u_res%x, v_res%x, w_res%x, n, c_Xh, this%bclst_du, &
-           this%bclst_dv, this%bclst_dw, gs_Xh, this%ksp_vel%max_iter)
+           u_res%x, v_res%x, w_res%x, n, c_Xh, &
+           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
+           this%ksp_vel%max_iter)
       call profiler_end_region('Linearized_velocity_solve')
 
       ksp_results(1)%name = 'LNS Pressure'
@@ -1317,12 +1317,8 @@ contains
              select type (bc_i)
              type is (symmetry_t)
                 ! Symmetry has 3 internal bcs, but only one actually contains
-                ! markings.
-                ! Symmetry's apply_scalar doesn't do anything, so we need to
-                ! mark individual nested bcs to the du,dv,dw, whereas the
-                ! vel_res can just get symmetry as a whole, because on this
-                ! list we call apply_vector.
-                ! Additionally we have to mark the special surface bc for p.
+                ! markings. Its apply_scalar does not do anything, so mark the
+                ! individual nested bcs for the solution increments.
                 call this%bclst_vel_res%append(bc_i)
                 call this%bc_du%mark_facets(bc_i%bc_x%marked_facet)
                 call this%bc_dv%mark_facets(bc_i%bc_y%marked_facet)
@@ -1333,13 +1329,12 @@ contains
                 call this%bc_sym_surface%mark_facets(bc_i%marked_facet)
              type is (non_normal_t)
                 ! This is a bc for the residuals and increments, not the
-                ! velocity itself. So, don't append to bcs_vel
+                ! velocity itself. So, do not append it to bcs_vel.
                 call this%bclst_vel_res%append(bc_i)
                 call this%bc_du%mark_facets(bc_i%bc_x%marked_facet)
                 call this%bc_dv%mark_facets(bc_i%bc_y%marked_facet)
                 call this%bc_dw%mark_facets(bc_i%bc_z%marked_facet)
              type is (shear_stress_t)
-                ! Same as symmetry
                 call this%bclst_vel_res%append(bc_i%symmetry)
                 call this%bclst_du%append(bc_i%symmetry%bc_x)
                 call this%bclst_dv%append(bc_i%symmetry%bc_y)
@@ -1347,7 +1342,6 @@ contains
 
                 call this%bcs_vel%append(bc_i)
              type is (wall_model_bc_t)
-                ! Same as symmetry
                 call this%bclst_vel_res%append(bc_i%symmetry)
                 call this%bclst_du%append(bc_i%symmetry%bc_x)
                 call this%bclst_dv%append(bc_i%symmetry%bc_y)
@@ -1356,9 +1350,8 @@ contains
                 call this%bcs_vel%append(bc_i)
              class default
 
-                ! For the default case we use our dummy zero_dirichlet bcs to
-                ! mark the same faces as in ordinary velocity dirichlet
-                ! conditions.
+                ! For the default case, use dummy zero Dirichlet bcs to mark
+                ! the same faces as ordinary velocity Dirichlet conditions.
                 ! Additionally we mark the special PnPn pressure  bc.
                 if (bc_i%strong .eqv. .true.) then
                    call this%bc_vel_res%mark_facets(bc_i%marked_facet)

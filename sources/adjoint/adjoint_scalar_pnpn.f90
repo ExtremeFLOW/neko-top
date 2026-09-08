@@ -361,7 +361,6 @@ contains
     if (this%freeze) return
 
     n = this%dm_Xh%size()
-
     call profiler_start_region('Adjoint Scalar')
     associate(u => this%u, v => this%v, w => this%w, s_adj => this%s_adj, &
          cp => this%cp, rho => this%rho, lambda => this%lambda, &
@@ -379,6 +378,7 @@ contains
 
       ! Logs extra information the log level is NEKO_LOG_DEBUG or above.
       call print_debug(this)
+
       ! Compute the source terms
       call this%source_term%compute(time)
 
@@ -425,7 +425,8 @@ contains
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual')
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
-           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs%x(1), &
+           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), &
+           ext_bdf%diffusion_coeffs%x(1), &
            dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)

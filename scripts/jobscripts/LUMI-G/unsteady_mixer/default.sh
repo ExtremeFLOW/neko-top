@@ -33,6 +33,7 @@
 # -- Mandatory options, change with great care.
 
 # Definitions of output files.
+#SBATCH --open-mode=append
 #SBATCH --output output.log
 #SBATCH --error error.log
 
@@ -72,7 +73,7 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export MPICH_GPU_SUPPORT_ENABLED=1
 export NEKO_GS_STRTGY=3
 
-mkdir checkpoints
+mkdir -p checkpoints
 lfs setstripe -c -1 -S 4M checkpoints
 
 run $example

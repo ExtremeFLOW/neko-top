@@ -74,6 +74,7 @@ custom install locations for the given dependencies.
 | `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000      |
 | `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                     |
 | `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                     |
+| `CUDA_ARCH`        | CUDA architecture for GPU builds (for example `80` for sm_80).       | Required for CUDA     |
 
 These can be defined either on the command line by the user or in a
 `prepare.env` file which is loaded by the setup script if it exists in the root
@@ -90,8 +91,12 @@ An example of a `prepare.env` file is shown below:
 module load cuda/10.1
 
 export CUDA_DIR=$CUDA_HOME
+export CUDA_ARCH=80
 export NEKO_DIR=$HOME/neko
 ```
+
+For CUDA builds, `CUDA_ARCH` must be explicitly specified before running
+`setup.sh` (for example `export CUDA_ARCH=80`).
 
 Additional examples of the preparation script for specific systems can be seen
 in the section on clusters: \subpage clusters.
