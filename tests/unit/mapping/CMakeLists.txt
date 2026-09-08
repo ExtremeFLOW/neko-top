@@ -29,6 +29,11 @@ add_pfunit_ctest(mapping_pde_filter
     MAX_PES 1
 )
 
+add_dependencies(Unit
+    mapping_finite_difference
+    mapping_pde_filter
+)
+
 # Set test properties
 set_tests_properties(mapping_finite_difference PROPERTIES
     LABELS "unit;mapping"

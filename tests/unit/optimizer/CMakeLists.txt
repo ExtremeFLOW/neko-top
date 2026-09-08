@@ -59,6 +59,8 @@ add_pfunit_ctest(optimizer_checkpoint
     MAX_PES 2
 )
 
+add_dependencies(Unit optimizer_checkpoint)
+
 # Set test properties
 set_tests_properties(optimizer_checkpoint PROPERTIES
     LABELS "unit;optimizer;hdf5"
