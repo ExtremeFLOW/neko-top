@@ -48,7 +48,6 @@ module simulation_m
   use field_output, only: field_output_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
-  use utils, only: neko_error
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
@@ -323,12 +322,6 @@ contains
     call this%neko_case%time%reset()
     call simulation_init(this%neko_case, dt_controller)
 
-    if (this%unsteady) then
-       if (.not. allocated(this%state_recover)) then
-          call neko_error("State recovery not initialized.")
-       end if
-    end if
-
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
     this%n_timesteps = 0
@@ -359,12 +352,6 @@ contains
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
-    if (this%unsteady) then
-       if (.not. allocated(this%state_recover)) then
-          call neko_error("State recovery not initialized.")
-       end if
-    end if
-
     call profiler_start_region("Adjoint simulation")
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
@@ -391,9 +378,6 @@ contains
     call reset_adjoint(this%adjoint_case, this%neko_case, &
          this%current_design_iteration, this%adjoint_field_base_fname)
     if (this%unsteady) then
-       if (.not. allocated(this%state_recover)) then
-          call neko_error("State recovery not initialized.")
-       end if
        call this%state_recover%reset()
     end if
 
