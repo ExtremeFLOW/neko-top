@@ -385,7 +385,7 @@ function find_neko() {
 
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
-            [ -z "$NEKO_VERSION" ] && NEKO_VERSION="neko-top"
+            [ -z "$NEKO_VERSION" ] && NEKO_VERSION="release/1.1"
 
             git clone --depth 1 --branch $NEKO_VERSION \
                 https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
