@@ -33,6 +33,17 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 !
 !> @brief Abstract interface for state recovery strategies.
+!!
+!! @par Factory API
+!! `state_recover_factory(recover, neko_case, params)` allocates a recovery
+!! implementation selected by the `type` entry in `params`, initializes it,
+!! and associates it with `neko_case`. The allocatable `recover` argument is
+!! replaced if it is already allocated.
+!!
+!! `state_recover_allocator(recover, recover_type)` only allocates the
+!! implementation selected by `recover_type`; the caller remains responsible
+!! for initializing it. The allocatable `recover` argument is replaced if it
+!! is already allocated.
 module state_recover
   use case, only: case_t
   use json_file_module, only: json_file
@@ -102,19 +113,14 @@ module state_recover
   end interface
 
   interface
-     !> Construct and initialize a state recovery object from JSON parameters.
-     !! @param[inout] recover Allocatable state recovery instance.
-     !! @param[inout] neko_case Case data structure.
-     !! @param[inout] params JSON parameters for state recovery.
+     ! Construct and initialize a state recovery object from JSON parameters.
      module subroutine state_recover_factory(recover, neko_case, params)
        class(state_recover_t), allocatable, intent(inout) :: recover
        class(case_t), target, intent(inout) :: neko_case
        type(json_file), intent(inout) :: params
      end subroutine state_recover_factory
 
-     !> Allocate a state recovery implementation.
-     !! @param[inout] recover Allocatable state recovery instance.
-     !! @param[in] recover_type State recovery implementation identifier.
+     ! Allocate a state recovery implementation.
      module subroutine state_recover_allocator(recover, recover_type)
        class(state_recover_t), allocatable, intent(inout) :: recover
        character(len=*), intent(in) :: recover_type
