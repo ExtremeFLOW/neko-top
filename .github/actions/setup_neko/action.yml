@@ -126,7 +126,7 @@ runs:
       shell: bash
       run: |
         sudo apt install autotools-dev automake autoconf openmpi-bin \
-          pkg-config liblapack-dev libopenblas-dev libopenmpi-dev
+          pkg-config liblapack-dev libopenblas-dev libopenmpi-dev libhdf5-mpi-dev
 
     # ------------------------------------------------------------------------ #
     # Clone and build the Neko library
