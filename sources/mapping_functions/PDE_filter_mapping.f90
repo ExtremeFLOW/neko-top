@@ -245,6 +245,11 @@ contains
     end if
     this%coef%ifh2 = .true.
 
+    ! The Helmholtz coefficients above may have changed since the previous
+    ! application (or may not have been set when the preconditioner was
+    ! initialized). Update the preconditioner for the operator used below.
+    call this%pc_filt%update()
+
     ! compute the A(X_in) component of the RHS
     ! (note, to be safe with the inout intent we first copy X_in to the
     !  temporary d_X_out)
@@ -279,8 +284,6 @@ contains
 
     ! add result
     call field_add3(X_out, X_in, d_X_out)
-    ! update preconditioner (needed?)
-    call this%pc_filt%update()
 
     ! write it all out
     call neko_log%message('Filter')
@@ -344,6 +347,10 @@ contains
     end if
     this%coef%ifh2 = .true.
 
+    ! Keep the preconditioner synchronized with the Helmholtz operator used
+    ! for this application.
+    call this%pc_filt%update()
+
     ! compute the A(sens_in) component of the RHS
     ! (note, to be safe with the inout intent we first copy sens_in to the
     !  temporary delta)
@@ -378,9 +385,6 @@ contains
     call field_add3(sens_out, sens_in, delta)
 
     call profiler_end_region
-
-    ! update preconditioner (needed?)
-    call this%pc_filt%update()
 
     ! write it all out
     call neko_log%message('Filter')
