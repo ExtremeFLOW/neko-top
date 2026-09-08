@@ -155,6 +155,7 @@ jobs:
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
+          hdf5-root: ${{ steps.get-hdf5.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
