@@ -170,12 +170,6 @@ contains
     call json_get_or_default(params, "keep_checkpoints", keep_checkpoints, &
          .false.)
 
-    select case (trim(algorithm))
-    case ("linear", "LINEAR", "Linear")
-    case default
-       call neko_error("Only the linear checkpoint strategy is supported.")
-    end select
-
     if ("extra_fields" .in. params) then
        allocate(extra_field_names(0))
        call json_get(params, "extra_fields", extra_field_names)
@@ -232,6 +226,12 @@ contains
     if (present(filename)) this%filename = trim(filename)
     if (present(fmt)) this%fmt = trim(fmt)
     if (present(keep_checkpoints)) this%keep_checkpoints = keep_checkpoints
+
+    select case (trim(this%algorithm))
+    case ("linear", "LINEAR", "Linear")
+    case default
+       call neko_error("Only the linear checkpoint strategy is supported.")
+    end select
 
     inquire(file = trim(this%path), exist = exists)
     if (.not. exists) then
