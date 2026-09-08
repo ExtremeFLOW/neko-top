@@ -254,7 +254,7 @@ module adjoint_fluid_scheme
   abstract interface
      subroutine adjoint_fluid_scheme_setup_bcs_intrf(this, user, params)
        import adjoint_fluid_scheme_t, user_t, json_file
-       class(adjoint_fluid_scheme_t), intent(inout) :: this
+       class(adjoint_fluid_scheme_t), target, intent(inout) :: this
        type(user_t), target, intent(in) :: user
        type(json_file), intent(inout) :: params
      end subroutine adjoint_fluid_scheme_setup_bcs_intrf
