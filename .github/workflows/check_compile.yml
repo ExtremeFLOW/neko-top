@@ -142,21 +142,12 @@ jobs:
         with:
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
 
-      - name: Get HDF5
-        id: get-hdf5
-        uses: ./.github/actions/setup_hdf5
-        with:
-          version: ${{ inputs.hdf5-version }}
-          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
-          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
-
       - name: Get neko
         id: get-neko
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
-          hdf5-dir: ${{ steps.get-hdf5.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
@@ -213,7 +204,6 @@ jobs:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
           PARMETIS_DIR: ${{ steps.get-parmetis.outputs.install-dir }}
-          HDF5_DIR: ${{ steps.get-hdf5.outputs.install-dir }}
         run: |
           # Adjust the end time and max iterations for the rugby ball case
           sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
