@@ -258,8 +258,8 @@ function find_hdf5() {
     fi
 
     # Ensure HDF5 is installed, if not install it.
-    HDF5_LIB=$(dirname "$(find "$HDF5_DIR" \
-        -name 'libhdf5*_fortran.so*' -print -quit)") || true
+    HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
+        -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
     if [[ ! -d "$HDF5_LIB" ]]; then
 
         # Clone HDF5 from the repository if it does not exist.
@@ -282,8 +282,8 @@ function find_hdf5() {
     fi
 
     # Add HDF5 to the environment variables
-    HDF5_LIB=$(dirname "$(find "$HDF5_DIR" \
-        -name 'libhdf5*_fortran.so*' -print -quit)") || true
+    HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
+        -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
     if [ -z "$HDF5_LIB" ]; then
         error "HDF5 not found at:"
         error "\t$HDF5_DIR"
