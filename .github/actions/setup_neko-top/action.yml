@@ -146,7 +146,7 @@ runs:
         FCFLAGS: ${{ inputs.compiler-flags }}
         NEKO_DIR: ${{ inputs.neko-dir }}
         JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
-        HDF5_DIR: ${{ inputs.hdf5-dir }}
+        HDF5_ROOT: ${{ inputs.hdf5-dir }}
         CONFIGURE_OPTIONS: ${{ inputs.configure-options }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
@@ -156,7 +156,7 @@ runs:
           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
           -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
           -DNEKO_DIR=$NEKO_DIR \
-          -DHDF5_DIR=$HDF5_DIR \
+          -DHDF5_ROOT=$HDF5_ROOT \
           $CONFIGURE_OPTIONS
 
     - name: Build
