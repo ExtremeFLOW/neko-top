@@ -14,6 +14,13 @@ if (${DEVICE_TYPE} STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
     find_package(CUDAToolkit REQUIRED)
+
+    if(DEFINED ENV{CUDA_ARCH})
+        set(CMAKE_CUDA_ARCHITECTURES "$ENV{CUDA_ARCH}")
+    endif()
+
+    message(STATUS "CUDA architecture(s) set to: ${CMAKE_CUDA_ARCHITECTURES}")
+
 elseif(${DEVICE_TYPE} STREQUAL "HIP")
     enable_language(HIP)
     enable_language(C)
@@ -92,6 +99,7 @@ target_include_directories(neko-top PUBLIC
 target_link_libraries(neko-top PUBLIC
     PkgConfig::neko
     PkgConfig::json-fortran
+    $<$<BOOL:${HAVE_HDF5}>:HDF5::HDF5>
     MPI::MPI_Fortran
     OpenMP::OpenMP_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
@@ -100,8 +108,6 @@ target_link_libraries(neko-top PUBLIC
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
-    $<$<BOOL:${HDF5_PKG_FOUND}>:PkgConfig::hdf5>
-    $<$<BOOL:${HDF5_FOUND}>:HDF5::HDF5>
 )
 
 # ============================================================================ #

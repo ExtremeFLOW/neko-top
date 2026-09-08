@@ -7,6 +7,7 @@ function help() {
     echo -e "Options:"
     echo -e "\t-h, --help        Show this help message and exit"
     echo -e "\t-t, --tests       Run the tests after the installation"
+    echo -e "\t    --test-neko   Run the Neko tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
@@ -23,6 +24,7 @@ function help() {
     echo -e "\tPFUNIT_DIR        The directory where PFUnit is installed"
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
+    echo -e "\tCUDA_ARCH         CUDA architecture (required for --device CUDA, e.g. 80)"
     echo -e "\tHIP_DIR           The directory where HIP is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
@@ -69,15 +71,23 @@ while true; do
     # Purely long settings
     "--docs") DOCS="ON" && shift ;;             # Build the documentation
     "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
+    "--test-neko") NEKO_TEST="true" && shift ;; # Test Neko
 
     # End of options
     "--") shift && break ;;
     esac
 done
 
+# Set Dependent Variables
 [ "$CLEAN_NEKO" == true ] && CLEAN=true
 
-export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
+export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE NEKO_TEST
+
+# Check for valid settings
+
+if [[ "$TEST" == "ON" || "$NEKO_TEST" == "true" ]] && [ -z "$PFUNIT_DIR" ]; then
+    export PFUNIT_DIR="$EXTERNAL_DIR/pfunit"
+fi
 
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
@@ -102,6 +112,7 @@ if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
     if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+    if [ -z "$CUDA_ARCH" ]; then echo >&2 "CUDA_ARCH is not set."; exit 1; fi
 elif [ "$DEVICE_TYPE" == "HIP" ]; then
     if [ -z "$HIPCC" ]; then export HIPCC=$(which hipcc); else export HIPCC; fi
 fi
@@ -113,10 +124,11 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Setting up external dependencies\n"
 
-check_system_dependencies                      # Check for system dependencies.
-find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
-find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
-[ "$TEST" == "ON" ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
+check_system_dependencies           # Check for system dependencies.
+find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
+find_hdf5 $HDF5_DIR                 # Re-defines the HDF5_DIR variable.
+find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
+find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
 
 # Done setting up external dependencies
 # ============================================================================ #
@@ -160,5 +172,8 @@ printf "\tDevice:        $DEVICE_TYPE\n"
 printf "\tTests:         " && [[ "$TEST" == "ON" ]] && printf "YES\n" || printf "NO\n"
 printf "\tExamples:      " && [[ "$EXAMPLES" == "ON" ]] && printf "YES\n" || printf "NO\n"
 printf "\tDocumentation: " && [[ "$DOCS" == "ON" ]] && printf "YES\n" || printf "NO\n"
-printf "\tHDF5:          " && [[ -d "$HDF5_DIR" ]] && printf "YES\n" || printf "NO\n"
+printf "\tHDF5:          " \
+    && grep -q '^HAVE_HDF5:INTERNAL=TRUE$' "$MAIN_DIR/build/CMakeCache.txt" \
+        2>/dev/null \
+    && printf "YES\n" || printf "NO\n"
 printf "=%.0s" {1..80} && printf "\n"

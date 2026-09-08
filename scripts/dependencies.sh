@@ -41,9 +41,13 @@ function find_json_fortran() {
 
     # Determine the JSON-Fortran installation directory
     if [[ $# -ge 1 ]]; then
-        JSON_FORTRAN_DIR="$(realpath $1)"
+        JSON_FORTRAN_DIR="$1"
     elif [ -z "$JSON_FORTRAN_DIR" ]; then
-        JSON_FORTRAN_DIR="$(realpath $EXTERNAL_DIR/json-fortran)"
+        JSON_FORTRAN_DIR="json-fortran"
+    fi
+
+    if [ "${JSON_FORTRAN_DIR:0:1}" != "/" ]; then
+        JSON_FORTRAN_DIR="$EXTERNAL_DIR/$JSON_FORTRAN_DIR"
     fi
 
     # Ensure JSON-Fortran is installed, if not install it.
@@ -97,14 +101,13 @@ function find_nek5000() {
 
     # Determine the Nek5000 installation directory
     if [[ $# -ge 1 ]]; then
-        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
-            NEK5000_DIR="$(realpath $EXTERNAL_DIR/$1)"
-        else
-            NEK5000_DIR="$(realpath $1)"
-        fi
-    else
-        export NEK5000_DIR=""
+        NEK5000_DIR="$1"
+    elif [ -z "$NEK5000_DIR" ]; then
         return
+    fi
+
+    if [ "${NEK5000_DIR:0:1}" != "/" ]; then
+        NEK5000_DIR="$EXTERNAL_DIR/$NEK5000_DIR"
     fi
 
     if [[ ! -d "$NEK5000_DIR" || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
@@ -122,14 +125,13 @@ function find_gslib() {
 
     # Determine the GSLib installation directory
     if [[ $# -ge 1 ]]; then
-        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
-            GSLIB_DIR="$(realpath $EXTERNAL_DIR/$1)"
-        else
-            GSLIB_DIR="$(realpath $1)"
-        fi
-    else
-        export GSLIB_DIR=""
+        GSLIB_DIR="$1"
+    elif [ -z "$GSLIB_DIR" ]; then
         return
+    fi
+
+    if [ "${GSLIB_DIR:0:1}" != "/" ]; then
+        GSLIB_DIR="$EXTERNAL_DIR/$GSLIB_DIR"
     fi
 
     # Ensure GSLIB is installed, if not install it.
@@ -180,9 +182,13 @@ function find_pfunit() {
 
     # Determine the pFUnit installation directory
     if [[ $# -ge 1 ]]; then
-        PFUNIT_DIR="$(realpath $1)"
+        PFUNIT_DIR="$1"
     elif [ -z "$PFUNIT_DIR" ]; then
-        PFUNIT_DIR="$(realpath $EXTERNAL_DIR/pfunit)"
+        return
+    fi
+
+    if [ "${PFUNIT_DIR:0:1}" != "/" ]; then
+        PFUNIT_DIR="$EXTERNAL_DIR/$PFUNIT_DIR"
     fi
 
     # Clone pFUnit from the repository if it does not exist.
@@ -241,56 +247,74 @@ _ACEOF
 # Ensure HDF5 is installed, if not install it.
 function find_hdf5() {
 
-    # Determine the HDF5 installation directory
     check_external_dir
+
+    # Determine the HDF5 installation directory. HDF5_ROOT is the name CMake
+    # and the module systems use; HDF5_DIR is accepted as a legacy spelling.
     if [[ $# -ge 1 ]]; then
-        HDF5_DIR="$1"
-    elif [ -z "$HDF5_DIR" ]; then
-        return
+        HDF5_ROOT="$1"
+    elif [ -n "$HDF5_ROOT" ]; then
+        : # already set in the environment
+    elif [ -n "$HDF5_DIR" ]; then
+        HDF5_ROOT="$HDF5_DIR"
+    else
+        return 0
     fi
 
-    if [[ "${HDF5_DIR:0:1}" != "/" && "${HDF5_DIR:0:1}" != "~" ]]; then
-        HDF5_DIR="$(realpath $EXTERNAL_DIR/$HDF5_DIR)"
+    if [ "${HDF5_ROOT:0:1}" != "/" ]; then
+        HDF5_ROOT="$EXTERNAL_DIR/$HDF5_ROOT"
     fi
 
     # Ensure HDF5 is installed, if not install it.
-    HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
+    HDF5_LIB=$(find "$HDF5_ROOT" -type d -name 'lib*' \
         -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
     if [[ ! -d "$HDF5_LIB" ]]; then
 
+        # Never try to build into a read-only prefix, such as one provided by
+        # a module system.
+        if [[ -d "$HDF5_ROOT" && ! -w "$HDF5_ROOT" ]]; then
+            error "HDF5 not found under the read-only prefix:"
+            error "\t$HDF5_ROOT"
+            error "It looks module-provided. Load a module that supplies the"
+            error "Fortran bindings, or set HDF5_ROOT to a writable path to"
+            error "have one built there."
+            exit 1
+        fi
+
         # Clone HDF5 from the repository if it does not exist.
-        if [ ! -d "$HDF5_DIR" ]; then
+        if [[ ! -d "$HDF5_ROOT" || $(ls -A $HDF5_ROOT | wc -l) -eq 0 ]]; then
             [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_2.0.0"
             git clone --depth 1 --branch $HDF5_VERSION \
-                https://github.com/HDFGroup/hdf5.git $HDF5_DIR
+                https://github.com/HDFGroup/hdf5.git $HDF5_ROOT
         fi
 
         # Build and install HDF5
-        cmake -B $HDF5_DIR/build -S $HDF5_DIR \
-            --install-prefix $HDF5_DIR -DCMAKE_BUILD_TYPE=Release \
+        cmake -B $HDF5_ROOT/build -S $HDF5_ROOT \
+            --install-prefix $HDF5_ROOT -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
             -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
             -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF \
             -DHDF5_BUILD_TOOLS:BOOL=ON
-        cmake --build $HDF5_DIR/build/ --config Release --parallel
-        cmake --install $HDF5_DIR/build/ --config Release
-        rm -fr $HDF5_DIR/build
+        cmake --build $HDF5_ROOT/build/ --config Release --parallel
+        cmake --install $HDF5_ROOT/build/ --config Release
+        rm -fr $HDF5_ROOT/build
     fi
 
     # Add HDF5 to the environment variables
-    HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
+    HDF5_LIB=$(find "$HDF5_ROOT" -type d -name 'lib*' \
         -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
-    if [ -z "$HDF5_LIB" ]; then
+    if [[ ! -d "$HDF5_LIB" ]]; then
         error "HDF5 not found at:"
-        error "\t$HDF5_DIR"
-        error "Please set HDF5_DIR to the directory containing"
-        error "the HDF5 source code."
+        error "\t$HDF5_ROOT"
+        error "Please set HDF5_ROOT to the directory containing"
+        error "the HDF5 installation."
         error "You can download the source code from:"
         error "\thttps://github.com/HDFGroup/hdf5.git"
         exit 1
     fi
 
-    export HDF5_DIR=$(realpath $HDF5_LIB/../)
+    export HDF5_ROOT=$(realpath $HDF5_LIB/../)
+    export HDF5_DIR=$HDF5_ROOT
     export LD_LIBRARY_PATH="$HDF5_LIB:$LD_LIBRARY_PATH"
     export PKG_CONFIG_PATH="$HDF5_LIB/pkgconfig:$PKG_CONFIG_PATH"
 }
@@ -369,13 +393,17 @@ function find_neko() {
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
     find_parmetis $PARMETIS_DIR
-    [ "$NEKO_TEST" == true ] && find_pfunit $PFUNIT_DIR
+    [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
-        NEKO_DIR="$(realpath $1)"
+        NEKO_DIR="$1"
     elif [ -z "$NEKO_DIR" ]; then
-        NEKO_DIR="$(realpath $EXTERNAL_DIR/neko)"
+        NEKO_DIR="neko"
+    fi
+
+    if [ "${NEKO_DIR:0:1}" != "/" ]; then
+        NEKO_DIR="$EXTERNAL_DIR/$NEKO_DIR"
     fi
 
     # Check if Neko is installed, if not install it.
@@ -412,7 +440,7 @@ function find_neko() {
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
-        [ "$NEKO_TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+        [ -n "$PFUNIT_DIR" ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -424,6 +452,16 @@ function find_neko() {
                 error "the CUDA installation."
                 exit 1
             fi
+
+            if [ -n "$NEKO_CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=$NEKO_CUDA_ARCH"
+            elif [ -n "$CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=-arch=sm_$CUDA_ARCH"
+            else
+                error "CUDA architecture not set."
+                exit 1
+            fi
+
         elif [ "$DEVICE_TYPE" == "HIP" ]; then
             if [ -d "$HIP_DIR" ]; then
                 FEATURES+=" --with-hip=$HIP_DIR"
@@ -621,8 +659,8 @@ function error() {
 function check_external_dir() {
     if [ -z "$EXTERNAL_DIR" ]; then
         echo "Environment EXTERNAL_DIR is not set."
-        echo "Default path will be used: ~/tmp/external"
-        export EXTERNAL_DIR=$(realpath ~/tmp/external)
+        echo "Default path will be used: $HOME/tmp/external"
+        export EXTERNAL_DIR=$HOME/tmp/external
     fi
 
     mkdir -p $EXTERNAL_DIR

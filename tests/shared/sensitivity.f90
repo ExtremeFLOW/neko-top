@@ -1,7 +1,24 @@
+!> Shared finite-difference sensitivity checker.
+!!
+!! This single module is compiled into both the unit driver
+!! (`tests/unit/sensitivity/problem_tester.f90`) and the regression driver
+!! (`tests/regression/sensitivity/problem_tester.f90`). It contains:
+!!  * MPI-safe perturbation/reduction handling (`glsum`, `pe_rank` guards) so it
+!!    is correct both single-rank (unit) and multi-rank (regression, `mpirun`).
+!!  * A real tolerance assertion on the analytic-vs-finite-difference agreement,
+!!    so both lanes actually gate on correctness rather than only logging a CSV.
+!!
+!! The assertion is deliberately made on the error at the *smallest*
+!! perturbation. For a one-sided forward difference the error at large
+!! perturbations is dominated by truncation (\f$O(\epsilon)\f$) and must not be
+!! asserted against; only as the perturbation shrinks does the estimate approach
+!! the analytic sensitivity, exposing any genuine bias (missing coupling term,
+!! wrong sign, wrong weighting) as a non-vanishing floor. Linear functionals
+!! (e.g. the volume constraint) hit that floor at round-off; PDE-coupled
+!! objectives hit a discretisation/steady-state floor set by the case.
 module sensitivity
   use simulation_m, only: simulation_t
   use design, only: design_t
-  use base_functional, only: base_functional_t
   use utils, only: neko_error
   use num_types, only: rp
   use math, only: abscmp, NEKO_EPS, glsum
@@ -41,11 +58,15 @@ contains
     type(vector_t) :: design_vector, design_perturbed, log_data, constraint_vec
     real(kind=rp) :: constraint, perturbed_constraint
     real(kind=rp) :: fd_estimate, fd_error
+    real(kind=rp) :: floor_error, floor_perturb
+    logical :: floor_set
     type(csv_file_t) :: logger
-    integer :: n
+    integer :: n, slash
 
     ! Initialize the vectors
     call design_vector%init(des%size())
+    call design_perturbed%init(des%size())
+    call log_data%init(4)
     call constraint_vec%init(problem%get_n_constraints())
 
     ! Get the design vector for reference
@@ -59,8 +80,6 @@ contains
        constraint = constraint_vec%x(1)
     end if
 
-    call design_perturbed%init(design_vector%size())
-
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(design_vector%x, design_vector%x_d, &
             design_vector%size(), DEVICE_TO_HOST, .true.)
@@ -69,7 +88,9 @@ contains
             DEVICE_TO_HOST, .true.)
     end if
 
-    ! Get global target sensitivity
+    ! Get global target sensitivity. Only the owning rank (i >= 0) holds the
+    ! entry; every other rank contributes zero to the reduction so all ranks
+    ! end up with the same global value.
     if (i .ge. 0) then
        work_arr(1) = target_sensitivities%x(i)
     else
@@ -85,11 +106,28 @@ contains
        write(*, fmt_data) 0.0_rp, constraint, target_sensitivity_i, 0.0_rp
     end if
 
-    ! Init the csv writer we assume file_name sits in cases/ and ends with .case
-    n = len_trim(file_name)
-    call logger%init('FD_check_'//trim(file_name(7:n-5))//'.csv')
-    call logger%set_header('perturbation,F,dFdx,error')
-    call log_data%init(4)
+    ! Init the csv writer. Only rank 0 owns the file: under MPI every rank
+    ! reaches this code (the surrounding solve is collective), and without
+    ! this guard multiple ranks independently opening/writing the same path
+    ! is a genuine race — depending on scheduling it can silently clobber
+    ! down to one rank's data (usually harmless, since all ranks compute
+    ! identical globally-reduced rows) or, observed in practice on a long
+    ! (~1000-timestep) run, duplicate every row once per rank.
+    !
+    ! The passed file name may carry a directory prefix (a stray future
+    ! caller might pass one, e.g. 'cases/<name>.case'); strip any leading
+    ! directory and the '.case' extension. Today both unit and regression
+    ! drivers pass a bare '<name>.case'.
+    if (pe_rank .eq. 0) then
+       n = len_trim(file_name)
+       slash = index(file_name(:n), '/', back = .true.)
+       call logger%init('FD_check_'//trim(file_name(slash+1:n-5))//'.csv')
+       call logger%set_header('perturbation,F,dFdx,error')
+    end if
+
+    floor_set = .false.
+    floor_error = 0.0_rp
+    floor_perturb = 0.0_rp
 
     n_perturbations = size(perturbations)
     do ip = 1, n_perturbations
@@ -117,7 +155,6 @@ contains
 
        ! Compute the objective value of the perturbed design
        call problem%compute(des, sim)
-       call problem%get_objective_value(perturbed_constraint)
        if (is_objective) then
           call problem%get_objective_value(perturbed_constraint)
        else
@@ -138,18 +175,37 @@ contains
           write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, &
                fd_error
        end if
-       log_data%x(1) = perturb
-       log_data%x(2) = perturbed_constraint
-       log_data%x(3) = fd_estimate
-       log_data%x(4) = fd_error
-       call logger%write(log_data)
+       if (pe_rank .eq. 0) then
+          log_data%x(1) = perturb
+          log_data%x(2) = perturbed_constraint
+          log_data%x(3) = fd_estimate
+          log_data%x(4) = fd_error
+          call logger%write(log_data)
+       end if
+
+       ! Track the error at the smallest-magnitude perturbation: this is the
+       ! Taylor floor the analytic sensitivity must converge to.
+       if (.not. floor_set .or. abs(perturb) .lt. abs(floor_perturb)) then
+          floor_perturb = perturb
+          floor_error = fd_error
+          floor_set = .true.
+       end if
     end do
+
+    ! Assert that the finite-difference estimate has converged to the analytic
+    ! sensitivity at the smallest perturbation. fd_error is built from globally
+    ! reduced quantities and is therefore identical on every rank, so this
+    ! branch is collective and safe under MPI.
+    if (abs(floor_error) .gt. tolerance) then
+       call neko_error('Finite difference estimate does not match ' // &
+            'sensitivity')
+    end if
 
     ! Free the internal vectors
     call design_vector%free()
     call design_perturbed%free()
-    call constraint_vec%free()
     call log_data%free()
+    call constraint_vec%free()
 
   end subroutine compute_sensitivity_i
 

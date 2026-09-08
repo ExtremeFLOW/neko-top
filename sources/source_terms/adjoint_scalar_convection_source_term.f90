@@ -47,10 +47,11 @@ module adjoint_scalar_convection_source_term
   use field_math, only: field_subcol3, field_sub2, field_col3
   use operators, only: grad, dudxyz
   use utils, only: neko_error
+  use gather_scatter, only: GS_OP_ADD
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: col2, invcol2
-  use device_math, only: device_col2, device_invcol2
+  use math, only: col2
+  use device_math, only: device_col2
   implicit none
   private
   public :: adjoint_scalar_convection_source_term_allocate
@@ -244,11 +245,16 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+          ! Sum contributions from adjoining elements at shared dofs before
+          ! normalizing.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call invcol2(work%x, this%coef%B, work%size())
+          ! See comment in the device branch above.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call col2(work%x, this%coef%Binv, work%size())
        end if
        call field_sub2(fu, work)
 
@@ -260,11 +266,16 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+          ! Sum contributions from adjoining elements at shared dofs before
+          ! normalizing.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call invcol2(work%x, this%coef%B, work%size())
+          ! See comment in the device branch above.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call col2(work%x, this%coef%Binv, work%size())
        end if
        call field_sub2(fv, work)
 
@@ -276,11 +287,16 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+          ! Sum contributions from adjoining elements at shared dofs before
+          ! normalizing.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call device_col2(work%x_d, this%coef%Binv_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
           call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call invcol2(work%x, this%coef%B, work%size())
+          ! See comment in the device branch above.
+          call this%coef%gs_h%op(work, GS_OP_ADD)
+          call col2(work%x, this%coef%Binv, work%size())
        end if
        call field_sub2(fw, work)
 

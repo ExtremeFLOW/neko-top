@@ -60,11 +60,16 @@ module steady_simcomp
   type, public, extends(simulation_component_t) :: steady_simcomp_t
      private
 
+     type(field_t), pointer :: u, v, w, p, s
+
      ! Old fields
      type(field_t) :: u_old, v_old, w_old, p_old, s_old
      real(kind=dp) :: tol
 
-     logical :: have_scalar = .false.
+     !> If true, the fluid and scalar fields are considered to be coupled, and
+     !! the simulation will only be considered converged if both the fluid and
+     !! scalar fields have converged.
+     logical :: scalar_coupled = .false.
 
      !> A file writer to document the convergence of the steady state
      type(csv_file_t) :: logger
@@ -107,7 +112,7 @@ contains
     call json_get_or_default(json, "tol", tol, 1.0e-6_dp)
     ! Read the log frequency
     call json_get_or_default(json, "log_frequency", log_frequency, 50)
-    call json_get_or_default(json, "scalar_coupled", this%have_scalar, .false.)
+    call json_get_or_default(json, "scalar_coupled", this%scalar_coupled, .false.)
 
     call this%init_from_attributes(tol, log_frequency)
 
@@ -122,20 +127,33 @@ contains
     this%tol = tol
     this%log_frequency = log_frequency
 
+    this%u => this%case%fluid%u
+    this%v => this%case%fluid%v
+    this%w => this%case%fluid%w
+    this%p => this%case%fluid%p
+    if (allocated(this%case%scalars)) then
+       if (size(this%case%scalars%scalar_fields) .gt. 1) then
+          call neko_error('steady simcomp only works for a single scalar')
+       end if
+       this%s => this%case%scalars%scalar_fields(1)%scalar%s
+    else
+       nullify(this%s)
+    end if
+
     ! initialize the logger
     call this%logger%init('steady_state_data.csv')
-    call this%logger%set_header('iter,time,u,v,w,p,t')
+    call this%logger%set_header('iter,time,u,v,w,p,scalar')
     call this%log_data%init(7)
 
     ! Point local fields to the scratch fields
-    call this%u_old%init(this%case%fluid%u%dof)
-    call this%v_old%init(this%case%fluid%v%dof)
-    call this%w_old%init(this%case%fluid%w%dof)
-    call this%p_old%init(this%case%fluid%p%dof)
+    call this%u_old%init(this%u%dof)
+    call this%v_old%init(this%v%dof)
+    call this%w_old%init(this%w%dof)
+    call this%p_old%init(this%p%dof)
 
     ! Check if the scalar field is allocated
-    if (this%have_scalar) then
-       call this%s_old%init(this%case%scalars%scalar_fields(1)%scalar%s%dof)
+    if (associated(this%s)) then
+       call this%s_old%init(this%s%dof)
     end if
 
   end subroutine steady_simcomp_init_from_attributes
@@ -143,6 +161,12 @@ contains
   ! Destructor.
   subroutine steady_simcomp_free(this)
     class(steady_simcomp_t), intent(inout) :: this
+
+    if (associated(this%u)) nullify(this%u)
+    if (associated(this%v)) nullify(this%v)
+    if (associated(this%w)) nullify(this%w)
+    if (associated(this%p)) nullify(this%p)
+    if (associated(this%s)) nullify(this%s)
 
     call this%u_old%free()
     call this%v_old%free()
@@ -163,8 +187,9 @@ contains
     real(kind=rp) :: t
     real(kind=rp) :: dt
 
-    real(kind=rp), dimension(5) :: normed_diff
-    type(field_t), pointer :: u, v, w, p, s
+    real(kind=rp), dimension(4) :: normed_diff_fluid
+    real(kind=rp), dimension(1) :: normed_diff_scalar
+    logical :: converged_fluid, converged_scalar, converged
 
     ! A frozen field is not interesting to compute differences for.
     if (this%case%fluid%freeze) return
@@ -180,51 +205,50 @@ contains
     ! Our goal is to freeze the simulation when the normed difference between
     ! the old and new fields is below a certain tolerance.
 
-    u => this%case%fluid%u
-    v => this%case%fluid%v
-    w => this%case%fluid%w
-    p => this%case%fluid%p
-
-    if (this%have_scalar) then
-       if (size(this%case%scalars%scalar_fields) .gt. 1) then
-          call neko_error('steady simcomp only works for a single scalar')
-       end if
-       s => this%case%scalars%scalar_fields(1)%scalar%s
-    else
-       s => null()
-    end if
-
     ! Compute the difference between the old and new fields
-    call field_sub2(this%u_old, u)
-    call field_sub2(this%v_old, v)
-    call field_sub2(this%w_old, w)
-    call field_sub2(this%p_old, p)
-    if (this%have_scalar) then
-       call field_sub2(this%s_old, s)
+    call field_sub2(this%u_old, this%u)
+    call field_sub2(this%v_old, this%v)
+    call field_sub2(this%w_old, this%w)
+    call field_sub2(this%p_old, this%p)
+    if (associated(this%s)) then
+       call field_sub2(this%s_old, this%s)
     end if
 
     ! Here we compute the squared difference between the old and new fields
     ! and store the result in the `normed_diff` array.
-    normed_diff(1) = energy_norm(this%u_old, this%case%fluid%C_Xh, dt)
-    normed_diff(2) = energy_norm(this%v_old, this%case%fluid%C_Xh, dt)
-    normed_diff(3) = energy_norm(this%w_old, this%case%fluid%C_Xh, dt)
-    normed_diff(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, dt)
-    if (this%have_scalar) then
-       normed_diff(5) = energy_norm(this%s_old, this%case%fluid%C_Xh, dt)
+    normed_diff_fluid(1) = energy_norm(this%u_old, this%case%fluid%C_Xh, dt)
+    normed_diff_fluid(2) = energy_norm(this%v_old, this%case%fluid%C_Xh, dt)
+    normed_diff_fluid(3) = energy_norm(this%w_old, this%case%fluid%C_Xh, dt)
+    normed_diff_fluid(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, dt)
+    if (associated(this%s)) then
+       normed_diff_scalar(1) = energy_norm(this%s_old, this%case%fluid%C_Xh, dt)
     else
-       normed_diff(5) = 0.0_rp
+       normed_diff_scalar(1) = 0.0_rp
+    end if
+
+    converged_fluid = maxval(normed_diff_fluid) .le. this%tol
+    if (associated(this%s)) then
+       converged_scalar = maxval(normed_diff_scalar) .le. this%tol
+    else
+       converged_scalar = .true.
+    end if
+    converged = converged_fluid .and. converged_scalar
+
+    if (this%scalar_coupled) then
+       converged_fluid = converged
+       converged_scalar = converged
     end if
 
     ! If the normed difference is below the tolerance, we consider the
     ! simulation to have converged. Otherwise, we copy the new fields to the
     ! old fields and continue the simulation.
-    if (maxval(normed_diff) .gt. this%tol) then
-       call field_copy(this%u_old, u)
-       call field_copy(this%v_old, v)
-       call field_copy(this%w_old, w)
-       call field_copy(this%p_old, p)
-       if (this%have_scalar) then
-          call field_copy(this%s_old, s)
+    if (.not. converged) then
+       call field_copy(this%u_old, this%u)
+       call field_copy(this%v_old, this%v)
+       call field_copy(this%w_old, this%w)
+       call field_copy(this%p_old, this%p)
+       if (associated(this%s)) then
+          call field_copy(this%s_old, this%s)
        end if
 
        ! this could be a csv, but I think it's nicer in the logfile, it can
@@ -232,24 +256,23 @@ contains
        if (mod(tstep, this%log_frequency) .eq. 0) then
           this%log_data%x(1) = real(tstep, kind=rp)
           this%log_data%x(2) = t
-          this%log_data%x(3) = normed_diff(1)
-          this%log_data%x(4) = normed_diff(2)
-          this%log_data%x(5) = normed_diff(3)
-          this%log_data%x(6) = normed_diff(4)
-          this%log_data%x(7) = normed_diff(5)
+          this%log_data%x(3) = normed_diff_fluid(1)
+          this%log_data%x(4) = normed_diff_fluid(2)
+          this%log_data%x(5) = normed_diff_fluid(3)
+          this%log_data%x(6) = normed_diff_fluid(4)
+          this%log_data%x(7) = normed_diff_scalar(1)
           call this%logger%write(this%log_data)
-       end if
-
-    else
-       this%case%fluid%freeze = .true.
-       if (this%have_scalar) then
-          ! @todo
-          ! we should implement a freeze for the scalar too
-          !this%case%scalar%freeze = .true.
        end if
     end if
 
+    if (converged_fluid) then
+       this%case%fluid%freeze = .true.
+       ! @todo
+       ! we should implement a freeze for the scalar too.
 
+       ! The scalar freeze should only happen after the fluid has converged.
+       ! if (converged_scalar) this%case%scalar%freeze = .true.
+    end if
   end subroutine steady_simcomp_compute
 
   !> A norm for a scalar field based on the energy.
