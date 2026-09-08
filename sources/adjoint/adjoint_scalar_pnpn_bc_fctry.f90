@@ -64,8 +64,8 @@ contains
     class(bc_t), pointer, intent(inout) :: object
     type(adjoint_scalar_pnpn_t), intent(in) :: scheme
     type(json_file), intent(inout) :: json
-    type(coef_t), intent(in) :: coef
-    type(user_t), intent(in) :: user
+    type(coef_t), target, intent(in) :: coef
+    type(user_t), target, intent(in) :: user
     character(len=:), allocatable :: type
     integer :: i
     integer, allocatable :: zone_indices(:)
@@ -94,7 +94,7 @@ contains
     call json_get(json, "zone_indices", zone_indices)
     call object%init(coef, json)
     do i = 1, size(zone_indices)
-       call object%mark_zone(coef%msh%labeled_zones(zone_indices(i)))
+       call object%mark_labeled_zone(zone_indices(i))
     end do
     call object%finalize()
 

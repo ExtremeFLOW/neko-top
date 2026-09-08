@@ -42,7 +42,7 @@ module normal_vec_bcs
   use json_module, only : json_file
   use, intrinsic :: iso_c_binding, only : c_ptr, c_null_ptr, c_associated
   use htable, only : htable_i4_t
-  use device, only : device_map, device_memcpy, device_free, &
+  use device, only : device_map, device_memcpy, device_unmap, &
        HOST_TO_DEVICE
   use time_state, only : time_state_t
   implicit none
@@ -233,10 +233,10 @@ contains
 
     call this%free_base()
     if (allocated(this%unique_mask)) then
+       if (c_associated(this%unique_mask_d)) then
+          call device_unmap(this%unique_mask, this%unique_mask_d)
+       end if
        deallocate(this%unique_mask)
-    end if
-    if (c_associated(this%unique_mask_d)) then
-       call device_free(this%unique_mask_d)
     end if
 
     call this%nx%free()
@@ -248,21 +248,13 @@ contains
 
   !> Finalize.
   !! @param[inout] this The boundary condition object.
-  !! @param[in] only_facets Enforce facet-only mask handling.
-  subroutine normal_vec_bcs_finalize(this, only_facets)
+  subroutine normal_vec_bcs_finalize(this)
     class(normal_vec_bcs_t), target, intent(inout) :: this
-    logical, optional, intent(in) :: only_facets
     type(htable_i4_t) :: unique_point_idx
     integer :: htable_data, rcode, i, j, idx(4), facet
     real(kind=rp) :: area, normal(3)
 
-    if (present(only_facets)) then
-       if (only_facets .eqv. .false.) then
-          call neko_error("For normal_vec_bcs_t, only_facets has to be true.")
-       end if
-    end if
-
-    call this%finalize_base(.true.)
+    call this%finalize_base()
     ! This part is purely needed to ensure that contributions
     ! for all faces a point is on is properly summed up.
     ! If one simply uses the original mask, if a point is on a corner
@@ -274,19 +266,19 @@ contains
     ! we also ensure that we only visit each point once
     ! and create a new mask with only unique points (this%unique_mask).
     if (allocated(this%unique_mask)) then
+       if (c_associated(this%unique_mask_d)) then
+          call device_unmap(this%unique_mask, this%unique_mask_d)
+       end if
        deallocate(this%unique_mask)
     end if
-    if (c_associated(this%unique_mask_d)) then
-       call device_free(this%unique_mask_d)
-    end if
 
-    call unique_point_idx%init(this%msk(0), htable_data)
+    call unique_point_idx%init(this%facet_node_msk(0), htable_data)
     j = 0
-    do i = 1, this%msk(0)
-       if (unique_point_idx%get(this%msk(i),htable_data) .ne. 0) then
+    do i = 1, this%facet_node_msk(0)
+       if (unique_point_idx%get(this%facet_node_msk(i), htable_data) .ne. 0) then
           j = j + 1
           htable_data = j
-          call unique_point_idx%set(this%msk(i), j)
+          call unique_point_idx%set(this%facet_node_msk(i), j)
        end if
     end do
 
@@ -305,13 +297,14 @@ contains
     end do
 
 
-    do i = 1, this%msk(0)
-       rcode = unique_point_idx%get(this%msk(i), htable_data)
+    do i = 1, this%facet_node_msk(0)
+       rcode = unique_point_idx%get(this%facet_node_msk(i), htable_data)
        if (rcode .ne. 0) call neko_error("Facet normal: htable get failed.")
-       this%unique_mask(htable_data) = this%msk(i)
+       this%unique_mask(htable_data) = this%facet_node_msk(i)
        facet = this%facet(i)
 
-       idx = nonlinear_index(this%msk(i), this%Xh%lx, this%Xh%lx, this%Xh%lx)
+       idx = nonlinear_index(this%facet_node_msk(i), this%Xh%lx, this%Xh%lx, &
+            this%Xh%lx)
        normal = this%coef%get_normal(idx(1), idx(2), idx(3), idx(4), facet)
        area = this%coef%get_area(idx(1), idx(2), idx(3), idx(4), facet)
        normal = normal * area !Scale normal by area

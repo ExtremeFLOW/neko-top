@@ -41,8 +41,11 @@ submodule(adjoint_fluid_pnpn) adjoint_fluid_pnpn_bc_fctry
   use blasius, only: blasius_t
   use dirichlet, only: dirichlet_t
   use dong_outflow, only: dong_outflow_t
-  use symmetry, only: symmetry_t
-  use non_normal, only: non_normal_t
+  use symmetry_aligned, only: symmetry_aligned_t
+  use non_normal_aligned, only: non_normal_aligned_t
+  use zero_dirichlet, only: zero_dirichlet_t
+  use shear_stress, only: shear_stress_t
+  use wall_model_bc, only: wall_model_bc_t
   use field_dirichlet_vector, only: field_dirichlet_vector_t
   implicit none
 
@@ -75,8 +78,8 @@ contains
     class(bc_t), pointer, intent(inout) :: object
     type(adjoint_fluid_pnpn_t), intent(in) :: scheme
     type(json_file), intent(inout) :: json
-    type(coef_t), intent(in) :: coef
-    type(user_t), intent(in) :: user
+    type(coef_t), target, intent(in) :: coef
+    type(user_t), target, intent(in) :: user
     character(len=:), allocatable :: type
     integer :: i, j, k
     integer, allocatable :: zone_indices(:)
@@ -110,7 +113,7 @@ contains
     call object%init(coef, json)
 
     do i = 1, size(zone_indices)
-       call object%mark_zone(coef%msh%labeled_zones(zone_indices(i)))
+       call object%mark_labeled_zone(zone_indices(i))
     end do
     call object%finalize()
 
@@ -137,8 +140,8 @@ contains
     class(bc_t), pointer, intent(inout) :: object
     type(adjoint_fluid_pnpn_t), intent(in) :: scheme
     type(json_file), intent(inout) :: json
-    type(coef_t), intent(in) :: coef
-    type(user_t), intent(in) :: user
+    type(coef_t), target, intent(in) :: coef
+    type(user_t), target, intent(in) :: user
     character(len=:), allocatable :: type
     integer :: i, j, k
     integer, allocatable :: zone_indices(:)
@@ -147,13 +150,13 @@ contains
 
     select case (trim(type))
     case ("symmetry")
-       allocate(symmetry_t::object)
+       allocate(symmetry_aligned_t::object)
     case ("velocity_value")
        allocate(inflow_t::object)
     case ("no_slip")
        allocate(zero_dirichlet_t::object)
     case ("normal_outflow", "normal_outflow+dong")
-       allocate(non_normal_t::object)
+       allocate(non_normal_aligned_t::object)
     case ("blasius_profile")
        allocate(blasius_t::object)
     case ("shear_stress")
@@ -191,7 +194,7 @@ contains
     call json_get(json, "zone_indices", zone_indices)
     call object%init(coef, json)
     do i = 1, size(zone_indices)
-       call object%mark_zone(coef%msh%labeled_zones(zone_indices(i)))
+       call object%mark_labeled_zone(zone_indices(i))
     end do
     call object%finalize()
 
