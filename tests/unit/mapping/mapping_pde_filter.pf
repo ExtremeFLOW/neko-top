@@ -109,9 +109,9 @@ contains
     call p(2)%init(1d0, 0d0, 0d0)
     call p(2)%set_id(2)
     call p(3)%init(0d0, 1d0, 0d0)
-    call p(3)%set_id(4)
+    call p(3)%set_id(3)
     call p(4)%init(1d0, 1d0, 0d0)
-    call p(4)%set_id(3)
+    call p(4)%set_id(4)
     call p(5)%init(2d0, 0d0, 0d0)
     call p(5)%set_id(5)
     call p(6)%init(2d0, 1d0, 0d0)
@@ -130,10 +130,10 @@ contains
     call p(12)%set_id(12)
 
     call msh%init(3, 2)
-    call msh%add_element(1, 1, p(1), p(2), p(4), p(3), &
-         p(7), p(8), p(9), p(10))
-    call msh%add_element(2, 2, p(2), p(5), p(6), p(4), &
-         p(8), p(11), p(12), p(9))
+    call msh%add_element(1, 1, p(1), p(2), p(3), p(4), &
+         p(7), p(8), p(10), p(9))
+    call msh%add_element(2, 2, p(2), p(5), p(4), p(6), &
+         p(8), p(11), p(9), p(12))
     call msh%generate_conn()
 
   end subroutine gen_msh
