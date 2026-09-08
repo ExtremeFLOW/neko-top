@@ -58,8 +58,7 @@ module simulation_m
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
-  use state_recover, only: state_recover_t
-  use state_recover_fctry, only: state_recover_factory
+  use state_recover, only: state_recover_t, state_recover_factory
   use runtime_stats, only: neko_rt_stats
   implicit none
   private

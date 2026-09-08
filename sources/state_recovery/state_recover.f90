@@ -101,6 +101,28 @@ module state_recover
      end subroutine state_recover_restore
   end interface
 
+  interface
+     !> Construct and initialize a state recovery object from JSON parameters.
+     !! @param[inout] recover Allocatable state recovery instance.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[inout] params JSON parameters for state recovery.
+     module subroutine state_recover_factory(recover, neko_case, params)
+       class(state_recover_t), allocatable, intent(inout) :: recover
+       class(case_t), target, intent(inout) :: neko_case
+       type(json_file), intent(inout) :: params
+     end subroutine state_recover_factory
+
+     !> Allocate a state recovery implementation.
+     !! @param[inout] recover Allocatable state recovery instance.
+     !! @param[in] recover_type State recovery implementation identifier.
+     module subroutine state_recover_allocator(recover, recover_type)
+       class(state_recover_t), allocatable, intent(inout) :: recover
+       character(len=*), intent(in) :: recover_type
+     end subroutine state_recover_allocator
+  end interface
+
+  public :: state_recover_factory, state_recover_allocator
+
 contains
 
   !> Get the number of states recorded by this recovery strategy.

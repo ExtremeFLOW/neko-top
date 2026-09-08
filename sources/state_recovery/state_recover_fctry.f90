@@ -33,17 +33,11 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 !
 !> @brief Factories for state recovery implementations.
-module state_recover_fctry
-  use case, only: case_t
-  use json_file_module, only: json_file
+submodule (state_recover) state_recover_fctry
   use json_utils, only: json_get_or_default
-  use state_recover, only: state_recover_t
   use state_recover_checkpoint, only: state_recover_checkpoint_t
   use utils, only: neko_error
   implicit none
-  private
-
-  public :: state_recover_factory, state_recover_allocator
 
 contains
 
@@ -51,7 +45,7 @@ contains
   !! @param[inout] recover Allocatable state recovery instance.
   !! @param[inout] neko_case Case data structure.
   !! @param[inout] params JSON parameters for state recovery.
-  subroutine state_recover_factory(recover, neko_case, params)
+  module subroutine state_recover_factory(recover, neko_case, params)
     class(state_recover_t), allocatable, intent(inout) :: recover
     class(case_t), target, intent(inout) :: neko_case
     type(json_file), intent(inout) :: params
@@ -67,7 +61,7 @@ contains
   !> Allocate a state recovery implementation.
   !! @param[inout] recover Allocatable state recovery instance.
   !! @param[in] recover_type State recovery implementation identifier.
-  subroutine state_recover_allocator(recover, recover_type)
+  module subroutine state_recover_allocator(recover, recover_type)
     class(state_recover_t), allocatable, intent(inout) :: recover
     character(len=*), intent(in) :: recover_type
 
@@ -85,4 +79,4 @@ contains
 
   end subroutine state_recover_allocator
 
-end module state_recover_fctry
+end submodule state_recover_fctry
