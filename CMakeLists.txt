@@ -155,6 +155,7 @@ else()
     set(_hdf5_requested FALSE)
 endif()
 
+set(HDF5_NO_FIND_PACKAGE_CONFIG_FILE TRUE)
 find_package(HDF5 COMPONENTS Fortran)
 if (_hdf5_requested AND NOT HDF5_FOUND)
     message(FATAL_ERROR "HDF5 support was requested, but HDF5 was not found.")
