@@ -100,7 +100,6 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
-        HDF5_DIR: ${{ inputs.hdf5-dir }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
@@ -110,7 +109,6 @@ runs:
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
         [ -n "$PARMETIS_DIR" ] && key="$key-with-parmetis"
-        [ -n "$HDF5_DIR" ] && key="$key-with-hdf5"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
@@ -157,7 +155,6 @@ runs:
         BACKEND_PATH: ${{ inputs.backend-path }}
         RP: ${{ inputs.precision }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
-        HDF5_DIR: ${{ inputs.hdf5-dir }}
       run: |
         BACKEND_FLAGS=""
         if [ "$BACKEND" == "CUDA" ]; then
@@ -169,14 +166,12 @@ runs:
           BACKEND_FLAGS="--with-opencl"
         fi
 
-        CONFIG_FLAGS="--prefix=$INSTALL_DIR"
+        CONFIG_FLAGS="--prefix=$INSTALL_DIR --with-hdf5"
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
         [ -n "$PARMETIS_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-parmetis=$PARMETIS_DIR"
-        [ -n "$HDF5_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-hdf5=$HDF5_DIR"
 
         cd $WORKING_DIR
-        [ -n "$HDF5_DIR" ] && export PKG_CONFIG_PATH="$HDF5_DIR/lib/pkgconfig:${PKG_CONFIG_PATH}"
         ./regen.sh
         ./configure FCFLAGS="-w -O2" $CONFIG_FLAGS
         make ${{ inputs.build-options }}

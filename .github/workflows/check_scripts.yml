@@ -14,10 +14,6 @@ on:
         description: "The version of Neko to use."
         required: true
         type: string
-      hdf5-version:
-        description: "The version of HDF5 to use."
-        required: true
-        type: string
       neko-top-version:
         description: "The version of Neko-TOP to use."
         required: true
@@ -52,7 +48,9 @@ jobs:
       - name: Get system cache
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: openmpi-bin pkg-config liblapack-dev ninja-build
+          packages: |
+            openmpi-bin libopenmpi-dev pkg-config liblapack-dev ninja-build
+            libhdf5-mpi-dev
           version: 1.0
 
       - name: Setup non-cache dependencies
