@@ -3,6 +3,7 @@ program usrneko
 !  use stdlib_io_npy, only : save_npy
   use LightKrylov
   use LightKrylov, only: wp => dp
+  use LightKrylov_AbstractVectors, only: init_like_basis
   use LightKrylov_Logger
   use LightKrylov_Constants
   use neko, only: neko_init, neko_finalize
@@ -52,6 +53,8 @@ program usrneko
   integer          :: info
   !> writer
   type(state_vector_t), allocatable :: X_writer
+  !> Mold used to initialize Neko-backed LightKrylov vectors.
+  type(state_vector_t) :: vector_mold
   !> Miscellaneous.
   integer :: i
   ! JSON related arguments
@@ -89,6 +92,8 @@ program usrneko
   call simulation%init(parameters)
   tau = real(simulation%neko_case%time%end_time, kind=wp)
   call non_linear%init(simulation)
+  vector_mold%coef => simulation%neko_case%fluid%c_Xh
+  vector_mold%if_2d = (simulation%neko_case%fluid%c_Xh%msh%gdim .eq. 2)
   non_linear%jacobian = jacobian
   select type (f => non_linear%jacobian)
   type is (jacobian_t)
@@ -97,7 +102,7 @@ program usrneko
 
   !> initial guess is baseflow loaded
   allocate(bf)
-  call bf%init()
+  call bf%init_like(vector_mold)
   call field_copy(bf%u, non_linear%simulation%neko_case%fluid%u)
   call field_copy(bf%v, non_linear%simulation%neko_case%fluid%v)
   call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
@@ -116,12 +121,12 @@ program usrneko
 
   !> Initialize Krylov subspace.
   allocate(X(nev))
-  call init_basis(X)
+  call init_like_basis(X, bf)
   call initialize_krylov_subspace(X)
 
   !> initialize writer
   allocate(X_writer)
-  call X_writer%init()
+  call X_writer%init_like(bf)
 
   !> Call to LightKrylov.
   call eigs(A, X, lambda, residuals, info)

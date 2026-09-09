@@ -31,18 +31,25 @@ module neko_vector
       procedure, pass(self), public :: axpby
       procedure, pass(self), public :: rand
       procedure, pass(self), public :: get_size
+      procedure, pass(self), public :: init_like => state_vector_init_like
       ! we also want some other things
-      procedure, pass(self), public :: init => state_vector_init
       procedure, pass(self), public :: free => state_vector_free
       procedure, pass(self), public :: write => state_vector_write
    end type state_vector_t
  
  contains
  
-   subroutine state_vector_init(self)
+   subroutine state_vector_init_like(self, mold)
       class(state_vector_t), intent(inout) :: self
+      class(abstract_vector_rdp), intent(in) :: mold
 
-      call state_vector_attach_coef(self)
+      select type (mold)
+      type is (state_vector_t)
+         if (associated(mold%coef)) self%coef => mold%coef
+         self%if_2d = mold%if_2d
+      end select
+
+      if (.not. associated(self%coef)) call state_vector_attach_coef(self)
       if (state_vector_is_initialized(self)) return
 
       call state_vector_sanitize_field(self%u)
@@ -54,7 +61,9 @@ module neko_vector
       call self%v%init(self%coef%dof, fld_name='state_v')
       call self%w%init(self%coef%dof, fld_name='state_w')
       call self%p%init(self%coef%dof, fld_name='state_p')
-   end subroutine state_vector_init
+      self%is_initialized = .true.
+      self%owns_data = .true.
+   end subroutine state_vector_init_like
  
    subroutine zero(self)
       class(state_vector_t), intent(inout) :: self
@@ -118,7 +127,7 @@ module neko_vector
       select type (vec)
       type is (state_vector_t)
          if (.not. associated(self%coef)) self%coef => vec%coef
-         call self%init()
+         call self%init_like(vec)
 
          alpha_rp = real(alpha, rp)
          beta_rp = real(beta, rp)
@@ -170,6 +179,8 @@ module neko_vector
 
       nullify(self%coef)
       self%if_2d = .false.
+      self%is_initialized = .false.
+      self%owns_data = .true.
    end subroutine state_vector_free
 
   ! User defined initial condition

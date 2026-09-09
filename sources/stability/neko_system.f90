@@ -38,7 +38,7 @@ module neko_system
 
            call self%simulation%run_forward()
 
-           call vec_out%init()
+           call vec_out%init_like(vec_in)
            call field_copy(vec_out%u, self%simulation%neko_case%fluid%u)
            call field_copy(vec_out%v, self%simulation%neko_case%fluid%v)
            call field_copy(vec_out%w, self%simulation%neko_case%fluid%w)

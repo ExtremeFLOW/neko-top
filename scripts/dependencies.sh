@@ -403,10 +403,17 @@ function find_lightkrylov() {
 
     LIGHTKRYLOV_PREFIX=$(realpath -m "$LIGHTKRYLOV_DIR/..")
     LIGHTKRYLOV_SOURCE_DIR="$LIGHTKRYLOV_PREFIX/src/LightKrylov"
+    LIGHTKRYLOV_VERSION_FILE="$LIGHTKRYLOV_DIR/.neko-top-lightkrylov-version"
+    [ -z "$LIGHTKRYLOV_REPOSITORY" ] &&
+        LIGHTKRYLOV_REPOSITORY="https://github.com/nekStab/LightKrylov.git"
+    [ -z "$LIGHTKRYLOV_VERSION" ] && LIGHTKRYLOV_VERSION="pr-neko_fix_sk"
+    LIGHTKRYLOV_REQUESTED_VERSION="$LIGHTKRYLOV_REPOSITORY $LIGHTKRYLOV_VERSION"
 
     LIGHTKRYLOV_LIB=$(find "$LIGHTKRYLOV_DIR" -type d -name 'lib*' \
         -exec test -f '{}'/libLightKrylov.a \; -print 2>/dev/null) || true
-    if [[ ! -d "$LIGHTKRYLOV_LIB" ]]; then
+    if [[ ! -d "$LIGHTKRYLOV_LIB" ||
+          ! -f "$LIGHTKRYLOV_VERSION_FILE" ||
+          "$(cat "$LIGHTKRYLOV_VERSION_FILE")" != "$LIGHTKRYLOV_REQUESTED_VERSION" ]]; then
 
         if [ -n "$FPM_EXECUTABLE" ]; then
             if [ ! -x "$FPM_EXECUTABLE" ]; then
@@ -424,13 +431,16 @@ function find_lightkrylov() {
 
         if [[ ! -d "$LIGHTKRYLOV_SOURCE_DIR" ||
               $(ls -A "$LIGHTKRYLOV_SOURCE_DIR" 2>/dev/null | wc -l) -eq 0 ]]; then
-            [ -z "$LIGHTKRYLOV_REPOSITORY" ] &&
-                LIGHTKRYLOV_REPOSITORY="https://github.com/gloopydoop/LightKrylov.git"
-            [ -z "$LIGHTKRYLOV_VERSION" ] && LIGHTKRYLOV_VERSION="init_and_free"
-
             mkdir -p "$(dirname "$LIGHTKRYLOV_SOURCE_DIR")"
             git clone --depth 1 --branch "$LIGHTKRYLOV_VERSION" \
                 "$LIGHTKRYLOV_REPOSITORY" "$LIGHTKRYLOV_SOURCE_DIR"
+        else
+            git -C "$LIGHTKRYLOV_SOURCE_DIR" remote set-url origin \
+                "$LIGHTKRYLOV_REPOSITORY"
+            git -C "$LIGHTKRYLOV_SOURCE_DIR" fetch --depth 1 origin \
+                "$LIGHTKRYLOV_VERSION"
+            git -C "$LIGHTKRYLOV_SOURCE_DIR" checkout --detach --force \
+                FETCH_HEAD
         fi
 
         cp "$MAIN_DIR/sources/stability/lightkrylov-fpm.toml" \
@@ -441,6 +451,9 @@ function find_lightkrylov() {
         "$FPM_EXECUTABLE" install --compiler "$FC" --profile release \
             --prefix "$LIGHTKRYLOV_DIR"
         cd "$CURRENT_DIR"
+
+        mkdir -p "$LIGHTKRYLOV_DIR"
+        echo "$LIGHTKRYLOV_REQUESTED_VERSION" > "$LIGHTKRYLOV_VERSION_FILE"
     fi
 
     LIGHTKRYLOV_LIB=$(find "$LIGHTKRYLOV_DIR" -type d -name 'lib*' \
