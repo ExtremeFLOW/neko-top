@@ -13,7 +13,6 @@ module neko_vector
    use device, only: device_associated, device_memcpy, HOST_TO_DEVICE
    use gather_scatter, only: GS_OP_ADD
    use user_access_singleton, only: neko_user_access
-   use, intrinsic :: iso_c_binding, only: c_null_ptr
 
    implicit none
 
@@ -51,11 +50,6 @@ module neko_vector
 
       if (.not. associated(self%coef)) call state_vector_attach_coef(self)
       if (state_vector_is_initialized(self)) return
-
-      call state_vector_sanitize_field(self%u)
-      call state_vector_sanitize_field(self%v)
-      call state_vector_sanitize_field(self%w)
-      call state_vector_sanitize_field(self%p)
 
       call self%u%init(self%coef%dof, fld_name='state_u')
       call self%v%init(self%coef%dof, fld_name='state_v')
@@ -167,15 +161,12 @@ module neko_vector
    subroutine state_vector_free(self)
       class(state_vector_t), intent(inout) :: self
 
-      call state_vector_sanitize_field(self%u)
-      call state_vector_sanitize_field(self%v)
-      call state_vector_sanitize_field(self%w)
-      call state_vector_sanitize_field(self%p)
-
-      call self%u%free()
-      call self%v%free()
-      call self%w%free()
-      call self%p%free()
+      if (self%owns_data) then
+         call self%u%free()
+         call self%v%free()
+         call self%w%free()
+         call self%p%free()
+      end if
 
       nullify(self%coef)
       self%if_2d = .false.
@@ -309,26 +300,6 @@ module neko_vector
 
       state_vector_is_initialized = .true.
    end function state_vector_is_initialized
-
-   subroutine state_vector_sanitize_field(fld)
-      type(field_t), intent(inout) :: fld
-      logical :: x_device_associated
-
-      if (NEKO_BCKND_DEVICE .ne. 1) return
-
-      if (.not. allocated(fld%x)) then
-         fld%x_d = c_null_ptr
-         fld%internal_dofmap = .false.
-         fld%name = ''
-         nullify(fld%dof)
-         nullify(fld%xh)
-         nullify(fld%msh)
-         return
-      end if
-
-      x_device_associated = device_associated(fld%x)
-      if (.not. x_device_associated) fld%x_d = c_null_ptr
-   end subroutine state_vector_sanitize_field
    
    subroutine z_plane_fix(fld)
       type(field_t), intent(inout) :: fld
