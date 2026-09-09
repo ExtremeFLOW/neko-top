@@ -38,8 +38,6 @@ module neko_jacobian
                  vec_in%v)
             call field_copy(self%simulation%adjoint_case%fluid_adj%w_adj, &
                  vec_in%w)
-            call field_copy(self%simulation%adjoint_case%fluid_adj%p_adj, &
-                 vec_in%p)
 
             call self%simulation%run_backward()
 
@@ -50,14 +48,11 @@ module neko_jacobian
                  self%simulation%adjoint_case%fluid_adj%v_adj)
             call field_copy(vec_out%w, &
                  self%simulation%adjoint_case%fluid_adj%w_adj)
-            call field_copy(vec_out%p, &
-                 self%simulation%adjoint_case%fluid_adj%p_adj)
 
             if (self%if_2d) then
                call z_plane_fix(vec_out%u)
                call z_plane_fix(vec_out%v)
                call field_rzero(vec_out%w)
-               call z_plane_fix(vec_out%p)
             end if
 
             call vec_out%sub(vec_in)

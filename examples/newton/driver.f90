@@ -125,7 +125,6 @@ program usrneko
   call field_copy(bf%u, non_linear%simulation%neko_case%fluid%u)
   call field_copy(bf%v, non_linear%simulation%neko_case%fluid%v)
   call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
-  call field_copy(bf%p, non_linear%simulation%neko_case%fluid%p)
 
   call newton(non_linear, bf, gmres_rdp, info, &
        scheduler=dynamic_tol_dp, rtol=newton_tol)
