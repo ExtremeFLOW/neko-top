@@ -43,7 +43,7 @@ module neko_jacobian
 
             call self%simulation%run_backward()
 
-            call vec_out%init()
+            call vec_out%init_like(vec_in)
             call field_copy(vec_out%u, &
                  self%simulation%adjoint_case%fluid_adj%u_adj)
             call field_copy(vec_out%v, &
