@@ -13,6 +13,7 @@ program usrneko
   use neko_linop, only: linear_propagator_t
   use simulation_m, only: simulation_t
   use json_module, only: json_file
+  use json_utils, only: json_get_or_default
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
@@ -42,7 +43,9 @@ program usrneko
   !> Sampling time.
   real(kind=wp) :: tau
   !> Number of eigenvalues we wish to converge.
-  integer, parameter :: nev = 15
+  integer :: nev
+  !> Eigensolver convergence tolerance.
+  real(kind=wp) :: eigs_tol
   !> Krylov subspace.
   type(state_vector_t), allocatable :: X(:)
   !> Eigenvalues.
@@ -84,6 +87,22 @@ program usrneko
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
+  call json_get_or_default(parameters, &
+       'case.lightkrylov.newton.relative_tolerance', newton_tol, 1.0e-3_wp)
+  call json_get_or_default(parameters, &
+       'case.lightkrylov.eigensolver.number_of_eigenvalues', nev, 15)
+  call json_get_or_default(parameters, &
+       'case.lightkrylov.eigensolver.tolerance', eigs_tol, rtol_dp)
+
+  if (newton_tol <= 0.0_wp) then
+     call neko_error('LightKrylov Newton relative_tolerance must be positive')
+  end if
+  if (nev < 1) then
+     call neko_error('LightKrylov number_of_eigenvalues must be positive')
+  end if
+  if (eigs_tol <= 0.0_wp) then
+     call neko_error('LightKrylov eigensolver tolerance must be positive')
+  end if
 
   !> Initialize propagators.
   ! -------------------------------------------------------------------------- !
@@ -108,7 +127,6 @@ program usrneko
   call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
   call field_copy(bf%p, non_linear%simulation%neko_case%fluid%p)
 
-  newton_tol = 1.0e-3
   call newton(non_linear, bf, gmres_rdp, info, &
        scheduler=dynamic_tol_dp, rtol=newton_tol)
 
@@ -129,7 +147,7 @@ program usrneko
   call X_writer%init_like(bf)
 
   !> Call to LightKrylov.
-  call eigs(A, X, lambda, residuals, info)
+  call eigs(A, X, lambda, residuals, info, tolerance=eigs_tol)
 
   call check_info(info, 'eigs', module=this_module, procedure='main')
   !> Transform eigenspectrum from unit-disk to standard complex plane.

@@ -74,5 +74,14 @@
                 }
             ],
         },
+        "lightkrylov": {
+            "newton": {
+                "relative_tolerance": 1e-3
+            },
+            "eigensolver": {
+                "number_of_eigenvalues": 15,
+                "tolerance": 1e-14
+            }
+        },
     }
 }
