@@ -74,7 +74,7 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Setup Neko-TOP
-        run: ./setup.sh --examples --test
+        run: ./setup.sh --examples --tests
 
       - name: Run TGV
         run: ./run.sh -nrc tgv
