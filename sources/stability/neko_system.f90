@@ -34,7 +34,6 @@ module neko_system
            call field_copy(self%simulation%neko_case%fluid%u, vec_in%u)
            call field_copy(self%simulation%neko_case%fluid%v, vec_in%v)
            call field_copy(self%simulation%neko_case%fluid%w, vec_in%w)
-           call field_copy(self%simulation%neko_case%fluid%p, vec_in%p)
 
            call self%simulation%run_forward()
 
@@ -42,12 +41,10 @@ module neko_system
            call field_copy(vec_out%u, self%simulation%neko_case%fluid%u)
            call field_copy(vec_out%v, self%simulation%neko_case%fluid%v)
            call field_copy(vec_out%w, self%simulation%neko_case%fluid%w)
-           call field_copy(vec_out%p, self%simulation%neko_case%fluid%p)
 
            if (self%if_2d) then
               call z_plane_fix(vec_out%u)
               call z_plane_fix(vec_out%v)
-              call z_plane_fix(vec_out%p)
               call field_rzero(vec_out%w)
            end if
 

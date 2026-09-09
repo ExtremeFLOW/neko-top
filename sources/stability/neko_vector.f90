@@ -6,6 +6,7 @@ module neko_vector
    use field, only: field_t
    use coefs, only: coef_t
    use fld_file_output, only: fld_file_output_t
+   use fld_file, only: fld_file_t
    use neko_config, only: NEKO_BCKND_DEVICE
    use field_math, only: field_rzero, field_cmult, field_add3s2
    use math, only: glsc3
@@ -17,8 +18,8 @@ module neko_vector
    implicit none
 
    type, extends(abstract_vector_rdp), public :: state_vector_t
-      ! velocity and pressure fields
-      type(field_t) :: u, v, w, p
+      ! velocity fields
+      type(field_t) :: u, v, w
       ! we need the mass matrix to integrate fields..
       type(coef_t), pointer :: coef => null()
       logical :: if_2d = .false.
@@ -54,7 +55,6 @@ module neko_vector
       call self%u%init(self%coef%dof, fld_name='state_u')
       call self%v%init(self%coef%dof, fld_name='state_v')
       call self%w%init(self%coef%dof, fld_name='state_w')
-      call self%p%init(self%coef%dof, fld_name='state_p')
       self%is_initialized = .true.
       self%owns_data = .true.
    end subroutine state_vector_init_like
@@ -65,7 +65,6 @@ module neko_vector
       call field_rzero(self%u)
       call field_rzero(self%v)
       call field_rzero(self%w)
-      call field_rzero(self%p)
    end subroutine zero
  
    real(kind=wp) function dot(self, vec) result(alpha)
@@ -109,7 +108,6 @@ module neko_vector
       call field_cmult(self%v, alpha_rp)
       call field_cmult(self%w, alpha_rp)
       if (self%if_2d) call field_rzero(self%w)
-      call field_cmult(self%p, alpha_rp)
    end subroutine scal
  
    subroutine axpby(alpha, vec, beta, self)
@@ -129,7 +127,6 @@ module neko_vector
          call field_add3s2(self%u, self%u, vec%u, beta_rp, alpha_rp)
          call field_add3s2(self%v, self%v, vec%v, beta_rp, alpha_rp)
          call field_add3s2(self%w, self%w, vec%w, beta_rp, alpha_rp)
-         call field_add3s2(self%p, self%p, vec%p, beta_rp, alpha_rp)
       end select
    end subroutine axpby
  
@@ -165,7 +162,6 @@ module neko_vector
          call self%u%free()
          call self%v%free()
          call self%w%free()
-         call self%p%free()
       end if
 
       nullify(self%coef)
@@ -252,11 +248,16 @@ module neko_vector
       integer, intent(in) :: idx
       type(fld_file_output_t) :: output
 
-      call output%init(sp, 'state', 4)
-      call output%fields%assign_to_field(1, self%p)
-      call output%fields%assign_to_field(2, self%u)
-      call output%fields%assign_to_field(3, self%v)
-      call output%fields%assign_to_field(4, self%w)
+      call output%init(sp, 'state', 3)
+      select type (ft => output%file_%file_type)
+      type is (fld_file_t)
+         ft%skip_pressure = .true.
+         ft%skip_velocity = .false.
+         ft%skip_temperature = .true.
+      end select
+      call output%fields%assign_to_field(1, self%u)
+      call output%fields%assign_to_field(2, self%v)
+      call output%fields%assign_to_field(3, self%w)
       call output%set_counter(idx - 1)
       call output%sample(real(idx, kind=rp))
       call output%free()
@@ -285,17 +286,14 @@ module neko_vector
       if (.not. allocated(self%u%x)) return
       if (.not. allocated(self%v%x)) return
       if (.not. allocated(self%w%x)) return
-      if (.not. allocated(self%p%x)) return
       if (.not. associated(self%u%dof, self%coef%dof)) return
       if (.not. associated(self%v%dof, self%coef%dof)) return
       if (.not. associated(self%w%dof, self%coef%dof)) return
-      if (.not. associated(self%p%dof, self%coef%dof)) return
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
          if (.not. device_associated(self%u%x)) return
          if (.not. device_associated(self%v%x)) return
          if (.not. device_associated(self%w%x)) return
-         if (.not. device_associated(self%p%x)) return
       end if
 
       state_vector_is_initialized = .true.
