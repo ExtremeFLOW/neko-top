@@ -384,6 +384,78 @@ function find_parmetis() {
 }
 
 # ============================================================================ #
+# Ensure LightKrylov is installed, if not install it.
+function find_lightkrylov() {
+    check_external_dir
+
+    # Determine the LightKrylov installation directory. The source checkout is
+    # kept next to it so deleting Neko-TOP's build directory does not invalidate
+    # FPM's object cache.
+    if [[ $# -ge 1 ]]; then
+        LIGHTKRYLOV_DIR="$1"
+    elif [ -z "$LIGHTKRYLOV_DIR" ]; then
+        LIGHTKRYLOV_DIR="$EXTERNAL_DIR/lightkrylov/install"
+    fi
+
+    if [ "${LIGHTKRYLOV_DIR:0:1}" != "/" ]; then
+        LIGHTKRYLOV_DIR="$EXTERNAL_DIR/$LIGHTKRYLOV_DIR"
+    fi
+
+    LIGHTKRYLOV_PREFIX=$(realpath -m "$LIGHTKRYLOV_DIR/..")
+    LIGHTKRYLOV_SOURCE_DIR="$LIGHTKRYLOV_PREFIX/src/LightKrylov"
+
+    LIGHTKRYLOV_LIB=$(find "$LIGHTKRYLOV_DIR" -type d -name 'lib*' \
+        -exec test -f '{}'/libLightKrylov.a \; -print 2>/dev/null) || true
+    if [[ ! -d "$LIGHTKRYLOV_LIB" ]]; then
+
+        if [ -n "$FPM_EXECUTABLE" ]; then
+            if [ ! -x "$FPM_EXECUTABLE" ]; then
+                error "FPM_EXECUTABLE is not executable:"
+                error "\t$FPM_EXECUTABLE"
+                exit 1
+            fi
+        elif command -v fpm 2>&1 1>/dev/null; then
+            FPM_EXECUTABLE=$(command -v fpm)
+        else
+            error "fpm not found."
+            error "Please add fpm to PATH or set FPM_EXECUTABLE."
+            exit 1
+        fi
+
+        if [[ ! -d "$LIGHTKRYLOV_SOURCE_DIR" ||
+              $(ls -A "$LIGHTKRYLOV_SOURCE_DIR" 2>/dev/null | wc -l) -eq 0 ]]; then
+            [ -z "$LIGHTKRYLOV_REPOSITORY" ] &&
+                LIGHTKRYLOV_REPOSITORY="https://github.com/gloopydoop/LightKrylov.git"
+            [ -z "$LIGHTKRYLOV_VERSION" ] && LIGHTKRYLOV_VERSION="init_and_free"
+
+            mkdir -p "$(dirname "$LIGHTKRYLOV_SOURCE_DIR")"
+            git clone --depth 1 --branch "$LIGHTKRYLOV_VERSION" \
+                "$LIGHTKRYLOV_REPOSITORY" "$LIGHTKRYLOV_SOURCE_DIR"
+        fi
+
+        cp "$MAIN_DIR/sources/stability/lightkrylov-fpm.toml" \
+            "$LIGHTKRYLOV_SOURCE_DIR/fpm.toml"
+
+        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
+        cd "$LIGHTKRYLOV_SOURCE_DIR"
+        "$FPM_EXECUTABLE" install --compiler "$FC" --profile release \
+            --prefix "$LIGHTKRYLOV_DIR"
+        cd "$CURRENT_DIR"
+    fi
+
+    LIGHTKRYLOV_LIB=$(find "$LIGHTKRYLOV_DIR" -type d -name 'lib*' \
+        -exec test -f '{}'/libLightKrylov.a \; -print 2>/dev/null) || true
+    if [ ! -d "$LIGHTKRYLOV_LIB" ]; then
+        error "LightKrylov not found at:"
+        error "\t$LIGHTKRYLOV_DIR"
+        error "Please set LIGHTKRYLOV_DIR to the LightKrylov installation."
+        exit 1
+    fi
+
+    export LIGHTKRYLOV_DIR=$(realpath "$LIGHTKRYLOV_LIB/../")
+}
+
+# ============================================================================ #
 # Ensure Neko is installed, if not install it.
 function find_neko() {
     check_external_dir
