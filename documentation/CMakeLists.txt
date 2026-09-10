@@ -2,12 +2,13 @@
 # Find Doxygen
 # ============================================================================ #
 
+if (NOT BUILD_DOCS)
+    return()
+endif()
+
 find_package(Doxygen QUIET)
 if (NOT Doxygen_FOUND)
-    if (BUILD_DOCS)
-        message(FATAL_ERROR "Doxygen is needed to build the documentation.")
-    endif()
-    return()
+    message(FATAL_ERROR "Doxygen is needed to build the documentation.")
 endif()
 
 # ============================================================================ #
