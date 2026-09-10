@@ -119,7 +119,6 @@ module state_recover
        class(case_t), target, intent(inout) :: neko_case
        type(json_file), intent(inout) :: params
      end subroutine state_recover_factory
-
   end interface
 
   public :: state_recover_factory

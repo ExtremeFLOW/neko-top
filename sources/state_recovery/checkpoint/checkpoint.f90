@@ -44,15 +44,19 @@ module state_recover_checkpoint
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use utils, only: neko_error
   use math, only: copy, rzero
+  use host_array, only: host_array_t
   use profiler, only: profiler_start_region, profiler_end_region
   use state_recover, only: state_recover_t
   use comm, only: pe_rank, NEKO_COMM
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   use registry, only: neko_registry
-  use mpi_f08, only: MPI_WTIME, MPI_Barrier
+  use mpi_f08, only: MPI_Barrier
   implicit none
   private
+
+  ! Backend Implementations
+  integer, parameter :: CHECKPOINT_LINEAR = 1
 
   type, public, extends(state_recover_t) :: state_recover_checkpoint_t
      private
@@ -60,10 +64,8 @@ module state_recover_checkpoint
      ! ----------------------------------------------------------------------- !
      ! User parameters
 
-     !> Whether checkpointing is enabled
-     logical :: enabled = .false.
      !> The checkpointing algorithm to use
-     character(len=256) :: algorithm = "linear"
+     character(len=256) :: algorithm = ""
      !> The name of the checkpoint file
      character(len=256) :: filename = "forward_checkpoint"
      !> The path to the checkpoint file (directory)
@@ -76,13 +78,14 @@ module state_recover_checkpoint
      logical :: keep_checkpoints = .false.
 
      ! Internal parameters
+     integer :: algorithm_id = 0
      integer :: n_saves_disc = 0
      integer :: first_valid_timestep = 2
      integer :: loaded_checkpoint = -1
 
      ! Field pointers
      type(field_list_t) :: state_list
-     type(host_array), dimension(:,:), allocatable :: state_storage
+     type(host_array_t), dimension(:,:), allocatable :: state_storage
 
      ! Structures to hold the checkpoint data
      type(chkp_output_t) :: chkp_output
@@ -108,29 +111,18 @@ module state_recover_checkpoint
      procedure, pass(this) :: load_data => checkpoint_load_data
   end type state_recover_checkpoint_t
 
-  type :: host_array
-     real(kind=rp), allocatable :: data(:)
-     integer :: size = 0
-   contains
-     procedure, pass(this) :: init => host_array_init
-     procedure, pass(this) :: free => host_array_free
-     procedure, pass(this) :: is_allocated => host_array_is_allocated
-  end type host_array
-
   ! ========================================================================== !
   ! Module procedures for our algorithm implementations.
 
   interface
      !> Save the current state of the simulation in a linear fashion
-     module subroutine checkpoint_save_linear(this, neko_case)
+     module subroutine checkpoint_save_linear(this)
        class(state_recover_checkpoint_t), intent(inout) :: this
-       class(case_t), intent(inout) :: neko_case
      end subroutine checkpoint_save_linear
 
      !> Restore the forward simulation state in a linear fashion
-     module subroutine checkpoint_restore_linear(this, neko_case, tstep)
+     module subroutine checkpoint_restore_linear(this, tstep)
        class(state_recover_checkpoint_t), intent(inout) :: this
-       class(case_t), target, intent(inout) :: neko_case
        integer, intent(in) :: tstep
      end subroutine checkpoint_restore_linear
 
@@ -143,7 +135,6 @@ contains
 
   !> Initialization
   !! @param[inout] this Checkpointing implementation.
-  !! @param[inout] neko_case Case data structure.
   !! @param[inout] params JSON parameters.
   subroutine checkpoint_init_from_json(this, neko_case, params)
     class(state_recover_checkpoint_t), intent(inout) :: this
@@ -156,9 +147,6 @@ contains
     type(field_t), pointer :: fi
     integer :: i
     logical :: enabled, keep_checkpoints
-
-    call json_get_or_default(params, "enabled", enabled, .false.)
-    if (.not. enabled) return
 
     call json_get_or_default(params, "algorithm", algorithm, "linear")
     call json_get_or_default(params, "n_memory", n_saves_memory, 10)
@@ -201,7 +189,7 @@ contains
        n_saves_memory, path, filename, fmt, keep_checkpoints, extra_fields)
     class(state_recover_checkpoint_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
-    character(len=*), optional, intent(in) :: algorithm
+    character(len=*), intent(in) :: algorithm
     integer, optional, intent(in) :: n_saves_memory
     character(len=*), optional, intent(in) :: path
     character(len=*), optional, intent(in) :: filename
@@ -217,7 +205,6 @@ contains
     this%neko_case => neko_case
 
     ! Assign parameters from arguments or defaults
-    this%enabled = .true.
     if (present(algorithm)) this%algorithm = algorithm
     if (present(n_saves_memory)) this%n_saves_memory = n_saves_memory
     if (present(path)) this%path = trim(path)
@@ -227,15 +214,16 @@ contains
 
     select case (trim(this%algorithm))
     case ("linear", "LINEAR", "Linear")
+       this%algorithm = "linear"
+       this%algorithm_id = CHECKPOINT_LINEAR
     case default
        call neko_error("Only the linear checkpoint strategy is supported.")
     end select
 
     inquire(file = trim(this%path), exist = exists)
     if (.not. exists) then
-       call MPI_Barrier(NEKO_COMM)
        if (pe_rank .eq. 0) then
-          call execute_command_line("mkdir -p '" // trim(this%path) // "'")
+          call mkdir(trim(this%path))
        end if
        call MPI_Barrier(NEKO_COMM)
     end if
@@ -281,6 +269,12 @@ contains
 
     ! Allocate the storage for the RAM checkpoints
     allocate(this%state_storage(this%n_saves_memory, this%state_list%size()))
+    do i = 1, this%n_saves_memory
+       do j = 1, this%state_list%size()
+          si => this%state_list%get(j)
+          call this%state_storage(i, j)%init(si%size())
+       end do
+    end do
 
     ! Write a status message with the parameters set
     call neko_log%section("Checkpointing")
@@ -312,7 +306,6 @@ contains
 
   end subroutine checkpoint_init_from_components
 
-  !> Free
   !> Free checkpointing resources.
   !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_free(this)
@@ -350,7 +343,6 @@ contains
     call MPI_Barrier(NEKO_COMM)
 
     ! Reset to default values
-    this%enabled = .false.
     this%filename = "checkpoint"
     this%fmt = "chkp"
     this%algorithm = "linear"
@@ -374,16 +366,14 @@ contains
   subroutine checkpoint_save(this)
     class(state_recover_checkpoint_t), intent(inout) :: this
 
-    if (.not. this%enabled) return
-
     call profiler_start_region("Checkpoint save")
 
     ! Update the number of recorded timesteps
     call this%set_n_timesteps(this%get_n_timesteps() + 1)
 
-    select case (this%algorithm)
-    case ("linear")
-       call checkpoint_save_linear(this, this%neko_case)
+    select case (this%algorithm_id)
+    case (CHECKPOINT_LINEAR)
+       call checkpoint_save_linear(this)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -400,8 +390,6 @@ contains
     integer, intent(in) :: tstep
     character(len=256) :: msg
 
-    if (.not. this%enabled) return
-
     call profiler_start_region("Checkpoint restore")
 
     if (tstep .lt. 1 .or. tstep .gt. this%get_n_timesteps()) then
@@ -410,9 +398,9 @@ contains
        call neko_error(trim(msg))
     end if
 
-    select case (this%algorithm)
-    case ("linear")
-       call checkpoint_restore_linear(this, this%neko_case, tstep)
+    select case (this%algorithm_id)
+    case (CHECKPOINT_LINEAR)
+       call checkpoint_restore_linear(this, tstep)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -448,12 +436,12 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 0) then
        do i = 1, this%state_list%size()
           si => this%state_list%get(i)
-          call copy(this%state_storage(index, i)%data, si%x, si%size())
+          call copy(this%state_storage(index, i)%x, si%x, si%size())
        end do
     else
        do i = 1, this%state_list%size()
           si => this%state_list%get(i)
-          call device_memcpy(this%state_storage(index, i)%data, si%x_d, &
+          call device_memcpy(this%state_storage(index, i)%x, si%x_d, &
                si%size(), DEVICE_TO_HOST, this%state_list%size() .eq. i)
        end do
     end if
@@ -482,12 +470,12 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 0) then
        do i = 1, this%state_list%size()
           si => this%state_list%get(i)
-          call copy(si%x, this%state_storage(index, i)%data, si%size())
+          call copy(si%x, this%state_storage(index, i)%x, si%size())
        end do
     else
        do i = 1, this%state_list%size()
           si => this%state_list%get(i)
-          call device_memcpy(this%state_storage(index, i)%data, si%x_d, &
+          call device_memcpy(this%state_storage(index, i)%x, si%x_d, &
                si%size(), HOST_TO_DEVICE, this%state_list%size() .eq. i)
        end do
     end if
@@ -498,14 +486,11 @@ contains
   ! ========================================================================== !
   ! Meta handling
 
-  !> Reset the checkpoint data
   !> Reset checkpointing state.
   !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_reset(this)
     class(state_recover_checkpoint_t), intent(inout) :: this
     integer :: i, j
-
-    if (.not. this%enabled) return
 
     ! Reset our checkpoints
     this%loaded_checkpoint = -1
@@ -514,45 +499,10 @@ contains
 
     do i = 1, size(this%state_storage, 1)
        do j = 1, size(this%state_storage, 2)
-          if (this%state_storage(i, j)%is_allocated()) then
-             call rzero(this%state_storage(i, j)%data, &
-                  this%state_storage(i, j)%size)
-          else
-             call neko_error("State storage not allocated")
-          end if
+          call rzero(this%state_storage(i, j)%x, this%state_storage(i, j)%size)
        end do
     end do
 
   end subroutine checkpoint_reset
-
-  ! -------------------------------------------------------------------------- !
-  ! Host array routines
-
-  subroutine host_array_init(this, size)
-    class(host_array), intent(inout) :: this
-    integer, intent(in) :: size
-
-    call this%free()
-    this%size = size
-    allocate(this%data(size))
-    call rzero(this%data, this%size)
-
-  end subroutine host_array_init
-
-  subroutine host_array_free(this)
-    class(host_array), intent(inout) :: this
-
-    this%size = 0
-    if (allocated(this%data)) deallocate(this%data)
-
-  end subroutine host_array_free
-
-  pure function host_array_is_allocated(this) result(is_alloc)
-    class(host_array), intent(in) :: this
-    logical :: is_alloc
-
-    is_alloc = allocated(this%data)
-
-  end function host_array_is_allocated
 
 end module state_recover_checkpoint
