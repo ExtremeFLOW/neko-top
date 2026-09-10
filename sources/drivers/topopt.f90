@@ -45,6 +45,7 @@ program topopt
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
   use continuation_scheduler, only: nekotop_continuation
+  use nekotop_logger, only: nekotop_log
 
   implicit none
 
@@ -71,6 +72,7 @@ program topopt
   call neko_init()
   call neko_job_info(date, time)
   call neko_top_register_types()
+  call nekotop_log%init(env_prefix = "NEKO_TOP")
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
@@ -117,6 +119,8 @@ program topopt
 
   if (allocated(des)) deallocate(des)
   if (allocated(opt)) deallocate(opt)
+
+  call nekotop_log%free()
 
   ! Finalize the Neko environment
   call neko_finalize()

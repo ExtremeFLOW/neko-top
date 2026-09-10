@@ -104,9 +104,13 @@ add_pfunit_ctest(checkpoint_end_of_run_gating
 )
 
 set(CHECKPOINT_RESTORE_ENV
-    "NEKO_LOG_FILE=checkpoint_restore_consistency.log;OMP_NUM_THREADS=1")
+    "NEKO_LOG_FILE=checkpoint_restore_consistency.log;\
+NEKO_TOP_LOG_FILE=checkpoint_restore_consistency_nekotop.log;\
+OMP_NUM_THREADS=1")
 set(CHECKPOINT_GATING_ENV
-    "NEKO_LOG_FILE=checkpoint_end_of_run_gating.log;OMP_NUM_THREADS=1")
+    "NEKO_LOG_FILE=checkpoint_end_of_run_gating.log;\
+NEKO_TOP_LOG_FILE=checkpoint_end_of_run_gating_nekotop.log;\
+OMP_NUM_THREADS=1")
 
 set_tests_properties(checkpoint_restore_consistency PROPERTIES
     LABELS "unit;checkpointing"
@@ -159,7 +163,9 @@ if (HAVE_HDF5)
         MAX_PES 2
     )
     set(CHECKPOINT_RESTORE_HDF5_ENV
-        "NEKO_LOG_FILE=checkpoint_restore_consistency_hdf5.log;OMP_NUM_THREADS=1")
+        "NEKO_LOG_FILE=checkpoint_restore_consistency_hdf5.log;\
+NEKO_TOP_LOG_FILE=checkpoint_restore_consistency_hdf5_nekotop.log;\
+OMP_NUM_THREADS=1")
     set_tests_properties(checkpoint_restore_consistency_hdf5 PROPERTIES
         LABELS "unit;checkpointing;hdf5"
         ENVIRONMENT "${CHECKPOINT_RESTORE_HDF5_ENV}"

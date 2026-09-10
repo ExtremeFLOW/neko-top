@@ -15,6 +15,7 @@ program usrneko
 
   use simplefield_design, only: simplefield_design_t
   use neko, only: neko_init, neko_finalize, neko_solve
+  use nekotop_logger, only: nekotop_log
   use case, only: case_t
   use field, only: field_t
   use num_types, only: rp
@@ -71,6 +72,7 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
   call neko_init(neko_case)
+  call nekotop_log%init(env_prefix = "NEKO_TOP")
   call neko_field%init(neko_case%msh, neko_case%fluid%Xh, "neko_field")
   nloc = neko_field%dof%size()
   call xcoord%init(nloc)
@@ -151,5 +153,6 @@ program usrneko
 
   if (allocated(opt)) deallocate(opt)
 
+  call nekotop_log%free()
   call neko_finalize(neko_case)
 end program usrneko

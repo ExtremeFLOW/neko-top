@@ -72,6 +72,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/IO)
 target_sources(neko-top
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/common/nekotop_logger.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90

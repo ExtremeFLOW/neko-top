@@ -49,7 +49,7 @@ module optimization_ic
   use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
   use registry, only: neko_registry
-  use logger, only: neko_log, LOG_SIZE
+  use nekotop_logger, only: nekotop_log, LOG_SIZE
   use fld_file_data, only: fld_file_data_t
   use fld_file, only: fld_file_t
   use checkpoint, only: chkp_t
@@ -166,9 +166,9 @@ contains
     integer :: n
     character(len=LOG_SIZE) :: log_buf
 
-    call neko_log%message("Type : uniform")
+    call nekotop_log%message("Type : uniform")
     write (log_buf, '(A,ES12.6)') "Value: ", ic_value
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
 
     fld = ic_value
     n = fld%dof%size()
@@ -197,12 +197,12 @@ contains
     class(point_zone_t), pointer :: zone
     integer :: size
 
-    call neko_log%message("Type      : point_zone")
+    call nekotop_log%message("Type      : point_zone")
     write (log_buf, '(A,ES12.6)') "Base value: ", base_value
-    call neko_log%message(log_buf)
-    call neko_log%message("Zone name : " // trim(zone_name))
+    call nekotop_log%message(log_buf)
+    call nekotop_log%message("Zone name : " // trim(zone_name))
     write (log_buf, '(A,ES12.6)') "Zone value: ", zone_value
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
 
     size = fld%dof%size()
     zone => neko_point_zone_registry%get_point_zone(trim(zone_name))
@@ -249,10 +249,10 @@ contains
     type(interpolator_t) :: space_interp
     ! ----
 
-    call neko_log%message("Type         : field")
-    call neko_log%message("File name    : " // trim(file_name))
+    call nekotop_log%message("Type         : field")
+    call nekotop_log%message("File name    : " // trim(file_name))
     write (log_buf, '(A,L1)') "Interpolation: ", interpolate
-    call neko_log%message(log_buf)
+    call nekotop_log%message(log_buf)
 
     ! Extract sample index from the file name
     sample_idx = extract_fld_file_index(file_name, -1)
@@ -285,10 +285,10 @@ contains
           end if
 
           write (log_buf, '(A,ES12.6)') "Tolerance     : ", tolerance
-          call neko_log%message(log_buf)
+          call nekotop_log%message(log_buf)
           write (log_buf, '(A,A)') "Mesh file     : ", &
                trim(mesh_file_name)
-          call neko_log%message(log_buf)
+          call nekotop_log%message(log_buf)
 
        end if ! if mesh_file_name .eq. none
 
@@ -317,7 +317,7 @@ contains
        call neko_error("The fld file must match the current mesh! " // &
             "Use 'interpolate': 'true' to enable interpolation.")
     else if (.not. mesh_mismatch .and. interpolate) then
-       call neko_log%warning("You have activated interpolation but you " // &
+       call nekotop_log%warning("You have activated interpolation but you " // &
             "might still be using the same mesh.")
     end if
 
@@ -330,10 +330,10 @@ contains
           if (.not. ft%dp_precision) then
              call neko_warning("The coordinates read from the field file " // &
                   "are in single precision.")
-             call neko_log%message("It is recommended to use a mesh in " // &
+             call nekotop_log%message("It is recommended to use a mesh in " // &
                   "double precision for better interpolation results.")
-             call neko_log%message("If the interpolation does not work, " // &
-                  "you can try to increase the tolerance.")
+             call nekotop_log%message("If the interpolation does not " // &
+                  "work, you can try to increase the tolerance.")
           end if
        class default
        end select

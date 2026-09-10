@@ -49,6 +49,7 @@ fi
 
 ranks="${NEKO_TOP_SENSITIVITY_RANKS:-2}"
 export NEKO_LOG_FILE="neko_${case_name%.*}.log"
+export NEKO_TOP_LOG_FILE="nekotop_${case_name%.*}.log"
 
 # The FD-vs-analytic tolerance assertion happens inside the driver itself
 # (shared `sensitivity` module, see tests/unit/sensitivity/sensitivity.f90) —
