@@ -57,6 +57,7 @@ module adv_lin_no_dealias
   type, public, extends(advection_adjoint_t) :: adv_lin_no_dealias_t
      real(kind=rp), allocatable :: temp(:)
      type(c_ptr) :: temp_d = C_NULL_PTR
+     logical :: if_adjoint
    contains
      !> Add the linearized advection term for the fluid, i.e.
      !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
@@ -68,6 +69,7 @@ module adv_lin_no_dealias
      !! , to
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => adjoint_advection_no_dealias
+     
      !> Compute the adjoint passive scalar.
      ! If one integrates by parts, this essentially switches sign and adds some
      ! boundary terms.
@@ -89,9 +91,12 @@ contains
   !> Constructor
   !! @param this The object.
   !! @param coef The coefficients of the (space, mesh) pair.
-  subroutine init_no_dealias(this, coef)
+  subroutine init_no_dealias(this, coef, if_adjoint)
     class(adv_lin_no_dealias_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
+    logical, intent(in) :: if_adjoint
+
+    this%if_adjoint = if_adjoint
 
     allocate(this%temp(coef%dof%size()))
 

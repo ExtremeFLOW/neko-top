@@ -68,6 +68,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/design)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/IO)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/stability)
 
 target_sources(neko-top
     PRIVATE

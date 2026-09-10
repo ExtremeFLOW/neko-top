@@ -84,9 +84,10 @@ module adjoint_case
      type(output_controller_t) :: output_controller
      type(time_based_controller_t) :: norm_output_ctrl
      type(file_t) :: norm_output_file
-     logical :: norm_output_enabled = .false.
 
+     logical :: norm_output_enabled = .false.
      logical :: have_scalar = .false.
+     logical :: if_adjoint = .true.
 
    contains
      procedure, pass(this) :: init => adjoint_init_from_json
@@ -141,7 +142,7 @@ contains
     select type (f => this%fluid_adj)
     type is (adjoint_fluid_pnpn_t)
        call f%init(neko_case%msh, lx, neko_case%params, &
-            neko_case%user, this%chkp)
+            neko_case%user, this%chkp, this%if_adjoint)
     end select
     !
     ! Setup adjoint scalar

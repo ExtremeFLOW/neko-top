@@ -69,7 +69,8 @@ module advection_adjoint
      !! allocated. This can be used to kill the advection term.
      !! @note The factory both allocates and initializes `object`.
      module subroutine advection_adjoint_factory(object, json, coef, &
-          ulag, vlag, wlag, dtlag, tlag, time_scheme, use_dummy, slag)
+          ulag, vlag, wlag, dtlag, tlag, time_scheme, if_adjoint, &
+          use_dummy, slag)
        class(advection_adjoint_t), allocatable, intent(inout) :: object
        type(json_file), intent(inout) :: json
        type(coef_t), intent(inout), target :: coef
@@ -77,6 +78,7 @@ module advection_adjoint
        real(kind=rp), intent(in), target :: dtlag(10)
        real(kind=rp), intent(in), target :: tlag(10)
        type(time_scheme_controller_t), intent(in), target :: time_scheme
+       logical, intent(in) :: if_adjoint
        logical, optional, intent(in) :: use_dummy
        type(field_series_t), target, optional, intent(in) :: slag
      end subroutine advection_adjoint_factory

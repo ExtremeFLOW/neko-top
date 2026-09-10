@@ -384,6 +384,91 @@ function find_parmetis() {
 }
 
 # ============================================================================ #
+# Ensure LightKrylov is installed, if not install it.
+function find_lightkrylov() {
+    check_external_dir
+
+    # Determine the LightKrylov installation directory. The source checkout is
+    # kept next to it so deleting Neko-TOP's build directory does not invalidate
+    # FPM's object cache.
+    if [[ $# -ge 1 ]]; then
+        LIGHTKRYLOV_DIR="$1"
+    elif [ -z "$LIGHTKRYLOV_DIR" ]; then
+        LIGHTKRYLOV_DIR="$EXTERNAL_DIR/lightkrylov/install"
+    fi
+
+    if [ "${LIGHTKRYLOV_DIR:0:1}" != "/" ]; then
+        LIGHTKRYLOV_DIR="$EXTERNAL_DIR/$LIGHTKRYLOV_DIR"
+    fi
+
+    LIGHTKRYLOV_PREFIX=$(realpath -m "$LIGHTKRYLOV_DIR/..")
+    LIGHTKRYLOV_SOURCE_DIR="$LIGHTKRYLOV_PREFIX/src/LightKrylov"
+    LIGHTKRYLOV_VERSION_FILE="$LIGHTKRYLOV_DIR/.neko-top-lightkrylov-version"
+    [ -z "$LIGHTKRYLOV_REPOSITORY" ] &&
+        LIGHTKRYLOV_REPOSITORY="https://github.com/nekStab/LightKrylov.git"
+    [ -z "$LIGHTKRYLOV_VERSION" ] && LIGHTKRYLOV_VERSION="pr-neko_fix_sk"
+    LIGHTKRYLOV_REQUESTED_VERSION="$LIGHTKRYLOV_REPOSITORY $LIGHTKRYLOV_VERSION"
+
+    LIGHTKRYLOV_LIB=$(find "$LIGHTKRYLOV_DIR" -type d -name 'lib*' \
+        -exec test -f '{}'/libLightKrylov.a \; -print 2>/dev/null) || true
+    if [[ ! -d "$LIGHTKRYLOV_LIB" ||
+          ! -f "$LIGHTKRYLOV_VERSION_FILE" ||
+          "$(cat "$LIGHTKRYLOV_VERSION_FILE")" != "$LIGHTKRYLOV_REQUESTED_VERSION" ]]; then
+
+        if [ -n "$FPM_EXECUTABLE" ]; then
+            if [ ! -x "$FPM_EXECUTABLE" ]; then
+                error "FPM_EXECUTABLE is not executable:"
+                error "\t$FPM_EXECUTABLE"
+                exit 1
+            fi
+        elif command -v fpm 2>&1 1>/dev/null; then
+            FPM_EXECUTABLE=$(command -v fpm)
+        else
+            error "fpm not found."
+            error "Please add fpm to PATH or set FPM_EXECUTABLE."
+            exit 1
+        fi
+
+        if [[ ! -d "$LIGHTKRYLOV_SOURCE_DIR" ||
+              $(ls -A "$LIGHTKRYLOV_SOURCE_DIR" 2>/dev/null | wc -l) -eq 0 ]]; then
+            mkdir -p "$(dirname "$LIGHTKRYLOV_SOURCE_DIR")"
+            git clone --depth 1 --branch "$LIGHTKRYLOV_VERSION" \
+                "$LIGHTKRYLOV_REPOSITORY" "$LIGHTKRYLOV_SOURCE_DIR"
+        else
+            git -C "$LIGHTKRYLOV_SOURCE_DIR" remote set-url origin \
+                "$LIGHTKRYLOV_REPOSITORY"
+            git -C "$LIGHTKRYLOV_SOURCE_DIR" fetch --depth 1 origin \
+                "$LIGHTKRYLOV_VERSION"
+            git -C "$LIGHTKRYLOV_SOURCE_DIR" checkout --detach --force \
+                FETCH_HEAD
+        fi
+
+        cp "$MAIN_DIR/sources/stability/lightkrylov-fpm.toml" \
+            "$LIGHTKRYLOV_SOURCE_DIR/fpm.toml"
+
+        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
+        cd "$LIGHTKRYLOV_SOURCE_DIR"
+        "$FPM_EXECUTABLE" install --compiler "$FC" --profile release \
+            --prefix "$LIGHTKRYLOV_DIR"
+        cd "$CURRENT_DIR"
+
+        mkdir -p "$LIGHTKRYLOV_DIR"
+        echo "$LIGHTKRYLOV_REQUESTED_VERSION" > "$LIGHTKRYLOV_VERSION_FILE"
+    fi
+
+    LIGHTKRYLOV_LIB=$(find "$LIGHTKRYLOV_DIR" -type d -name 'lib*' \
+        -exec test -f '{}'/libLightKrylov.a \; -print 2>/dev/null) || true
+    if [ ! -d "$LIGHTKRYLOV_LIB" ]; then
+        error "LightKrylov not found at:"
+        error "\t$LIGHTKRYLOV_DIR"
+        error "Please set LIGHTKRYLOV_DIR to the LightKrylov installation."
+        exit 1
+    fi
+
+    export LIGHTKRYLOV_DIR=$(realpath "$LIGHTKRYLOV_LIB/../")
+}
+
+# ============================================================================ #
 # Ensure Neko is installed, if not install it.
 function find_neko() {
     check_external_dir
@@ -413,7 +498,7 @@ function find_neko() {
 
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
-            [ -z "$NEKO_VERSION" ] && NEKO_VERSION="neko-top"
+            [ -z "$NEKO_VERSION" ] && NEKO_VERSION="release/1.1"
 
             git clone --depth 1 --branch $NEKO_VERSION \
                 https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
