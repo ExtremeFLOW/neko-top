@@ -52,16 +52,14 @@ contains
     character(len=:), allocatable :: recover_type
 
     call json_get_or_default(params, "type", recover_type, "checkpoint")
-
     call state_recover_allocator(recover, recover_type)
-
     call recover%init(neko_case, params)
   end subroutine state_recover_factory
 
   !> Allocate a state recovery implementation.
   !! @param[inout] recover Allocatable state recovery instance.
   !! @param[in] recover_type State recovery implementation identifier.
-  module subroutine state_recover_allocator(recover, recover_type)
+  subroutine state_recover_allocator(recover, recover_type)
     class(state_recover_t), allocatable, intent(inout) :: recover
     character(len=*), intent(in) :: recover_type
 

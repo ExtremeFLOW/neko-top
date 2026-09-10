@@ -78,7 +78,7 @@ module state_recover
        import state_recover_t, case_t, json_file
        class(state_recover_t), intent(inout) :: this
        class(case_t), target, intent(inout) :: neko_case
-       type(json_file), target, intent(inout) :: params
+       type(json_file), intent(inout) :: params
      end subroutine state_recover_init
 
      !> Free state recovery resources.
@@ -120,14 +120,9 @@ module state_recover
        type(json_file), intent(inout) :: params
      end subroutine state_recover_factory
 
-     ! Allocate a state recovery implementation.
-     module subroutine state_recover_allocator(recover, recover_type)
-       class(state_recover_t), allocatable, intent(inout) :: recover
-       character(len=*), intent(in) :: recover_type
-     end subroutine state_recover_allocator
   end interface
 
-  public :: state_recover_factory, state_recover_allocator
+  public :: state_recover_factory
 
 contains
 

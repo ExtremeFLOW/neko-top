@@ -90,8 +90,6 @@ module state_recover_checkpoint
    contains
      !> Initialization from a JSON file
      procedure, public, pass(this) :: init => checkpoint_init_from_json
-     procedure, public, pass(this) :: init_from_json => &
-          checkpoint_init_from_json
      !> Initialization from components
      procedure, public, pass(this) :: init_from_components => &
           checkpoint_init_from_components
@@ -150,7 +148,7 @@ contains
   subroutine checkpoint_init_from_json(this, neko_case, params)
     class(state_recover_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    type(json_file), target, intent(inout) :: params
+    type(json_file), intent(inout) :: params
     integer :: n_saves_memory
     character(len=:), allocatable :: path, filename, algorithm, fmt
     character(len=256), dimension(:), allocatable :: extra_field_names
@@ -519,6 +517,8 @@ contains
           if (this%state_storage(i, j)%is_allocated()) then
              call rzero(this%state_storage(i, j)%data, &
                   this%state_storage(i, j)%size)
+          else
+             call neko_error("State storage not allocated")
           end if
        end do
     end do
