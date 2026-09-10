@@ -2,7 +2,7 @@
 # Find Doxygen
 # ============================================================================ #
 
-if (NOT BUILD_DOCS)
+if (NOT BUILD_DOCS AND NOT ONLY_DOCS)
     return()
 endif()
 
