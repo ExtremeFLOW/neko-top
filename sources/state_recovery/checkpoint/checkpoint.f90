@@ -519,6 +519,8 @@ contains
                   this%state_storage(i, j)%size)
           else
              call neko_error("State storage not allocated")
+          else
+             call neko_error("State storage not allocated")
           end if
        end do
     end do
