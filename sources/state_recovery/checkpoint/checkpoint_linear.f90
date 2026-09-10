@@ -53,7 +53,7 @@ contains
   !> Save the current state of the simulation in a linear fashion.
   !! We save every `n_saves_memory` time steps to disc and we always save
   !! any timestep leading up to the `first_valid_timestep` time steps to disc.
-  module subroutine checkpoint_save_linear(this, neko_case)
+  module subroutine checkpoint_save_linear(this)
     class(state_recover_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
     integer :: index, tstep, counter, n_total
