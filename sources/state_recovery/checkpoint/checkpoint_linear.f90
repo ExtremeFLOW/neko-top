@@ -59,6 +59,7 @@ contains
     real(kind=rp) :: time, start_time, end_time, dt
 
     time = this%neko_case%time%t
+    dt = this%neko_case%time%dt
     tstep = this%neko_case%time%tstep
     start_time = this%neko_case%time%start_time
     end_time = this%neko_case%time%end_time

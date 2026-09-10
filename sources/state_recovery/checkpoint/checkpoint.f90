@@ -135,6 +135,7 @@ contains
 
   !> Initialization
   !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
   !! @param[inout] params JSON parameters.
   subroutine checkpoint_init_from_json(this, neko_case, params)
     class(state_recover_checkpoint_t), intent(inout) :: this
@@ -146,7 +147,7 @@ contains
     type(field_list_t) :: extra_fields
     type(field_t), pointer :: fi
     integer :: i
-    logical :: enabled, keep_checkpoints
+    logical :: keep_checkpoints
 
     call json_get_or_default(params, "algorithm", algorithm, "linear")
     call json_get_or_default(params, "n_memory", n_saves_memory, 10)
@@ -157,7 +158,6 @@ contains
          .false.)
 
     if ("extra_fields" .in. params) then
-       allocate(extra_field_names(0))
        call json_get(params, "extra_fields", extra_field_names)
        call extra_fields%init(size(extra_field_names))
        do i = 1, size(extra_field_names)
@@ -198,21 +198,21 @@ contains
     type(field_list_t), optional, intent(inout) :: extra_fields
     type(field_t), pointer :: si
     character(len=LOG_SIZE) :: msg
-    integer :: i, n_states
+    integer :: i, j, n_states
     logical :: exists
 
     call this%free()
     this%neko_case => neko_case
 
     ! Assign parameters from arguments or defaults
-    if (present(algorithm)) this%algorithm = algorithm
     if (present(n_saves_memory)) this%n_saves_memory = n_saves_memory
     if (present(path)) this%path = trim(path)
     if (present(filename)) this%filename = trim(filename)
     if (present(fmt)) this%fmt = trim(fmt)
     if (present(keep_checkpoints)) this%keep_checkpoints = keep_checkpoints
 
-    select case (trim(this%algorithm))
+    ! Assign the checkpointing algorithm
+    select case (trim(algorithm))
     case ("linear", "LINEAR", "Linear")
        this%algorithm = "linear"
        this%algorithm_id = CHECKPOINT_LINEAR
@@ -222,6 +222,7 @@ contains
 
     inquire(file = trim(this%path), exist = exists)
     if (.not. exists) then
+       call MPI_Barrier(NEKO_COMM)
        if (pe_rank .eq. 0) then
           call mkdir(trim(this%path))
        end if
@@ -499,7 +500,7 @@ contains
 
     do i = 1, size(this%state_storage, 1)
        do j = 1, size(this%state_storage, 2)
-          call rzero(this%state_storage(i, j)%x, this%state_storage(i, j)%size)
+          call rzero(this%state_storage(i, j)%x, this%state_storage(i, j)%size())
        end do
     end do
 
