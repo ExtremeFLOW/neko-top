@@ -42,7 +42,7 @@ module state_recover_checkpoint
   use field, only: field_t
   use field_list, only: field_list_t
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use utils, only: neko_error
+  use utils, only: neko_error, mkdir
   use math, only: copy, rzero
   use host_array, only: host_array_t
   use profiler, only: profiler_start_region, profiler_end_region
