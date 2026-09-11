@@ -43,9 +43,10 @@ if they are not already present on the system. The external libraries are:
 1. Neko
 2. JSON-Fortran (Required by Neko)
 3. GSLib (Required by Neko)
-4. Nek5000 (optional)
-5. PFUnit (optional)
-6. CUDA (optional)
+4. ADIOS2 (optional)
+5. Nek5000 (optional)
+6. PFUnit (optional)
+7. CUDA (optional)
 
 ## Quick-start compilation {#installation-quick}
 
@@ -67,14 +68,16 @@ dependencies. The script relies in a number of environment variables, which can
 be used to modify the behaviour of the system and allow the user to specify
 custom install locations for the given dependencies.
 
-| Variable           | Description                                                          | Default               |
-| ------------------ | -------------------------------------------------------------------- | --------------------- |
-| `NEKO_DIR`         | Location of the Neko library.                                        | external/neko         |
-| `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                   | external/json-fortran |
-| `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000      |
-| `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                     |
-| `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                     |
-| `CUDA_ARCH`        | CUDA architecture for GPU builds (for example `80` for sm_80).       | Required for CUDA     |
+| Variable                         | Description                                                                | Default               |
+| -------------------------------- | -------------------------------------------------------------------------- | --------------------- |
+| `NEKO_DIR`                       | Location of the Neko library.                                              | external/neko         |
+| `JSON_FORTRAN_DIR`               | JSON-Fortran library, required dependency of Neko.                         | external/json-fortran |
+| `ADIOS2_DIR`                     | ADIOS2 installation; setting it enables ADIOS2 support.                    | -                     |
+| `NEKO_ADIOS2_EXTRA_LINK_FLAGS`   | Extra toolchain flags needed only when linking Neko's ADIOS2 C++ bridge.   | -                     |
+| `NEK5000_DIR`                    | Nek5000, primarily used for meshing and for GSLib.                         | external/Nek5000      |
+| `PFUNIT_DIR`                     | Unit testing library used in Neko.                                         | -                     |
+| `CUDA_DIR`                       | Location of the CUDA library folders, needed for Nvidia GPU support.       | -                     |
+| `CUDA_ARCH`                      | CUDA architecture for GPU builds (for example `80` for sm_80).             | Required for CUDA     |
 
 These can be defined either on the command line by the user or in a
 `prepare.env` file which is loaded by the setup script if it exists in the root
@@ -95,6 +98,56 @@ export CUDA_ARCH=80
 export NEKO_DIR=$HOME/neko
 ```
 
+### ADIOS2-enabled Python workflow
+
+For the ADIOS2-enabled Python workflow, the build order matters. The intended
+order is:
+
+1. Create and activate a fresh Python environment.
+2. Install `mpi4py` into that environment with the MPI compiler wrapper that
+   will be used for the rest of the build.
+3. Build ADIOS2 against that same active Python environment.
+4. Build Neko against that ADIOS2 installation.
+5. Build Neko-TOP on top of that Neko build.
+
+In practice, `./setup.sh` performs steps 3-5, so the critical requirement is
+that steps 1-2 are done first in the shell where setup is invoked. This avoids
+mixing one Python environment for `mpi4py` with another Python environment for
+ADIOS2 and the runtime scripts.
+
+The recommended workflow is therefore:
+
+```sh
+python -m venv PATH_TO_ENV
+source PATH_TO_ENV/bin/activate
+MPICC=mpicc python -m pip install --no-binary=mpi4py mpi4py
+export ADIOS2_DIR=adios2
+./setup.sh
+```
+
+The relative value `adios2` installs ADIOS2 in `external/adios2`; an absolute
+path can be used to install it elsewhere.
+
+If the active Python environment or MPI toolchain changes after ADIOS2 has been
+built, rebuild from ADIOS2 onward so that `mpi4py`, ADIOS2, Neko, and
+Neko-TOP all agree on the same Python and MPI stack.
+
+The setup script queries `adios2-config` only after ADIOS2 is available. It then
+places ADIOS2's C++ libraries after `libneko.a`, where the linker can resolve
+Neko's ADIOS2 symbols. Users do not need to copy those libraries into
+`prepare.env`.
+
+\warning Some Fortran MPI wrappers do not automatically link the C++ runtime
+required by Neko's ADIOS2 C++ bridge. If the Neko link step reports undefined
+C++ runtime symbols such as `std::` or `__gxx_personality_v0`, add only the
+missing toolchain flag to `prepare.env`. For GNU compilers, use:
+\code{.sh}
+NEKO_ADIOS2_EXTRA_LINK_FLAGS="-lstdc++"
+\endcode
+This setting is considered only when `ADIOS2_DIR` enables ADIOS2 support. Use
+the equivalent compiler-runtime flag for a non-GNU toolchain. If Neko was
+already configured, apply the changed flags with `./setup.sh --clean-neko`.
+
 For CUDA builds, `CUDA_ARCH` must be explicitly specified before running
 `setup.sh` (for example `export CUDA_ARCH=80`).
 
@@ -114,4 +167,3 @@ Link 1 is the microsoft description of getting started with WSL 2. Link 2 is the
 NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
-

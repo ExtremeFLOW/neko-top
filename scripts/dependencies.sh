@@ -34,6 +34,49 @@ function check_system_dependencies() {
 
 }
 
+# Resolve the Python executable and export it for CMake/configure callers.
+function find_python_executable() {
+    local candidate
+    local resolved_python
+    local python_path
+
+    if [ -n "${PYTHON_BIN:-}" ]; then
+        if [ -x "${PYTHON_BIN}" ]; then
+            if [[ "${PYTHON_BIN}" = /* ]]; then
+                resolved_python="${PYTHON_BIN}"
+            elif [[ "${PYTHON_BIN}" == */* ]]; then
+                python_path=$(cd "$(dirname "${PYTHON_BIN}")" && pwd)
+                resolved_python="${python_path}/$(basename "${PYTHON_BIN}")"
+            else
+                resolved_python=$(command -v "${PYTHON_BIN}")
+            fi
+            export PYTHON_EXECUTABLE="${resolved_python}"
+            printf '%s\n' "${PYTHON_EXECUTABLE}"
+            return 0
+        elif command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
+            resolved_python=$(command -v "${PYTHON_BIN}")
+            export PYTHON_EXECUTABLE="${resolved_python}"
+            printf '%s\n' "${PYTHON_EXECUTABLE}"
+            return 0
+        fi
+
+        error "PYTHON_BIN is set but not executable:"
+        error "\t${PYTHON_BIN}"
+        return 1
+    fi
+
+    for candidate in python3 python; do
+        if command -v "${candidate}" >/dev/null 2>&1; then
+            resolved_python=$(command -v "${candidate}")
+            export PYTHON_EXECUTABLE="${resolved_python}"
+            printf '%s\n' "${PYTHON_EXECUTABLE}"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 # ============================================================================ #
 # Ensure JSON-Fortran is installed, if not install it.
 function find_json_fortran() {
@@ -320,6 +363,153 @@ function find_hdf5() {
 }
 
 # ============================================================================ #
+# Ensure ADIOS2 is installed, if not install it.
+function find_adios2() {
+    check_external_dir
+    local pyexe
+    local pyver
+    local cmake_args=()
+
+    if [[ $# -ge 1 && -n "$1" ]]; then
+        ADIOS2_DIR="$1"
+    elif [ -z "${ADIOS2_DIR:-}" ]; then
+        return
+    fi
+
+    if ! find_python_executable >/dev/null; then
+        echo "Error: could not find python3 or python in PATH." >&2
+        return 1
+    fi
+    pyexe="${PYTHON_EXECUTABLE}"
+    pyver=$("${pyexe}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+
+    if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
+        ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
+    fi
+
+    ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
+
+    if [[ ! -x "${ADIOS2_CONFIG}" ]]; then
+        [ -z "${ADIOS2_VERSION:-}" ] && ADIOS2_VERSION="2.10.1"
+        [ -z "${ADIOS2_ENABLE_PYTHON:-}" ] && ADIOS2_ENABLE_PYTHON="ON"
+        [ -z "${ADIOS2_ENABLE_SST:-}" ] && ADIOS2_ENABLE_SST="ON"
+
+        if [ ! -d "$ADIOS2_DIR/.git" ]; then
+            git clone --depth 1 --branch "v${ADIOS2_VERSION}" \
+                https://github.com/ornladios/ADIOS2.git "$ADIOS2_DIR"
+        fi
+
+        cmake_args=(
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+            -DCMAKE_INSTALL_PREFIX="$ADIOS2_DIR"
+            -DCMAKE_INSTALL_PYTHONDIR="lib/python${pyver}/site-packages"
+            -DADIOS2_BUILD_EXAMPLES=OFF
+            -DADIOS2_USE_MPI=ON
+            -DADIOS2_USE_SST="$ADIOS2_ENABLE_SST"
+            -DADIOS2_USE_Python="$ADIOS2_ENABLE_PYTHON"
+            -DADIOS2_USE_Fortran=OFF
+            -DADIOS2_USE_BZip2=OFF
+            -DBUILD_TESTING=OFF
+            -DPython3_EXECUTABLE="$pyexe"
+            -DPython_EXECUTABLE="$pyexe"
+            -DPYTHON_EXECUTABLE="$pyexe"
+            -DPython3_FIND_STRATEGY=LOCATION
+            -DPython_FIND_STRATEGY=LOCATION
+            -DCMAKE_C_COMPILER="${MPICC:-${CC:-cc}}"
+            -DCMAKE_CXX_COMPILER="${MPICXX:-${CXX:-CC}}"
+        )
+
+        if [ -n "${HDF5_DIR:-}" ]; then
+            cmake_args+=(
+                -DADIOS2_USE_HDF5=ON
+                -DHDF5_ROOT="$HDF5_DIR"
+            )
+        else
+            cmake_args+=(
+                -DADIOS2_USE_HDF5=OFF
+            )
+        fi
+
+        cmake -S "$ADIOS2_DIR" -B "$ADIOS2_DIR/build" "${cmake_args[@]}"
+        cmake --build "$ADIOS2_DIR/build" --parallel
+        cmake --install "$ADIOS2_DIR/build"
+        rm -rf "$ADIOS2_DIR/build"
+
+        ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
+    fi
+
+    if [ ! -x "${ADIOS2_CONFIG}" ]; then
+        error "ADIOS2 not found at:"
+        error "\t$ADIOS2_DIR"
+        error "Please set ADIOS2_DIR to the directory containing"
+        error "the ADIOS2 installation."
+        exit 1
+    fi
+
+    export ADIOS2_DIR="$(realpath "$ADIOS2_DIR")"
+    export ADIOS2_PATH="$ADIOS2_DIR"
+    export PATH="$ADIOS2_DIR/bin:$PATH"
+
+    [ -d "$ADIOS2_DIR/lib/pkgconfig" ] && \
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    [ -d "$ADIOS2_DIR/lib64/pkgconfig" ] && \
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib64/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
+    [ -d "$ADIOS2_DIR/lib" ] && \
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    [ -d "$ADIOS2_DIR/lib64" ] && \
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+    if [ -n "${pyver:-}" ] && [ -d "$ADIOS2_DIR/lib/python${pyver}/site-packages" ]; then
+        export PYTHONPATH="$ADIOS2_DIR/lib/python${pyver}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+    fi
+    if [ -n "${pyver:-}" ] && [ -d "$ADIOS2_DIR/lib64/python${pyver}/site-packages" ]; then
+        export PYTHONPATH="$ADIOS2_DIR/lib64/python${pyver}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+    fi
+
+    echo "Using ADIOS2_DIR=$ADIOS2_DIR"
+    echo "Using Python=${pyexe:-<not found>}"
+    echo "done"
+}
+
+# Return ADIOS2's C++ link flags in a form that libtool keeps in LIBS.  The
+# installed adios2-config emits absolute library filenames, which libtool moves
+# ahead of libneko.a and which are then discarded by linkers using --as-needed.
+# Converting those filenames to -L/-l pairs preserves their position after
+# libneko.a in the final link command.
+function get_neko_adios2_link_flags() {
+    local adios2_config_flags
+    local adios2_flag
+    local adios2_lib_dir
+    local adios2_lib_name
+    local adios2_libs=()
+
+    if ! adios2_config_flags=$("$ADIOS2_CONFIG" --cxx-libs); then
+        error "Failed to query ADIOS2 C++ link flags from:"
+        error "\t$ADIOS2_CONFIG"
+        return 1
+    fi
+
+    for adios2_flag in $adios2_config_flags; do
+        case "$adios2_flag" in
+        */lib*.so*|*/lib*.a)
+            adios2_lib_dir=${adios2_flag%/*}
+            adios2_lib_name=${adios2_flag##*/}
+            adios2_lib_name=${adios2_lib_name#lib}
+            adios2_lib_name=${adios2_lib_name%%.so*}
+            adios2_lib_name=${adios2_lib_name%%.a}
+            adios2_libs+=("-L$adios2_lib_dir" "-l$adios2_lib_name")
+            ;;
+        *)
+            adios2_libs+=("$adios2_flag")
+            ;;
+        esac
+    done
+
+    printf '%s ' "${adios2_libs[@]}"
+}
+
+# ============================================================================ #
 # Ensure ParMETIS is installed, if not install it.
 
 function find_parmetis() {
@@ -388,12 +578,22 @@ function find_parmetis() {
 function find_neko() {
     check_external_dir
 
+    local neko_adios2_link_flags=""
+
     # Find the required dependencies for Neko
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
+    find_adios2 $ADIOS2_DIR
     find_parmetis $PARMETIS_DIR
     [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
+
+    # ADIOS2 is available only after find_adios2 has run.  Keep its libraries
+    # and any explicitly requested compatibility flags after libneko.a.
+    if [ -n "$ADIOS2_DIR" ]; then
+        neko_adios2_link_flags=$(get_neko_adios2_link_flags)
+        neko_adios2_link_flags+="${NEKO_ADIOS2_EXTRA_LINK_FLAGS:-}"
+    fi
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
@@ -439,6 +639,7 @@ function find_neko() {
         [ -n "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
+        [ -n "$ADIOS2_DIR" ] && FEATURES+=" --with-adios2=$ADIOS2_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
         [ -n "$PFUNIT_DIR" ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
@@ -490,7 +691,9 @@ function find_neko() {
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
             ./configure --prefix="$(realpath ./)" $FEATURES \
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
-                CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
+                CC=$CC MPICC=$MPICC CFLAGS="$NEKO_CFLAGS" \
+                CXX=$CXX MPICXX=$MPICXX CXXFLAGS="$NEKO_CXXFLAGS" \
+                LIBS="$neko_adios2_link_flags" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
                 CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
@@ -660,9 +863,10 @@ function check_external_dir() {
     if [ -z "$EXTERNAL_DIR" ]; then
         echo "Environment EXTERNAL_DIR is not set."
         echo "Default path will be used: $HOME/tmp/external"
-        export EXTERNAL_DIR=$HOME/tmp/external
+        EXTERNAL_DIR="$HOME/tmp/external"
     fi
 
-    mkdir -p $EXTERNAL_DIR
+    mkdir -p "$EXTERNAL_DIR"
+    export EXTERNAL_DIR="$(realpath "$EXTERNAL_DIR")"
 
 }
