@@ -506,6 +506,7 @@ function get_neko_adios2_link_flags() {
 # Ensure ParMETIS is installed, if not install it.
 
 function find_parmetis() {
+
     # Determine the Parmetis installation directory
     check_external_dir
     if [[ $# -ge 1 ]]; then
@@ -529,7 +530,7 @@ function find_parmetis() {
         tar xzf parmetis-4.0.3.tar.gz
         cd parmetis-4.0.3
 
-        # Modify the bundled CMake files to satisfy newer toolchains.
+        # Modify the minimum requirement of cmake
         cmake_lists=$(find . -name CMakeLists.txt)
         for file in $cmake_lists; do
             sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.11)/g' $file
@@ -602,6 +603,7 @@ function find_neko() {
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
+
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
             [ -z "$NEKO_VERSION" ] && NEKO_VERSION="neko-top"
@@ -678,7 +680,6 @@ function find_neko() {
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
-
         if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then
             ./regen.sh
         fi
