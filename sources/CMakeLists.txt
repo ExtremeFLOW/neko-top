@@ -109,7 +109,7 @@ target_link_libraries(neko-top PUBLIC
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
 )
 
-if(ADIOS2_CONFIG_EXECUTABLE)
+if(TARGET neko_cxx_support)
     # ADIOS2/MPI C++/stdc++ must come after libneko.
     target_link_libraries(neko-top PUBLIC neko_cxx_support)
 endif()
@@ -122,9 +122,11 @@ add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
 # Install the neko-top library and its modules.
 # These should adhere to the CMake installation conventions.
 
-install(TARGETS neko_cxx_support
-    EXPORT neko-top-targets
-)
+if(TARGET neko_cxx_support)
+    install(TARGETS neko_cxx_support
+        EXPORT neko-top-targets
+    )
+endif()
 install(TARGETS neko-top
     EXPORT neko-top-targets
     ARCHIVE DESTINATION lib/neko-top

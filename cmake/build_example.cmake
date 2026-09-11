@@ -126,7 +126,7 @@ function(build_example)
         $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
     )
 
-    if(ADIOS2_CONFIG_EXECUTABLE)
+    if(TARGET neko_cxx_support)
         # Keep the ADIOS2 C++ libraries after libneko in the final link line.
         target_link_libraries(${EXAMPLE_NAME} neko_cxx_support)
     endif()
