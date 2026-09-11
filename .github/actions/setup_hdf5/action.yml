@@ -124,8 +124,9 @@ runs:
         CC: ${{ inputs.c-compiler }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
-            --install-prefix $INSTALL_DIR -DHDF5_ENABLE_PARALLEL=ON \
-            -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF
+            --install-prefix $INSTALL_DIR -DCMAKE_BUILD_TYPE=Release \
+            -DHDF5_ENABLE_PARALLEL=ON -DHDF5_BUILD_FORTRAN=ON \
+            -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF -DHDF5_BUILD_TOOLS:BOOL=ON
 
     - name: Build
       if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
@@ -162,4 +163,6 @@ runs:
         echo "install-dir=${INSTALL_DIR}"
         echo "install-dir=${INSTALL_DIR}" >> $GITHUB_OUTPUT
         echo "HDF5_ROOT=${INSTALL_DIR}" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${INSTALL_DIR}/lib/pkgconfig" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}/lib" >> $GITHUB_ENV
+        echo "PATH=${INSTALL_DIR}/bin:${PATH}" >> $GITHUB_ENV
