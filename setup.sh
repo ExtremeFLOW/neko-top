@@ -21,6 +21,7 @@ function help() {
     echo -e "\tNEKO_DIR          The directory where Neko is installed"
     echo -e "\tJSON_FORTRAN_DIR  The directory where JSON-Fortran is installed"
     echo -e "\tADIOS2_DIR        The directory where ADIOS2 is installed"
+    echo -e "\tNEKO_ADIOS2_EXTRA_LINK_FLAGS  Extra flags for Neko's ADIOS2 link"
     echo -e "\tNEK5000_DIR       The directory where Nek5000 is installed"
     echo -e "\tPFUNIT_DIR        The directory where PFUnit is installed"
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"

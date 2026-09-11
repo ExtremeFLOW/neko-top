@@ -465,6 +465,43 @@ function find_adios2() {
     echo "done"
 }
 
+# Return ADIOS2's C++ link flags in a form that libtool keeps in LIBS.  The
+# installed adios2-config emits absolute library filenames, which libtool moves
+# ahead of libneko.a and which are then discarded by linkers using --as-needed.
+# Converting those filenames to -L/-l pairs preserves their position after
+# libneko.a in the final link command.
+function get_neko_adios2_link_flags() {
+    local adios2_config_flags
+    local adios2_flag
+    local adios2_lib_dir
+    local adios2_lib_name
+    local adios2_libs=()
+
+    if ! adios2_config_flags=$("$ADIOS2_CONFIG" --cxx-libs); then
+        error "Failed to query ADIOS2 C++ link flags from:"
+        error "\t$ADIOS2_CONFIG"
+        return 1
+    fi
+
+    for adios2_flag in $adios2_config_flags; do
+        case "$adios2_flag" in
+        */lib*.so*|*/lib*.a)
+            adios2_lib_dir=${adios2_flag%/*}
+            adios2_lib_name=${adios2_flag##*/}
+            adios2_lib_name=${adios2_lib_name#lib}
+            adios2_lib_name=${adios2_lib_name%%.so*}
+            adios2_lib_name=${adios2_lib_name%%.a}
+            adios2_libs+=("-L$adios2_lib_dir" "-l$adios2_lib_name")
+            ;;
+        *)
+            adios2_libs+=("$adios2_flag")
+            ;;
+        esac
+    done
+
+    printf '%s ' "${adios2_libs[@]}"
+}
+
 # ============================================================================ #
 # Ensure ParMETIS is installed, if not install it.
 
@@ -533,6 +570,8 @@ function find_parmetis() {
 function find_neko() {
     check_external_dir
 
+    local neko_adios2_link_flags=""
+
     # Find the required dependencies for Neko
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
@@ -540,6 +579,13 @@ function find_neko() {
     find_adios2 $ADIOS2_DIR
     find_parmetis $PARMETIS_DIR
     [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
+
+    # ADIOS2 is available only after find_adios2 has run.  Keep its libraries
+    # and any explicitly requested compatibility flags after libneko.a.
+    if [ -n "$ADIOS2_DIR" ]; then
+        neko_adios2_link_flags=$(get_neko_adios2_link_flags)
+        neko_adios2_link_flags+="${NEKO_ADIOS2_EXTRA_LINK_FLAGS:-}"
+    fi
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
@@ -641,7 +687,7 @@ function find_neko() {
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
                 CC=$CC MPICC=$MPICC CFLAGS="$NEKO_CFLAGS" \
                 CXX=$CXX MPICXX=$MPICXX CXXFLAGS="$NEKO_CXXFLAGS" \
-                LIBS="$NEKO_LIBS" \
+                LIBS="$neko_adios2_link_flags" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
                 CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
