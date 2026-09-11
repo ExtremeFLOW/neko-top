@@ -49,9 +49,15 @@ QUIET=false
 TEST=OFF
 DOCS=OFF
 EXAMPLES=OFF
+NEKO_TEST=OFF
+
+# Load the environment file.
+if [ -f "$MAIN_DIR/prepare.env" ]; then
+    source $MAIN_DIR/prepare.env
+fi
 
 # List possible options
-OPTIONS=help,tests,clean,clean-neko,quiet,device:,docs,examples
+OPTIONS=help,tests,clean,clean-neko,test-neko,quiet,device:,docs,examples
 OPT=h,t,c,q,d:,e
 
 # Parse the inputs for options
@@ -95,10 +101,6 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Preparing environment.\n"
 
-# Execute the preparation script if it exists
-if [ -f "$MAIN_DIR/prepare.env" ]; then
-    source $MAIN_DIR/prepare.env
-fi
 source $MAIN_DIR/scripts/dependencies.sh
 
 # Define standard compilers if they are not defined as environment variables

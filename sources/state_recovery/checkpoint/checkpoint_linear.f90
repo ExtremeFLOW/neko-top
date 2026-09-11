@@ -1,6 +1,6 @@
 !> @file checkpoint_linear.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -36,29 +36,33 @@
 !> Implementation for the Linear Checkpointing algorithm.
 !! In this case, we save the state of the simulation every `n_saves_memory`
 !! time steps. When restoring to a given time step, we load the nearest
-!! checkpoint and then we fill our cache with the following `n_saves_memory` time
-!! steps. Finally, we copy the required time step from our cache.
+!! checkpoint and then we fill our cache with the following
+!! `n_saves_memory` time steps. Finally, we copy the required time step from
+!! our cache.
 !!
 !! This algorithm is the simplest one and do a minimum of re-computation. But
 !! requires large amounts of memory and disk space.
-submodule (simulation_checkpoint) checkpoint_linear
+submodule (state_recover_checkpoint) checkpoint_linear
+  use num_types, only: dp
   use simulation, only: simulation_step, simulation_restart
-  use file, only: file_t, file_free
   use time_step_controller, only: time_step_controller_t
+  use profiler, only: profiler_start_region, profiler_end_region
 
 contains
 
   !> Save the current state of the simulation in a linear fashion.
   !! We save every `n_saves_memory` time steps to disc and we always save
   !! any timestep leading up to the `first_valid_timestep` time steps to disc.
-  module subroutine checkpoint_save_linear(this, neko_case)
-    class(simulation_checkpoint_t), intent(inout) :: this
-    class(case_t), intent(inout) :: neko_case
+  module subroutine checkpoint_save_linear(this)
+    class(state_recover_checkpoint_t), intent(inout) :: this
     integer :: index, tstep, counter, n_total
-    real(kind=rp) :: time
+    real(kind=rp) :: time, start_time, end_time, dt
 
-    time = neko_case%time%t
-    tstep = neko_case%time%tstep
+    time = this%neko_case%time%t
+    dt = this%neko_case%time%dt
+    tstep = this%neko_case%time%tstep
+    start_time = this%neko_case%time%start_time
+    end_time = this%neko_case%time%end_time
 
     ! We save to disc only every n_saves_memory time steps
     index = modulo(tstep, this%n_saves_memory)
@@ -69,7 +73,9 @@ contains
             this%first_valid_timestep)
 
        call this%chkp_output%set_counter(counter)
+       call profiler_start_region("Checkpoint write to disk")
        call this%chkp_output%sample(time)
+       call profiler_end_region("Checkpoint write to disk")
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
@@ -79,8 +85,7 @@ contains
     ! Note: the plus 0.5 is to round up to the next integer, as the division can
     ! be slightly smaller than the actual number of steps due to floating point
     ! errors.
-    n_total = int(((neko_case%time%end_time - neko_case%time%start_time) &
-         / neko_case%time%dt) + 0.5_rp)
+    n_total = int(((end_time - start_time) / dt) + 0.5_rp)
     if (tstep .ge. n_total - modulo(n_total, this%n_saves_memory)) then
        call this%save_data(index + 1)
     end if
@@ -91,9 +96,8 @@ contains
   !! If the requested time step is not in memory, we load the nearest
   !! checkpoint from disc and then we step forward in time to fill our cache.
   !! Finally, we copy the requested time step from our cache.
-  module subroutine checkpoint_restore_linear(this, neko_case, tstep)
-    class(simulation_checkpoint_t), intent(inout) :: this
-    class(case_t), target, intent(inout) :: neko_case
+  module subroutine checkpoint_restore_linear(this, tstep)
+    class(state_recover_checkpoint_t), intent(inout) :: this
     integer, intent(in) :: tstep
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
@@ -121,27 +125,31 @@ contains
        counter = determine_counter(previous_save, this%n_saves_memory, &
             this%first_valid_timestep)
        call this%chkp_output%set_counter(counter)
-       call this%chkp_output%file_%read(neko_case%chkp)
-       call simulation_restart(neko_case, neko_case%chkp)
+       call profiler_start_region("Checkpoint read from disk")
+       call this%chkp_output%file_%read(this%neko_case%chkp)
+       call profiler_end_region("Checkpoint read from disk")
+       call simulation_restart(this%neko_case, this%neko_case%chkp)
 
        ! Initialize the time step controller and set the time step
-       call dt_controller%init(neko_case%params)
-       neko_case%time%tstep = previous_save
-       this%loaded_checkpoint = neko_case%time%tstep
+       call dt_controller%init(this%neko_case%params)
+       this%neko_case%time%tstep = previous_save
+       this%loaded_checkpoint = this%neko_case%time%tstep
 
+       call profiler_start_region("Checkpoint recompute")
        ! Step through the simulation and store field states in memory
-       do k = previous_save, min(next_save - 1, this%n_timesteps)
+       do k = previous_save, min(next_save - 1, this%get_n_timesteps())
 
           ! Do not run simulation step on the first iteration
           if (k .ne. previous_save) then
-             if (neko_case%time%t .ge. neko_case%time%end_time) exit
-             call simulation_step(neko_case, dt_controller, loop_start)
+             if (this%neko_case%time%t .ge. this%neko_case%time%end_time) exit
+             call simulation_step(this%neko_case, dt_controller, loop_start)
           end if
 
           ! Save the restored state in memory
           local_idx = modulo(k, this%n_saves_memory) + 1
           call this%save_data(local_idx)
        end do
+       call profiler_end_region("Checkpoint recompute")
     end if
 
     ! Restore the required time step from memory
