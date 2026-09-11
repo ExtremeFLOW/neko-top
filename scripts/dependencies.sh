@@ -366,7 +366,6 @@ function find_hdf5() {
 # Ensure ADIOS2 is installed, if not install it.
 function find_adios2() {
     check_external_dir
-    find_hdf5 $HDF5_DIR
     local pyexe
     local pyver
     local cmake_args=()
