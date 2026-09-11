@@ -279,17 +279,6 @@ add_custom_target(neko-top_ready
     DEPENDS neko-top
     COMMENT "Neko-TOP library is ready.")
 add_dependencies(neko-top-a neko-top_ready)
-# Anything that links against neko-top-a also needs the full Neko stack
-# (core Neko lib, JSON-Fortran, BLAS/LAPACK and the C++/ADIOS2 bits)
-target_link_libraries(neko-top-a INTERFACE
-    PkgConfig::neko          # libneko.a + its C deps
-    PkgConfig::json-fortran  # JSON-Fortran
-    ${LAPACK_LIBRARIES}
-    ${BLAS_LIBRARIES}
-)
-if(TARGET neko_cxx_support)
-    target_link_libraries(neko-top-a INTERFACE neko_cxx_support)
-endif()
 
 # ============================================================================ #
 # Build the examples
