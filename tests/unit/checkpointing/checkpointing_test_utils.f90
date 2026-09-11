@@ -1,6 +1,6 @@
 module checkpointing_test_utils
   use simulation_m, only: simulation_t
-  use simulation_checkpoint, only: simulation_checkpoint_t
+  use state_recover_checkpoint, only: state_recover_checkpoint_t
   use design, only: design_t, design_factory
   use problem, only: problem_t
   use neko, only: neko_init
@@ -146,7 +146,7 @@ contains
     type(simulation_t), intent(inout) :: sim
     class(design_t), allocatable, intent(inout) :: des
     type(problem_t), intent(inout) :: prob
-    type(simulation_checkpoint_t), optional, intent(inout) :: chkp
+    type(state_recover_checkpoint_t), optional, intent(inout) :: chkp
 
     if (present(chkp)) call chkp%free()
     call sim%free()

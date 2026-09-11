@@ -139,7 +139,8 @@
         ]
     },
     "unsteady": true,
-    "checkpoints": {
+    "state_recovery": {
+        "type": "checkpoint",
         "enabled": true,
         "format": "chkp",
         "n_memory": 3
