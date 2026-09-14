@@ -296,6 +296,22 @@ function Run() {
     cd $CURRENT_DIR
 }
 
+function ExampleUsesPodStateRecovery() {
+    local example_dir=$1
+    local case_file
+
+    while IFS= read -r case_file; do
+        if grep -q '"type"[[:space:]]*:[[:space:]]*"pod"' "$case_file"; then
+            return 0
+        fi
+    done < <(
+        find "$example_dir" -maxdepth 1 -type f \
+            \( -name "*.case" -or -name "*.json" \) | sort
+    )
+
+    return 1
+}
+
 # Function for submitting the examples
 function Submit() {
 
@@ -479,11 +495,19 @@ for case in ${example_list[@]}; do
     if [ -n "$CLUSTER" ]; then
 
         setting=$HPATH/${case%.*}.sh
+        exact_setting=$setting
 
         # Find the setting file for the case recursively
         while [[ ! -f $setting && "$(dirname $setting)" != "$HPATH" ]]; do
             setting=$(dirname ${setting%/default.sh})/default.sh
         done
+
+        if [ ! -f "$exact_setting" ] && \
+           [ -f "$HPATH/pod/default.sh" ] && \
+           ExampleUsesPodStateRecovery "$EPATH/$case_dir"; then
+            setting="$HPATH/pod/default.sh"
+        fi
+
         setting=$(realpath $setting)
 
         if [ ! -f $setting ]; then

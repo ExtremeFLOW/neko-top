@@ -49,7 +49,13 @@ add_subdirectory(${EXAMPLES_DIR}/1d_beam)
 add_subdirectory(${EXAMPLES_DIR}/static_mixer)
 add_subdirectory(${EXAMPLES_DIR}/unsteady_mixer)
 add_subdirectory(${EXAMPLES_DIR}/unsteady_rugby_ball)
+add_subdirectory(${EXAMPLES_DIR}/low_Re)
 add_subdirectory(${EXAMPLES_DIR}/wiggles)
+
+# This case is not present in every branch/checkout.
+if (EXISTS ${EXAMPLES_DIR}/Re3000/CMakeLists.txt)
+    add_subdirectory(${EXAMPLES_DIR}/Re3000)
+endif()
 
 # If the benchmark_mixer folder exists, add it as well
 if (EXISTS ${EXAMPLES_DIR}/benchmark_mixer/CMakeLists.txt)

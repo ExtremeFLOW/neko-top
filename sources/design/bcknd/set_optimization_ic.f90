@@ -263,7 +263,7 @@ contains
     end if
 
     ! Change from "field0.f000*" to "field0.fld" for the fld reader
-    call filename_chsuffix(file_name, trim(file_name), 'fld')
+    call filename_chsuffix(file_name, file_name, 'fld')
 
     call fld_data%init()
     call f%init(trim(file_name))

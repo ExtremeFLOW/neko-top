@@ -1,33 +1,30 @@
-#!/bin/bash
+#!/bin/bash -l
 
 # In this file make changes to the SBATCH variables to control the LUMI
-# hpc settings.
-#
-# In addition, all modules should be loaded and python virtualenv should be
-# setup if python is used in either testing or visualisation.
-# Modules and python setups can be done in a separate file and supplied through
-# the FILES variable in submit.sh. This will ensure a uniform setup.
+# hpc settings for the low_Re POD run.
 
 # =============================================================================
 # Define the SBATCH options here.
 
-# --  Technical Options
+# -- Technical options
 
 # Queue name
 #SBATCH --partition=small-g
 
-# Ask for n cores placed on R host.
-#SBATCH --ntasks=1
-#SBATCH --gpus-per-task=1
-#SBATCH --cpus-per-task=6
+# Ask for a full-node layout on LUMI-G: eight GPU-backed Neko ranks and
+# forty-eight CPU-only Python ranks, matching the 56 usable CPU cores/node.
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=56
+#SBATCH --gpus-per-node=8
+#SBATCH --mem=480GB
 
 # Time specifications (dd-hh:mm:ss)
-#SBATCH --time 00-00:10:00
+#SBATCH --time 23:30:00
 
 # -- Notification options
 
 # Set the email to receive to and when to receive it
-#SBATCH --mail-type=END    # Send notification at completion
+#SBATCH --mail-type=ALL
 
 # -- Mandatory options, change with great care.
 
@@ -50,14 +47,38 @@ else
     exit 1
 fi
 
-# ============================================================================ #
-# Select which GPU to map to which core
+ml craype-accel-amd-gfx90a rocm
+
+cat <<'EOF' > select_gpu
+#!/bin/bash
+
+export ROCR_VISIBLE_DEVICES=${SLURM_LOCALID:-0}
+exec "$@"
+EOF
+
+chmod +x ./select_gpu
+trap 'rm -f ./select_gpu' EXIT
+
 source functions.sh
 
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export MPICH_GPU_SUPPORT_ENABLED=1
-export NEKO_GS_STRTGY=3
+export ATP_ENABLED=true
+
+if [ -f "${MAIN_DIR}/build/pod_runtime.env" ]; then
+    source "${MAIN_DIR}/build/pod_runtime.env"
+else
+    echo "Error: missing ${MAIN_DIR}/build/pod_runtime.env" >&2
+    echo "Run ./setup.sh -e after activating the target Python environment." >&2
+    exit 1
+fi
+
+# Set these explicitly if you want a different case, Python executable, or
+# recovery script than the defaults in examples/low_Re/run.sh.
+export CASE_FILE="${CASE_FILE:-case.case}"
+export PYTHON_BIN="${PYTHON_BIN:-$(command -v python3 || command -v python)}"
+export PYTHON_SCRIPT="${PYTHON_SCRIPT:-${MAIN_DIR}/scripts/python/pod_state_recover.py}"
+export NEKO_RANKS="${NEKO_RANKS:-8}"
+export PY_RANKS="${PY_RANKS:-48}"
+export NEKO_STARTUP_DELAY="${NEKO_STARTUP_DELAY:-20}"
 
 run $example
-
-# ==============================   End of File   ==============================

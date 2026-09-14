@@ -19,6 +19,7 @@ function help() {
     echo -e "Environment Variables:"
     echo -e "\tNEKO_DIR          The directory where Neko is installed"
     echo -e "\tJSON_FORTRAN_DIR  The directory where JSON-Fortran is installed"
+    echo -e "\tADIOS2_DIR        The directory where ADIOS2 is installed"
     echo -e "\tNEK5000_DIR       The directory where Nek5000 is installed"
     echo -e "\tPFUNIT_DIR        The directory where PFUnit is installed"
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
@@ -117,6 +118,7 @@ printf "Setting up external dependencies\n"
 
 check_system_dependencies                      # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
+find_adios2 $ADIOS2_DIR                        # Re-defines the ADIOS2_DIR variable.
 find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
 [ "$TEST" == "ON" ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
@@ -129,6 +131,12 @@ printf "Compiling the example codes and Neko-TOP\n"
 
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+mkdir -p $MAIN_DIR/build
+
+# Validate and persist the POD Python runtime when example launchers are built.
+if [ "$EXAMPLES" == "ON" ]; then
+    find_pod_python_runtime $MAIN_DIR
+fi
 
 # If CMAKE_VARIABLES is a string, convert it to an array
 if [ -n "$CMAKE_VARIABLES" ]; then
