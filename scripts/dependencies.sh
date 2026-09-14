@@ -506,10 +506,6 @@ function get_neko_adios2_link_flags() {
         esac
     done
 
-    if [[ " ${adios2_libs[*]} " != *" -lstdc++ "* ]]; then
-        adios2_libs+=("-lstdc++")
-    fi
-
     printf '%s ' "${adios2_libs[@]}"
 }
 
