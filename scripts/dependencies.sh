@@ -390,7 +390,7 @@ function find_adios2() {
     ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
 
     if [[ ! -x "${ADIOS2_CONFIG}" ]]; then
-        [ -z "${ADIOS2_VERSION:-}" ] && ADIOS2_VERSION="2.10.1"
+        [ -z "${ADIOS2_VERSION:-}" ] && ADIOS2_VERSION="2.11.0"
         [ -z "${ADIOS2_ENABLE_PYTHON:-}" ] && ADIOS2_ENABLE_PYTHON="ON"
         [ -z "${ADIOS2_ENABLE_SST:-}" ] && ADIOS2_ENABLE_SST="ON"
 
