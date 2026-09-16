@@ -41,7 +41,8 @@ module adjoint_pnpn_res_cpu
   use coefs, only : coef_t
   use facet_normal, only : facet_normal_t
   use adjoint_pnpn_residual, only : adjoint_pnpn_prs_res_t, &
-       adjoint_pnpn_vel_res_t
+       adjoint_pnpn_vel_res_t, adjoint_pnpn_pressure_coef_hook, &
+       adjoint_pnpn_pressure_rhs_hook
   use scratch_registry, only: neko_scratch_registry
   use mesh, only : mesh_t
   use num_types, only : rp
@@ -117,6 +118,9 @@ contains
     call cfill(c_Xh%h1, 1.0_rp / rho_val, n)
     call cfill(c_Xh%h2, 0.0_rp, n)
     c_Xh%ifh2 = .false.
+    if (associated(adjoint_pnpn_pressure_coef_hook)) then
+       call adjoint_pnpn_pressure_coef_hook(c_Xh, bd, dt, mu, rho, n)
+    end if
 
     call col3(ta1%x, f_x%x, c_Xh%B, n)
     call col3(ta2%x, f_y%x, c_Xh%B, n)
@@ -132,6 +136,10 @@ contains
     call col2(ta1%x, c_Xh%Binv, n)
     call col2(ta2%x, c_Xh%Binv, n)
     call col2(ta3%x, c_Xh%Binv, n)
+    if (associated(adjoint_pnpn_pressure_rhs_hook)) then
+       call adjoint_pnpn_pressure_rhs_hook(ta1, ta2, ta3, c_Xh, bd, dt, &
+            mu, rho, n)
+    end if
 
     call cdtp(wa1%x, ta1%x, c_Xh%drdx, c_Xh%dsdx, c_Xh%dtdx, c_Xh)
     call cdtp(wa2%x, ta2%x, c_Xh%drdy, c_Xh%dsdy, c_Xh%dtdy, c_Xh)

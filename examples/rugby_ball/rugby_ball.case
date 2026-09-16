@@ -87,6 +87,7 @@
         "design": {
             "type": "brinkman",
             "dealias": false,
+            "implicit_brinkman": true,
             "mapping": [
                 {
                     "type": "PDE_filter",
@@ -94,7 +95,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100.0,
+                    "f_max": 100000.0,
                     "q": 3.0
                 }
             ],
@@ -111,8 +112,8 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 5,
-            "tolerance": 1.0e-3,
+            "max_iterations": 100,
+            "tolerance": 1.0e-8,
             "mma": {
                 "max_iter": 100,
                 "asyinit": 0.5,

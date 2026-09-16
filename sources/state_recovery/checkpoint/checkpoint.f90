@@ -164,11 +164,21 @@ contains
           fi => neko_registry%get_field(extra_field_names(i))
           call extra_fields%assign(i, fi)
        end do
-       ! Create a field list for the extra fields
+    end if
+
+    if (neko_registry%field_exists("implicit_brinkman_u_sens")) then
+       fi => neko_registry%get_field("implicit_brinkman_u_sens")
+       call extra_fields%append(fi)
+       fi => neko_registry%get_field("implicit_brinkman_v_sens")
+       call extra_fields%append(fi)
+       fi => neko_registry%get_field("implicit_brinkman_w_sens")
+       call extra_fields%append(fi)
+    end if
+
+    if (extra_fields%size() .gt. 0) then
        call this%init_from_components(neko_case, algorithm, n_saves_memory, &
             path, filename, fmt, keep_checkpoints, extra_fields)
     else
-       ! Create a field list without the extra fields
        call this%init_from_components(neko_case, algorithm, n_saves_memory, &
             path, filename, fmt, keep_checkpoints)
     end if

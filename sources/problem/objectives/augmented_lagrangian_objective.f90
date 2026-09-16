@@ -49,6 +49,8 @@ module augmented_lagrangian_objective
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
+  use registry, only: neko_registry
+  use brinkman_design, only: brinkman_design_t
   implicit none
   private
 
@@ -86,6 +88,9 @@ module augmented_lagrangian_objective
      type(interpolator_t), pointer :: GLL_to_GL
      !> If dealiasing should be applied
      logical :: dealias
+     !> Use the implicit Brinkman projection-stage factor in the state
+     !! equation sensitivity.
+     logical :: implicit_brinkman = .false.
      !> GL scratch registry
      type(scratch_registry_t), pointer :: scratch_GL
 
@@ -167,6 +172,17 @@ contains
     this%u => simulation%neko_case%fluid%u
     this%v => simulation%neko_case%fluid%v
     this%w => simulation%neko_case%fluid%w
+    select type (brinkman_design => design)
+    type is (brinkman_design_t)
+       this%implicit_brinkman = brinkman_design%is_implicit_brinkman()
+       if (this%implicit_brinkman) then
+          this%u => neko_registry%get_field("implicit_brinkman_u_sens")
+          this%v => neko_registry%get_field("implicit_brinkman_v_sens")
+          this%w => neko_registry%get_field("implicit_brinkman_w_sens")
+       end if
+    class default
+       this%implicit_brinkman = .false.
+    end select
     this%adjoint_u => simulation%adjoint_case%fluid_adj%u_adj
     this%adjoint_v => simulation%adjoint_case%fluid_adj%v_adj
     this%adjoint_w => simulation%adjoint_case%fluid_adj%w_adj
@@ -195,6 +211,7 @@ contains
     if (associated(this%u)) nullify(this%u)
     if (associated(this%v)) nullify(this%v)
     if (associated(this%w)) nullify(this%w)
+    this%implicit_brinkman = .false.
 
     if (associated(this%adjoint_u)) nullify(this%adjoint_u)
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
@@ -272,7 +289,9 @@ contains
        call field_addcol3(work, this%v, this%adjoint_v)
        call field_addcol3(work, this%w, this%adjoint_w)
     end if
-    ! but negative
+    ! Explicit Brinkman gives -u . u_adj.  In implicit mode, this%u/v/w point
+    ! to the stored projection-stage factors u**/beta, giving
+    ! -(1/beta) u** . u_adj for the modified Pn/Pn split.
     call field_cmult(work, -1.0_rp)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then

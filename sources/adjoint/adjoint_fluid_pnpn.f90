@@ -43,7 +43,7 @@ module adjoint_fluid_pnpn
   use krylov, only: ksp_monitor_t
   use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
        adjoint_pnpn_vel_res_t, adjoint_pnpn_prs_res_factory, &
-       adjoint_pnpn_vel_res_factory
+       adjoint_pnpn_vel_res_factory, adjoint_pnpn_projection_hook
   use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
@@ -960,6 +960,11 @@ contains
       else
          call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, &
               -1.0_rp, n, msh%gdim)
+      end if
+
+      if (associated(adjoint_pnpn_projection_hook)) then
+         call adjoint_pnpn_projection_hook(u, v, w, c_Xh, &
+              ext_bdf%diffusion_coeffs%x(1), dt, mu, rho, n)
       end if
 
       call neko_scratch_registry%relinquish_field(temp_indices)

@@ -48,6 +48,8 @@ module brinkman_design
   use design, only: design_t
   use simulation_m, only: simulation_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
+  use implicit_brinkman_pnpn, only: setup_implicit_brinkman_pnpn, &
+       clear_implicit_brinkman_pnpn
   use vector, only: vector_t
   use matrix, only: matrix_t
   use vector_math, only: vector_cmult
@@ -82,6 +84,14 @@ module brinkman_design
      ! or as I describe below, we also have multiple constraints,
      ! so a list-of-lists may be the correct way forward
      type(field_t), pointer :: brinkman_amplitude
+
+     !> Move Brinkman operator terms into the Pn/Pn pressure projection.
+     logical :: implicit_brinkman = .false.
+     !> Forward projection-stage fields used by the implicit Brinkman
+     !! discrete-adjoint sensitivity.
+     type(field_t), pointer :: implicit_brinkman_u_sens => null()
+     type(field_t), pointer :: implicit_brinkman_v_sens => null()
+     type(field_t), pointer :: implicit_brinkman_w_sens => null()
 
      ! NOTE:
      ! again, we have to be so clear with nomenclature.
@@ -248,6 +258,10 @@ module brinkman_design
      procedure, pass(this) :: set_output_counter => &
           brinkman_design_set_output_counter
 
+     !> Whether Brinkman forcing is handled through the implicit Pn/Pn hooks.
+     procedure, pass(this), public :: is_implicit_brinkman => &
+          brinkman_design_is_implicit_brinkman
+
      !> Destructor
      procedure, pass(this) :: free => brinkman_design_free
      ! TODO
@@ -267,12 +281,14 @@ contains
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
     character(len=:), allocatable :: output_format_str, output_precision_str
-    logical :: dealias, verbose_design, verbose_sensitivity
+    logical :: dealias, implicit_brinkman, verbose_design, verbose_sensitivity
     integer :: output_precision
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
     call json_get_or_default(parameters, 'dealias', dealias, .true.)
+    call json_get_or_default(parameters, 'implicit_brinkman', &
+         implicit_brinkman, .false.)
     call json_get_or_default(parameters, 'verbose_design', verbose_design, &
          .false.)
     call json_get_or_default(parameters, 'verbose_sensitivity', &
@@ -308,7 +324,7 @@ contains
     end select
 
     ! Initialize and inject into the simulation
-    call this%init_from_components(name, simulation, dealias)
+    call this%init_from_components(name, simulation, dealias, implicit_brinkman)
 
     ! Initialize the mapper
     associate(coef => simulation%neko_case%fluid%c_Xh, &
@@ -343,6 +359,11 @@ contains
 
     call this%free_base()
     call this%mapping%free()
+    if (this%implicit_brinkman) call clear_implicit_brinkman_pnpn()
+    this%implicit_brinkman = .false.
+    nullify(this%implicit_brinkman_u_sens)
+    nullify(this%implicit_brinkman_v_sens)
+    nullify(this%implicit_brinkman_w_sens)
     nullify(this%brinkman_amplitude)
     nullify(this%design_indicator)
     nullify(this%sensitivity)
@@ -350,25 +371,45 @@ contains
   end subroutine brinkman_design_free
 
   subroutine brinkman_design_init_from_components(this, name, simulation, &
-       dealias)
+       dealias, implicit_brinkman)
     class(brinkman_design_t), intent(inout) :: this
     character(len=*), intent(in) :: name
     type(simulation_t), intent(inout) :: simulation
     logical, intent(in) :: dealias
+    logical, intent(in), optional :: implicit_brinkman
     integer :: n
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
+
+    if (present(implicit_brinkman)) then
+       this%implicit_brinkman = implicit_brinkman
+    else
+       this%implicit_brinkman = .false.
+    end if
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
 
       call neko_registry%add_field(dof, "design_indicator", .true.)
       call neko_registry%add_field(dof, "brinkman_amplitude", .true.)
       call neko_registry%add_field(dof, "sensitivity", .true.)
+      if (this%implicit_brinkman) then
+         call neko_registry%add_field(dof, "implicit_brinkman_u_sens", .true.)
+         call neko_registry%add_field(dof, "implicit_brinkman_v_sens", .true.)
+         call neko_registry%add_field(dof, "implicit_brinkman_w_sens", .true.)
+      end if
 
     end associate
 
     this%design_indicator => neko_registry%get_field("design_indicator")
     this%brinkman_amplitude => neko_registry%get_field("brinkman_amplitude")
     this%sensitivity => neko_registry%get_field("sensitivity")
+    if (this%implicit_brinkman) then
+       this%implicit_brinkman_u_sens => &
+            neko_registry%get_field("implicit_brinkman_u_sens")
+       this%implicit_brinkman_v_sens => &
+            neko_registry%get_field("implicit_brinkman_v_sens")
+       this%implicit_brinkman_w_sens => &
+            neko_registry%get_field("implicit_brinkman_w_sens")
+    end if
 
     this%coef => simulation%fluid%c_Xh
 
@@ -379,6 +420,11 @@ contains
     this%design_indicator = 0.0_rp
     this%brinkman_amplitude = 0.0_rp
     this%design_indicator = 0.0_rp
+    if (this%implicit_brinkman) then
+       this%implicit_brinkman_u_sens = 0.0_rp
+       this%implicit_brinkman_v_sens = 0.0_rp
+       this%implicit_brinkman_w_sens = 0.0_rp
+    end if
 
     ! TODO
     ! Regarding masks and filters,
@@ -419,44 +465,60 @@ contains
     ! compute the average mass matrix
     this%avg_B = this%coef%volume / real(simulation%fluid%glb_unique_points)
 
-    ! init the simple brinkman term for the forward problem
-    call forward_brinkman%init_from_components( &
-         simulation%fluid%f_x, &
-         simulation%fluid%f_y, &
-         simulation%fluid%f_z, &
-         this%brinkman_amplitude, &
-         simulation%fluid%u, &
-         simulation%fluid%v, &
-         simulation%fluid%w, &
-         simulation%fluid%c_Xh, &
-         simulation%adjoint_fluid%c_Xh_GL, &
-         simulation%adjoint_fluid%GLL_to_GL, &
-         dealias, simulation%adjoint_fluid%scratch_GL)
-    ! append brinkman source term to the forward problem
-    call simulation%fluid%source_term%add(forward_brinkman)
+    if (this%implicit_brinkman) then
+       call setup_implicit_brinkman_pnpn(this%brinkman_amplitude, &
+            this%implicit_brinkman_u_sens, &
+            this%implicit_brinkman_v_sens, &
+            this%implicit_brinkman_w_sens)
+    else
+       ! init the simple brinkman term for the forward problem
+       call forward_brinkman%init_from_components( &
+            simulation%fluid%f_x, &
+            simulation%fluid%f_y, &
+            simulation%fluid%f_z, &
+            this%brinkman_amplitude, &
+            simulation%fluid%u, &
+            simulation%fluid%v, &
+            simulation%fluid%w, &
+            simulation%fluid%c_Xh, &
+            simulation%adjoint_fluid%c_Xh_GL, &
+            simulation%adjoint_fluid%GLL_to_GL, &
+            dealias, simulation%adjoint_fluid%scratch_GL)
+       ! append brinkman source term to the forward problem
+       call simulation%fluid%source_term%add(forward_brinkman)
+    end if
 
-    ! init the simple brinkman term for the adjoint
-    call adjoint_brinkman%init_from_components( &
-         simulation%adjoint_fluid%f_adj_x, &
-         simulation%adjoint_fluid%f_adj_y, &
-         simulation%adjoint_fluid%f_adj_z, &
-         this%brinkman_amplitude, &
-         simulation%adjoint_fluid%u_adj, &
-         simulation%adjoint_fluid%v_adj, &
-         simulation%adjoint_fluid%w_adj, &
-         simulation%adjoint_fluid%c_Xh, &
-         simulation%adjoint_fluid%c_Xh_GL, &
-         simulation%adjoint_fluid%GLL_to_GL, &
-         dealias, simulation%adjoint_fluid%scratch_GL)
-    ! append brinkman source term based on design
+    if (.not. this%implicit_brinkman) then
+       ! init the simple brinkman term for the adjoint
+       call adjoint_brinkman%init_from_components( &
+            simulation%adjoint_fluid%f_adj_x, &
+            simulation%adjoint_fluid%f_adj_y, &
+            simulation%adjoint_fluid%f_adj_z, &
+            this%brinkman_amplitude, &
+            simulation%adjoint_fluid%u_adj, &
+            simulation%adjoint_fluid%v_adj, &
+            simulation%adjoint_fluid%w_adj, &
+            simulation%adjoint_fluid%c_Xh, &
+            simulation%adjoint_fluid%c_Xh_GL, &
+            simulation%adjoint_fluid%GLL_to_GL, &
+            dealias, simulation%adjoint_fluid%scratch_GL)
+       ! append brinkman source term based on design
 
-    select type (f => simulation%adjoint_fluid)
-    type is (adjoint_fluid_pnpn_t)
-       call f%source_term%add(adjoint_brinkman)
-    class default
-    end select
+       select type (f => simulation%adjoint_fluid)
+       type is (adjoint_fluid_pnpn_t)
+          call f%source_term%add(adjoint_brinkman)
+       class default
+       end select
+    end if
 
   end subroutine brinkman_design_init_from_components
+
+  function brinkman_design_is_implicit_brinkman(this) result(is_implicit)
+    class(brinkman_design_t), intent(in) :: this
+    logical :: is_implicit
+
+    is_implicit = this%implicit_brinkman
+  end function brinkman_design_is_implicit_brinkman
 
 
   subroutine brinkman_design_map_forward(this)

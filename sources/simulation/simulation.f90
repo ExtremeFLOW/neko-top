@@ -60,6 +60,7 @@ module simulation_m
        simulation_restart
   use state_recover, only: state_recover_t, state_recover_factory
   use runtime_stats, only: neko_rt_stats
+  use registry, only: neko_registry
   implicit none
   private
 
@@ -143,7 +144,7 @@ contains
     integer :: i, n_scalars
     character(len=:), allocatable :: output_directory, precision_s, file_format
     integer :: precision
-    logical :: unsteady, subdivide
+    logical :: unsteady, subdivide, implicit_brinkman
 
     ! initialize the primal Neko objects
     call this%neko_case%init(parameters)
@@ -261,6 +262,19 @@ contains
 
     ! State recovery is only needed for unsteady runs.
     if (this%unsteady) then
+       call json_get_or_default(parameters, &
+            'optimization.design.implicit_brinkman', implicit_brinkman, &
+            .false.)
+       if (implicit_brinkman) then
+          associate(dof => this%fluid%dm_Xh)
+            call neko_registry%add_field(dof, &
+                 "implicit_brinkman_u_sens", .true.)
+            call neko_registry%add_field(dof, &
+                 "implicit_brinkman_v_sens", .true.)
+            call neko_registry%add_field(dof, &
+                 "implicit_brinkman_w_sens", .true.)
+          end associate
+       end if
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_factory(this%state_recover, this%neko_case, &
             state_recovery_params)

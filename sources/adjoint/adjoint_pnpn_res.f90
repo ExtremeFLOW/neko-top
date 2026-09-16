@@ -57,6 +57,33 @@ module adjoint_pnpn_residual
   end type adjoint_pnpn_vel_res_t
 
   abstract interface
+     subroutine adjoint_pnpn_coef_hook(c_Xh, bd, dt, mu, rho, n)
+       import coef_t
+       import field_t
+       import rp
+       type(coef_t), intent(inout) :: c_Xh
+       type(field_t), intent(in) :: mu
+       type(field_t), intent(in) :: rho
+       real(kind=rp), intent(in) :: bd
+       real(kind=rp), intent(in) :: dt
+       integer, intent(in) :: n
+     end subroutine adjoint_pnpn_coef_hook
+
+     subroutine adjoint_pnpn_vector_hook(x, y, z, c_Xh, bd, dt, mu, rho, n)
+       import coef_t
+       import field_t
+       import rp
+       type(field_t), intent(inout) :: x
+       type(field_t), intent(inout) :: y
+       type(field_t), intent(inout) :: z
+       type(coef_t), intent(inout) :: c_Xh
+       type(field_t), intent(in) :: mu
+       type(field_t), intent(in) :: rho
+       real(kind=rp), intent(in) :: bd
+       real(kind=rp), intent(in) :: dt
+       integer, intent(in) :: n
+     end subroutine adjoint_pnpn_vector_hook
+
      !> Compute adjoint pressure residual.
      !! @param p Adjoint pressure field.
      !! @param p_res Pressure residual output.
@@ -187,5 +214,13 @@ module adjoint_pnpn_residual
   end interface
 
   public :: adjoint_pnpn_prs_res_factory, adjoint_pnpn_vel_res_factory
+  public :: adjoint_pnpn_coef_hook, adjoint_pnpn_vector_hook
+
+  procedure(adjoint_pnpn_coef_hook), pointer, public :: &
+       adjoint_pnpn_pressure_coef_hook => null()
+  procedure(adjoint_pnpn_vector_hook), pointer, public :: &
+       adjoint_pnpn_pressure_rhs_hook => null()
+  procedure(adjoint_pnpn_vector_hook), pointer, public :: &
+       adjoint_pnpn_projection_hook => null()
 
 end module adjoint_pnpn_residual

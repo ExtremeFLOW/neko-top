@@ -9,6 +9,7 @@ target_sources(neko-top PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top_source_terms.f90
 
         # Individual source terms
+        ${CMAKE_CURRENT_SOURCE_DIR}/implicit_brinkman_pnpn.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/simple_brinkman_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_brinkman_dissipation_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_viscous_dissipation_source_term.f90

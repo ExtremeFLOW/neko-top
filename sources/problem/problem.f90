@@ -41,6 +41,7 @@
 module problem
   use num_types, only: rp, dp
   use design, only: design_t
+  use brinkman_design, only: brinkman_design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
@@ -556,8 +557,17 @@ contains
     real(kind=rp) :: total_time
     integer :: i
     type(time_state_t) :: accumulation_time
+    logical :: implicit_brinkman
 
     call dt_controller%init(simulation%neko_case%params)
+
+    implicit_brinkman = .false.
+    select type (brinkman_design => design)
+    type is (brinkman_design_t)
+       implicit_brinkman = brinkman_design%is_implicit_brinkman()
+    class default
+       implicit_brinkman = .false.
+    end select
 
     call simulation_adjoint_init(simulation%adjoint_case, dt_controller)
 
@@ -583,10 +593,22 @@ contains
        ! accumulate objective sensitivity
        accumulation_time = simulation%adjoint_case%time
        accumulation_time%t = total_time - simulation%adjoint_case%time%t
-       call this%accumulate_objective_sensitivities(design, accumulation_time)
-       ! step the adjoint backwards
-       call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
-            cfl, loop_start, total_time)
+       if (implicit_brinkman) then
+          ! The implicit Brinkman sensitivity pairs the restored forward
+          ! projection state at time n with the adjoint after this backward
+          ! update, i.e. u_hat_hat_n . u_adj_n.
+          call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
+               cfl, loop_start, total_time)
+          call this%accumulate_objective_sensitivities(design, &
+               accumulation_time)
+       else
+          ! Explicit Brinkman pairs the restored forward state at time n with
+          ! the incoming adjoint state u_adj_{n+1}.
+          call this%accumulate_objective_sensitivities(design, &
+               accumulation_time)
+          call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
+               cfl, loop_start, total_time)
+       end if
     end do
 
     call profiler_end_region("Adjoint simulation")
