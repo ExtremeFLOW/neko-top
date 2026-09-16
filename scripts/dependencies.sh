@@ -406,10 +406,26 @@ function find_neko() {
         NEKO_DIR="$EXTERNAL_DIR/$NEKO_DIR"
     fi
 
+    NEKO_PATCH_APPLIED=false
+    NEKO_TOP_PATCH="$MAIN_DIR/patches/neko-pnpn-implicit-brinkman-hooks.patch"
+    if [[ -f "$NEKO_TOP_PATCH" && -d "$NEKO_DIR/.git" ]]; then
+        if git -C "$NEKO_DIR" apply --check "$NEKO_TOP_PATCH" 2>/dev/null; then
+            git -C "$NEKO_DIR" apply "$NEKO_TOP_PATCH"
+            NEKO_PATCH_APPLIED=true
+        elif git -C "$NEKO_DIR" apply --reverse --check "$NEKO_TOP_PATCH" 2>/dev/null; then
+            : # Patch already applied.
+        else
+            error "Neko-TOP Neko patch does not apply cleanly:"
+            error "\t$NEKO_TOP_PATCH"
+            exit 1
+        fi
+    fi
+
     # Check if Neko is installed, if not install it.
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
-    if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
+    if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true || \
+        "$NEKO_PATCH_APPLIED" == true ]]; then
 
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
@@ -418,6 +434,18 @@ function find_neko() {
             git clone --depth 1 --branch $NEKO_VERSION \
                 https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
 
+        fi
+
+        if [[ -f "$NEKO_TOP_PATCH" && -d "$NEKO_DIR/.git" ]]; then
+            if git -C "$NEKO_DIR" apply --check "$NEKO_TOP_PATCH" 2>/dev/null; then
+                git -C "$NEKO_DIR" apply "$NEKO_TOP_PATCH"
+            elif git -C "$NEKO_DIR" apply --reverse --check "$NEKO_TOP_PATCH" 2>/dev/null; then
+                : # Patch already applied.
+            else
+                error "Neko-TOP Neko patch does not apply cleanly:"
+                error "\t$NEKO_TOP_PATCH"
+                exit 1
+            fi
         fi
 
         # Apply Cray-specific patches before building on Cray systems

@@ -1,0 +1,267 @@
+diff --git a/src/fluid/bcknd/cpu/pnpn_res_cpu.f90 b/src/fluid/bcknd/cpu/pnpn_res_cpu.f90
+index 2926ea6..6e42918 100644
+--- a/src/fluid/bcknd/cpu/pnpn_res_cpu.f90
++++ b/src/fluid/bcknd/cpu/pnpn_res_cpu.f90
+@@ -6,7 +6,10 @@ module pnpn_res_cpu
+   use ax_product, only : ax_t
+   use coefs, only : coef_t
+   use facet_normal, only : facet_normal_t
+-  use pnpn_residual, only : pnpn_prs_res_t, pnpn_vel_res_t
++  use pnpn_residual, only : pnpn_prs_res_t, pnpn_vel_res_t, &
++       pnpn_pressure_coef_hook, pnpn_velocity_coef_hook, &
++       pnpn_pressure_rhs_hook, pnpn_pressure_bc_rhs_hook, &
++       pnpn_velocity_res_hook
+   use scratch_registry, only : neko_scratch_registry
+   use mesh, only : mesh_t
+   use num_types, only : rp
+@@ -76,6 +79,9 @@ contains
+     end do
+     !$omp end parallel do
+     c_Xh%ifh2 = .false.
++    if (associated(pnpn_pressure_coef_hook)) then
++       call pnpn_pressure_coef_hook(c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+     call curl(ta1, ta2, ta3, u_e, v_e, w_e, work1, work2, c_Xh)
+     call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
+@@ -111,6 +117,9 @@ contains
+        ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+     end do
+     !$omp end parallel do
++    if (associated(pnpn_pressure_rhs_hook)) then
++       call pnpn_pressure_rhs_hook(ta1, ta2, ta3, c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+     call cdtp(wa1%x, ta1%x, c_Xh%drdx, c_Xh%dsdx, c_Xh%dtdx, c_Xh)
+     call cdtp(wa2%x, ta2%x, c_Xh%drdy, c_Xh%dsdy, c_Xh%dtdy, c_Xh)
+@@ -163,6 +172,9 @@ contains
+     !$omp end parallel do
+ 
+     call bc_prs_surface%apply_surfvec(ta1%x, ta2%x, ta3%x, u%x, v%x, w%x, n)
++    if (associated(pnpn_pressure_bc_rhs_hook)) then
++       call pnpn_pressure_bc_rhs_hook(ta1, ta2, ta3, c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+     !OCL NORECURRENCE, NOVREC, NOALIAS
+     !DIR$ CONCURRENT
+@@ -214,6 +226,9 @@ contains
+     end do
+     !$omp end parallel do
+     c_Xh%ifh2 = .true.
++    if (associated(pnpn_velocity_coef_hook)) then
++       call pnpn_velocity_coef_hook(c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+     call Ax%compute(u_res%x, u%x, c_Xh, msh, Xh)
+     call Ax%compute(v_res%x, v%x, c_Xh, msh, Xh)
+@@ -224,17 +239,25 @@ contains
+ 
+     call opgrad(ta1%x, ta2%x, ta3%x, p%x, c_Xh)
+ 
+-    !OCL NORECURRENCE, NOVREC, NOALIAS
+-    !DIR$ CONCURRENT
+-    !DIR$ IVDEP
+-    !GCC$ ivdep
+-    !$omp parallel do
+-    do i = 1, n
+-       u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) - ta1%x(i,1,1,1) + f_x%x(i,1,1,1)
+-       v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) - ta2%x(i,1,1,1) + f_y%x(i,1,1,1)
+-       w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) - ta3%x(i,1,1,1) + f_z%x(i,1,1,1)
+-    end do
+-    !$omp end parallel do
++    if (associated(pnpn_velocity_res_hook)) then
++       call pnpn_velocity_res_hook(u_res, v_res, w_res, ta1, ta2, ta3, &
++            f_x, f_y, f_z, c_Xh, bd, dt, mu, rho, n)
++    else
++       !OCL NORECURRENCE, NOVREC, NOALIAS
++       !DIR$ CONCURRENT
++       !DIR$ IVDEP
++       !GCC$ ivdep
++       !$omp parallel do
++       do i = 1, n
++          u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) - ta1%x(i,1,1,1) &
++               + f_x%x(i,1,1,1)
++          v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) - ta2%x(i,1,1,1) &
++               + f_y%x(i,1,1,1)
++          w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) - ta3%x(i,1,1,1) &
++               + f_z%x(i,1,1,1)
++       end do
++       !$omp end parallel do
++    end if
+ 
+     call neko_scratch_registry%relinquish_field(temp_indices)
+ 
+diff --git a/src/fluid/bcknd/device/pnpn_res_device.F90 b/src/fluid/bcknd/device/pnpn_res_device.F90
+index af14687..ea03184 100644
+--- a/src/fluid/bcknd/device/pnpn_res_device.F90
++++ b/src/fluid/bcknd/device/pnpn_res_device.F90
+@@ -42,7 +42,10 @@ module pnpn_res_device
+   use space, only : space_t
+   use device_math, only : device_cfill, device_rzero
+   use device_mathops, only : device_opcolv
+-  use pnpn_residual, only : pnpn_prs_res_t, pnpn_vel_res_t
++  use pnpn_residual, only : pnpn_prs_res_t, pnpn_vel_res_t, &
++       pnpn_pressure_coef_hook, pnpn_velocity_coef_hook, &
++       pnpn_pressure_rhs_hook, pnpn_pressure_bc_rhs_hook, &
++       pnpn_velocity_res_hook
+   use device, only : device_event_sync
+   use, intrinsic :: iso_c_binding, only : c_ptr, c_int
+   use scratch_registry, only : neko_scratch_registry
+@@ -336,6 +339,9 @@ contains
+ #endif
+     c_Xh%ifh2 = .false.
+     call device_cfill(c_Xh%h1_d, 1.0_rp / rho_val, n)
++    if (associated(pnpn_pressure_coef_hook)) then
++       call pnpn_pressure_coef_hook(c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+     call rotate_cyc(ta1%x_d, ta2%x_d, ta3%x_d, 1, c_Xh)
+     call gs_Xh%op(ta1%x, ta2%x, ta3%x, n, GS_OP_ADD, event)
+@@ -343,6 +349,9 @@ contains
+     call rotate_cyc(ta1%x_d, ta2%x_d, ta3%x_d, 0, c_Xh)
+ 
+     call device_opcolv(ta1%x_d, ta2%x_d, ta3%x_d, c_Xh%Binv_d, gdim, n)
++    if (associated(pnpn_pressure_rhs_hook)) then
++       call pnpn_pressure_rhs_hook(ta1, ta2, ta3, c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+     call cdtp(wa1%x, ta1%x, c_Xh%drdx, c_Xh%dsdx, c_Xh%dtdx, c_Xh)
+     call cdtp(wa2%x, ta2%x, c_Xh%drdy, c_Xh%dsdy, c_Xh%dtdy, c_Xh)
+@@ -390,6 +399,9 @@ contains
+ 
+     call bc_prs_surface%apply_surfvec_dev(ta1%x_d, ta2%x_d, ta3%x_d, &
+          u%x_d, v%x_d, w%x_d)
++    if (associated(pnpn_pressure_bc_rhs_hook)) then
++       call pnpn_pressure_bc_rhs_hook(ta1, ta2, ta3, c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+ #ifdef HAVE_HIP
+     call pnpn_prs_res_part3_hip(p_res%x_d, ta1%x_d, ta2%x_d, ta3%x_d, dtbd, n)
+@@ -432,6 +444,9 @@ contains
+     call device_cfill(c_Xh%h1_d, mu_val, n)
+     call device_cfill(c_Xh%h2_d, rho_val * (bd / dt), n)
+     c_Xh%ifh2 = .true.
++    if (associated(pnpn_velocity_coef_hook)) then
++       call pnpn_velocity_coef_hook(c_Xh, bd, dt, mu, rho, n)
++    end if
+ 
+     call Ax%compute_vector(u_res%x, v_res%x, w_res%x, &
+          u%x, v%x, w%x, c_Xh, msh, Xh)
+@@ -442,19 +457,24 @@ contains
+ 
+     call opgrad(ta1%x, ta2%x, ta3%x, p%x, c_Xh)
+ 
++    if (associated(pnpn_velocity_res_hook)) then
++       call pnpn_velocity_res_hook(u_res, v_res, w_res, ta1, ta2, ta3, &
++            f_x, f_y, f_z, c_Xh, bd, dt, mu, rho, n)
++    else
+ #ifdef HAVE_HIP
+-    call pnpn_vel_res_update_hip(u_res%x_d, v_res%x_d, w_res%x_d, &
+-         ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
++       call pnpn_vel_res_update_hip(u_res%x_d, v_res%x_d, w_res%x_d, &
++            ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
+ #elif HAVE_CUDA
+-    call pnpn_vel_res_update_cuda(u_res%x_d, v_res%x_d, w_res%x_d, &
+-         ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
++       call pnpn_vel_res_update_cuda(u_res%x_d, v_res%x_d, w_res%x_d, &
++            ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
+ #elif HAVE_OPENCL
+-    call pnpn_vel_res_update_opencl(u_res%x_d, v_res%x_d, w_res%x_d, &
+-         ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
++       call pnpn_vel_res_update_opencl(u_res%x_d, v_res%x_d, w_res%x_d, &
++            ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
+ #elif HAVE_METAL
+-    call pnpn_vel_res_update_metal(u_res%x_d, v_res%x_d, w_res%x_d, &
+-         ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
++       call pnpn_vel_res_update_metal(u_res%x_d, v_res%x_d, w_res%x_d, &
++            ta1%x_d, ta2%x_d, ta3%x_d, f_x%x_d, f_y%x_d, f_z%x_d, n)
+ #endif
++    end if
+ 
+     call neko_scratch_registry%relinquish_field(temp_indices)
+   end subroutine pnpn_vel_res_device_compute
+diff --git a/src/fluid/pnpn_res.f90 b/src/fluid/pnpn_res.f90
+index 1562a9f..7ff1941 100644
+--- a/src/fluid/pnpn_res.f90
++++ b/src/fluid/pnpn_res.f90
+@@ -44,6 +44,68 @@ module pnpn_residual
+   implicit none
+   private
+ 
++  abstract interface
++     subroutine pnpn_coef_hook(c_Xh, bd, dt, mu, rho, n)
++       import coef_t
++       import field_t
++       import rp
++       type(coef_t), intent(inout) :: c_Xh
++       type(field_t), intent(in) :: mu
++       type(field_t), intent(in) :: rho
++       real(kind=rp), intent(in) :: bd
++       real(kind=rp), intent(in) :: dt
++       integer, intent(in) :: n
++     end subroutine pnpn_coef_hook
++  end interface
++
++  abstract interface
++     subroutine pnpn_vector_hook(x, y, z, c_Xh, bd, dt, mu, rho, n)
++       import coef_t
++       import field_t
++       import rp
++       type(field_t), intent(inout) :: x
++       type(field_t), intent(inout) :: y
++       type(field_t), intent(inout) :: z
++       type(coef_t), intent(inout) :: c_Xh
++       type(field_t), intent(in) :: mu
++       type(field_t), intent(in) :: rho
++       real(kind=rp), intent(in) :: bd
++       real(kind=rp), intent(in) :: dt
++       integer, intent(in) :: n
++     end subroutine pnpn_vector_hook
++  end interface
++
++  abstract interface
++     subroutine pnpn_velocity_res_hook_intf(u_res, v_res, w_res, gradp_x, &
++          gradp_y, gradp_z, f_x, f_y, f_z, c_Xh, bd, dt, mu, rho, n)
++       import coef_t
++       import field_t
++       import rp
++       type(field_t), intent(inout) :: u_res
++       type(field_t), intent(inout) :: v_res
++       type(field_t), intent(inout) :: w_res
++       type(field_t), intent(inout) :: gradp_x
++       type(field_t), intent(inout) :: gradp_y
++       type(field_t), intent(inout) :: gradp_z
++       type(field_t), intent(in) :: f_x
++       type(field_t), intent(in) :: f_y
++       type(field_t), intent(in) :: f_z
++       type(coef_t), intent(inout) :: c_Xh
++       type(field_t), intent(in) :: mu
++       type(field_t), intent(in) :: rho
++       real(kind=rp), intent(in) :: bd
++       real(kind=rp), intent(in) :: dt
++       integer, intent(in) :: n
++     end subroutine pnpn_velocity_res_hook_intf
++  end interface
++
++  procedure(pnpn_coef_hook), pointer :: pnpn_pressure_coef_hook => null()
++  procedure(pnpn_coef_hook), pointer :: pnpn_velocity_coef_hook => null()
++  procedure(pnpn_vector_hook), pointer :: pnpn_pressure_rhs_hook => null()
++  procedure(pnpn_vector_hook), pointer :: pnpn_pressure_bc_rhs_hook => null()
++  procedure(pnpn_velocity_res_hook_intf), pointer :: &
++       pnpn_velocity_res_hook => null()
++
+   !> Abstract type to compute pressure residual
+   type, public, abstract :: pnpn_prs_res_t
+    contains
+@@ -148,6 +210,10 @@ module pnpn_residual
+   end interface
+ 
+   public :: pnpn_prs_res_factory, pnpn_vel_res_factory, &
+-       pnpn_prs_res_stress_factory, pnpn_vel_res_stress_factory
++       pnpn_prs_res_stress_factory, pnpn_vel_res_stress_factory, &
++       pnpn_coef_hook, pnpn_vector_hook, pnpn_velocity_res_hook_intf, &
++       pnpn_pressure_coef_hook, pnpn_velocity_coef_hook, &
++       pnpn_pressure_rhs_hook, pnpn_pressure_bc_rhs_hook, &
++       pnpn_velocity_res_hook
+ 
+ end module pnpn_residual
