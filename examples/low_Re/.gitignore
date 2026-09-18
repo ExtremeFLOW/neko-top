@@ -1,0 +1,10 @@
+*.csv
+*.log
+*.png
+*.sst
+box.nmsh
+design/
+forward_fields/
+mpmd.conf
+neko
+select_gpu

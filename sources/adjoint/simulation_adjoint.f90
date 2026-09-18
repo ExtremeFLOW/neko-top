@@ -35,8 +35,8 @@
 !> Adjoint simulation driver
 module simulation_adjoint
   use mpi_f08, only: MPI_WTIME
-  use neko_config, only: NEKO_BCKND_DEVICE
   use num_types, only: rp, dp
+  use neko_config, only: NEKO_BCKND_DEVICE
   use time_scheme_controller, only: time_scheme_controller_t
   use file, only: file_t
   use logger, only: LOG_SIZE, neko_log
@@ -138,8 +138,8 @@ contains
     ! Advance time step from t to t+dt and print the status
     call simulation_settime(C%time, C%fluid_adj%ext_bdf)
     ! for cosmetic reasons we want the simulation to run backwards
+    t_bkp = C%time%t
     if (present(final_time)) then
-       t_bkp = C%time%t
        C%time%t = final_time - t_bkp
     end if
     call C%time%status()
@@ -197,7 +197,7 @@ contains
 
     call neko_log%end_section()
     call neko_log%end()
-    call profiler_end_region
+    call profiler_end_region('Time-Step Adjoint')
 
 
   end subroutine simulation_adjoint_step

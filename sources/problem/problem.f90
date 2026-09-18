@@ -55,11 +55,13 @@ module problem
   use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
   use time_step_controller, only: time_step_controller_t
+  use time_state, only: time_state_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
+  use utils, only: neko_error
   implicit none
   private
 
@@ -530,7 +532,11 @@ contains
        ! accumulate objective value
        call this%accumulate_objectives(design, simulation%neko_case%time)
        ! save a checkpoint
-       call simulation%checkpoint%save(simulation%neko_case)
+       if (.not. allocated(simulation%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call simulation%state_recover%save(simulation%neko_case, &
+            simulation%neko_case%time)
     end do
     call profiler_end_region("Forward simulation")
 
@@ -547,6 +553,7 @@ contains
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
     real(kind=rp) :: total_time
+    type(time_state_t) :: time
     integer :: i
     type(time_state_t) :: accumulation_time
 
@@ -565,26 +572,15 @@ contains
 
     call profiler_start_region("Adjoint simulation")
 
-    ! TODO. IC's need to be handled rather carefully, we should take a
-    ! checkpoint at i = 0. However, 99% of the time we use an initial condition
-    ! for the fluid of u=0, so this doesn't matter. Then we use u_adj = 0 on
-    ! the other end.
-    !
-    ! we have:
-    !  - n    time steps to compute
-    !  - n+1  fields to consider
-    !  - n-1  non-zero contributions to u * u_adj
-    !
-    !              non-zero
-    !             |--------|
-    !  primal  o--x--x--x--x--x
-    !          x--x--x--x--x--o  adjoint
-    !          ^              ^
-    !         u=0          u_adj=0
-
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
-       call simulation%checkpoint%restore(simulation%neko_case, i)
+       time = simulation%neko_case%time
+       time%tstep = i
+       time%t = time%start_time + real(i, rp) * time%dt
+       if (.not. allocated(simulation%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call simulation%state_recover%restore(simulation%neko_case, time)
        ! accumulate objective sensitivity
        accumulation_time = simulation%adjoint_case%time
        accumulation_time%t = total_time - simulation%adjoint_case%time%t

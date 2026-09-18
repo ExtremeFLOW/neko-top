@@ -19,12 +19,15 @@ function help() {
     echo -e "Environment Variables:"
     echo -e "\tNEKO_DIR          The directory where Neko is installed"
     echo -e "\tJSON_FORTRAN_DIR  The directory where JSON-Fortran is installed"
+    echo -e "\tADIOS2_DIR        The directory where ADIOS2 is installed"
     echo -e "\tNEK5000_DIR       The directory where Nek5000 is installed"
     echo -e "\tPFUNIT_DIR        The directory where PFUnit is installed"
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
+    echo -e "\tCUDA_ARCH         CUDA architecture (required for --device CUDA, e.g. 80)"
     echo -e "\tHIP_DIR           The directory where HIP is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
+    echo -e "\tNeko commit       ad3eaf8f18b337f283bbc327aaa8f95fe6a1326c (pinned)"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
     echo -e "\tNEKO_CONFIG_FLAGS Additional features to pass to neko configure"
 }
@@ -102,6 +105,7 @@ if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
     if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+    if [ -z "$CUDA_ARCH" ]; then echo >&2 "CUDA_ARCH is not set."; exit 1; fi
 elif [ "$DEVICE_TYPE" == "HIP" ]; then
     if [ -z "$HIPCC" ]; then export HIPCC=$(which hipcc); else export HIPCC; fi
 fi
@@ -115,6 +119,7 @@ printf "Setting up external dependencies\n"
 
 check_system_dependencies                      # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
+find_adios2 $ADIOS2_DIR                        # Re-defines the ADIOS2_DIR variable.
 find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
 [ "$TEST" == "ON" ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
@@ -127,6 +132,12 @@ printf "Compiling the example codes and Neko-TOP\n"
 
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+mkdir -p $MAIN_DIR/build
+
+# Validate and persist the POD Python runtime when example launchers are built.
+if [ "$EXAMPLES" == "ON" ]; then
+    find_pod_python_runtime $MAIN_DIR
+fi
 
 # If CMAKE_VARIABLES is a string, convert it to an array
 if [ -n "$CMAKE_VARIABLES" ]; then

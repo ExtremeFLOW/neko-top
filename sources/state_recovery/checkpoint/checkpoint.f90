@@ -32,6 +32,7 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
+!> @brief Checkpoint-based state recovery for adjoint runs.
 module simulation_checkpoint
   use num_types, only: rp, sp, dp
   use case, only: case_t
@@ -48,13 +49,16 @@ module simulation_checkpoint
   use utils, only: neko_error
   use math, only: copy, rzero
   use profiler, only: profiler_start_region, profiler_end_region
+  use state_recover, only: state_recover_t
+  use comm, only: pe_rank, NEKO_COMM
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   use registry, only: neko_registry
+  use mpi_f08, only: MPI_WTIME, MPI_Barrier
   implicit none
   private
 
-  type, public :: simulation_checkpoint_t
+  type, public, extends(state_recover_t) :: simulation_checkpoint_t
      private
 
      ! ----------------------------------------------------------------------- !
@@ -77,7 +81,6 @@ module simulation_checkpoint
 
      ! Internal parameters
      integer :: n_saves_disc = 0
-     integer :: n_timesteps = 0
      integer :: first_valid_timestep = 2
      integer :: loaded_checkpoint = -1
 
@@ -89,9 +92,8 @@ module simulation_checkpoint
      type(chkp_output_t) :: chkp_output
 
    contains
-     !> Initialization
-     generic, public :: init => init_from_json, init_from_components
      !> Initialization from a JSON file
+     procedure, public, pass(this) :: init => checkpoint_init_from_json
      procedure, public, pass(this) :: init_from_json => &
           checkpoint_init_from_json
      !> Initialization from components
@@ -137,6 +139,7 @@ module simulation_checkpoint
        class(case_t), target, intent(inout) :: neko_case
        integer, intent(in) :: tstep
      end subroutine checkpoint_restore_linear
+
   end interface
 
 contains
@@ -145,6 +148,9 @@ contains
   ! Initialization and deallocation
 
   !> Initialization
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[inout] params JSON parameters.
   subroutine checkpoint_init_from_json(this, neko_case, params)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
@@ -168,6 +174,12 @@ contains
     call json_get_or_default(params, "keep_checkpoints", keep_checkpoints, &
          .false.)
 
+    select case (trim(algorithm))
+    case ("linear", "LINEAR", "Linear")
+    case default
+       call neko_error("Only the linear checkpoint strategy is supported.")
+    end select
+
     if ("extra_fields" .in. params) then
        allocate(extra_field_names(0))
        call json_get(params, "extra_fields", extra_field_names)
@@ -188,6 +200,13 @@ contains
   end subroutine checkpoint_init_from_json
 
   !> Initialization from components
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] algorithm Checkpointing algorithm identifier.
+  !! @param[in] n_saves_memory Number of checkpoints in memory.
+  !! @param[in] filename Checkpoint base filename.
+  !! @param[in] fmt Checkpoint file format.
+  !! @param[in] keep_checkpoints Whether to keep checkpoint files on disk.
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
        n_saves_memory, path, filename, fmt, keep_checkpoints, extra_fields)
     class(simulation_checkpoint_t), intent(inout), target :: this
@@ -297,6 +316,8 @@ contains
   end subroutine checkpoint_init_from_components
 
   !> Free
+  !> Free checkpointing resources.
+  !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_free(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i, j
@@ -318,7 +339,7 @@ contains
 
     ! Delete the checkpoint file list
     if (.not. this%keep_checkpoints .and. pe_rank .eq. 0) then
-       do i = this%n_timesteps, 1, -1
+       do i = this%get_n_timesteps(), 1, -1
           call this%chkp_output%set_counter(i)
           file_name = this%chkp_output%file_%get_fname()
           inquire(file = trim(file_name), exist = exists)
@@ -340,7 +361,7 @@ contains
     this%keep_checkpoints = .false.
 
     this%n_saves_disc = 0
-    this%n_timesteps = 0
+    call this%set_n_timesteps(0)
     this%first_valid_timestep = 2
     this%loaded_checkpoint = -1
 
@@ -350,16 +371,21 @@ contains
   ! Saving and Restoring
 
   !> Save the current state of the simulation to disk
-  subroutine checkpoint_save(this, neko_case)
+  !> Save forward state.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Current time state.
+  subroutine checkpoint_save(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
+    type(time_state_t), intent(in) :: time
 
     if (.not. this%enabled) return
 
     call profiler_start_region("Checkpoint save")
 
     ! Update the number of recorded timesteps
-    this%n_timesteps = this%n_timesteps + 1
+    call this%set_n_timesteps(max(this%get_n_timesteps(), time%tstep))
 
     select case (this%algorithm)
     case ("linear")
@@ -372,19 +398,25 @@ contains
   end subroutine checkpoint_save
 
   !> Restore the forward simulation state
-  subroutine checkpoint_restore(this, neko_case, tstep)
+  !> Restore forward state for adjoint.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Target time state.
+  subroutine checkpoint_restore(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     character(len=256) :: msg
+    integer :: tstep
 
     if (.not. this%enabled) return
 
     call profiler_start_region("Checkpoint restore")
 
-    if (tstep .lt. 1 .or. tstep .gt. this%n_timesteps) then
+    tstep = time%tstep
+    if (tstep .lt. 1 .or. tstep .gt. this%get_n_timesteps()) then
        write(msg, '(A,I0,A,I0,A)') "Requested timestep ", tstep, &
-            " is out of range [1, ", this%n_timesteps, "]"
+            " is out of range [1, ", this%get_n_timesteps(), "]"
        call neko_error(trim(msg))
     end if
 
@@ -437,7 +469,8 @@ contains
     end if
   end subroutine checkpoint_save_data
 
-  !> Restore data from the RAM checkpoint at the specified index to the current state.
+  !> Restore data from the RAM checkpoint at the specified index to the current
+  !! state.
   !! @param this The checkpoint object.
   !! @param index The index in the RAM checkpoint to restore from.
   subroutine checkpoint_load_data(this, index)
@@ -473,6 +506,8 @@ contains
   ! Meta handling
 
   !> Reset the checkpoint data
+  !> Reset checkpointing state.
+  !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_reset(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i, j
@@ -482,12 +517,14 @@ contains
     ! Reset our checkpoints
     this%loaded_checkpoint = -1
     this%n_saves_disc = 0
-    this%n_timesteps = 0
+    call this%set_n_timesteps(0)
 
     do i = 1, size(this%state_storage, 1)
        do j = 1, size(this%state_storage, 2)
-          call rzero(this%state_storage(i, j)%data, &
-               this%state_storage(i, j)%size)
+          if (this%state_storage(i, j)%is_allocated()) then
+             call rzero(this%state_storage(i, j)%data, &
+                  this%state_storage(i, j)%size)
+          end if
        end do
     end do
 

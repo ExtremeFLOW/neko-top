@@ -36,8 +36,9 @@
 !> Implementation for the Linear Checkpointing algorithm.
 !! In this case, we save the state of the simulation every `n_saves_memory`
 !! time steps. When restoring to a given time step, we load the nearest
-!! checkpoint and then we fill our cache with the following `n_saves_memory` time
-!! steps. Finally, we copy the required time step from our cache.
+!! checkpoint and then we fill our cache with the following
+!! `n_saves_memory` time steps. Finally, we copy the required time step from
+!! our cache.
 !!
 !! This algorithm is the simplest one and do a minimum of re-computation. But
 !! requires large amounts of memory and disk space.
@@ -45,6 +46,7 @@ submodule (simulation_checkpoint) checkpoint_linear
   use simulation, only: simulation_step, simulation_restart
   use file, only: file_t, file_free
   use time_step_controller, only: time_step_controller_t
+  use profiler, only: profiler_start_region, profiler_end_region
 
 contains
 
@@ -71,7 +73,9 @@ contains
             this%first_valid_timestep)
 
        call this%chkp_output%set_counter(counter)
+       call profiler_start_region("Checkpoint write to disk")
        call this%chkp_output%sample(time)
+       call profiler_end_region("Checkpoint write to disk")
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
@@ -119,7 +123,9 @@ contains
        counter = determine_counter(previous_save, this%n_saves_memory, &
             this%first_valid_timestep)
        call this%chkp_output%set_counter(counter)
+       call profiler_start_region("Checkpoint read from disk")
        call this%chkp_output%file_%read(neko_case%chkp)
+       call profiler_end_region("Checkpoint read from disk")
        call simulation_restart(neko_case, neko_case%chkp)
 
        ! Initialize the time step controller and set the time step
@@ -127,8 +133,9 @@ contains
        neko_case%time%tstep = previous_save
        this%loaded_checkpoint = neko_case%time%tstep
 
+       call profiler_start_region("Checkpoint recompute")
        ! Step through the simulation and store field states in memory
-       do k = previous_save, min(next_save - 1, this%n_timesteps)
+       do k = previous_save, min(next_save - 1, this%get_n_timesteps())
 
           ! Do not run simulation step on the first iteration
           if (k .ne. previous_save) then
@@ -140,6 +147,7 @@ contains
           local_idx = modulo(k, this%n_saves_memory) + 1
           call this%save_data(local_idx)
        end do
+       call profiler_end_region("Checkpoint recompute")
     end if
 
     ! Restore the required time step from memory
