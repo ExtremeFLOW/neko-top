@@ -56,8 +56,6 @@ source "${MAIN_DIR}/scripts/mpmd_run_helpers.sh"
 
 mpmd_prepare_python_runtime "${MAIN_DIR}"
 
-export MPICH_DMAPP_APP_IS_WORLD=${MPICH_DMAPP_APP_IS_WORLD:-1}
-
 mpmd_print_runtime_env
 
 cat <<'EOF' > select_gpu
@@ -73,11 +71,11 @@ chmod +x ./select_gpu
 rm -f ./mpmd.conf
 
 for ((rank=0; rank<NEKO_RANKS; rank++)); do
-    echo "${rank} /usr/bin/env MPICH_DMAPP_APP_IS_WORLD=${MPICH_DMAPP_APP_IS_WORLD} MPICH_GPU_SUPPORT_ENABLED=${MPICH_GPU_SUPPORT_ENABLED:-1} NEKO_COMM_ID=0 NEKO_CTRL_PEER_ROOT=${NEKO_RANKS} ./select_gpu ${NEKO_EXE} ${CASE_FILE}" >> mpmd.conf
+    echo "${rank} /usr/bin/env NEKO_COMM_ID=0 NEKO_CTRL_PEER_ROOT=${NEKO_RANKS} ./select_gpu ${NEKO_EXE} ${CASE_FILE}" >> mpmd.conf
 done
 
 for ((rank=NEKO_RANKS; rank<NEKO_RANKS + PY_RANKS; rank++)); do
-    echo "${rank} /usr/bin/env MPICH_DMAPP_APP_IS_WORLD=${MPICH_DMAPP_APP_IS_WORLD} MPICH_GPU_SUPPORT_ENABLED=0 NEKO_COMM_ID=1 NEKO_CTRL_PEER_ROOT=0 ${PYTHON_BIN} ${PYTHON_SCRIPT} ${CASE_FILE}" >> mpmd.conf
+    echo "${rank} /usr/bin/env NEKO_COMM_ID=1 NEKO_CTRL_PEER_ROOT=0 ${PYTHON_BIN} ${PYTHON_SCRIPT} ${CASE_FILE}" >> mpmd.conf
 done
 
 echo "Launching ${NEKO_RANKS} Neko GPU ranks and ${PY_RANKS} Python ranks"
