@@ -49,9 +49,10 @@ QUIET=false
 TEST=OFF
 DOCS=OFF
 EXAMPLES=OFF
+NEKO_TEST=OFF
 
 # List possible options
-OPTIONS=help,tests,clean,clean-neko,quiet,device:,docs,examples
+OPTIONS=help,tests,clean,clean-neko,test-neko,quiet,device:,docs,examples
 OPT=h,t,c,q,d:,e
 
 # Parse the inputs for options
