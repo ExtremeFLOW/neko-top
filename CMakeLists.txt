@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, The Neko-TOP Authors
+# Copyright (c) 2023-2026, The Neko-TOP Authors
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,7 @@
 # ============================================================================ #
 
 cmake_minimum_required(VERSION 3.21)
-project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
+project(Neko-TOP VERSION 1.1.0 LANGUAGES Fortran)
 
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
