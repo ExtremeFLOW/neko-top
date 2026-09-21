@@ -5,8 +5,16 @@ import os
 import re
 import sys
 import time
+import traceback
 from dataclasses import dataclass
 from typing import Optional
+
+_BOOT_RANK = os.environ.get("SLURM_PROCID", "?")
+print(
+    f"[pod boot world_rank={_BOOT_RANK}] starting Python imports",
+    file=sys.stderr,
+    flush=True,
+)
 
 import numpy as np
 from mpi4py import MPI
@@ -14,9 +22,7 @@ from mpi4py import MPI
 from pysemtools.datatypes.coef import Coef
 from pysemtools.datatypes.msh import Mesh
 from pysemtools.io.adios2.stream import DataStreamer
-from pysemtools.io.hdf.vtkhdf import VTKHDFFile
 from pysemtools.io.utils import get_fld_from_ndarray
-from pysemtools.io.wrappers import write_data
 from pysemtools.rom.io_help import IoHelp
 from pysemtools.rom.pod import POD
 
@@ -31,7 +37,27 @@ from neko_communicator import PHASE_FWD_RUNNING
 from neko_communicator import get_peer_root
 from neko_communicator import make_local_comm
 
+print(
+    f"[pod boot world_rank={_BOOT_RANK}] imports complete",
+    file=sys.stderr,
+    flush=True,
+)
+
 DEBUG = False
+
+
+def status(comm: MPI.Comm, msg: str, all_ranks: bool = False) -> None:
+    if all_ranks or comm.Get_rank() == 0 or as_bool(
+        os.getenv("POD_STATUS_ALL_RANKS")
+    ):
+        print(
+            "[pod "
+            f"local_rank={comm.Get_rank()}/{comm.Get_size()} "
+            f"world_rank={MPI.COMM_WORLD.Get_rank()}/"
+            f"{MPI.COMM_WORLD.Get_size()}] {msg}",
+            file=sys.stderr,
+            flush=True,
+        )
 
 
 def log(comm: MPI.Comm, msg: str) -> None:
@@ -626,6 +652,8 @@ def write_modes_to_vtkhdf(
     n_avail: int,
     output_index: int,
 ) -> int:
+    from pysemtools.io.hdf.vtkhdf import VTKHDFFile
+
     out_dir, vtk_path, mesh_link = vtk_mode_output_path(
         cfg, output_index
     )
@@ -675,6 +703,8 @@ def write_modes_to_disk(
 
     fmt = cfg.mode_output_format
     if fmt in ("fld", "nek5000"):
+        from pysemtools.io.wrappers import write_data
+
         out_dir, sample_base, meta_path = fld_mode_output_paths(cfg)
         ensure_mode_output_dir(comm, out_dir)
 
@@ -732,37 +762,64 @@ def init_runtime(
     IoHelp,
     list[np.ndarray],
 ]:
+    status(comm, "creating DataStreamer", all_ranks=True)
     ds = DataStreamer(comm)
 
+    status(comm, "receiving mesh x")
     x = recv_field(ds, cfg.dtype)
+    status(comm, "receiving mesh y")
     y = recv_field(ds, cfg.dtype)
+    status(comm, "receiving mesh z")
     z = recv_field(ds, cfg.dtype)
 
+    status(comm, f"receiving {cfg.n_fields} initial field(s)")
     initial_fields = recv_fields(ds, cfg.n_fields, cfg.dtype)
 
+    status(comm, "building Mesh/Coef/POD objects")
     mesh = Mesh(comm, x=x, y=y, z=z, create_connectivity=False)
     coef = Coef(mesh, comm)
     pod, ioh = make_pod(comm, coef.B, cfg)
+    status(comm, "runtime initialized")
     return ds, mesh, coef.B, pod, ioh, initial_fields
 
 
 def main() -> None:
     global DEBUG
 
+    print(
+        f"[pod boot world_rank={_BOOT_RANK}] entering main",
+        file=sys.stderr,
+        flush=True,
+    )
     world = MPI.COMM_WORLD
     comm = make_local_comm(world)
     rank = comm.Get_rank()
     peer_root = get_peer_root()
+    status(
+        comm,
+        f"communicator ready; peer_root={peer_root}",
+        all_ranks=True,
+    )
 
     case_path = sys.argv[1] if len(sys.argv) > 1 else "POD_rugby_ball.case"
     case_path = os.path.abspath(case_path)
+    status(comm, f"loading case {case_path}")
     case, cfg = load_pod_config(case_path)
     DEBUG = cfg.debug
+    status(
+        comm,
+        "config loaded: "
+        f"n_fields={cfg.n_fields} n_modes={cfg.keep_modes} "
+        f"batch_size={cfg.batch_size} i_stream={cfg.i_stream} "
+        f"dtype={cfg.dtype.__name__} write_modes={cfg.write_modes}",
+    )
 
     ds, mesh, bm, pod, ioh, initial_fields = init_runtime(comm, cfg)
     times = []
     energy = EnergyState()
+    status(comm, "adding initial snapshot")
     add_snapshot(comm, pod, ioh, bm, initial_fields, 0.0, times, energy)
+    status(comm, "initial snapshot loaded")
     mode_output_index = 0
     pod_iteration = 0
     singular_value_history_new = True
@@ -770,37 +827,52 @@ def main() -> None:
     ctrl = None
     if rank == 0:
         ctrl = CtrlClient(world, peer_root, cfg.debug)
+        status(comm, "control client created")
 
     my_count = getattr(ds, "py2f_field_my_count", None)
     if my_count is None:
         my_count = initial_fields[0].size
     zero_field = np.zeros(my_count, dtype=cfg.dtype)
+    status(comm, f"py2f field count={my_count}")
 
     try:
         while True:
             if rank == 0:
+                status(comm, "waiting for Neko control state")
                 state = ctrl.read_state()
             else:
                 state = (None, None, None, None)
 
             mode, phase, step, tcur = comm.bcast(state, root=0)
+            status(
+                comm,
+                f"received control state mode={mode} phase={phase} "
+                f"step={step} t={tcur}",
+            )
 
             if mode is None or mode == MODE_STOP:
+                status(comm, "received stop; leaving loop")
                 break
 
             if mode == MODE_FORWARD and phase == PHASE_FWD_RUNNING:
+                status(comm, f"receiving forward snapshot at step={step}")
                 fields = recv_fields(ds, cfg.n_fields, cfg.dtype)
                 add_snapshot(comm, pod, ioh, bm, fields, tcur, times, energy)
+                status(comm, f"forward snapshot stored; n_times={len(times)}")
                 continue
 
             if mode == MODE_FORWARD and phase == PHASE_FWD_DONE:
+                status(comm, "forward done; flushing POD buffer")
                 flush_buffer(comm, pod, ioh)
+                status(comm, "scaling and rotating POD modes")
                 pod.scale_modes(comm, bm1sqrt=ioh.bm1sqrt, op="div")
                 pod.rotate_local_modes_to_global(comm)
 
+                status(comm, "building POD time coefficients")
                 coeffs, header, n_avail = build_time_coefficients(
                     comm, pod, cfg, times
                 )
+                status(comm, f"POD coefficients ready; n_avail={n_avail}")
                 write_time_coefficients(
                     comm, coeffs, header, cfg.write_modes
                 )
@@ -815,22 +887,16 @@ def main() -> None:
                 singular_value_history_new = False
                 if rank == 0:
                     report_energy_capture(pod, energy, cfg.keep_modes)
+                    status(comm, "sending ADJOINT/RUNNING command to Neko")
                     ctrl.send_cmd(MODE_ADJOINT, PHASE_ADJ_RUNNING)
 
+                status(comm, "streaming POD modes back to Neko")
                 stream_mode_fields(ds, ioh, pod, cfg, zero_field, n_avail)
-                mode_output_index = write_modes_to_disk(
-                    comm,
-                    mesh,
-                    ioh,
-                    pod,
-                    cfg,
-                    zero_field,
-                    n_avail,
-                    mode_output_index,
-                )
+                status(comm, "finished streaming POD modes to Neko")
                 continue
 
             if mode == MODE_ADJOINT and phase == PHASE_ADJ_DONE:
+                status(comm, "adjoint done; resetting POD state")
                 pod, ioh = make_pod(comm, bm, cfg)
                 times = []
                 energy = EnergyState()
@@ -844,16 +910,28 @@ def main() -> None:
                     times,
                     energy,
                 )
+                status(comm, "POD state reset")
                 continue
 
             time.sleep(0.001)
 
     finally:
+        status(comm, "finalizing Python POD runtime", all_ranks=True)
         if rank == 0 and ctrl is not None:
             ctrl.close()
         comm.Barrier()
         ds.finalize()
+        status(comm, "Python POD runtime finalized", all_ranks=True)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except BaseException:
+        print(
+            f"[pod fatal world_rank={_BOOT_RANK}] unhandled exception",
+            file=sys.stderr,
+            flush=True,
+        )
+        traceback.print_exc(file=sys.stderr)
+        raise
