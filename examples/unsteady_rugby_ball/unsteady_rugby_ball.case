@@ -91,7 +91,8 @@
         ]
     },
     "unsteady": true,
-    "checkpoints": {
+    "state_recovery": {
+        "type": "checkpoint",
         "enabled": true,
         "n_memory": 100
     },
@@ -106,8 +107,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 100.0,
-                    "q": 3.0,
-                    "convex_up": true
+                    "q": 3.0
                 }
             ],
             "initial_distribution": {

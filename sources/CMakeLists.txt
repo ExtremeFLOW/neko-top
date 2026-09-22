@@ -63,7 +63,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/state_recovery)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/design)
@@ -98,6 +98,7 @@ target_include_directories(neko-top PUBLIC
 target_link_libraries(neko-top PUBLIC
     PkgConfig::neko
     PkgConfig::json-fortran
+    $<$<BOOL:${HAVE_HDF5}>:HDF5::HDF5>
     MPI::MPI_Fortran
     OpenMP::OpenMP_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
@@ -106,8 +107,6 @@ target_link_libraries(neko-top PUBLIC
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
-    $<$<BOOL:${HDF5_PKG_FOUND}>:PkgConfig::hdf5>
-    $<$<BOOL:${HDF5_FOUND}>:HDF5::HDF5>
 )
 
 # ============================================================================ #

@@ -74,10 +74,10 @@ contains
        call mma_subsolve_unconstrained_cpu(this, x)
     elseif (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_cpu(this, x)
-    elseif (this%subsolver .eq. "dpip") then
-       call mma_subsolve_dpip_cpu(this, x)
+    else if (this%subsolver .eq. "pdip") then
+       call mma_subsolve_pdip_cpu(this, x)
     else
-       call neko_error("MMA subsolver is not recognised (NOT dip or dpip).")
+       call neko_error("Unrecognized subsolver for MMA in mma_cpu.")
     end if
     call profiler_end_region("MMA subsolve")
 
@@ -119,10 +119,10 @@ contains
        call mma_unconstrained_KKT_cpu(this, x, df0dx)
     else if (this%subsolver .eq. "dip") then
        call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
-    elseif (this%subsolver .eq. "dpip") then
-       call mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
+    else if (this%subsolver .eq. "pdip") then
+       call mma_pdip_KKT_cpu(this, x, df0dx, fval, dfdx)
     else
-       call neko_error("MMA subsolver is not recognised (NOT dip or dpip).")
+       call neko_error("Unrecognized subsolver for MMA in mma_cpu.")
     end if
 
     call profiler_end_region("MMA KKT computation")
@@ -169,8 +169,8 @@ contains
   end subroutine mma_unconstrained_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual primal interior
-  ! point method (dpip) subsolve of MMA algorithm.
-  module subroutine mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
+  ! point method (pdip) subsolve of MMA algorithm.
+  module subroutine mma_pdip_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
     ! designx x and set the max and norm values of the      !
@@ -230,7 +230,7 @@ contains
          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
     this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
-  end subroutine mma_dpip_KKT_cpu
+  end subroutine mma_pdip_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual interior
   ! point method (dip) subsolve of MMA algorithm.
@@ -419,7 +419,7 @@ contains
 
   !> solve the subproblem defined by this%pij, this%qij, etc using Dual-primal
   !! interior point method.
-  subroutine mma_subsolve_dpip_cpu(this, designx)
+  subroutine mma_subsolve_pdip_cpu(this, designx)
     ! ------------------------------------------------------- !
     ! Dual-primal interior point method using Newton's step   !
     ! to solve MMA sub problem.                               !
@@ -674,7 +674,7 @@ contains
 
           if (info .ne. 0) then
              call neko_error("DGESV failed to solve the linear system in " // &
-                  "mma_subsolve_dpip.")
+                  "mma_subsolve_pdip.")
           end if
 
 
@@ -811,7 +811,7 @@ contains
     this%mu%x = mu
     this%s%x = s
 
-  end subroutine mma_subsolve_dpip_cpu
+  end subroutine mma_subsolve_pdip_cpu
 
   !> solve the subproblem defined by this%pij, this%qij, etc using a pure Dual
   !! interior point method.
@@ -932,7 +932,7 @@ contains
          z = max(0.0_rp,dot_product(lambda, a) - a0)
 
          ! Comput the value of x that minimizes L_x for the current λ
-         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} ��_i *
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} ����_i *
          ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
          pjlambda = (p0j + matmul(transpose(pij), lambda))

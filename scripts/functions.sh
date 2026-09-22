@@ -292,6 +292,11 @@ function cleanup {
         --exclude "*.smod" \
         ./ $results
 
+    if [ -s ./error.log ]; then
+        printf >&2 "ERROR: An error occurred during rsync.\n"
+        return 1
+    fi
+
     # Remove all but the log files
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete
     find ./ -type d -empty -delete

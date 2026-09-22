@@ -1,0 +1,133 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": true,
+        "time": {
+            "end_time": 0.1,
+            "timestep": 5.0e-3
+        },
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 3,
+            "dealias": false
+        },
+        "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2 ]
+                }
+            ]
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 0.1,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-9,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-8,
+                "max_iterations": 800
+            },
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1, 2 ]
+                }
+            ],
+            "output_control": "never"
+        },
+        "simulation_components": [
+            {
+                "type": "steady",
+                "tol": 1e-8,
+                "compute_control": "tsteps",
+                "compute_value": 1
+            }
+        ],
+        "point_zones": [
+            {
+                "name": "optimization_domain",
+                "geometry": "box",
+                "x_bounds": [ 0.2, 0.8 ],
+                "y_bounds": [ 0.2, 0.8 ],
+                "z_bounds": [ -1.0, 1.0 ]
+            },
+            {
+                "name": "initial_ball",
+                "geometry": "cylinder",
+                "start": [ 0.5, 0.5, -0.5 ],
+                "end": [ 0.5, 0.5, 1.5 ],
+                "radius": 0.25
+            }
+        ]
+    },
+    "optimization": {
+        "fd_test_tolerance": 1.0e-2,
+        "domain": {
+            "type": "point_zone",
+            "zone_name": "optimization_domain"
+        },
+        "design": {
+            "type": "brinkman",
+            "mapping": [
+                {
+                    "type": "RAMP",
+                    "f_max": 100.0
+                }
+            ],
+            "initial_distribution": {
+                "type": "point_zone",
+                "base_value": 0.0,
+                "zone_value": 1.0,
+                "zone_name": "initial_ball"
+            }
+        },
+        "solver": {
+            "type": "mma",
+            "max_iterations": 0,
+            "tolerance": 1.0e-3,
+            "mma": {
+                "max_iter": 100,
+                "asyinit": 0.5,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "scale": 1.0,
+                "auto_scale": false,
+                "xmin": 0.0,
+                "xmax": 1.0,
+                "a0": 1.0,
+                "a": 0.0,
+                "c": 1000.0,
+                "d": 0.0
+            }
+        },
+        "objectives": [
+            {
+                "type": "viscous_dissipation",
+                "weight": 1.0
+            }
+        ]
+    }
+}
