@@ -56,6 +56,21 @@ int mma_red_s = 0;
 real * mma_bufred = NULL;
 real * mma_bufred_d = NULL;
 
+void mma_unconstrained_kkt_hip(void* rex, void* x, void* xmin, void* xmax, 
+                               void* df0dx, real* eps, int* n) {
+    const int N = *n;
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((N + 1024 - 1) / 1024, 1, 1);
+    const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+
+    hipLaunchKernelGGL(
+        mma_unconstrained_kkt_kernel<real>, nblcks, nthrds, 0, stream,
+        (real*)rex, (const real*)x, (const real*)xmin, (const real*)xmax, 
+        (const real*)df0dx, *eps, N);
+
+    HIP_CHECK(hipGetLastError());
+}
+
 void mma_update_hessian_z_hip(void* Hess, void* a, int m) {
     const int M = m;
     const int total = M * M;

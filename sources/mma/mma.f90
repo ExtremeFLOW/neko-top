@@ -96,6 +96,7 @@ module mma
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
+     logical :: unconstrained_problem = .false.
      type(scratch_registry_t) :: scratch
      character(len=:), allocatable :: subsolver, bcknd
 
@@ -382,6 +383,7 @@ contains
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
     real(kind=rp), intent(in), optional :: move_limit
     character(len=*), intent(in), optional :: bcknd, subsolver
+
     character(len=256) :: log_msg
     integer :: i, ierr
 
@@ -390,6 +392,7 @@ contains
 
     this%n = n
     this%m = m
+    this%unconstrained_problem = m .eq. 0
 
     call this%xold1%init(n)
     call this%xold2%init(n)

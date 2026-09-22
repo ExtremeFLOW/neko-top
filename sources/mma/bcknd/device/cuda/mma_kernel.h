@@ -38,6 +38,34 @@
 #define MMA_CUDA_KERNEL_H
 
 template <typename T>
+__global__ void mma_unconstrained_kkt_kernel(
+    T* __restrict__ rex,
+    const T* __restrict__ x,
+    const T* __restrict__ xmin,
+    const T* __restrict__ xmax,
+    const T* __restrict__ df0dx,
+    const T eps,
+    const int n)
+{
+    int j = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (j >= n) return;
+
+    if (x[j] - xmin[j] <= eps) {
+        // At lower bound: residual is non-zero only if gradient is negative
+        rex[j] = (df0dx[j] < (T)0.0) ? df0dx[j] : (T)0.0;
+    } 
+    else if (xmax[j] - x[j] <= eps) {
+        // At upper bound: residual is non-zero only if gradient is positive
+        rex[j] = (df0dx[j] > (T)0.0) ? df0dx[j] : (T)0.0;
+    } 
+    else {
+        // Strictly internal
+        rex[j] = df0dx[j];
+    }
+}
+	
+template <typename T>
 __global__ void mma_update_hessian_z_kernel(
     T* __restrict__ Hess,
     const T* __restrict__ a,
