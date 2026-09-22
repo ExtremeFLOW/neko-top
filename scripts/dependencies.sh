@@ -37,7 +37,7 @@ function check_system_dependencies() {
 # ============================================================================ #
 # Ensure JSON-Fortran is installed, if not install it.
 function find_json_fortran() {
-    check_external_dir
+    check_environment
 
     # Determine the JSON-Fortran installation directory
     if [[ $# -ge 1 ]]; then
@@ -57,8 +57,6 @@ function find_json_fortran() {
 
         # Clone JSON-Fortran from the repository if it does not exist.
         if [[ ! -d "$JSON_FORTRAN_DIR" || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
-            [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
-
             git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
                 https://github.com/jacobwilliams/json-fortran $JSON_FORTRAN_DIR
         fi
@@ -97,7 +95,7 @@ function find_json_fortran() {
 # ============================================================================ #
 # Ensure Nek5000 is installed, if not install it.
 function find_nek5000() {
-    check_external_dir
+    check_environment
 
     # Determine the Nek5000 installation directory
     if [[ $# -ge 1 ]]; then
@@ -111,8 +109,6 @@ function find_nek5000() {
     fi
 
     if [[ ! -d "$NEK5000_DIR" || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
-        [ -z "$NEK5000_VERSION" ] && NEK5000_VERSION="master"
-
         git clone --depth 1 --branch $NEK5000_VERSION \
             https://github.com/Nek5000/Nek5000.git $NEK5000_DIR
     fi
@@ -121,7 +117,7 @@ function find_nek5000() {
 # ============================================================================ #
 # Ensure GSLIB is installed, if not install it.
 function find_gslib() {
-    check_external_dir
+    check_environment
 
     # Determine the GSLib installation directory
     if [[ $# -ge 1 ]]; then
@@ -178,7 +174,7 @@ function find_gslib() {
 # ============================================================================ #
 # Ensure PFUnit is installed, if not install it.
 function find_pfunit() {
-    check_external_dir
+    check_environment
 
     # Determine the pFUnit installation directory
     if [[ $# -ge 1 ]]; then
@@ -193,8 +189,6 @@ function find_pfunit() {
 
     # Clone pFUnit from the repository if it does not exist.
     if [[ ! -d "$PFUNIT_DIR" || $(ls -A $PFUNIT_DIR | wc -l) -eq 0 ]]; then
-        [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="v4.12.0"
-
         git clone --depth=1 --branch $PFUNIT_VERSION \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $PFUNIT_DIR
 
@@ -247,7 +241,7 @@ _ACEOF
 # Ensure HDF5 is installed, if not install it.
 function find_hdf5() {
 
-    check_external_dir
+    check_environment
 
     # Determine the HDF5 installation directory. HDF5_ROOT is the name CMake
     # and the module systems use; HDF5_DIR is accepted as a legacy spelling.
@@ -283,7 +277,6 @@ function find_hdf5() {
 
         # Clone HDF5 from the repository if it does not exist.
         if [[ ! -d "$HDF5_ROOT" || $(ls -A $HDF5_ROOT | wc -l) -eq 0 ]]; then
-            [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_2.0.0"
             git clone --depth 1 --branch $HDF5_VERSION \
                 https://github.com/HDFGroup/hdf5.git $HDF5_ROOT
         fi
@@ -323,9 +316,9 @@ function find_hdf5() {
 # Ensure ParMETIS is installed, if not install it.
 
 function find_parmetis() {
+    check_environment
 
     # Determine the Parmetis installation directory
-    check_external_dir
     if [[ $# -ge 1 ]]; then
         PARMETIS_DIR="$1"
     elif [ -z "$PARMETIS_DIR" ]; then
@@ -386,7 +379,7 @@ function find_parmetis() {
 # ============================================================================ #
 # Ensure Neko is installed, if not install it.
 function find_neko() {
-    check_external_dir
+    check_environment
 
     # Find the required dependencies for Neko
     find_json_fortran $JSON_FORTRAN_DIR
@@ -413,20 +406,13 @@ function find_neko() {
 
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
-            [ -z "$NEKO_VERSION" ] && NEKO_VERSION="neko-top"
-
             git clone --depth 1 --branch $NEKO_VERSION \
                 https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
-
         fi
 
         # Apply Cray-specific patches before building on Cray systems
         if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
-            cray_patches=(
-                "patches/cce_stack.patch"
-                "patches/cce_time_state.patch"
-                "patches/cce_openmp.patch"
-            )
+            cray_patches=($(find $NEKO_DIR/patches/ -name 'cce_*.patch' -type f))
             for patch in "${cray_patches[@]}"; do
                 if git -C "$NEKO_DIR" apply --check "$patch" 2>/dev/null; then
                     git -C "$NEKO_DIR" apply "$patch"
@@ -656,13 +642,12 @@ function error() {
     echo -e "$1" >&2
 }
 
-function check_external_dir() {
-    if [ -z "$EXTERNAL_DIR" ]; then
-        echo "Environment EXTERNAL_DIR is not set."
-        echo "Default path will be used: $HOME/tmp/external"
-        export EXTERNAL_DIR=$HOME/tmp/external
-    fi
+function check_environment() {
+    # Check the main directory and source the dependency versions file
+    export MAIN_DIR=${MAIN_DIR:-$(cd $(dirname $0)/.. && pwd)}
+    export EXTERNAL_DIR=${EXTERNAL_DIR:-$HOME/tmp/external}
 
+    source $MAIN_DIR/config/dependency-versions.env
     mkdir -p $EXTERNAL_DIR
 
 }
