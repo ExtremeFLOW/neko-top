@@ -159,7 +159,6 @@ contains
     type(vector_t), pointer :: x
     integer :: ind
     character(len=32) :: extra_headers(3)
-    class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
 
