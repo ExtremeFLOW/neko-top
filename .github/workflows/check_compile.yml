@@ -150,6 +150,7 @@ jobs:
         with:
           version: ${{ inputs.hdf5-version }}
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
 
       - name: Get neko
         id: get-neko
