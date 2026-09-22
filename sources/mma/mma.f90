@@ -226,8 +226,7 @@ contains
   ! Initializers and destructors
 
   !> Read attributes from the case file, and calling the init function
-  subroutine mma_init_from_json(this, x, n, m, json, scale, auto_scale, &
-       unconstrained_problem)
+  subroutine mma_init_from_json(this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -248,7 +247,6 @@ contains
     ! Read the scaling info for fval and dfdx from json
     real(kind=rp), intent(out) :: scale
     logical, intent(out) :: auto_scale
-    logical, intent(in) :: unconstrained_problem
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
     !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -315,7 +313,7 @@ contains
 
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver, &
-         move_limit, unconstrained_problem)
+         move_limit)
 
   end subroutine mma_init_from_json
 
@@ -356,7 +354,7 @@ contains
   !> Initialize the mma object based on the attributes from the json file
   subroutine mma_init_from_components(this, x, n, m, a0, a, c, d, xmin, xmax, &
        max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver, &
-       move_limit, unconstrained_problem)
+       move_limit)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -385,16 +383,16 @@ contains
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
     real(kind=rp), intent(in), optional :: move_limit
     character(len=*), intent(in), optional :: bcknd, subsolver
-    logical, intent(in) :: unconstrained_problem
+
     character(len=256) :: log_msg
     integer :: i, ierr
 
     call this%free()
     call this%scratch%init()
 
-    this%unconstrained_problem = unconstrained_problem
     this%n = n
     this%m = m
+    this%unconstrained_problem = m .eq. 0
 
     call this%xold1%init(n)
     call this%xold2%init(n)

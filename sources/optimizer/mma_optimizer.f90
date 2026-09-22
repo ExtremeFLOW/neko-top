@@ -168,15 +168,6 @@ contains
     if (this%unconstrained_problem) then
        call neko_log%message('Unconstrained problem detected. ' // &
             'Switching to explicit closed-form MMA subsolver and KKT.')
-
-       allocate(dummy_constraint_t::dummy_con)
-       select type (con => dummy_con)
-       type is (dummy_constraint_t)
-          call con%init_from_attributes(design)
-       end select
-
-       call problem%add_constraint(dummy_con)
-       if (allocated(dummy_con)) deallocate(dummy_con)
     end if
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
@@ -185,8 +176,7 @@ contains
 
     call design%get_values(x)
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
-         solver_parameters, this%scale, this%auto_scale, &
-         this%unconstrained_problem)
+         solver_parameters, this%scale, this%auto_scale)
 
     call neko_scratch_registry%relinquish(ind)
 

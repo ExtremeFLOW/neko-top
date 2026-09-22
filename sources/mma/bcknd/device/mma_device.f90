@@ -87,7 +87,7 @@ contains
 
     if (this%unconstrained_problem) then
        call mma_subsolve_unconstrained_device(this, x)
-    elseif (this%subsolver .eq. "dip") then
+    else if (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_device(this, x)
     else if (this%subsolver .eq. "pdip") then
        call mma_subsolve_pdip_device(this, x)
@@ -105,7 +105,7 @@ contains
 
     if (this%unconstrained_problem) then
        call mma_unconstrained_KKT_device(this, x, df0dx)
-    elseif (this%subsolver .eq. "dip") then
+    else if (this%subsolver .eq. "dip") then
        call mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
     else if (this%subsolver .eq. "pdip") then
        call mma_pdip_KKT_device(this, x, df0dx, fval, dfdx)
