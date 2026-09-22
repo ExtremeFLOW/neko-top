@@ -51,10 +51,9 @@ DOCS=OFF
 EXAMPLES=OFF
 NEKO_TEST=OFF
 
-# Load the environment file.
-if [ -f "$MAIN_DIR/prepare.env" ]; then
-    source $MAIN_DIR/prepare.env
-fi
+# Load the environment files.
+source $MAIN_DIR/config/dependency-versions.env
+[ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
 
 # List possible options
 OPTIONS=help,tests,clean,clean-neko,test-neko,quiet,device:,docs,examples
