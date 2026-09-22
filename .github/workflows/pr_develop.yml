@@ -42,19 +42,6 @@ on:
   push:
     branches:
       - develop
-      - main
-
-# ---------------------------------------------------------------------------- #
-# Define the global environment variables, these control versioning and other
-# useful settings in a unified way. Due to limitations in the GitHub Actions
-# environment, we cannot pass these as inputs to the jobs, so the prepare job
-# will store them in a file that the other jobs can read.
-
-env:
-  PFUNIT_VERSION: v4.12.0
-  JSON_FORTRAN_VERSION: 9.2.1
-  NEKO_VERSION: neko-top
-  HDF5_VERSION: hdf5_1_14_6
 
 # ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run
@@ -89,9 +76,16 @@ jobs:
             exit 1
           fi
 
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Store environment variables
         id: store
         run: |
+          source $GITHUB_WORKSPACE/config/dependency-versions.env
+
           echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
           echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
           echo "hdf5-version=$HDF5_VERSION" >> $GITHUB_OUTPUT
