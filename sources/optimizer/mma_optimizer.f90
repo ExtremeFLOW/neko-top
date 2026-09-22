@@ -385,6 +385,8 @@ contains
     type(vector_t), pointer :: constraint_values
     integer :: ind
 
+    if (this%unconstrained_problem) return
+
     call neko_scratch_registry%request(constraint_values, ind, &
          problem%get_n_constraints(), .false.)
 
