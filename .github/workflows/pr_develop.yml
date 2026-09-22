@@ -44,15 +44,6 @@ on:
       - develop
 
 # ---------------------------------------------------------------------------- #
-# Define the global environment variables, these control versioning and other
-# useful settings in a unified way. Due to limitations in the GitHub Actions
-# environment, we cannot pass these as inputs to the jobs, so the prepare job
-# will store them in a file that the other jobs can read.
-
-env:
-  NEKO_VERSION: develop
-
-# ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run
 # in-progress and latest queued. We do not wish to waste time on old runs if a
 # newer one is available.
