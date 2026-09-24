@@ -50,7 +50,6 @@ module simulation_m
   use json_file_module, only: json_file
   use json_utils, only: json_extract_item
   use num_types, only: rp, sp
-  use user_intf, only: user_t, simulation_component_user_settings
   implicit none
   private
 
