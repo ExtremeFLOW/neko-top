@@ -68,7 +68,7 @@ contains
        deallocate(object)
     end if
 
-    call json_get(parameters, "optimization.design.type", type)
+    call json_get(parameters, "type", type)
     select case (trim(type))
     case ("brinkman")
        allocate(brinkman_design_t::object)
