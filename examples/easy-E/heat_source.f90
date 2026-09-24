@@ -81,12 +81,12 @@ contains
 
        ! Set the resistance to 1.0 in the cylinder
        do i = 1, cyl%size
-          resistance(cyl%mask(i)) = target_temperature
+          resistance(cyl%mask%get(i)) = target_temperature
        end do
 
        ! Set the resistance to 1.0 in the ball
        do i = 1, ball%size
-          resistance(ball%mask(i)) = target_temperature
+          resistance(ball%mask%get(i)) = target_temperature
        end do
 
        ! Copy to device
@@ -103,9 +103,9 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cfill_mask(s%x_d, current_temperature, rhs%dm%size(), &
-            cyl%mask_d, cyl%size)
+            cyl%mask%get_d(), cyl%size)
        call device_cfill_mask(s%x_d, current_temperature, rhs%dm%size(), &
-            ball%mask_d, ball%size)
+            ball%mask%get_d(), ball%size)
 
 
        !  call device_cfill(rhs%s_d, 0.0_rp, rhs%dm%size())
@@ -115,9 +115,9 @@ contains
        !       ball%mask_d, ball%size)
     else
 
-       call cfill_mask(s%x, current_temperature, rhs%dm%size(), cyl%mask, &
+       call cfill_mask(s%x, current_temperature, rhs%dm%size(), cyl%mask%get(), &
             cyl%size)
-       call cfill_mask(s%x, current_temperature, rhs%dm%size(), ball%mask, &
+       call cfill_mask(s%x, current_temperature, rhs%dm%size(), ball%mask%get(), &
             ball%size)
 
        !  call cfill(rhs%s, 0.0_rp, rhs%dm%size())

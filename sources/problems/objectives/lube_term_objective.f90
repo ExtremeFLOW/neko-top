@@ -252,7 +252,7 @@ contains
           this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
        else
           this%value = glsc2_mask(work%x, this%c_Xh%B, design%size(), &
-               this%mask%mask, this%mask%size)
+               this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
