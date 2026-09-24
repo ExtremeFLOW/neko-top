@@ -51,7 +51,7 @@ module RAMP_mapping
   !! This is the standard RAMP described in
   !! https://doi.org/10.1007/s001580100129
   !!
-  !! $f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}$
+  !! \f$f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}\f$
   !!
   !!
   !!  |        .
@@ -64,7 +64,7 @@ module RAMP_mapping
   !! or a convex up equivelent used by Borrvall & Peterson
   !! https://doi.org/10.1002/fld.1964
   !!
-  !! $f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}$
+  !! \f$f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}\f$
   !!
   !! It seems very similar to RAMP but with the convexity the other way
   !!
@@ -145,6 +145,7 @@ contains
   end subroutine RAMP_mapping_free
 
   !> Apply the mapping
+  !! @param this mapping
   !! @param X_out mapped field
   !! @param X_in unmapped field
   subroutine RAMP_forward_mapping(this, X_out, X_in)
@@ -164,9 +165,10 @@ contains
 
 
   !> Apply the  chain rule
-  !! @param X_in unmapped field
+  !! @param this mapping
   !! @param sens_out is the sensitivity with respect to the unfiltered design
   !! @param sens_in is the sensitivity with respect to the filtered design
+  !! @param X_in unmapped field
   subroutine RAMP_backward_mapping(this, sens_out, sens_in, X_in)
     class(RAMP_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
@@ -184,6 +186,9 @@ contains
   end subroutine RAMP_backward_mapping
 
   !> Apply the mapping
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_out mapped field
   !! @param X_in unmapped field
   subroutine convex_down_RAMP_mapping_apply(f_min, f_max, q, X_out, X_in)
@@ -209,6 +214,9 @@ contains
 
 
   !> Apply the  chain rule
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_in unmapped field
   !! @param sens_out is the sensitivity with respect to the unfiltered design
   !! @param sens_in is the sensitivity with respect to the filtered design
@@ -240,6 +248,9 @@ contains
   end subroutine convex_down_RAMP_mapping_apply_backward
 
   !> Apply the mapping
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_out mapped field
   !! @param X_in unmapped field
   subroutine convex_up_RAMP_mapping_apply(f_min, f_max, q, X_out, X_in)
@@ -267,6 +278,9 @@ contains
 
 
   !> Apply the  chain rule
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_in unmapped field
   !! @param sens_out is the sensitivity with respect to the unfiltered design
   !! @param sens_in is the sensitivity with respect to the filtered design

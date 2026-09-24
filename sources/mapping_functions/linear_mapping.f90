@@ -103,6 +103,7 @@ contains
   end subroutine linear_mapping_free
 
   !> Apply the mapping
+  !! @param this the mapping
   !! @param X_out mapped field
   !! @param X_in unmapped field
   subroutine linear_forward_mapping(this, X_out, X_in)
@@ -119,6 +120,7 @@ contains
 
 
   !> Apply the  chain rule
+  !! @param this the mapping
   !! @param X_in unmapped field
   !! @param sens_out is the sensitivity with respect to the unfiltered design
   !! @param sens_in is the sensitivity with respect to the filtered design
