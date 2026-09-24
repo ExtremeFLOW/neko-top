@@ -187,7 +187,7 @@ contains
        x = design%get_values()
 
        ! Use scaled sensitivities to update the design variable
-       call this%mma%update(iter, x%x, objective_sensitivities, &
+       call this%mma%update(iter, x, objective_sensitivities, &
             scaling_factor * constraint_value, &
             scaling_factor * constraint_sensitivities)
 
@@ -205,7 +205,7 @@ contains
        call problem%get_constraint_sensitivities(constraint_sensitivities)
        call problem%get_all_objective_values(all_objectives)
 
-       call this%mma%KKT(x%x, objective_sensitivities, &
+       call this%mma%KKT(x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
 
        ! Stamp the i^th iteration
