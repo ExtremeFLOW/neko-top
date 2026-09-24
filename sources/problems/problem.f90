@@ -342,9 +342,15 @@ contains
   ! Problem part computation
 
   !> The computation of the objective function and constraints.
-  subroutine problem_compute(this, design)
+  subroutine problem_compute(this, design, simulation)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
+    class(simulation_t), optional, intent(inout) :: simulation
+
+    if (present(simulation)) then
+       call simulation%reset()
+       call simulation%run_forward()
+    end if
 
     call this%update_objectives(design)
     call this%update_constraints(design)
@@ -352,19 +358,24 @@ contains
   end subroutine problem_compute
 
   !> The computation of the objective function and constraints.
-  subroutine problem_compute_sensitivity(this, design)
+  subroutine problem_compute_sensitivity(this, design, simulation)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
+    class(simulation_t), optional, intent(inout) :: simulation
 
     type(vector_t) :: objective_sensitivity
+
+    if (present(simulation)) call simulation%run_backward()
 
     call this%update_objective_sensitivities(design)
     call this%update_constraint_sensitivities(design)
 
+    call objective_sensitivity%init(this%n_design)
     call this%get_objective_sensitivities(objective_sensitivity)
 
     call design%map_backward(objective_sensitivity)
 
+    call objective_sensitivity%free()
   end subroutine problem_compute_sensitivity
 
   ! ========================================================================== !
@@ -441,10 +452,10 @@ contains
   !!
   !! This function constructs the objective value from the individual
   !! objectives and their weights.
-  !! @param[inout] this The problem to update the objectives with.
+  !! @param[in] this The problem to update the objectives with.
   !! @param[out] objective_value The weighted sum of all objective values.
   subroutine problem_get_objective_value(this, objective_value)
-    class(problem_t), intent(inout) :: this
+    class(problem_t), intent(in) :: this
     real(kind=rp), intent(out) :: objective_value
     integer :: i
 
@@ -461,15 +472,14 @@ contains
   !!
   !! This function returns all the indivual objectives comprising the
   !! objective function
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] all_objective_values A vector containing all objectives
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] all_objective_values A vector containing all objectives
   subroutine problem_get_all_objective_values(this, all_objective_values)
-    class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: all_objective_values
+    class(problem_t), intent(in) :: this
+    type(vector_t), intent(inout) :: all_objective_values
     integer :: i
 
     call all_objective_values%init(this%n_objectives)
-
     do i = 1, this%n_objectives
        all_objective_values%x(i) = this%objective_list(i)%objective%value
     end do
@@ -485,15 +495,14 @@ contains
   !!
   !! This function constructs the constraint values from the individual
   !! constraints.
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] constraint_value The vector of all constraint values.
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] constraint_value The vector of all constraint values.
   subroutine problem_get_constraint_values(this, constraint_value)
-    class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: constraint_value
+    class(problem_t), intent(in) :: this
+    type(vector_t), intent(inout) :: constraint_value
     integer :: i
 
     call constraint_value%init(this%n_constraints)
-
     do i = 1, this%n_constraints
        constraint_value%x(i) = this%constraint_list(i)%constraint%value
     end do
@@ -509,15 +518,14 @@ contains
   !!
   !! This function constructs the sensitivity of the objective value from the
   !! individual objectives and their weights.
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] sensitivity The weighted sum of all objective sensitivities.
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] sensitivity The weighted sum of all objective sensitivities.
   subroutine problem_get_objective_sensitivities(this, sensitivity)
-    class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: sensitivity
+    class(problem_t), intent(in) :: this
+    type(vector_t), intent(inout) :: sensitivity
     integer :: i
 
     call sensitivity%init(this%n_design)
-
     do i = 1, this%n_objectives
        sensitivity = sensitivity + this%objective_list(i)%objective%sensitivity
     end do
@@ -528,31 +536,44 @@ contains
   !!
   !! This function constructs the sensitivity of the constraint values from the
   !! individual constraints.
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] sensitivity The matrix of all constraint sensitivities.
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] sensitivity The matrix of all constraint sensitivities.
   subroutine problem_get_constraint_sensitivities(this, sensitivity)
-    class(problem_t), intent(inout) :: this
-    type(matrix_t), intent(out) :: sensitivity
-    integer :: i, j
+    class(problem_t), intent(in) :: this
+    type(matrix_t), intent(inout) :: sensitivity
+    type(vector_t) :: tmp
+    integer :: i, j, n
 
+    n = this%n_constraints * this%n_design
     call sensitivity%init(this%n_constraints, this%n_design)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call tmp%init(this%n_design)
+    end if
 
     do i = 1, this%n_constraints
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy( &
-               this%constraint_list(i)%constraint%sensitivity%x, &
-               this%constraint_list(i)%constraint%sensitivity%x_d, &
+          tmp = this%constraint_list(i)%constraint%sensitivity
+          call device_memcpy(tmp%x, tmp%x_d, &
                this%n_design, DEVICE_TO_HOST, sync = .true.)
+          do j = 1, this%n_design
+             sensitivity%x(i, j) = tmp%x(j)
+          end do
+       else
+          do j = 1, this%n_design
+             sensitivity%x(i, j) = &
+                  this%constraint_list(i)%constraint%sensitivity%x(j)
+          end do
        end if
-       do j = 1, this%n_design
-          sensitivity%x(i, j) = &
-               this%constraint_list(i)%constraint%sensitivity%x(j)
-       end do
     end do
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(sensitivity%x, sensitivity%x_d, &
-            this%n_design * this%n_constraints, HOST_TO_DEVICE, sync = .true.)
+       call device_memcpy(sensitivity%x, sensitivity%x_d, n, &
+            HOST_TO_DEVICE, sync = .true.)
+    end if
+
+    ! Free the temporary vector
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call tmp%free()
     end if
 
   end subroutine problem_get_constraint_sensitivities
