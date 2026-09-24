@@ -193,8 +193,9 @@ contains
     integer :: ierr, n, offset, k
 
     ! Local design values
-    call design%get_values(h)
     n = design%size()
+    call h%init(n)
+    call design%get_values(h)
     call sensitivity%init(n)
 
     ! Project design variables to physical height
@@ -267,8 +268,9 @@ contains
     real(rp) :: Le, global_mass
 
     ! Get local design values
-    call design%get_values(design_values)
     n = design%size()
+    call design_values%init(n)
+    call design%get_values(design_values)
 
     ! Project design variables to physical height !h = (h_max-h_min) x + h_min
     call vector_cmult(design_values, (h_max - h_min) )
@@ -350,8 +352,9 @@ contains
 
     ! This element is on our rank
     ! Fetch the local design values
-    call design%get_values(h)
     n = design%size()
+    call h%init(n)
+    call design%get_values(h)
 
     ! Project design variables to physical height
     call vector_cmult(h, (h_max - h_min), n)
@@ -404,8 +407,9 @@ contains
 
     ! This element is on our rank
     ! Local design values
-    call design%get_values(h)
     n = design%size()
+    call h%init(n)
+    call design%get_values(h)
 
     ! Project design variables to physical height
     call vector_cmult(h, (h_max - h_min), n)
