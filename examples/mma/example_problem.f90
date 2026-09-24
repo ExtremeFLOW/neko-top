@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-module example_problem
+module example_problem_mma
   use num_types, only: rp
 
   use objective, only: objective_t
@@ -128,4 +128,4 @@ contains
 
   end subroutine mma_obj_update_sensitivity
 
-end module example_problem
+end module example_problem_mma

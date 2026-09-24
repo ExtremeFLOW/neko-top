@@ -10,7 +10,7 @@ program usrneko
   use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD
 
 
-  use example_problem, only: mma_obj
+  use example_problem_mma, only: mma_obj
   use objective, only: objective_t
 
   use simplefield_design, only: simplefield_design_t

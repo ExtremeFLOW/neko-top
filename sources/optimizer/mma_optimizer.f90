@@ -91,13 +91,6 @@ contains
     type(json_file) :: solver_parameters
     logical :: unconstrained_problem
 
-    ! Initialize the logger
-    call this%logger%init('optimization_data.csv')
-
-    ! Write the header
-    problem_header = problem%get_log_header()
-    optimization_header = 'iter, ' // trim(problem_header) // &
-         ', KKTmax, KKTnorm2, scaling factor'
 
     call design%get_values(x)
 
@@ -129,8 +122,15 @@ contains
     call this%init_from_components(problem, design, &
          max_iterations, tolerance, enable_output, simulation)
 
-    call this%logger%set_header(trim(optimization_header) // &
-         this%mma%get_backend_and_subsolver())
+    ! Initialize the logger
+    call this%logger%init('optimization_data.csv')
+
+    ! Write the header
+    problem_header = problem%get_log_header()
+    optimization_header = 'iter, ' // trim(problem_header) // &
+         ', KKTmax, KKTnorm2, scaling factor, ' // &
+         this%mma%get_backend_and_subsolver()
+    call this%logger%set_header(trim(optimization_header))
     call x%free()
   end subroutine mma_optimizer_init_from_json
 
