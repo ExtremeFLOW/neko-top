@@ -285,7 +285,7 @@ function find_neko() {
     fi
 
     # Check if Neko is installed, if not install it.
-    if [[ -z "$(find $1/lib*/ -name libneko.a)" || "$CLEAN" == true ]]; then
+    if [[ -z "$(find $NEKO_DIR/lib*/ -name libneko.a)" || "$CLEAN_NEKO" == true ]]; then
 
         # Determine available features
         FEATURES="--enable-contrib "
@@ -313,10 +313,10 @@ function find_neko() {
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
-        if [[ ! -f "configure" || "$CLEAN" == true ]]; then
+        if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then
             ./regen.sh
         fi
-        if [[ ! -f Makefile || "$CLEAN" == true ]]; then
+        if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
             ./configure --prefix="$(realpath ./)" $FEATURES
         fi
 
@@ -329,7 +329,7 @@ function find_neko() {
                 rm -fr autom4te.cache
             fi
         fi
-        [ "$CLEAN" == true ] && make clean
+        [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j install || make -j install
         [ "$TEST" == true ] && make check
 
