@@ -27,6 +27,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scheme.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn_bc_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_ic.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_no_dealias.f90

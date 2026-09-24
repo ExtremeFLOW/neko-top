@@ -4,7 +4,7 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
-        "output_boundary": false,
+        "output_boundary": true,
         "end_time": 0.1,
         "timestep": 1e-4,
         "numerics": {
@@ -19,21 +19,24 @@
                     0.0, 0.0, 0.0
                 ]
             },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2 ]
+                },
+                // {
+                //     "type": "velocity_value",
+                //     "value": [ 0, 0, 0 ],
+                //     "zone_indices": [ 2 ]
+                // }
+            ],
         },
         "fluid": {
             "scheme": "pnpn",
             "Re": 2,
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
-            },
-            "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -49,9 +52,15 @@
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
-            "boundary_types": [ "v", "v", "sym", "sym" ],
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1, 0, 0 ],
+                    "zone_indices": [ 1, 2 ]
+                }
+            ],
             "output_control": "tsteps",
-            "output_value": 50000000,
+            "output_value": 50000000
         },
         "simulation_components": [
             {
@@ -62,7 +71,7 @@
                 "compute_value": 1
             }
         ],
-     "point_zones": [
+        "point_zones": [
             {
                 "name": "optimization_domain",
                 "geometry": "box",
@@ -76,24 +85,24 @@
                 ],
                 "z_bounds": [
                     -1.0,
-                     1.0,
+                    1.0,
                 ],
-           }
-                 ]
-    }, 
+            }
+        ]
+    },
     "mma": {
-    	"max_iter": 100,
-    	"asyinit": 0.5,
-    	"asyincr": 1.2,
-    	"asydecr": 0.7,
-    	"m": 1,
-    	"scale": 1.0,
-    	"auto_scale": false,
-    	"xmin": 0.0,
-    	"xmax": 1.0,
-    	"a0": 1.0,
-    	"a": 0.0,
-    	"c": 100.0,
-    	"d": 0.0
+        "max_iter": 100,
+        "asyinit": 0.5,
+        "asyincr": 1.2,
+        "asydecr": 0.7,
+        "m": 1,
+        "scale": 1.0,
+        "auto_scale": false,
+        "xmin": 0.0,
+        "xmax": 1.0,
+        "a0": 1.0,
+        "a": 0.0,
+        "c": 100.0,
+        "d": 0.0
     }
 }
