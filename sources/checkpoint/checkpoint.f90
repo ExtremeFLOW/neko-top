@@ -216,6 +216,9 @@ contains
   subroutine checkpoint_free(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i
+    character(len=1024) :: file_name
+    logical :: exists
+    integer :: stat, unit
 
     ! Free the RAM Checkpoints
     do i = 1, this%n_saves_memory
@@ -239,10 +242,17 @@ contains
     if (allocated(this%s_list)) deallocate(this%s_list)
 
     ! Delete the checkpoint file list
-    ! call this%chkp_output%free()
     if (.not. this%keep_checkpoints) then
-       call system("rm -f $(ls | grep -E '" // &
-            trim(this%filename) // "[0-9]{5}\.(chkp|h5)$')")
+       do i = this%n_timesteps, 1, -1
+          call this%chkp_output%set_counter(i)
+          file_name = this%chkp_output%file_%get_fname()
+          inquire(file = trim(file_name), exist = exists)
+          if (exists) then
+             open(newunit = unit, file = trim(file_name), iostat = stat, &
+                  status='old')
+             if (stat .eq. 0) close(unit, status = 'delete')
+          end if
+       end do
     end if
 
     ! Reset to default values
