@@ -58,7 +58,7 @@
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
-                }
+                },
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 50
             },
