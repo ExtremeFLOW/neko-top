@@ -87,16 +87,17 @@ target_include_directories(neko-top
         ${CMAKE_Fortran_MODULE_DIRECTORY}
 )
 
-target_link_libraries(neko-top
-    BLAS::BLAS
-    LAPACK::LAPACK
-    jsonfortran-gnu::jsonfortran
-    PkgConfig::neko
-)
 
-if(MPI_FOUND)
-    target_link_libraries(neko-top MPI::MPI_Fortran)
-endif()
+# ............................................................................ #
+# Link to the required libraries.
+
+target_link_libraries(neko-top
+    PkgConfig::neko
+    PkgConfig::json-fortran
+    MPI::MPI_Fortran
+    $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
+    $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+)
 
 # ============================================================================ #
 # Specify installation instructions
