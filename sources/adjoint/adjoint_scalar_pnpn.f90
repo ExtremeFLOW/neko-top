@@ -39,10 +39,10 @@ module adjoint_scalar_pnpn
   use rhs_maker, only : rhs_maker_bdf_t, rhs_maker_ext_t, rhs_maker_oifs_t, &
        rhs_maker_ext_fctry, rhs_maker_bdf_fctry, rhs_maker_oifs_fctry
   use adjoint_scalar_scheme, only : adjoint_scalar_scheme_t
+  use checkpoint, only : chkp_t
   use field, only : field_t
   use bc_list, only : bc_list_t
   use mesh, only : mesh_t
-  use checkpoint, only : chkp_t
   use coefs, only : coef_t
   use device, only : HOST_TO_DEVICE, device_memcpy
   use gather_scatter, only : gs_t, GS_OP_ADD
@@ -103,9 +103,6 @@ module adjoint_scalar_pnpn
      ! Time interpolation scheme
      logical :: oifs
 
-     ! Lag arrays for the RHS.
-     type(field_t) :: abx1, abx2
-
      ! Advection terms for the oifs method
      type(field_t) :: advs
 
@@ -158,8 +155,9 @@ contains
   !! @param[in] msh The mesh.
   !! @param[in] coef The coefficients of the mesh.
   !! @param[in] gs The gather-scatter.
-  !! @param[inout] params The case parameter file in json.
-  !! @param[inout] numerics_params The numerical parameters in json.
+  !! @param[inout] params_adjoint The snippet of the json for the adjoint scalar.
+  !! @param[inout] params_primal The snippet of the json for the primal scalar.
+  !! @param[inout] numerics_params The numeric parameters json.
   !! @param[in] user Type with user-defined procedures.
   !! @param[inout] chkp The checkpoint object.
   !! @param[in] ulag Lag arrays for the x velocity component.
@@ -167,13 +165,15 @@ contains
   !! @param[in] wlag Lag arrays for the z velocity component.
   !! @param[in] time_scheme The time-integration controller.
   !! @param[in] rho The fluid density.
-  subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, &
-       numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
+  subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params_adjoint, &
+       params_primal, numerics_params, user, chkp, ulag, vlag, wlag, &
+       time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: coef
     type(gs_t), target, intent(inout) :: gs
-    type(json_file), target, intent(inout) :: params
+    type(json_file), target, intent(inout) :: params_adjoint
+    type(json_file), target, intent(inout) :: params_primal
     type(json_file), target, intent(inout) :: numerics_params
     type(user_t), target, intent(in) :: user
     type(chkp_t), target, intent(inout) :: chkp
@@ -188,7 +188,8 @@ contains
     call this%free()
 
     ! Initiliaze base type.
-    call this%scheme_init(msh, coef, gs, params, scheme, user, rho)
+    call this%scheme_init(msh, coef, gs, params_adjoint, params_primal, &
+         scheme, user, rho)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%ax, full_formulation = .false.)
@@ -225,7 +226,7 @@ contains
     call this%setup_bcs_(user)
 
     ! Initialize dirichlet bcs for scalar residual
-    call this%bc_res%init(this%c_Xh, params)
+    call this%bc_res%init(this%c_Xh, params_adjoint)
     do i = 1, this%bcs%size()
        if (this%bcs%strong(i)) then
           bc_i => this%bcs%get(i)
@@ -245,11 +246,13 @@ contains
          this%projection_activ_step)
 
     ! Determine the time-interpolation scheme
-    call json_get_or_default(params, 'case.numerics.oifs', this%oifs, .false.)
+    call json_get_or_default(numerics_params, 'oifs', this%oifs, .false.)
+
     ! Point to case checkpoint
-    ! this%chkp => chkp
+    this%chkp => chkp
+
     ! Initialize advection factory
-    call json_get_or_default(params, 'advection', advection, .true.)
+    call json_get_or_default(params_adjoint, 'advection', advection, .true.)
 
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
          ulag, vlag, wlag, this%chkp%dtlag, &
@@ -355,13 +358,12 @@ contains
 
     call profiler_start_region('Scalar', 2)
     associate(u => this%u, v => this%v, w => this%w, s_adj => this%s_adj, &
-         cp => this%cp, rho => this%rho, &
+         cp => this%cp, rho => this%rho, lambda => this%lambda, &
          ds_adj => this%ds_adj, &
          s_adj_res => this%s_adj_res, &
          Ax => this%Ax, f_Xh => this%f_Xh, Xh => this%Xh, &
          c_Xh => this%c_Xh, dm_Xh => this%dm_Xh, gs_Xh => this%gs_Xh, &
          s_adj_lag => this%s_adj_lag, oifs => this%oifs, &
-         lambda_field => this%lambda, &
          projection_dim => this%projection_dim, &
          msh => this%msh, res => this%res, makeoifs => this%makeoifs, &
          makeext => this%makeext, makebdf => this%makebdf, &
@@ -395,12 +397,12 @@ contains
       ! the scalar field from the previous time-step.
       ! Now, this value is used in the explicit time scheme to advance these
       ! terms in time.
-      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho%x(1,1,1,1), &
-           ext_bdf%advection_coeffs, n)
+      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, &
+           rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
 
       ! Add the RHS contributions coming from the BDF scheme.
-      call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, rho%x(1,1,1,1), &
-           dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+      call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, &
+           rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
       ! end if
 
       call s_adj_lag%update()
@@ -415,7 +417,8 @@ contains
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual', 20)
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
-           lambda_field, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
+           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), &
+           dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
 
@@ -512,7 +515,7 @@ contains
                 write(error_unit, '(A, A, I0, A, A, I0, A)') "*** ERROR ***: ",&
                      "Zone index ", zone_indices(j), &
                      " is invalid as this zone has 0 size, meaning it ", &
-                     "does not in the mesh. Check adjoint scalar BC ", &
+                     "does not exist in the mesh. Check adjoint scalar BC ", &
                      i, "."
                 error stop
              end if
@@ -550,7 +553,8 @@ contains
        do i = 1, size(this%msh%labeled_zones)
           if (this%msh%labeled_zones(i)%size .gt. 0) then
              write(error_unit, '(A, A, A)') "*** ERROR ***: ", &
-                  "No boundary_conditions entry in the case file for adjoint scalar ", &
+                  "No boundary_conditions entry in the case file for " // &
+                  " adjoint scalar ", &
                   this%s%name
              error stop
           end if

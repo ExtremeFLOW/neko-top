@@ -40,6 +40,7 @@ module adjoint_output
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST
   use output, only: output_t
+  use adjoint_scalars, only : adjoint_scalars_t
   implicit none
   private
 
@@ -56,15 +57,23 @@ module adjoint_output
 
 contains
 
-  function adjoint_output_init(precision, adjoint, scalar, name, path) &
-       result(this)
+  !> Constructor.
+  !! @details initialize the output.
+  !! @param[inout] precision The precision of the output fields.
+  !! @param[in] adjoint The adjoint fluid scheme.
+  !! @param[in] adjoint_scalars The adjoint scalar schemes.
+  !! @param[in] name The name of the .fld file.
+  !! @param[in] path The path to save the .fld files.
+  function adjoint_output_init(precision, adjoint, adjoint_scalars, &
+       name, path) result(this)
     integer, intent(inout) :: precision
     class(adjoint_fluid_scheme_t), intent(in), target :: adjoint
-    class(adjoint_scalar_scheme_t), intent(in), optional, target :: scalar
+    class(adjoint_scalars_t), intent(in), optional, target :: adjoint_scalars
     character(len=*), intent(in), optional :: name
     character(len=*), intent(in), optional :: path
     type(adjoint_output_t) :: this
     character(len=1024) :: fname
+    integer :: i, n_scalars
 
     if (present(name) .and. present(path)) then
        fname = trim(path) // trim(name) // '.fld'
@@ -78,24 +87,33 @@ contains
 
     call this%init_base(fname, precision)
 
-    if (present(scalar)) then
-       call this%adjoint%init(5)
-    else
-       call this%adjoint%init(4)
+    ! Calculate total number of fields
+    n_scalars = 0
+    if (present(adjoint_scalars)) then
+       n_scalars = size(adjoint_scalars%adjoint_scalar_fields)
     end if
+
+    ! Initialize field list with appropriate size
+    call this%adjoint%init(4 + n_scalars)
 
     call this%adjoint%assign(1, adjoint%p_adj)
     call this%adjoint%assign(2, adjoint%u_adj)
     call this%adjoint%assign(3, adjoint%v_adj)
     call this%adjoint%assign(4, adjoint%w_adj)
 
-    if (present(scalar)) then
-       call this%adjoint%assign(5, scalar%s_adj)
+    ! Assign all scalar fields
+    if (present(adjoint_scalars)) then
+       do i = 1, n_scalars
+          call this%adjoint%assign(4 + i, &
+               adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+       end do
     end if
 
   end function adjoint_output_init
 
   !> Sample a adjoint solution at time @a t
+  !! @param[inout] this The output sampler.
+  !! @param[in] t The time.
   subroutine adjoint_output_sample(this, t)
     class(adjoint_output_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
