@@ -57,7 +57,7 @@ module brinkman_design
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
-  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_utils, only: json_get, json_get_or_default, json_get
   use utils, only: neko_error
   implicit none
   private
@@ -274,13 +274,13 @@ contains
          gs => simulation%neko_case%fluid%gs_Xh)
 
       if ('mapping' .in. parameters) then
-         call json_extract_object(parameters, 'mapping', json_subdict)
+         call json_get(parameters, 'mapping', json_subdict)
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
       end if
 
       if ('initial_distribution' .in. parameters) then
-         call json_extract_object(parameters, 'initial_distribution', json_subdict)
+         call json_get(parameters, 'initial_distribution', json_subdict)
          call set_optimization_ic(this%design_indicator, coef, gs, &
               json_subdict)
       else
