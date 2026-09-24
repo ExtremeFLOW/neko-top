@@ -444,9 +444,9 @@ contains
 
   end subroutine brinkman_design_map_forward
 
-  function brinkman_design_get_design(this) result(values)
+  subroutine brinkman_design_get_design(this, values)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: values
+    type(vector_t), intent(inout) :: values
     integer :: n
 
     n = this%size()
@@ -456,11 +456,11 @@ contains
        call device_copy(values%x_d, this%design_indicator%x_d, n)
     end if
 
-  end function brinkman_design_get_design
+  end subroutine brinkman_design_get_design
 
-  function brinkman_design_get_x(this) result(x)
+  subroutine brinkman_design_get_x(this, x)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: x
+    type(vector_t), intent(inout) :: x
     integer :: n
 
     n = this%size()
@@ -470,7 +470,7 @@ contains
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
     end if
 
-  end function brinkman_design_get_x
+  end subroutine brinkman_design_get_x
 
   function brinkman_design_get_x_i(this, i) result(x_i)
     class(brinkman_design_t), intent(in) :: this
@@ -487,9 +487,9 @@ contains
 
   end function brinkman_design_get_x_i
 
-  function brinkman_design_get_y(this) result(y)
+  subroutine brinkman_design_get_y(this, y)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: y
+    type(vector_t), intent(inout) :: y
     integer :: n
 
     n = this%size()
@@ -499,7 +499,7 @@ contains
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
     end if
 
-  end function brinkman_design_get_y
+  end subroutine brinkman_design_get_y
 
   function brinkman_design_get_y_i(this, i) result(y_i)
     class(brinkman_design_t), intent(in) :: this
@@ -516,9 +516,9 @@ contains
 
   end function brinkman_design_get_y_i
 
-  function brinkman_design_get_z(this) result(z)
+  subroutine brinkman_design_get_z(this, z)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: z
+    type(vector_t), intent(inout) :: z
     integer :: n
 
     n = this%size()
@@ -528,7 +528,7 @@ contains
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
     end if
 
-  end function brinkman_design_get_z
+  end subroutine brinkman_design_get_z
 
   function brinkman_design_get_z_i(this, i) result(z_i)
     class(brinkman_design_t), intent(in) :: this
