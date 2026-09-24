@@ -48,7 +48,6 @@ module constraint
   !!
   !! This is the base class for constraints, which is a type of base functional.
   type, abstract, extends(base_functional_t) :: constraint_t
-
    contains
 
      !> Initializer for the base class
@@ -68,15 +67,20 @@ module constraint
   ! -------------------------------------------------------------------------- !
   ! Explicit interfaces
 
-  !> Factory function interface
-  interface
+  !> Factory function
+  !! Allocates and initializes an constraint function object
+  !! @param object The constraint function object to be created
+  !! @param type The type of the constraint function
+  !! @param design The design object
+  !! @param simulation The simulation object
+  interface constraint_factory
      module subroutine constraint_factory(object, json, design, simulation)
        class(constraint_t), allocatable, intent(inout) :: object
        type(json_file), intent(inout) :: json
        class(design_t), intent(in) :: design
        type(simulation_t), target, optional, intent(inout) :: simulation
      end subroutine constraint_factory
-  end interface
+  end interface constraint_factory
 
 contains
 
@@ -94,14 +98,17 @@ contains
     integer, intent(in) :: design_size
     character(len=*), intent(in), optional :: mask_name
 
-    this%name = name
-    this%value = 0.0_rp
-    call this%sensitivity%init(design_size)
+    call this%free_base()
 
-    this%has_mask = .false.
-    if (trim(mask_name) .ne. "") then
-       this%has_mask = .true.
-       this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+    this%name = name
+    call this%sensitivity%init(design_size)
+    call this%sensitivity_old%init(design_size)
+
+    if (present(mask_name)) then
+       if (mask_name .ne. "") then
+          this%has_mask = .true.
+          this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+       end if
     end if
 
   end subroutine constraint_init_base
@@ -110,8 +117,13 @@ contains
   subroutine constraint_free_base(this)
     class(constraint_t), target, intent(inout) :: this
 
+    this%name = ""
+
     this%value = 0.0_rp
+    this%value_old = 0.0_rp
     call this%sensitivity%free()
+    call this%sensitivity_old%free()
+
     this%has_mask = .false.
     if (associated(this%mask)) nullify(this%mask)
 
