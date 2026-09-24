@@ -1,5 +1,5 @@
 program usrneko
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use design, only: design_t, design_factory
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
@@ -20,13 +20,13 @@ program usrneko
   integer :: ierr
 
   !> The simulation we are working with
-  type(simulation_t) :: simulation
+  type(simulation_t) :: sim
   !> The design type
-  class(design_t), allocatable :: design
+  class(design_t), allocatable :: des
   !> The problem type
-  type(problem_t) :: problem
+  type(problem_t) :: prob
   !> The optimizer (in this case mma)
-  class(optimizer_t), allocatable :: optimizer
+  class(optimizer_t), allocatable :: opt
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -46,25 +46,25 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
-  call simulation%init(parameters)
-  call design_factory(design, parameters, simulation)
-  call problem%init(parameters, design, simulation)
-  call optimizer_factory(optimizer, parameters, problem, design, simulation)
+  call sim%init(parameters)
+  call design_factory(des, parameters, sim)
+  call prob%init(parameters, des, sim)
+  call optimizer_factory(opt, parameters, prob, des, sim)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
 
-  call optimizer%run(problem, design, simulation)
+  call opt%run(prob, des, sim)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
-  call optimizer%free()
-  call problem%free()
-  call design%free()
-  call simulation%free()
+  call opt%free()
+  call prob%free()
+  call des%free()
+  call sim%free()
 
-  if (allocated(design)) deallocate(design)
-  if (allocated(optimizer)) deallocate(optimizer)
+  if (allocated(des)) deallocate(des)
+  if (allocated(opt)) deallocate(opt)
 
 end program usrneko

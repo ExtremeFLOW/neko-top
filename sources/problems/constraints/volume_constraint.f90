@@ -40,7 +40,7 @@ module volume_constraint
 
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
 
   use num_types, only: rp
   use coefs, only: coef_t
