@@ -37,7 +37,7 @@ jobs:
 
       - name: Build documentation
         run: |
-          cmake --build build --target documentation
+          cmake --build build --target Documentation
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
