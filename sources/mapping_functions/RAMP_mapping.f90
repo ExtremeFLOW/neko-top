@@ -38,6 +38,11 @@ module RAMP_mapping
   use json_module, only: json_file
   use field, only: field_t
   use coefs, only: coef_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device_RAMP_mapping, only: device_convex_down_RAMP_mapping_apply, &
+       device_convex_down_RAMP_mapping_apply_backward, &
+       device_convex_up_RAMP_mapping_apply, &
+       device_convex_up_RAMP_mapping_apply_backward
   implicit none
   private
 
@@ -147,9 +152,6 @@ contains
             this%q, X_out, X_in)
     end if
 
-    ! TODO
-    ! memcopy or GPU backend
-
   end subroutine RAMP_mapping_apply
 
 
@@ -171,9 +173,6 @@ contains
             this%q, dF_dX_in, dF_dX_out, X_in)
     end if
 
-    ! TODO
-    ! memcopy or GPU backend
-
   end subroutine RAMP_mapping_apply_backward
 
   !> Apply the mapping
@@ -188,10 +187,15 @@ contains
     ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) )
 
     n = X_in%dof%size()
-    do i = 1, n
-       X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
-            X_in%x(i,1,1,1) / (1.0_rp + q * (1.0_rp - X_in%x(i,1,1,1) ) )
-    end do
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+            X_out%x_d, X_in%x_d, n)
+    else
+       do i = 1, n
+          X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
+               X_in%x(i,1,1,1) / (1.0_rp + q * (1.0_rp - X_in%x(i,1,1,1) ) )
+       end do
+    end if
 
   end subroutine convex_down_RAMP_mapping_apply
 
@@ -213,11 +217,17 @@ contains
     ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (1 - q*(x - 1))**2
 
     n = X_in%dof%size()
-    do i = 1, n
-       dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
-            ((1.0_rp - q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
-            dF_dX_out%x(i,1,1,1)
-    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
+    else
+       do i = 1, n
+          dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
+               ((1.0_rp - q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
+               dF_dX_out%x(i,1,1,1)
+       end do
+    end if
 
   end subroutine convex_down_RAMP_mapping_apply_backward
 
@@ -231,11 +241,18 @@ contains
     integer :: n, i
 
     ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q)
+
     n = X_in%dof%size()
-    do i = 1, n
-       X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
-            X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q)
-    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
+            X_out%x_d, X_in%x_d, n)
+    else
+       do i = 1, n
+          X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
+               X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q)
+       end do
+    end if
 
 
   end subroutine convex_up_RAMP_mapping_apply
@@ -258,11 +275,17 @@ contains
     ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (q + x)**2
 
     n = X_in%dof%size()
-    do i = 1, n
-       dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
-            ( (X_in%x(i,1,1,1) + q)**2) * &
-            dF_dX_out%x(i,1,1,1)
-    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
+            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
+    else
+       do i = 1, n
+          dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
+               ( (X_in%x(i,1,1,1) + q)**2) * &
+               dF_dX_out%x(i,1,1,1)
+       end do
+    end if
 
   end subroutine convex_up_RAMP_mapping_apply_backward
 end module RAMP_mapping

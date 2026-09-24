@@ -70,13 +70,13 @@ contains
     end if
 
     call json_get(json, "type", type)
-    select case(trim(type))
-      case("minimum_dissipation")
+    select case (trim(type))
+    case ("minimum_dissipation")
        allocate(minimum_dissipation_objective_t::object)
-      case("lube_term")
+    case ("lube_term")
        allocate(lube_term_objective_t::object)
 
-      case default
+    case default
        call neko_type_error("Objective", type, KNOWN_TYPES)
     end select
 

@@ -35,7 +35,7 @@ contains
                 fcoeff(1) = 3.0e4_rp
                 fcoeff(2) = -1.5e3_rp
                 fcoeff(3) = 0.5e5_rp
-                u%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, iz, iel, xl,&
+                u%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, iz, iel, xl, &
                      fcoeff) * 1.0e-08_rp
                 fcoeff(1) = 2.3e4_rp
                 fcoeff(2) = 2.3e3_rp

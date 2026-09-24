@@ -148,7 +148,7 @@ contains
             "on masks if results seem wonky.")
 
        design_domain_mask = design_domain_mask -1
-       call device_memcpy(design_domain_mask, design_domain_mask_d,&
+       call device_memcpy(design_domain_mask, design_domain_mask_d, &
             this%design_domain%size, HOST_TO_DEVICE, &
             .true. &
             )
