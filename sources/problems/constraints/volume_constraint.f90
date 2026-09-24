@@ -174,7 +174,7 @@ contains
     if (this%has_mask) then
 
        ! calculate the volume of the optimization domain
-       call neko_scratch_registry%request_field(work, temp_indices(1))
+       call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
        call field_rone(work)
        call mask_exterior_const(work, this%mask, 0.0_rp)
 
@@ -260,8 +260,10 @@ contains
 
     if (this%if_mapping) then
        ! Recompute and map backward
-       call neko_scratch_registry%request_field(unmapped, temp_indices(1))
-       call neko_scratch_registry%request_field(mapped, temp_indices(2))
+       call neko_scratch_registry%request_field(unmapped, temp_indices(1), &
+            .false.)
+       call neko_scratch_registry%request_field(mapped, temp_indices(2), &
+            .false.)
        ! The mapping will handle the mass matrix
        call field_cfill(unmapped, -1.0_rp / this%volume_domain)
        if (this%is_max) then
@@ -319,12 +321,12 @@ contains
     integer :: temp_indices, ind_value, ind_um_value
 
     call neko_scratch_registry%request_vector(design%size(), values, &
-         ind_value)
+         ind_value, .false.)
 
     volume = 0.0_rp
     if (this%if_mapping) then
        call neko_scratch_registry%request_vector(design%size(), &
-            unmapped_values, ind_um_value)
+            unmapped_values, ind_um_value, .false.)
        call design%get_values(unmapped_values)
        call this%mapping%apply_forward(values, unmapped_values)
        call neko_scratch_registry%relinquish_vector(ind_um_value)
@@ -335,7 +337,7 @@ contains
     if (this%has_mask) then
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_scratch_registry%request_field(work, temp_indices)
+          call neko_scratch_registry%request_field(work, temp_indices, .false.)
           call device_copy(work%x_d, values%x_d, design%size())
           call mask_exterior_const(work, this%mask, 0.0_rp)
 

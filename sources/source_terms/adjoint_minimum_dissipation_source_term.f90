@@ -220,7 +220,7 @@ contains
     v => this%v
     w => this%w
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     associate(coef => this%coef)
 
