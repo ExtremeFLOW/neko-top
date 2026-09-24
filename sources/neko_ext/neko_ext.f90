@@ -170,10 +170,10 @@ contains
          json_subdict)
 
     ! Reset the fields. The ICs often assumes these are 0.
-    call field_rzero(this%p)
-    call field_rzero(this%u)
-    call field_rzero(this%v)
-    call field_rzero(this%w)
+    call field_rzero(p)
+    call field_rzero(u)
+    call field_rzero(v)
+    call field_rzero(w)
 
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(u, v, w, p, &
