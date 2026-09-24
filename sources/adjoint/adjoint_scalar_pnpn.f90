@@ -173,7 +173,7 @@ contains
     type(user_t), target, intent(in) :: user
     type(field_series_t), target, intent(in) :: ulag, vlag, wlag
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
-    real(kind=rp), intent(in) :: rho
+    type(field_t), target, intent(in) :: rho
     integer :: i
     class(bc_t), pointer :: bc_i
     character(len=15), parameter :: scheme = 'Modular (Pn/Pn)'
@@ -352,7 +352,7 @@ contains
          Ax => this%Ax, f_Xh => this%f_Xh, Xh => this%Xh, &
          c_Xh => this%c_Xh, dm_Xh => this%dm_Xh, gs_Xh => this%gs_Xh, &
          s_adj_lag => this%s_adj_lag, oifs => this%oifs, &
-         lambda_field => this%lambda_field, &
+         lambda_field => this%lambda, &
          projection_dim => this%projection_dim, &
          msh => this%msh, res => this%res, makeoifs => this%makeoifs, &
          makeext => this%makeext, makebdf => this%makebdf, &
@@ -374,33 +374,33 @@ contains
       ! Apply weak boundary conditions, that contribute to the source terms.
       call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), t, tstep, .false.)
 
-      if (oifs) then
-         call neko_error("oifs not implemented for adjoint scalar")
-         ! ! Add the advection operators to the right-hans-side.
-         ! call this%adv%compute_scalar(u, v, w, s_adj, this%advs, &
-         !                           Xh, this%c_Xh, dm_Xh%size())
+      ! if (oifs) then
+      !    call neko_error("oifs not implemented for adjoint scalar")
+      ! ! Add the advection operators to the right-hans-side.
+      ! call this%adv%compute_scalar(u, v, w, s_adj, this%advs, &
+      !                           Xh, this%c_Xh, dm_Xh%size())
 
-         ! call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
-         !                             ext_bdf%advection_coeffs, n)
+      ! call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
+      !                             ext_bdf%advection_coeffs, n)
 
-         ! call makeoifs%compute_scalar(this%advs%x, f_Xh%x, rho, dt, n)
-      else
-         ! Add the advection operators to the right-hans-side.
-         call this%adv%compute_adjoint_scalar(u, v, w, s_adj, f_Xh, &
-              Xh, this%c_Xh, dm_Xh%size())
+      ! call makeoifs%compute_scalar(this%advs%x, f_Xh%x, rho, dt, n)
+      ! else
+      ! Add the advection operators to the right-hans-side.
+      call this%adv%compute_adjoint_scalar(u, v, w, s_adj, f_Xh, &
+           Xh, this%c_Xh, dm_Xh%size())
 
-         ! At this point the RHS contains the sum of the advection operator,
-         ! Neumann boundary sources and additional source terms, evaluated using
-         ! the scalar field from the previous time-step.
-         ! Now, this value is used in the explicit time scheme to advance these
-         ! terms in time.
-         call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
-              ext_bdf%advection_coeffs, n)
+      ! At this point the RHS contains the sum of the advection operator,
+      ! Neumann boundary sources and additional source terms, evaluated using
+      ! the scalar field from the previous time-step.
+      ! Now, this value is used in the explicit time scheme to advance these
+      ! terms in time.
+      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho%x(1,1,1,1), &
+           ext_bdf%advection_coeffs, n)
 
-         ! Add the RHS contributions coming from the BDF scheme.
-         call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, rho, &
-              dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
-      end if
+      ! Add the RHS contributions coming from the BDF scheme.
+      call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, rho%x(1,1,1,1), &
+           dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+      ! end if
 
       call s_adj_lag%update()
 
@@ -409,12 +409,12 @@ contains
            .true.)
 
       ! Update material properties if necessary
-      call this%update_material_properties()
+      call this%update_material_properties(t, tstep)
 
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual', 20)
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
-           lambda_field, rho*cp, ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
+           lambda_field, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
 
