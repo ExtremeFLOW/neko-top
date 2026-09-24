@@ -124,7 +124,7 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(neko_case%msh, lx, neko_case%params, neko_case%usr, &
-         neko_case%ext_bdf)
+         neko_case%fluid%ext_bdf)
 
     !
     ! Setup scalar scheme
