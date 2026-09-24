@@ -32,16 +32,16 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "device/cuda/check.h"
+#include "neko/device/cuda/check.h"
 #include "mma_kernel.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 
 extern "C" {
-#include "math/bcknd/device/device_mpi_reduce.h"
-#include "math/bcknd/device/device_mpi_op.h"
-#include "device/device_config.h"
+#include "neko/math/bcknd/device/device_mpi_reduce.h"
+#include "neko/math/bcknd/device/device_mpi_op.h"
+#include "neko/device_config.h"
 
 
   int mma_red_s = 0;
