@@ -10,8 +10,8 @@ examples/debug/*
 !examples/debug/debug.case
 !examples/debug/CMakeLists.txt
 
-# Translated test files
-tests/**/*.[Ff]90
+# Translated unit test files
+tests/unit/**/*.F90
 
 # Preparation scripts
 prepare.env
