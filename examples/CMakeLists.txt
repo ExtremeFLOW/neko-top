@@ -31,6 +31,13 @@ add_custom_target(Examples
     DEPENDS neko-top
     )
 
+# Add the documentation target to ALL if we have "BUILD_EXAMPLES" enabled
+if (BUILD_EXAMPLES)
+    set_target_properties(Examples PROPERTIES EXCLUDE_FROM_ALL FALSE)
+else()
+    set_target_properties(Examples PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
 # ============================================================================ #
 # Add the example directories.
 
