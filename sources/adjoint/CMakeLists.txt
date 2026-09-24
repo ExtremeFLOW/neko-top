@@ -1,0 +1,18 @@
+# Contains the Neko-TOP adjoint functionality
+#
+target_sources(neko-top
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_case.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_output.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_scheme.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_pnpn_bc_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_ic.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adv_adjoint_no_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adv_adjoint_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/advection_adjoint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/advection_adjoint_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/simulation_adjoint.f90
+)

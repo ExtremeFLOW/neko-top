@@ -1,14 +1,14 @@
 program mmatest
-  !===========================================================================!
-  !       Test_Case_I for the MMA solver implementation                       !
-  ! Dependencies: Neko-top and Lapack (lapack function DGESV is used to solve !
-  ! the linear system )                                                       !
-  ! ------------------------------------------------------------------------- !
-  !                                                                           !
-  !        TEST_CASE_1:                                                       !
-  !    Problem 1 in "https://people.kth.se/~krille/originalmma.pdf"           !
-  !                                                                           !
-  !===========================================================================!
+!===========================================================================!
+!       Test_Case_I for the MMA solver implementation                       !
+! Dependencies: Neko-top and Lapack (lapack function DGESV is used to solve !
+! the linear system )                                                       !
+! ------------------------------------------------------------------------- !
+!                                                                           !
+!        TEST_CASE_1:                                                       !
+!    Problem 1 in "https://people.kth.se/~krille/originalmma.pdf"           !
+!                                                                           !
+!===========================================================================!
 
 
   use num_types, only: rp
