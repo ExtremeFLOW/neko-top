@@ -413,7 +413,7 @@ for case in ${example_list[@]}; do
     cp -f $SPATH/functions.sh $log/functions.sh
 
     # If we are submitting to a cluster, look for the associated jobscript
-    if [ -n $CLUSTER ]; then
+    if [ -n "$CLUSTER" ]; then
         # Find the setting file for the case recursively
         setting=$HPATH/${case%.*}.sh
         while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
