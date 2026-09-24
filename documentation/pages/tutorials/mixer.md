@@ -35,7 +35,7 @@ In this tutorial you will learn how to
 - [Define different domains](@ref mixer_domains)
 - [Define the objective functions and constraints being solved.](@ref mixer_objectives)
 - [Define a mapping cascade.](@ref mixer_mapping)
-- [Define optimization parameters for the MMA algorithm.](@ref mixer_MMA)
+- [Define parameters for the optimization algorithm.](@ref mixer_MMA)
 - [Prepare a driver to solve the optimization problem.](@ref mixer_driver)
 - [Solve the optimization problem.](@ref mixer_solve)
 - [Post process the results.](@ref mixer_post)
@@ -229,7 +229,7 @@ numerics and case set up.
         "timestep": 2e-4,
         "numerics": {
             "time_order": 1,
-            "polynomial_order": 6,
+            "polynomial_order": 5,
             "dealias": true
         },
 ```
@@ -285,14 +285,14 @@ solvers, boundary conditions and initial conditions.
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "boundary_conditions": [
                 {
@@ -394,7 +394,7 @@ scalar properties, solvers, boundary conditions and initial conditions.
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "initial_condition": {
                 "type": "user"
@@ -773,7 +773,6 @@ In this tutorial we we select the MMA algorithm by prescribing
             "mma": {
                 "m": 0,
                 "scale": 1000.0,
-                "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0
             }
@@ -781,7 +780,7 @@ In this tutorial we we select the MMA algorithm by prescribing
 ```
 
 The key parameters selected are
-- a maximum of 100 optimization iterations (`"max_iter": 100`)
+- a maximum of 100 optimization iterations (`"max_iterations": 100`)
 - a convergence criterion of 1.0e-3 (`"tolerance": 1.0e-3`)
 - no constraints (`"m": 0`)
 - a scaling factor of 1000 for the objective function (`"scale": 1000.0`)

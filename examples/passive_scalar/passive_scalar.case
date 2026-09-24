@@ -9,7 +9,7 @@
         "timestep": 2e-4,
         "numerics": {
             "time_order": 1,
-            "polynomial_order": 6,
+            "polynomial_order": 5,
             "dealias": true
         },
         "fluid": {
@@ -24,14 +24,14 @@
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "boundary_conditions": [
                 {
@@ -57,7 +57,7 @@
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "initial_condition": {
                 "type": "user"
@@ -182,7 +182,6 @@
             "mma": {
                 "m": 0,
                 "scale": 1000.0,
-                "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0
             }
