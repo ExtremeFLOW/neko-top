@@ -1,4 +1,4 @@
-# Compilation of Neko-TOP {#compilation}
+# Installation {#installation}
 \tableofcontents
 
 Neko-TOP is an extension of the Neko library, and as such it requires the Neko
@@ -34,7 +34,7 @@ Neko library and the Neko-TOP library. The system dependencies are:
 9. Autotools
 10. PKG-Config
 
-### External libraries
+### External libraries {#installation-external}
 
 The external libraries are required to be present for the compilation of
 Neko-TOP. However, these can be compiled and installed by the `setup.sh` script
@@ -47,7 +47,7 @@ if they are not already present on the system. The external libraries are:
 5. PFUnit (optional)
 6. CUDA (optional)
 
-## Quick-start compilation
+## Quick-start compilation {#installation-quick}
 
 To compile the library and all external dependencies, the user can run the
 `setup.sh` script. This script will download and compile all dependencies and
@@ -93,6 +93,10 @@ export CUDA_DIR=$CUDA_HOME
 export NEKO_DIR=$HOME/neko
 ```
 
+Additional examples of the prepare scripts can be seen bellow:
+
+- [LUMI](#lumi)
+
 ### Notes on linking against CUDA on WSL.
 
 Look through the following documentations:
@@ -105,3 +109,14 @@ Link 1 is the microsoft description of getting started with WSL 2. Link 2 is the
 NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
+
+### Prepare script examples
+
+Here is a few examples of prepare scripts that can be used to setup the
+environment for the compilation of Neko-TOP. These are to help you correctly
+setup the environment for a particular system.
+
+#### LUMI {#lumi}
+
+```bash
+```

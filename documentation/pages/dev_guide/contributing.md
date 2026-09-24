@@ -1,4 +1,4 @@
-# Contributing to Neko-TOP {#contributing}
+# Contributing {#contributing}
 
 This document describes the guidelines for contributing to Neko-TOP. Neko-TOP is
 a topology optimization code based on the Neko library. As such, the guidelines
