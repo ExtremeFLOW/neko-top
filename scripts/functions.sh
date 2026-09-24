@@ -146,15 +146,9 @@ function prepare {
     # ------------------------------------------------------------------------ #
     # Ensure the environment is set up
 
-    [ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
-    if [ -z "$JSON_FORTRAN_DIR" ]; then
-        JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
-    fi
-
-    JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
-        -exec test -f '{}'/libjsonfortran.so \; -print)
-    export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
-    export PATH="$NEKO_DIR/bin:$PATH"
+    source $MAIN_DIR/scripts/dependencies.sh
+    find_json_fortran
+    find_neko
 
     # ------------------------------------------------------------------------ #
     # Run preparation if it exists
