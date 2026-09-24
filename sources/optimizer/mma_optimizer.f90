@@ -4,8 +4,8 @@ module mma_optimizer
   use mma, only: mma_t
   use problem, only: problem_t
   use topopt_design, only: topopt_design_t
-  use num_types, only : rp
-  use utils, only : neko_error
+  use num_types, only: rp
+  use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use simulation, only: simulation_t
@@ -30,6 +30,7 @@ module mma_optimizer
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use json_utils_ext, only: json_get_subdict
 
+  use device_math, only: device_copy
   implicit none
   private
   public :: mma_optimizer_t
@@ -103,8 +104,7 @@ contains
     end if
 
     call json_get_subdict(parameters, "optimization.solver", solver_parameters)
-    call this%mma%init_json(x%x, &
-         design%size(), problem%get_n_constraints(), &
+    call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
     call this%init_from_components(problem, design, simulation, &
@@ -191,73 +191,23 @@ contains
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
 
-       !Scaling
+       ! Scaling
        if (this%auto_scale .eqv. .true.) then
           scaling_factor = abs(this%scale/constraint_value%x(1))
        else
           scaling_factor = abs(this%scale)
        end if
 
-       ! Scale the constraint value and sensitivities
-       constraint_value = scaling_factor * constraint_value
-       constraint_sensitivities = scaling_factor * constraint_sensitivities
-
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ! TO BE REPLACED WITH GPU MMA
-          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ! just for now so we can test, do a few memcopies and run on CPU
-          ! this will ultimately be replaced by GPU MMA
-          !
-          ! actually, on closer inspection of the problem %get functionality
-          ! many of these should already live on the device too.
-          call device_memcpy(x%x, x%x_d, x%size(), &
-               DEVICE_TO_HOST, sync = .false.)
-          call device_memcpy(objective_sensitivities%x, &
-               objective_sensitivities%x_d, &
-               objective_sensitivities%n, &
-               DEVICE_TO_HOST, sync = .false.)
-          call device_memcpy(constraint_value%x, &
-               constraint_value%x_d, &
-               constraint_value%n, &
-               DEVICE_TO_HOST, sync = .false.)
-          call device_memcpy(constraint_sensitivities%x, &
-               constraint_sensitivities%x_d, &
-               constraint_sensitivities%n, &
-               DEVICE_TO_HOST, sync = .false.)
-          !write(stderr, *) "Device not supported in mma_optimizer.f90."
-          !error stop
-
-          call this%mma%mma_update_cpu(iter, x%x, objective_sensitivities%x, &
-               constraint_value%x, constraint_sensitivities%x)
-
-          call device_memcpy(x%x, x%x_d, x%size(), &
-               HOST_TO_DEVICE, sync = .false.)
-          call device_memcpy(objective_sensitivities%x, &
-               objective_sensitivities%x_d, &
-               objective_sensitivities%n, &
-               HOST_TO_DEVICE, sync = .false.)
-          call device_memcpy(constraint_value%x, &
-               constraint_value%x_d, &
-               constraint_value%n, &
-               HOST_TO_DEVICE, sync = .false.)
-          call device_memcpy(constraint_sensitivities%x, &
-               constraint_sensitivities%x_d, &
-               constraint_sensitivities%n, &
-               HOST_TO_DEVICE, sync = .false.)
-          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ! TO BE REPLACED WITH GPU MMA
-          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-       else
-          call this%mma%mma_update_cpu(iter, x%x, objective_sensitivities%x, &
-               constraint_value%x, constraint_sensitivities%x)
-       end if
+       ! Use scaled sensitivities to update the design variable
+       call this%mma%update(iter, x%x, objective_sensitivities, &
+            scaling_factor * constraint_value, &
+            scaling_factor * constraint_sensitivities)
 
        select type (d => design)
        type is (topopt_design_t)
-
           call copy(d%design_indicator%x, x%x, n)
           if (NEKO_BCKND_DEVICE .eq. 1) then
+             call device_memcpy(x%x, x%x_d, n, HOST_TO_DEVICE, sync = .false.)
              call device_copy(d%design_indicator%x_d, x%x_d, n)
           end if
 
@@ -266,8 +216,8 @@ contains
           call copy(x%x, d%design_indicator%x, n)
           if (NEKO_BCKND_DEVICE .eq. 1) then
              call device_copy(x%x_d, d%design_indicator%x_d, n)
+             call device_memcpy(x%x, x%x_d, n, DEVICE_TO_HOST, sync = .false.)
           end if
-
        class default
           call neko_error('Unknown design type for MMA Optimizer')
        end select
@@ -284,8 +234,8 @@ contains
        call problem%get_constraint_sensitivities(constraint_sensitivities)
        call problem%get_all_objective_values(all_objectives)
 
-       call this%mma%KKT(x%x, objective_sensitivities%x, &
-            constraint_value%x, constraint_sensitivities%x)
+       call this%mma%KKT(x%x, objective_sensitivities, &
+            constraint_value, constraint_sensitivities)
 
        ! Stamp the i^th iteration
        call mma_logger_assemble_data(log_data, iter, objective_value, &

@@ -15,7 +15,7 @@ module neko_ext
   use scalar_ic, only: set_scalar_ic
   use field, only: field_t
   use chkp_output, only: chkp_output_t
-  use output_controller, only : output_controller_t
+  use output_controller, only: output_controller_t
   implicit none
 
   ! ========================================================================= !

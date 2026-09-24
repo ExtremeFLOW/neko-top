@@ -32,13 +32,13 @@
 !
 !> Defines an output for a adjoint
 module adjoint_output
-  use num_types, only : rp
-  use adjoint_fluid_scheme, only : adjoint_fluid_scheme_t
-  use scalar_scheme, only : scalar_scheme_t
-  use field_list, only : field_list_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use device, only : device_memcpy, DEVICE_TO_HOST
-  use output, only : output_t
+  use num_types, only: rp
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
+  use scalar_scheme, only: scalar_scheme_t
+  use field_list, only: field_list_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST
+  use output, only: output_t
   implicit none
   private
 

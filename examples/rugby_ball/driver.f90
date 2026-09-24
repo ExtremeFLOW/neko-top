@@ -9,6 +9,7 @@ program usrneko
   use json_utils_ext, only: json_read_file
 
   use mpi_f08, only: MPI_Init
+
   implicit none
 
   ! JSON related arguments
@@ -30,7 +31,6 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
-
   call MPI_Init(ierr)
 
   ! -------------------------------------------------------------------------- !

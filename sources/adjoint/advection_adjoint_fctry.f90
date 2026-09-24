@@ -32,15 +32,15 @@
 !
 !> Contains the factory routine for `advection_t` children.
 module advection_adjoint_fctry
-  use num_types, only : rp
-  use coefs, only : coef_t
-  use json_utils, only : json_get
-  use json_module, only : json_file
+  use num_types, only: rp
+  use coefs, only: coef_t
+  use json_utils, only: json_get
+  use json_module, only: json_file
 
   ! Advection and derivatives
-  use advection_adjoint, only : advection_adjoint_t
-  use adv_lin_dealias, only : adv_lin_dealias_t
-  use adv_lin_no_dealias, only : adv_lin_no_dealias_t
+  use advection_adjoint, only: advection_adjoint_t
+  use adv_lin_dealias, only: adv_lin_dealias_t
+  use adv_lin_no_dealias, only: adv_lin_no_dealias_t
 
   implicit none
   private
