@@ -35,7 +35,7 @@ module augmented_lagrangian_objective
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE

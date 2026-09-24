@@ -12,7 +12,7 @@ module mma_optimizer
   use brinkman_design, only: brinkman_design_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
-  use vector_scratch_registry, only: neko_vector_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   use profiler, only: profiler_start_region, profiler_end_region
 
   use vector, only: vector_t
@@ -94,7 +94,7 @@ contains
     type(json_file) :: solver_parameters
     logical :: unconstrained_problem
 
-    call neko_vector_scratch_registry%request_vector(design%size(), x, ind)
+    call neko_scratch_registry%request_vector(design%size(), x, ind)
 
     call design%get_values(x)
 
@@ -116,7 +116,7 @@ contains
             solver_parameters, this%scale, this%auto_scale)
     end if
 
-    call neko_vector_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish_vector(ind)
 
     call json_get_or_default(parameters, "optimization.solver.max_iterations", &
          max_iterations, 100)
@@ -192,12 +192,12 @@ contains
     end if
 
     ! Initialize the vectors
-    call neko_vector_scratch_registry%request_vector(n, x, ind(1))
-    call neko_vector_scratch_registry%request_vector( &
+    call neko_scratch_registry%request_vector(n, x, ind(1))
+    call neko_scratch_registry%request_vector( &
          problem%get_n_objectives(), all_objectives, ind(2))
-    call neko_vector_scratch_registry%request_vector( &
+    call neko_scratch_registry%request_vector( &
          problem%get_n_constraints(), constraint_value, ind(3))
-    call neko_vector_scratch_registry%request_vector(n, &
+    call neko_scratch_registry%request_vector(n, &
          objective_sensitivities, ind(4))
 
     call constraint_sensitivities%init(problem%get_n_constraints(), n)
@@ -325,8 +325,7 @@ contains
     end if
 
     ! Free local resources
-    call neko_vector_scratch_registry%relinquish_vector(ind)
-
+    call neko_scratch_registry%relinquish_vector(ind)
     call constraint_sensitivities%free()
 
   end subroutine mma_optimizer_run
@@ -340,7 +339,7 @@ contains
     type(vector_t), pointer :: constraint_values
     integer :: ind
 
-    call neko_vector_scratch_registry%request_vector( &
+    call neko_scratch_registry%request_vector( &
          problem%get_n_constraints(), constraint_values, ind)
 
     call problem%get_constraint_values(constraint_values)
@@ -355,7 +354,7 @@ contains
     end if
 
     ! Free local resources
-    call neko_vector_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish_vector(ind)
 
   end subroutine mma_optimizer_validate
 

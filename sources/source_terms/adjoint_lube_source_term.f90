@@ -60,7 +60,7 @@ module adjoint_lube_source_term
   use point_zone, only: point_zone_t
   use utils, only: neko_error
   use field_registry, only : neko_field_registry
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
