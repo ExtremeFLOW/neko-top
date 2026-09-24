@@ -23,6 +23,7 @@ module mma_optimizer
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 
   use math, only: copy, cmult
+  use device_math, only: device_copy
   use field_math, only: field_rzero
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
