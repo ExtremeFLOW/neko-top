@@ -66,7 +66,7 @@ module lube_term_objective
   use brinkman_design, only: brinkman_design_t
   use simulation_m, only: simulation_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
-
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry
@@ -204,7 +204,10 @@ contains
     end associate
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_fluid%source_term%add_source_term(lube_term)
+    select type (f => simulation%adjoint_fluid)
+    type is (adjoint_fluid_pnpn_t)
+       call f%source_term%add_source_term(lube_term)
+    end select
 
   end subroutine lube_term_init_attributes
 
