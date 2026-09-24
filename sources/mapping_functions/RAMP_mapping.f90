@@ -294,7 +294,7 @@ contains
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
 
-    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (q + x)**2
+    ! dx_out/dx_in = (f_min - f_max) * (q + 1) * q / (q + x)**2
 
     n = X_in%dof%size()
 
@@ -303,7 +303,7 @@ contains
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
        do i = 1, n
-          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
+          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) * q / &
                ( (X_in%x(i,1,1,1) + q)**2) * &
                sens_in%x(i,1,1,1)
        end do
