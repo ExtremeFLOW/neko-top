@@ -22,6 +22,10 @@ inputs:
     description: "The directory where the JSON-Fortran library was installed."
     required: true
 
+  parmetis-dir:
+    description: "The directory where the ParMETIS library was installed."
+    required: true
+
   os:
     description: "The operating system to use."
     required: false
@@ -144,6 +148,7 @@ runs:
         BACKEND: ${{ inputs.backend }}
         BACKEND_PATH: ${{ inputs.backend-path }}
         RP: ${{ inputs.precision }}
+        PARMETIS_DIR: ${{ inputs.parmetis-dir }}
       run: |
         BACKEND_FLAGS=""
         if [ "$BACKEND" == "CUDA" ]; then
@@ -158,6 +163,7 @@ runs:
         CONFIG_FLAGS="--prefix=$INSTALL_DIR"
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
+        [ -n "$PARMETIS_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-parmetis=$PARMETIS_DIR"
 
         cd $WORKING_DIR
         ./regen.sh
