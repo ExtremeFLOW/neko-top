@@ -237,13 +237,19 @@ function cleanup {
     done
     printf "\n"
 
+    # Move all the Checkpoint files to the results folder.
+    printf "Archiving chkp files.\n"
+    if [ -n "$(find ./ -name "*.chkp" -print)" ]; then
+        mkdir -p $results/checkpoints
+        find ./ -name "*.chkp" -execdir mv {} $results/checkpoints/ \;
+    fi
+
     # Move all files which are not the error or executable files to the log
     # folder
     rsync -a --no-links --remove-source-files \
         --exclude "output.log" \
         --exclude "error.log" \
         --exclude "neko" \
-        --exclude "*.chkp" \
         --exclude "*.smod" \
         ./ $results
 
