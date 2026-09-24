@@ -34,10 +34,12 @@
 module base_functional
   use design, only: design_t
   use json_module, only: json_file
+  use json_utils, only: json_get
   use num_types, only: rp
   use point_zone, only: point_zone_t
   use simulation_m, only: simulation_t
   use vector, only: vector_t
+  use utils, only: neko_error
   implicit none
   private
 
@@ -69,8 +71,12 @@ module base_functional
      ! ----------------------------------------------------------------------- !
      ! Derived class interfaces
 
+     generic :: init => init_json, init_json_sim
+
      !> Constructor
-     procedure(functional_init), pass(this), deferred :: init_json
+     procedure, pass(this) :: init_json => functional_init_json
+     !> Constructor
+     procedure, pass(this) :: init_json_sim => functional_init_json_sim
      !> Destructor
      procedure(functional_free), pass(this), deferred :: free
 
@@ -86,15 +92,6 @@ module base_functional
   ! for the different types of objective functions.
 
   abstract interface
-
-     !> Initialize the objective function
-     subroutine functional_init(this, json, design, simulation)
-       import base_functional_t, design_t, simulation_t, json_file
-       class(base_functional_t), intent(inout) :: this
-       type(json_file), intent(inout) :: json
-       class(design_t), intent(in) :: design
-       type(simulation_t), target, intent(inout) :: simulation
-     end subroutine functional_init
 
      !> Destructor
      subroutine functional_free(this)
@@ -117,5 +114,32 @@ module base_functional
      end subroutine functional_update_sensitivity
 
   end interface
+
+contains
+
+  !> Initialize the objective function
+  subroutine functional_init_json(this, json, design)
+    class(base_functional_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+    class(design_t), intent(in) :: design
+    character(len=:), allocatable :: type
+
+    call json_get(json, 'type', type)
+    call neko_error("Functional type: '" // type // &
+         "' does not support initialization without simulation")
+  end subroutine functional_init_json
+
+  !> Initialize the objective function
+  subroutine functional_init_json_sim(this, json, design, simulation)
+    class(base_functional_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+    class(design_t), intent(in) :: design
+    type(simulation_t), target, intent(inout) :: simulation
+    character(len=:), allocatable :: type
+
+    call json_get(json, 'type', type)
+    call neko_error("Functional type: '" // type // &
+         "' does not support initialization with simulation")
+  end subroutine functional_init_json_sim
 
 end module base_functional

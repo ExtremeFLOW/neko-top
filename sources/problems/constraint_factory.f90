@@ -59,7 +59,7 @@ contains
     class(constraint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
-    type(simulation_t), target, intent(inout) :: simulation
+    type(simulation_t), target, optional, intent(inout) :: simulation
     character(len=:), allocatable :: type
 
     if (allocated(object)) then
@@ -75,7 +75,7 @@ contains
        call neko_type_error("Constraint", type, KNOWN_TYPES)
     end select
 
-    call object%init_json(json, design, simulation)
+    call object%init(json, design, simulation)
   end subroutine constraint_factory
 
 end submodule constraint_factory_mod
