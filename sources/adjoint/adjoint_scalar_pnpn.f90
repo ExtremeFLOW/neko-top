@@ -358,7 +358,7 @@ contains
 
     n = this%dm_Xh%size()
 
-    call profiler_start_region('Scalar', 2)
+    call profiler_start_region('Adjoint Scalar')
     associate(u => this%u, v => this%v, w => this%w, s_adj => this%s_adj, &
          cp => this%cp, rho => this%rho, lambda => this%lambda, &
          ds_adj => this%ds_adj, &
@@ -417,7 +417,7 @@ contains
       call this%update_material_properties(time)
 
       ! Compute scalar residual.
-      call profiler_start_region('Adjoint_scalar_residual', 20)
+      call profiler_start_region('Adjoint_scalar_residual')
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
            lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), &
            dt, dm_Xh%size())
@@ -428,15 +428,15 @@ contains
       ! Apply a 0-valued Dirichlet boundary conditions on the ds_adj.
       call this%bclst_ds%apply_scalar(s_adj_res%x, dm_Xh%size())
 
-      call profiler_end_region('Adjoint_scalar_residual', 20)
+      call profiler_end_region('Adjoint_scalar_residual')
 
       call this%proj_s%pre_solving(s_adj_res%x, tstep, c_Xh, n, dt_controller)
 
       call this%pc%update()
-      call profiler_start_region('Adjoint_scalar_solve', 21)
+      call profiler_start_region('Adjoint_scalar_solve')
       ksp_results(1) = this%ksp%solve(Ax, ds_adj, s_adj_res%x, n, &
            c_Xh, this%bclst_ds, gs_Xh)
-      call profiler_end_region('Adjoint_scalar_solve', 21)
+      call profiler_end_region('Adjoint_scalar_solve')
 
       ksp_results(1)%name = 'Adjoint Scalar'
 
@@ -453,7 +453,7 @@ contains
       call scalar_step_info(time, ksp_results)
 
     end associate
-    call profiler_end_region('Scalar', 2)
+    call profiler_end_region('Adjoint Scalar')
   end subroutine adjoint_scalar_pnpn_step
 
   subroutine print_debug(this)
