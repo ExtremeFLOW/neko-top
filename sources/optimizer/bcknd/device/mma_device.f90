@@ -267,7 +267,7 @@ contains
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_xstuff_squ_global
 
-    integer :: nglobal
+    integer :: nglobal, i
 
     real(kind=rp) :: cons
     real(kind=rp) :: minimal_epsilon
@@ -332,6 +332,10 @@ contains
     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync = .true.)
+
+    call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, &
+         neko_comm, ierr)
+
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
@@ -346,21 +350,30 @@ contains
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
-       call device_rex(rex%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
-            this%pij%x_d, this%p0j%x_d, this%qij%x_d, this%q0j%x_d, &
-            lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m)
-       call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, &
-            neko_comm, ierr)
-       call device_col3(rey%x_d, this%d%x_d, y%x_d, this%m)
-       call device_add2(rey%x_d, this%c%x_d, this%m)
-       call device_sub2(rey%x_d, lambda%x_d, this%m)
-       call device_sub2(rey%x_d, mu%x_d, this%m)
-       rez = this%a0 - zeta - device_lcsc2(lambda%x_d, this%a%x_d, this%m)
-       call device_cfill(relambda%x_d, 0.0_rp, this%m)
-       call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
-            this%low%x_d, this%pij%x_d, this%qij%x_d, this%n, this%m)
-       call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-            sync = .true.)
+       associate(p0j => this%p0j, q0j => this%q0j, &
+            pij => this%pij, qij => this%qij, &
+            low => this%low, upp => this%upp, &
+            alpha => this%alpha, beta => this%beta, &
+            c => this%c, d => this%d, &
+            a0 => this%a0, a => this%a, &
+            bi => this%bi)
+
+         call device_rex(rex%x_d, x%x_d, low%x_d, upp%x_d, &
+              pij%x_d, p0j%x_d, qij%x_d, q0j%x_d, &
+              lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m)
+
+         call device_col3(rey%x_d, d%x_d, y%x_d, this%m)
+         call device_add2(rey%x_d, c%x_d, this%m)
+         call device_sub2(rey%x_d, lambda%x_d, this%m)
+         call device_sub2(rey%x_d, mu%x_d, this%m)
+         rez = a0 - zeta - device_lcsc2(lambda%x_d, a%x_d, this%m)
+         call device_cfill(relambda%x_d, 0.0_rp, this%m)
+         call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
+              low%x_d, pij%x_d, qij%x_d, this%n, this%m)
+         call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+              sync = .true.)
+
+       end associate
 
        globaltmp_m%x = 0.0_rp
        call MPI_Allreduce(relambda%x, globaltmp_m%x, this%m, &
@@ -462,10 +475,10 @@ contains
           call device_memcpy(bb%x, bb%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
 
-          globaltmp_m%x = 0.0_rp
-          call MPI_Allreduce(bb%x(1:this%m), globaltmp_m%x, this%m, &
+          call MPI_Allreduce(MPI_IN_PLACE, bb%x(1:this%m), this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
-          call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
+
+          call device_memcpy(bb%x, bb%x_d, this%m, &
                HOST_TO_DEVICE, sync = .true.)
 
           call device_updatebb(bb%x_d, dellambda%x_d, dely%x_d, &
@@ -475,16 +488,28 @@ contains
           call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m)
           call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                DEVICE_TO_HOST, sync = .true.)
-          globaltmp_mm%x = 0.0_rp
-          call MPI_Allreduce(AA%x(1:this%m, 1:this%m), globaltmp_mm%x, &
-               this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-          call device_memcpy(globaltmp_mm%x, globaltmp_mm%x_d, &
+          call MPI_Allreduce(MPI_IN_PLACE, AA%x(1:this%m, 1:this%m), &
+               this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+          call device_memcpy(AA%x, AA%x_d, &
                (this%m) * (this%m), HOST_TO_DEVICE, sync = .true.)
-          call device_updateAA(AA%x_d, globaltmp_mm%x_d, s%x_d, &
-               lambda%x_d, this%d%x_d, mu%x_d, y%x_d, this%a%x_d, &
-               zeta, z, this%m)
-          call device_memcpy(AA%x, AA%x_d, (this%m+1)*(this%m+1), &
-               DEVICE_TO_HOST, sync = .true.)
+
+          call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .true.)
+          call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .true.)
+          call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .true.)
+          call device_memcpy(s%x, s%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .true.)
+          do i = 1, this%m
+             ! update the diag AA
+             AA%x(i, i) = AA%x(i, i) &
+                  + s%x(i) / lambda%x(i) &
+                  + 1.0_rp / (this%d%x(i) + mu%x(i) / y%x(i))
+          end do
+          AA%x(1:this%m, this%m+1) = this%a%x
+          AA%x(this%m+1, 1:this%m) = this%a%x
+          AA%x(this%m+1, this%m+1) = - zeta/z
 
 
 
