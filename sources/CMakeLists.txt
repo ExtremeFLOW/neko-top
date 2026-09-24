@@ -24,6 +24,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 # Add the mapping extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
 
+# Add the adjoint library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+
 # ============================================================================ #
 # Define the library sources and targets
 target_sources(neko-top
@@ -33,20 +36,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_case.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_output.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scheme.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn_bc_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_ic.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_no_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/simulation_adjoint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90

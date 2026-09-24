@@ -1,2 +1,3 @@
-nobvisual==0.2.0
-flinter==0.4.0
+setuptools
+nobvisual
+flinter
