@@ -9,8 +9,8 @@ module optimizer
   use simulation, only: simulation_t
   use problem, only: problem_t
   use design, only: design_t
-  use num_types, only : rp
-  use csv_file, only : csv_file_t
+  use num_types, only: rp
+  use csv_file, only: csv_file_t
   implicit none
   private
 

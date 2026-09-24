@@ -32,9 +32,9 @@
 !
 !> Factory for all adjoint fluid schemes
 module adjoint_fluid_fctry
-  use adjoint_fluid_scheme, only : adjoint_fluid_scheme_t
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
-  use utils, only : concat_string_array, neko_error
+  use utils, only: neko_type_error
   implicit none
   private
 
@@ -49,18 +49,14 @@ contains
   !> Initialise a adjoint fluid scheme
   subroutine adjoint_fluid_scheme_factory(object, type_name)
     class(adjoint_fluid_scheme_t), intent(inout), allocatable :: object
-    character(len=*) :: type_name
-    character(len=:), allocatable :: type_string
+    character(len=*), intent(in) :: type_name
 
-    if (trim(type_name) .eq. 'pnpn') then
+    select case (trim(type_name))
+    case ('pnpn')
        allocate(adjoint_fluid_pnpn_t::object)
-    else
-       type_string = concat_string_array(KNOWN_TYPES, NEW_LINE('A') // "-  ", &
-            .true.)
-       call neko_error("Unknown adjoint scheme type: " &
-            // trim(type_name) // ". Known types are: " &
-            // type_string)
-    end if
+    case default
+       call neko_type_error("adjoint fluid scheme", type_name, KNOWN_TYPES)
+    end select
 
   end subroutine adjoint_fluid_scheme_factory
 

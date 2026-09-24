@@ -31,9 +31,9 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 module device_math_ext
-  use utils, only : neko_error
-  use num_types, only : rp, c_rp
-  use, intrinsic :: iso_c_binding, only : c_ptr, c_int
+  use utils, only: neko_error
+  use num_types, only: rp, c_rp
+  use, intrinsic :: iso_c_binding, only: c_ptr, c_int
   implicit none
 
 #if HAVE_HIP
@@ -43,8 +43,7 @@ module device_math_ext
   interface
      subroutine cuda_copy_mask(a_d, b_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_copy_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        type(c_ptr), value :: b_d
        integer(c_int) :: size
@@ -55,8 +54,7 @@ module device_math_ext
   interface
      subroutine cuda_cadd_mask(a_d, c, size, mask_d, mask_size) &
           bind(c, name = 'cuda_cadd_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        real(c_rp) :: c
        integer(c_int) :: size
@@ -67,8 +65,7 @@ module device_math_ext
   interface
      subroutine cuda_invcol1_mask(a_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_invcol1_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        integer(c_int) :: size
        type(c_ptr), value :: mask_d
@@ -78,8 +75,7 @@ module device_math_ext
   interface
      subroutine cuda_col2_mask(a_d, b_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_col2_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        type(c_ptr), value :: b_d
        integer(c_int) :: size
@@ -90,8 +86,7 @@ module device_math_ext
   interface
      subroutine cuda_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_col3_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        type(c_ptr), value :: b_d
        type(c_ptr), value :: c_d
@@ -103,8 +98,7 @@ module device_math_ext
   interface
      subroutine cuda_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_sub3_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        type(c_ptr), value :: b_d
        type(c_ptr), value :: c_d

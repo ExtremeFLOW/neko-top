@@ -8,8 +8,8 @@ from pynektools.io.read_probes import ProbesReader
 
 
 # ============================================================================ #
-## Main function for computing the separation angle
-#def compute_lift_and_drag(file_name: str, method: str, Re: float) -> dict:
+# Main function for computing the separation angle
+# def compute_lift_and_drag(file_name: str, method: str, Re: float) -> dict:
 #
 #    # force the cache
 #    cache_dir = file_name
@@ -17,7 +17,7 @@ from pynektools.io.read_probes import ProbesReader
 #    # the os somehow to find everything starting with 'circ'
 #    # but I'm not.. so I'm listing them manually.
 #    # AND I'm only going to select one
-#    #circ_list = ['048', '050', '0501', '0502', '0505', '051', '052', '055']
+#    # circ_list = ['048', '050', '0501', '0502', '0505', '051', '052', '055']
 #    circ_list = ['0501']
 #    # First is lift and drag
 #    if method == 'meshed':
@@ -223,15 +223,15 @@ def surface_integral_lift_and_drag(file_name: str,
         # note that p = fields[0], u = fields[1], v = fields[2], du_dx = fields[3]
         # du_dy = fields[4], dv_dx = fields[5], dv_dy = fields[6]
         '''
-        shear_drag_components = ( dudx_reshaped[:, t] * 2                    * np.cos(theta) + \
-                                 (dvdx_reshaped[:, t] + dudy_reshaped[:, t]) * np.sin(theta))/Re  # Shear contribution to drag
+        shear_drag_components = ( dudx_reshaped[:, t] * 2 * np.cos(theta) + \
+                                 (dvdx_reshaped[:, t] + dudy_reshaped[:, t]) * np.sin(theta)) / Re # Shear contribution to drag
         shear_lift_components = ((dvdx_reshaped[:, t] + dudy_reshaped[:, t]) * np.cos(theta) + \
-                                  dvdy_reshaped[:, t] * 2                    * np.sin(theta))/Re  # Shear contribution to lift
+                                  dvdy_reshaped[:, t] * 2 * np.sin(theta))/Re  # Shear contribution to lift
         '''
-        shear_drag_components = ( fields[3, :, t] * 2                    * np.cos(theta) + \
-                                 (fields[5, :, t] + fields[4, :, t]) * np.sin(theta))/Re  # Shear contribution to drag
+        shear_drag_components = ( fields[3, :, t] * 2 * np.cos(theta) + \
+                                 (fields[5, :, t] + fields[4, :, t]) * np.sin(theta)) / Re  # Shear contribution to drag
         shear_lift_components = ((fields[5, :, t] + fields[4, :, t]) * np.cos(theta) + \
-                                  fields[6, :, t] * 2                    * np.sin(theta))/Re  # Shear contribution to lift
+                                  fields[6, :, t] * 2 * np.sin(theta))/Re  # Shear contribution to lift
 
         # Compute the drag and lift components from pressure
         drag_components = -fields[0, :, t] * np.cos(theta)
@@ -379,8 +379,8 @@ def read_brinkman_force(file_name: str, cache_dir: str = None) -> dict:
         fx_tot=np.array(fx_list),
         fy_tot=np.array(fy_list),
         type="method3"
-        #note: the pressure viscous split doesn't apply here, we should always
-        #check that it exists before we try to plot
+        # note: the pressure viscous split doesn't apply here, we should always
+        # check that it exists before we try to plot
     )
     # ------------------------------------------------------------------------ #
     # Caching the results
