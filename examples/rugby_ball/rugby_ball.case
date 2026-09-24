@@ -59,8 +59,7 @@
                     "zone_indices": [ 1, 2 ]
                 }
             ],
-            "output_control": "tsteps",
-            "output_value": 50000000
+            "output_control": "never",
         },
         "simulation_components": [
             {
@@ -97,7 +96,6 @@
             "tolerance": 1.0e-3,
             "mma": {
                 "max_iter": 100,
-                "backend": "cuda",
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
