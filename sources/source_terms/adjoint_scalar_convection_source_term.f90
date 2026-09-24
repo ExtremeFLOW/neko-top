@@ -40,9 +40,16 @@ module adjoint_scalar_convection_source_term
   use json_module, only: json_file
   use time_state, only: time_state_t
   use source_term, only: source_term_t
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
   use coefs, only: coef_t
-  use field_math, only: field_subcol3
-  use operators, only: grad
+  use field_math, only: field_subcol3, field_sub2, field_col3
+  use operators, only: grad, dudxyz
+  use utils, only: neko_error
+  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: col2, invcol2
+  use device_math, only: device_col2, device_invcol2
   implicit none
   private
 
@@ -61,6 +68,20 @@ module adjoint_scalar_convection_source_term
      type(field_t), pointer :: s_adj => null()
      !> forward passive scalar
      type(field_t), pointer :: s => null()
+     ! --- for over-integration
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
+     !> if dealiasing should be applied
+     logical :: dealias
+     !> GL scratch registry
+     type(scratch_registry_t), pointer :: scratch_GL
+
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
@@ -100,16 +121,30 @@ contains
 
   end subroutine adjoint_scalar_convection_source_term_init_from_json
 
-
+  !> The constructor from type components.
+  !! @param this The source term.
+  !! @param f_x, f_y, f_z the RHS of the equation (either primal or adjoint).
+  !! @param s the primal scalar
+  !! @param s_adj the primal scalar
+  !! @param coef The SEM coeffs.
+  !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
+  !! @param GLL_to_GL Interpolator between GLL and GL.
+  !! @param dealias if dealiasing should be applied.
+  !! @param scratch_GL A scratch registry on the GL space.
   subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
-       f_x, f_y, f_z, s, s_adj, coef)
+       f_x, f_y, f_z, s, s_adj, coef, c_Xh_GL, GLL_to_GL, dealias, scratch_GL)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
+    type(field_t), intent(in), target :: s, s_adj
+    type(coef_t), intent(in), target :: coef
+    type(coef_t), intent(in), target :: c_Xh_GL
+    type(interpolator_t), intent(in), target :: GLL_to_GL
+    logical, intent(in) :: dealias
+    type(scratch_registry_t), intent(in), target :: scratch_GL
+
     type(field_list_t) :: fields
-    type(coef_t) :: coef
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    type(field_t), intent(in), target :: s, s_adj
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -131,6 +166,14 @@ contains
     this%s_adj => s_adj
     this%s => s
 
+    ! for over integration
+    this%dealias = dealias
+    this%c_Xh_GL => c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+    this%Xh_GLL => this%coef%Xh
+    this%GLL_to_GL => GLL_to_GL
+    this%scratch_GL => scratch_GL
+
   end subroutine adjoint_scalar_convection_source_term_init_from_components
 
   !> Destructor.
@@ -138,6 +181,14 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    nullify(this%s_adj)
+    nullify(this%s)
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%Xh_GLL)
+    nullify(this%GLL_to_GL)
+    nullify(this%scratch_GL)
+
   end subroutine adjoint_scalar_convection_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
@@ -147,36 +198,90 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
-    integer :: temp_indices(3)
-    type(field_t), pointer :: dsdx, dsdy, dsdz
+    integer :: temp_indices(4)
+    type(field_t), pointer :: dsdx, dsdy, dsdz, work
+    type(field_t), pointer :: accumulate, fld_GL, s_GL, s_adj_GL
+    integer :: temp_indices_GL(4)
+    integer :: n_GL, nel
 
 
     call neko_scratch_registry%request_field(dsdx, temp_indices(1))
     call neko_scratch_registry%request_field(dsdy, temp_indices(2))
     call neko_scratch_registry%request_field(dsdz, temp_indices(3))
+    call neko_scratch_registry%request_field(work, temp_indices(4))
 
     fu => this%fields%get(1)
     fv => this%fields%get(2)
     fw => this%fields%get(3)
 
-    ! we basically just need the term
-    ! \f$\nabla s s_adj\f$
-    ! TODO
-    ! In principle, this should have to option to be evaluated on the dealiased
-    ! mesh!
+    ! we need the term \f$\nabla s s_adj\f$
+    if (this%dealias) then
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
+       call this%scratch_GL%request_field(s_GL, temp_indices_GL(3))
+       call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4))
 
-    ! So should the Brinkman term actually....
+       call this%GLL_to_GL%map(s_GL%x, this%s%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)
 
-    call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
+       ! u
+       call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdx, &
+            this%c_Xh_GL%dsdx, this%c_Xh_GL%dtdx, this%c_Xh_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call invcol2(work%x, this%coef%B, work%size())
+       end if
+       call field_sub2(fu, work)
 
-    ! TODO
-    ! So in principal, the derivatives could have kinks now.
-    ! I don't think a gsop will remedy this (or even whether it's a good idea)
-    ! But I want to leave this todo as a reminder.
+       ! v
+       call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdy, &
+            this%c_Xh_GL%dsdy, this%c_Xh_GL%dtdy, this%c_Xh_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call invcol2(work%x, this%coef%B, work%size())
+       end if
+       call field_sub2(fv, work)
 
-    call field_subcol3(fu, this%s_adj, dsdx)
-    call field_subcol3(fv, this%s_adj, dsdy)
-    call field_subcol3(fw, this%s_adj, dsdz)
+       ! w
+       call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdz, &
+            this%c_Xh_GL%dsdz, this%c_Xh_GL%dtdz, this%c_Xh_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call invcol2(work%x, this%coef%B, work%size())
+       end if
+       call field_sub2(fw, work)
+
+       call this%scratch_GL%relinquish_field(temp_indices_GL)
+
+    else
+       call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
+       call field_subcol3(fu, this%s_adj, dsdx)
+       call field_subcol3(fv, this%s_adj, dsdy)
+       call field_subcol3(fw, this%s_adj, dsdz)
+    end if
 
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)

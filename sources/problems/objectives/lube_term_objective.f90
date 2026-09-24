@@ -69,30 +69,27 @@ module lube_term_objective
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
-  use scratch_registry, only: neko_scratch_registry
+  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
-  use mask_ops, only: mask_exterior_const
+  use mask_ops, only: mask_exterior_const, compute_masked_volume
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
   use coefs, only: coef_t
-  use math, only: glsc2, copy
-  use device_math, only: device_copy, device_glsc2
+  use math, only: glsc2, copy, col2, invcol2
+  use device_math, only: device_copy, device_glsc2, device_col2, device_invcol2
   use math_ext, only: glsc2_mask
-  use field_math, only: field_col3, field_addcol3, field_cmult
-  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
+  use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
   implicit none
   private
 
-  !> An objective function corresponding to minimum dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega \f$
+  !> An objective function corresponding to out of plane stresses
+  !! \f$ F =  \int_Omega \frac{1}{2} \chi |\mathbf{u}|^2 d \Omega \f$
   type, public, extends(objective_t) :: lube_term_objective_t
      private
-
-     !> The coefficient for the lube term.
-     real(kind=rp) :: K
 
      !> Pointer to the u field.
      type(field_t), pointer :: u => null()
@@ -100,10 +97,30 @@ module lube_term_objective
      type(field_t), pointer :: v => null()
      !> Pointer to the w field.
      type(field_t), pointer :: w => null()
-     !> Pointer to the coefficient field.
-     type(coef_t), pointer :: c_Xh => null()
      !> Pointer to the brinkman amplitude field.
      type(field_t), pointer :: brinkman_amplitude => null()
+     !> dealias sensitivity
+     logical :: dealias_sensitivity
+     !> dealias forcing
+     logical :: dealias_forcing
+     !> volume of objective domain
+     real(kind=rp) :: volume
+
+     ! ---- everything GLL ----
+     !> The coefs
+     type(coef_t), pointer :: c_Xh_GLL
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+
+     ! ---- everything for GL ----
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> coefs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
+     !> GL scratch registry
+     type(scratch_registry_t), pointer :: scratch_GL
 
    contains
 
@@ -138,15 +155,19 @@ contains
 
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
-    real(kind=rp) :: weight, K
+    real(kind=rp) :: weight
+    logical :: dealias_sensitivity, dealias_forcing
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Out of plane stresses")
-    call json_get_or_default(json, "K", K, 1.0_rp)
+    call json_get_or_default(json, "dealias_sensitivity", &
+         dealias_sensitivity, .true.)
+    call json_get_or_default(json, "dealias_forcing", &
+         dealias_forcing, .true.)
 
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, K)
+         mask_name, dealias_sensitivity, dealias_forcing)
   end subroutine lube_term_init_json_sim
 
   !> The actual constructor.
@@ -156,23 +177,25 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
-  !! @param K the coefficient for the lube term.
+  !! @param dealias_sensitivity use dealiasing on the sensitivity.
+  !! @param dealias_forcing use dealiasing on the adjoint forcing.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
-       name, mask_name, K)
+       name, mask_name, dealias_sensitivity, dealias_forcing)
     class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
-    real(kind=rp), intent(in) :: K
+    logical, intent(in) :: dealias_sensitivity
+    logical, intent(in) :: dealias_forcing
     type(adjoint_lube_source_term_t) :: lube_term
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
 
-    ! Set the coefficient for the lube term
-    this%K = K
+    this%dealias_forcing = dealias_forcing
+    this%dealias_sensitivity = dealias_sensitivity
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
@@ -188,18 +211,38 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%c_Xh => simulation%neko_case%fluid%c_Xh
+
+    ! GLL
+    this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
+    this%Xh_GLL => simulation%neko_case%fluid%c_Xh%Xh
+
+    ! GL
+    this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+
+    ! GLL to GL
+    this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
+
+    this%scratch_GL => simulation%adjoint_case%fluid_adj%scratch_GL
+
+    ! compute the volume of the objective domain
+    if (this%has_mask) then
+       this%volume = compute_masked_volume(this%mask, this%c_Xh_GLL)
+    else
+       this%volume = this%c_Xh_GLL%volume
+    end if
 
     ! if we have the lube term we need to initialize and append that too
 
     associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
          f_adj_y => simulation%adjoint_fluid%f_adj_y, &
-         f_adj_z => simulation%adjoint_fluid%f_adj_z, &
-         c_Xh => simulation%adjoint_fluid%c_Xh)
+         f_adj_z => simulation%adjoint_fluid%f_adj_z)
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
-           this%k * this%weight, this%u, this%v, this%w, this%mask, &
-           this%has_mask, c_Xh)
+           this%weight, this%u, this%v, this%w, this%mask, &
+           this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
+           this%dealias_forcing, this%volume, &
+           this%scratch_GL)
 
     end associate
 
@@ -219,8 +262,13 @@ contains
     this%u => null()
     this%v => null()
     this%w => null()
-    this%c_Xh => null()
+    this%c_Xh_GLL => null()
     this%brinkman_amplitude => null()
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%Xh_GLL)
+    nullify(this%GLL_to_GL)
+    nullify(this%scratch_GL)
 
   end subroutine lube_term_free
 
@@ -235,39 +283,36 @@ contains
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    ! it's becoming so stupid to pass the whole fluid and adjoint and
-    ! design through
-    ! I feel like every objective function should have internal pointers to
-    ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
-    ! (the whole design, so we get all the coeffients)
-    call field_col3(work, this%u, this%brinkman_amplitude)
-    call field_addcol3(work, this%v, this%brinkman_amplitude)
-    call field_addcol3(work, this%w, this%brinkman_amplitude)
+    call field_col3(work, this%u, this%u)
+    call field_addcol3(work, this%v, this%v)
+    call field_addcol3(work, this%w, this%w)
+    call field_col2(work, this%brinkman_amplitude)
 
     if (this%has_mask) then
        if (NEKO_BCKND_DEVICE .eq. 1) then
           ! note, this could be done more elagantly by writing
           ! device_glsc2_mask
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, design%size())
        else
-          this%value = glsc2_mask(work%x, this%c_Xh%B, design%size(), &
+          this%value = glsc2_mask(work%x, this%c_Xh_GLL%B, design%size(), &
                this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
-          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, design%size())
        else
-          this%value = glsc2(work%x, this%c_Xh%B, design%size())
+          this%value = glsc2(work%x, this%c_Xh_GLL%B, design%size())
        end if
     end if
-    this%value = 0.5_rp * this%K * this%value
+    this%value = 0.5_rp * this%value / this%volume
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine lube_term_update_value
 
-  !> update_value the sensitivity of the objective function with respect to $\chi$
+  !> update_value the sensitivity of the objective function with respect to
+  !! \f$chi\f$
   !! @param this The objective.
   !! @param design the design.
   subroutine lube_term_update_sensitivity(this, design)
@@ -275,20 +320,49 @@ contains
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
+    integer :: n_GL, nel
+    type(field_t), pointer :: accumulate, fld_GL
+    integer :: temp_indices_GL(2)
 
     ! if we have the lube term we also get an extra term in the sensitivity
-    ! K * u^2
-    ! TODO
-    ! omfg be so careful with non-dimensionalization etc
-    ! I bet this is scaled a smidge wrong (ie, track if it's 1/2 or not etc)
-    ! do this later
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    call field_col3(work, this%u, this%u)
-    call field_addcol3(work, this%v, this%v)
-    call field_addcol3(work, this%w, this%w)
-    call field_cmult(work, this%K)
+    if(this%dealias_sensitivity) then
+       nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
+
+       call this%GLL_to_GL%map(fld_GL%x, this%u%x, nel, this%Xh_GL)
+       call field_col3(accumulate, fld_GL, fld_GL)
+       call this%GLL_to_GL%map(fld_GL%x, this%v%x, nel, this%Xh_GL)
+       call field_addcol3(accumulate, fld_GL, fld_GL)
+       call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
+       call field_addcol3(accumulate, fld_GL, fld_GL)
+       ! scale
+       call field_cmult(accumulate, this%weight * 0.5_rp / this%volume)
+
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%c_Xh_GLL%B_d, work%size())
+       else
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call invcol2(work%x, this%c_Xh_GLL%B, work%size())
+       end if
+
+       call this%scratch_GL%relinquish_field(temp_indices_GL)
+
+    else
+       call field_col3(work, this%u, this%u)
+       call field_addcol3(work, this%v, this%v)
+       call field_addcol3(work, this%w, this%w)
+       ! scale
+       call field_cmult(work, this%weight * 0.5_rp / this%volume)
+    end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
