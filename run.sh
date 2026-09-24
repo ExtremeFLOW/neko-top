@@ -360,8 +360,8 @@ for case in ${example_list[@]}; do
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
-    if [ $case == "run.sh" ]; then
-        find $EPATH/$case_dir -name "*.case" -or -name "*.json" \
+    if [ ${case: -6} == "run.sh" ]; then
+        find $EPATH/$case_dir \( -name "*.case" -or -name "*.json" \) \
             -exec cp -ft $log {} +
     elif [ ${case: -5} == ".case" ]; then
         cp -ft $log $EPATH/$case
