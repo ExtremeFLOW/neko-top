@@ -41,7 +41,8 @@ module device_mma_math
        cuda_add2inv2, cuda_GG, cuda_diagx, cuda_bb, cuda_updatebb, cuda_AA, &
        cuda_updateAA, cuda_dx, cuda_dy, cuda_deta, cuda_dxsi, cuda_maxval2, &
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
-       mma_gensub3_cuda, mma_gensub4_cuda
+       mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
+       mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess
 
   implicit none
   private
@@ -54,9 +55,98 @@ module device_mma_math
        device_norm, device_delx, device_add2inv2, device_GG, device_diagx, &
        device_bb, device_updatebb, device_AA, device_updateAA, device_dx, &
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
-       device_kkt_rex
+       device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
+       device_mma_Ljjxinv, device_Hess
 
 contains
+
+  subroutine device_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m)
+    type(c_ptr):: Hess_d, hijx_d, Ljjxinv_d
+    integer(c_int) :: n, m
+#if HAVE_HIP
+    call neko_error('no device backend configured')
+#elif HAVE_CUDA
+    call cuda_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_Hess
+
+  subroutine device_mma_Ljjxinv(Ljjxinv_d,pjlambda_d, qjlambda_d, x_d, &
+       low_d, upp_d, alpha_d, beta_d, n)
+    !--------------------------------------------------------------------------!
+    ! A device support to do the following calculation needed for the          !
+    ! dualsubsolve for MMA:                                                    !
+    !   Ljjxinv= - 1 / ( (2*pjlambda/(upp - x)**3) + &                         !
+    !                                  (2*qjlambda/(x - low)**3))              !                                                     !
+    !                                                                          !
+    ! And then remove the sensitivity for the active primal constraints        !
+    ! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)                           !
+    ! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)                            !
+    !--------------------------------------------------------------------------!
+    type(c_ptr) :: Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &
+         low_d, upp_d, alpha_d, beta_d
+    integer(c_int) :: n
+#if HAVE_HIP
+    call neko_error('no device backend configured')
+#elif HAVE_CUDA
+    call mma_Ljjxinv_cuda(Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &
+         low_d, upp_d, alpha_d, beta_d, n)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_mma_Ljjxinv
+
+
+  subroutine device_mma_dipsolvesub1(x_d, pjlambda_d, qjlambda_d, &
+       low_d, upp_d, alpha_d, beta_d, n)
+    !--------------------------------------------------------------------------!
+    ! A device support to do the following calculation needed for the          !
+    ! dualsubsolve for MMA:                                                    !
+    !   x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) /  &                 !
+    !                                  (sqrt(pjlambda) + sqrt(qjlambda))       !                                                     !
+    !--------------------------------------------------------------------------!
+    type(c_ptr) :: x_d, pjlambda_d, qjlambda_d, &
+         low_d, upp_d, alpha_d, beta_d
+    integer(c_int) :: n
+#if HAVE_HIP
+    call neko_error('no device backend configured')
+#elif HAVE_CUDA
+    call mma_dipsolvesub1_cuda(x_d, pjlambda_d, qjlambda_d, &
+         low_d, upp_d, alpha_d, beta_d, n)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_mma_dipsolvesub1
+
+
+  subroutine device_mattrans_v_mul(output_d, pij_d, lambda_d, m, n)
+    !--------------------------------------------------------------------------!
+    ! A device support to do the following matrix multiplication               !
+    !               output = matmul(transpose(pij), lambda)                    !
+    ! where matrix pij is mxn, vector lambda is of size m and the output       !
+    ! vector is of size n                                                      !
+    !--------------------------------------------------------------------------!
+    type(c_ptr) :: output_d, pij_d, lambda_d
+    integer :: m, n
+#if HAVE_HIP
+    call neko_error('no device backend configured')
+#elif HAVE_CUDA
+    call mattrans_v_mul_cuda(output_d, pij_d, lambda_d, m, n)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_mattrans_v_mul
+
+
 
   subroutine device_mma_gensub1(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)
     type(c_ptr) :: low_d, upp_d, x_d, xmin_d, xmax_d
