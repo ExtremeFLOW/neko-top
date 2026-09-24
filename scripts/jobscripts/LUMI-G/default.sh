@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# In this file make changes to the SBATCH variables to control the Marenostrum
+# In this file make changes to the SBATCH variables to control the LUMI
 # hpc settings.
 #
 # In addition, all modules should be loaded and python virtualenv should be
 # setup if python is used in either testing or visualisation.
-# Modules and python setups can be done in a seperate file and supplied through
+# Modules and python setups can be done in a separate file and supplied through
 # the FILES variable in submit.sh. This will ensure a uniform setup.
 
 # =============================================================================
@@ -27,7 +27,7 @@
 
 # -- Notification options
 
-# Set the email to recieve to and when to recieve it
+# Set the email to receive to and when to receive it
 #SBATCH --mail-type=END    # Send notification at completion
 
 # -- Mandatory options, change with great care.
