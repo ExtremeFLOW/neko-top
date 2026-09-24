@@ -72,8 +72,8 @@ export ALL KEEP REMESH DIMENSION
 # User defined inputs.
 
 # Define all needed folders relative to the project folder. (without trailing /)
-CURRENT_DIR=$(pwd)
-MAIN_DIR=$(dirname $(realpath $0))
+export CURRENT_DIR=$(pwd)
+export MAIN_DIR=$(dirname $(realpath $0))
 
 # Set the path to the input files and the output meshes
 [ -z $INPUT_PATH ] && INPUT_PATH="$MAIN_DIR/data"         # Input files
