@@ -89,6 +89,7 @@ cases=$(find cases/ -type f -name "*.case")
 for case in ${cases[@]}; do
     case=${case#./}
     case_name=$(basename "$case")
+    export NEKO_LOG_FILE="neko_${case_name%.*}.log"
     echo "Running ${case} with mpirun -n $NP"
     mpirun -n "$NP" ./sensitivity_regression_driver "${case}" || exit 1
     mv steady_state_data.csv steady_state_data_${case_name%.*}.csv
@@ -96,6 +97,12 @@ done
 
 python steady_state_plotter.py || exit 1
 python FD_check.py || exit 1
+
+# Clean up generated files
+find . -maxdepth 1 -type f -name "box.nmsh" -delete
+find . -maxdepth 1 -type f -name "*.log" -delete
+find . -maxdepth 1 -type f -name "*.nek5000" \
+    -exec sh -c 'rm "$1" "${1%.nek5000}".f*' _ {} \;
 
 cd "$CURRENT_DIR" || exit 1
 

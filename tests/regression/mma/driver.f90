@@ -209,6 +209,9 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
   call neko_finalize(neko_case)
+  call initdesign%free()
+  call all_objectives%free()
+  call constraint_value%free()
   call opt%free()
   call prob%free()
   call des%free()
