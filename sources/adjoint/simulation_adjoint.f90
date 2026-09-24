@@ -112,8 +112,7 @@ contains
        tstep_adj = tstep_adj + 1
        start_time = MPI_WTIME()
 
-       call neko_log%status(t_adj, this%case%time%end_time)
-       write(log_buf, '(A,I6)') 'Time-step: ', tstep_adj
+       call this%case%time%status()
        call neko_log%message(log_buf)
        call neko_log%begin()
 
