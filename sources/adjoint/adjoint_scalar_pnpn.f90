@@ -66,7 +66,6 @@ module adjoint_scalar_pnpn
   use json_module, only : json_file, json_core, json_value
   use user_intf, only : user_t
   use neko_config, only : NEKO_BCKND_DEVICE
-  use zero_dirichlet, only : zero_dirichlet_t
   use time_step_controller, only : time_step_controller_t
   use scratch_registry, only : neko_scratch_registry
   use time_state, only : time_state_t
@@ -89,11 +88,6 @@ module adjoint_scalar_pnpn
 
      !> Solution projection.
      type(projection_t) :: proj_s
-
-     !> Dirichlet conditions for the residual
-     !! Collects all the Dirichlet condition facets into one bc and applies 0,
-     !! Since the values never change there during the solve.
-     type(zero_dirichlet_t) :: bc_res
 
      !> Projector for the adjoint scalar increment constraints.
      type(scalar_bc_projector_t) :: bc_projector
@@ -226,18 +220,13 @@ contains
     ! Set up boundary conditions
     call this%setup_bcs_(user)
 
-    ! Initialize dirichlet bcs for scalar residual
-    call this%bc_res%init(this%c_Xh, params_adjoint)
+    ! Collect the Dirichlet dofs of all bcs into the increment projector.
     do i = 1, this%bcs%size()
        if (this%bcs%bc_type(i) .eq. BC_DIRICHLET) then
           bc_i => this%bcs%get(i)
-          call this%bc_res%mark_facets(bc_i%marked_facet)
+          call this%bc_projector%mark(bc_i)
        end if
     end do
-
-!    call this%bc_res%mark_zones_from_list('d_s', this%bc_labels)
-    call this%bc_res%finalize()
-    call this%bc_projector%mark(this%bc_res)
 
 
     ! Initialize projection space
@@ -310,7 +299,6 @@ contains
     call this%scheme_free()
 
     call this%bc_projector%free()
-    call this%bc_res%free()
     call this%proj_s%free()
 
     call this%s_adj_res%free()
@@ -443,7 +431,7 @@ contains
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
 
 
-      ! Apply a 0-valued Dirichlet boundary conditions on the ds_adj.
+      ! Zero-out residual at Dirichlet nodes before solving.
       call this%bc_projector%apply(s_adj_res%x, dm_Xh%size())
 
       call profiler_end_region('Adjoint_scalar_residual')
