@@ -28,7 +28,6 @@ contains
   subroutine user_setup(usr)
     type(user_t), intent(inout) :: usr
     usr%scalar_user_f_vector => heat_source
-    usr%material_properties => set_material_properties
     usr%user_startup => user_startup
   end subroutine user_setup
 
