@@ -63,6 +63,7 @@ for case in ${cases[@]}; do
     case=${case#./}
     case_name=$(basename "$case" | cut -f1 -d'.')
     export NEKO_LOG_FILE="neko_${case_name}.log"
+    export NEKO_TOP_LOG_FILE="nekotop_${case_name}.log"
     echo "Running ${case} with mpirun -n $NP"
     mpirun -n "$NP" ./reg_mma_bin "${case}" || exit 1
     mv optimization_data.csv optimization_data_${case_name}.csv

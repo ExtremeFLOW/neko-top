@@ -45,7 +45,7 @@ module RAMP_mapping
   use RAMP_mapping_cpu, only: convex_down_RAMP_mapping_apply_cpu, &
        convex_down_RAMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
-  use logger, only: neko_log
+  use nekotop_logger, only: nekotop_log
   use utils, only: neko_error
   use continuation_scheduler, only: nekotop_continuation
   implicit none
@@ -131,14 +131,14 @@ contains
     this%f_max = f_max
     this%q = q
 
-    call neko_log%section('RAMP Mapping')
+    call nekotop_log%section('RAMP Mapping')
     write(msg, '(A,F8.4)') '  f_min: ', this%f_min
-    call neko_log%message(msg)
+    call nekotop_log%message(msg)
     write(msg, '(A,F8.4)') '  f_max: ', this%f_max
-    call neko_log%message(msg)
+    call nekotop_log%message(msg)
     write(msg, '(A,F8.4)') '  q:     ', this%q
-    call neko_log%message(msg)
-    call neko_log%end_section()
+    call nekotop_log%message(msg)
+    call nekotop_log%end_section()
 
   end subroutine RAMP_mapping_init_from_attributes
 

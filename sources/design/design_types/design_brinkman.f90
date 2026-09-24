@@ -57,6 +57,7 @@ module brinkman_design
   use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
+  use nekotop_logger, only: nekotop_log
   use field_math, only: field_rzero
   use json_utils, only: json_get, json_get_or_default
   use utils, only: neko_error
@@ -323,13 +324,12 @@ contains
               'design', 'sensitivity')
       end if
 
-      if ('initial_distribution' .in. parameters) then
-         call json_get(parameters, 'initial_distribution', json_subdict)
-         call set_optimization_ic(this%design_indicator, coef, gs, &
-              json_subdict)
-      else
-         call field_rzero(this%design_indicator)
-      end if
+      call json_get(parameters, 'initial_distribution', json_subdict)
+      call nekotop_log%section('Design Initialization')
+      call set_optimization_ic(this%design_indicator, coef, gs, &
+           json_subdict)
+      call nekotop_log%end_section()
+
     end associate
 
     ! Map to the Brinkman amplitude
