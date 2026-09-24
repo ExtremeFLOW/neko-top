@@ -1,6 +1,6 @@
 program usrneko
   use simulation, only: simulation_t
-  use topopt_design, only: topopt_design_t
+  use brinkman_design, only: brinkman_design_t
   use problem, only: problem_t
   use optimizer, only : optimizer_t, optimizer_factory
 
@@ -25,7 +25,7 @@ program usrneko
   !> The problem type
   type(problem_t) :: problem
   !> The design type
-  type(topopt_design_t) :: design
+  type(brinkman_design_t) :: design
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: optimizer
 
@@ -48,9 +48,7 @@ program usrneko
 
   call simulation%init(parameters)
 
-  ! Todo: We are currently working on the design.
   call design%init(parameters, simulation)
-  call design%add_mapping(parameters, simulation)
 
 
   call problem%init(parameters, design, simulation)

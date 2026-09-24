@@ -35,7 +35,8 @@ contains
   !!
   !! \param[inout] neko_case The neko case to setup the user interface for
   !!
-  !! @todo We use a hacky way to run the physics and adjoint physics. This
+  !! @todo
+  !! We use a hacky way to run the physics and adjoint physics. This
   !! should be replaced with a more robust way to run the physics and adjoint
   !! physics.
   subroutine neko_user_init(neko_case)

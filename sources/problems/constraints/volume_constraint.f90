@@ -36,39 +36,26 @@
 ! $V < V_\text{max}$
 ! $V > V_\text{min}$
 module volume_constraint
+  use constraint, only: constraint_t
+
+  use design, only: design_t
+  use brinkman_design, only: brinkman_design_t
+  use simulation, only: simulation_t
+
   use num_types, only: rp
-  use field_list, only: field_list_t
-  use json_utils, only: json_get, json_get_or_default
-  use source_term, only: source_term_t
   use coefs, only: coef_t
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use utils, only: neko_error
-  use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_rone, field_copy
-  use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
-  use steady_simcomp, only: steady_simcomp_t
-  use simcomp_executor, only: neko_simcomps
-  use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only: rp
+  use json_utils, only: json_get, json_get_or_default
   use field, only: field_t
   use field_registry, only: neko_field_registry
-  use math, only: rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult, device_glsc2
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: curl, grad
   use scratch_registry, only: neko_scratch_registry
-  use constraint, only: constraint_t
-  use simulation, only: simulation_t
-  use fluid_source_term, only: fluid_source_term_t
-  use math, only: glsc2
-  use field_math, only: field_rone, field_cmult
-  use design, only: design_t
-  use topopt_design, only: topopt_design_t
+  use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
+  use math, only: glsc2
+  use device_math, only: device_glsc2
   use math_ext, only: glsc2_mask
-  use json_module, only: json_file
-  use json_utils, only: json_get_or_default
+  use field_math, only: field_rone, field_copy
+  use utils, only: neko_error
   implicit none
   private
 
@@ -103,7 +90,7 @@ module volume_constraint
      procedure, public, pass(this) :: update_sensitivity => &
           volume_constraint_update_sensitivity
 
-     !> Computes the volume of the topopt_design.
+     !> Computes the volume of the brinkman_design.
      procedure, private, pass(this) :: compute_volume
 
   end type volume_constraint_t
@@ -262,53 +249,54 @@ contains
 
     volume = 0.0_rp
     select type (design)
-    type is (topopt_design_t)
-       volume = volume_topopt_design(this, design)
+    type is (brinkman_design_t)
+       volume = volume_brinkman_design(this, design)
 
     class default
-       call neko_error('Volume constraint only works with topopt_design')
+       call neko_error('Volume constraint only works with brinkman_design')
     end select
 
   end function compute_volume
 
-  !> Computes the volume of the topopt_design.
+  !> Computes the volume of the brinkman_design.
   !! @param design the design.
-  function volume_topopt_design(this, design) result(volume)
+  function volume_brinkman_design(this, design) result(volume)
     class(volume_constraint_t), intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
+    type(brinkman_design_t), intent(in) :: design
     real(kind=rp) :: volume
-    type(field_t), pointer :: work
+    type(field_t), pointer :: work, design_indicator
     integer :: temp_indices(1)
 
     volume = 0.0_rp
+    design_indicator => neko_field_registry%get_field("design_indicator")
 
     ! in the future we should be using the mapped design variable
     ! corresponding to this constraint!!!
     if (this%has_mask) then
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_scratch_registry%request_field(work , temp_indices(1))
-          call field_copy(work, design%design_indicator)
+          call neko_scratch_registry%request_field(work, temp_indices(1))
+          call field_copy(work, design_indicator)
           call mask_exterior_const(work, this%mask, 0.0_rp)
           volume = device_glsc2(work%x_d, this%c_xh%B_d, design%size())
           call neko_scratch_registry%relinquish_field(temp_indices)
        else
-          volume = glsc2_mask(design%design_indicator%x, &
+          volume = glsc2_mask(design_indicator%x, &
                this%c_Xh%B, design%size(), this%mask%mask, this%mask%size)
        end if
 
     else
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          volume = device_glsc2(design%design_indicator%x_d, &
+          volume = device_glsc2(design_indicator%x_d, &
                this%c_xh%B_d, design%size())
        else
-          volume = glsc2(design%design_indicator%x, &
+          volume = glsc2(design_indicator%x, &
                this%c_Xh%B, design%size())
        end if
 
     end if
 
-  end function volume_topopt_design
+  end function volume_brinkman_design
 
 end module volume_constraint

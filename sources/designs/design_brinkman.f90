@@ -1,37 +1,37 @@
 ! Copyright (c) 2024, The Neko Authors
- ! All rights reserved.
- !
- ! Redistribution and use in source and binary forms, with or without
- ! modification, are permitted provided that the following conditions
- ! are met:
- !
- !   * Redistributions of source code must retain the above copyright
- !     notice, this list of conditions and the following disclaimer.
- !
- !   * Redistributions in binary form must reproduce the above
- !     copyright notice, this list of conditions and the following
- !     disclaimer in the documentation and/or other materials provided
- !     with the distribution.
- !
- !   * Neither the name of the authors nor the names of its
- !     contributors may be used to endorse or promote products derived
- !     from this software without specific prior written permission.
- !
- ! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- ! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- ! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- ! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- ! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- ! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- ! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- ! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- ! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- ! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- ! POSSIBILITY OF SUCH DAMAGE.
+! All rights reserved.
+!
+! Redistribution and use in source and binary forms, with or without
+! modification, are permitted provided that the following conditions
+! are met:
+!
+!   * Redistributions of source code must retain the above copyright
+!     notice, this list of conditions and the following disclaimer.
+!
+!   * Redistributions in binary form must reproduce the above
+!     copyright notice, this list of conditions and the following
+!     disclaimer in the documentation and/or other materials provided
+!     with the distribution.
+!
+!   * Neither the name of the authors nor the names of its
+!     contributors may be used to endorse or promote products derived
+!     from this software without specific prior written permission.
+!
+! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+! POSSIBILITY OF SUCH DAMAGE.
 
- ! Implements the `topopt_design_t` type.
-module topopt_design
+! Implements the `brinkman_design_t` type.
+module brinkman_design
   use num_types, only: rp, sp
   use field, only: field_t
   use json_module, only: json_file
@@ -53,17 +53,19 @@ module topopt_design
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
+  use field_registry, only: neko_field_registry
   implicit none
   private
 
   !> A topology optimization design variable
-  type, extends(design_t), public :: topopt_design_t
+  type, extends(design_t), public :: brinkman_design_t
+     private
 
      ! TODO
      ! in the future make this a derived type of a `design_variable`
-     ! type, public, extends(design_variable_t) :: topopt_design_t
+     ! type, public, extends(design_variable_t) :: brinkman_design_t
      !> the unfilitered design
-     type(field_t), public :: design_indicator
+     type(field_t), pointer :: design_indicator
 
      !> the mapped coefficient (Brinkman term)
      ! TODO
@@ -73,7 +75,7 @@ module topopt_design
      !
      ! or as I describe below, we also have multiple constraints,
      ! so a list-of-lists may be the correct way forward
-     type(field_t), public :: brinkman_amplitude
+     type(field_t), pointer :: brinkman_amplitude
 
      ! NOTE:
      ! again, we have to be so clear with nomenclature.
@@ -105,7 +107,7 @@ module topopt_design
      !and chain rule it's way back to
      ! dF/d\rho
      ! and store it here          v
-     type(field_t), public :: sensitivity
+     type(field_t), pointer :: sensitivity
      ! have a field list here
      ! type(filed_list_t), public :: constraint_sensitivity
      ! HOWEVER !
@@ -143,7 +145,7 @@ module topopt_design
      type(RAMP_mapping_t) :: mapping
 
      ! and we need to hold onto a field for the chain of mappings
-     type(field_t) :: filtered_design
+     type(field_t), pointer :: filtered_design
 
 
      !> A mask indicating the optimization domain
@@ -158,34 +160,34 @@ module topopt_design
      ! afield writer would be nice too
      type(fld_file_output_t), private :: output
 
-
    contains
 
      ! ----------------------------------------------------------------------- !
      ! Initializations
 
      !> Initialize the design
-     generic, public :: init => init_from_json, &
-          init_from_components
+     generic, public :: init => init_from_json_sim, init_from_components
      !> Initialize the design from a JSON file
-     procedure, pass(this), public :: init_from_json => &
-          topopt_design_init_from_json
+     procedure, pass(this), public :: init_from_json_sim => &
+          brinkman_design_init_from_json_sim
      !> Initialize the design from components
      procedure, pass(this), public :: init_from_components => &
-          topopt_design_init_from_components
+          brinkman_design_init_from_components
 
-     !> Add mappings to the design
-     procedure, pass(this) :: add_mapping => topopt_design_add_mapping
+     !> Retrieve the design variables
+     procedure, pass(this) :: get_design => brinkman_design_get_design
 
+     !> Update the design
+     procedure, pass(this) :: update_design => brinkman_design_update_design
 
      !> map (this will include everything from mapping
      ! design_indicator -> filtering -> chi
      ! and ultimately handle mapping different coeficients!
-     procedure, pass(this) :: map_forward => topopt_design_map_forward
+     procedure, pass(this) :: map_forward => brinkman_design_map_forward
      !> this will contain chain rule for going backwards
      ! d_design_indicator <- d_filtering <- d_chi
      ! and ultimately handle mapping different coeficients!
-     procedure, pass(this) :: map_backward => topopt_design_map_backward
+     procedure, pass(this) :: map_backward => brinkman_design_map_backward
      ! TODO
      ! maybe it would have been smarter to have a "coeficient" type,
      ! which is just a scalar field and set of mappings going from
@@ -193,46 +195,75 @@ module topopt_design
      ! maybe also some information about what equation they live in...
 
      ! a writer being called from outside would be nice
-     procedure, pass(this) :: write => topopt_design_write
+     procedure, pass(this) :: write => brinkman_design_write
 
      !> Destructor
-     procedure, pass(this) :: free => topopt_design_free
+     procedure, pass(this) :: free => brinkman_design_free
      ! TODO
      ! I'm not sure who owns the optimizer...
      ! but it would make sense to have it in here so you provide it
      ! with dF/d_design_indicator and it updates itself.
-     ! procedure, pass(this) :: update => topopt_design_update
-  end type topopt_design_t
+     ! procedure, pass(this) :: update => brinkman_design_update_design
+  end type brinkman_design_t
 
 
 contains
 
-
   !> Initialize the design from a JSON file
-  subroutine topopt_design_init_from_json(this, parameters, simulation)
-    class(topopt_design_t), intent(inout) :: this
+  subroutine brinkman_design_init_from_json_sim(this, parameters, simulation)
+    class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
 
     call this%init_from_components(simulation)
 
-  end subroutine topopt_design_init_from_json
+    ! Todo: This need to be read from the parameters in the JSON
+    associate(coef => simulation%neko_case%fluid%c_Xh)
+      call this%filter%init(parameters, coef)
+      call this%mapping%init(parameters, coef)
+    end associate
 
+    ! and then we would map for the first one
+    call this%map_forward()
 
-  subroutine topopt_design_init_from_components(this, simulation)
-    class(topopt_design_t), intent(inout) :: this
+  end subroutine brinkman_design_init_from_json_sim
+
+  !> Free the design
+  subroutine brinkman_design_free(this)
+    class(brinkman_design_t), intent(inout) :: this
+
+    call this%free_base()
+    call this%brinkman_amplitude%free()
+    call this%design_indicator%free()
+    call this%filtered_design%free()
+    call this%sensitivity%free()
+
+  end subroutine brinkman_design_free
+
+  subroutine brinkman_design_init_from_components(this, simulation)
+    class(brinkman_design_t), intent(inout) :: this
     type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
-    associate(coef => simulation%neko_case%fluid%c_Xh)
-      ! init the fields
-      call this%design_indicator%init(coef%dof, "design_indicator")
-      call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
-      call this%sensitivity%init(coef%dof, "sensitivity")
-      call this%filtered_design%init(coef%dof, "filtered_design")
+    associate(dof => simulation%neko_case%fluid%dm_Xh)
+
+      call neko_field_registry%add_field(dof, "design_indicator", .true.)
+      call neko_field_registry%add_field(dof, "brinkman_amplitude", .true.)
+      call neko_field_registry%add_field(dof, "sensitivity", .true.)
+      call neko_field_registry%add_field(dof, "filtered_design", .true.)
+
     end associate
+
+    this%design_indicator => &
+         neko_field_registry%get_field("design_indicator")
+    this%brinkman_amplitude => &
+         neko_field_registry%get_field("brinkman_amplitude")
+    this%sensitivity => &
+         neko_field_registry%get_field("sensitivity")
+    this%filtered_design => &
+         neko_field_registry%get_field("filtered_design")
 
     ! TODO
     ! this is where we steal basically everything in
@@ -347,28 +378,11 @@ contains
     ! append brinkman source term based on design
     call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
 
-  end subroutine topopt_design_init_from_components
-
-  !> Add mappings to the design
-  subroutine topopt_design_add_mapping(this, parameters, simulation)
-    class(topopt_design_t), intent(inout) :: this
-    type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
-
-    ! Todo: This need to be read from the parameters in the JSON
-    associate(coef => simulation%neko_case%fluid%c_Xh)
-      call this%filter%init(parameters, coef)
-      call this%mapping%init(parameters, coef)
-    end associate
-
-    ! and then we would map for the first one
-    call this%map_forward()
-
-  end subroutine topopt_design_add_mapping
+  end subroutine brinkman_design_init_from_components
 
 
-  subroutine topopt_design_map_forward(this)
-    class(topopt_design_t), intent(inout) :: this
+  subroutine brinkman_design_map_forward(this)
+    class(brinkman_design_t), intent(inout) :: this
 
     ! TODO, see previous todo about mask first, then mapping
     if (this%if_mask) then
@@ -387,10 +401,44 @@ contains
     call this%mapping%apply_forward(this%brinkman_amplitude, &
          this%filtered_design)
 
-  end subroutine topopt_design_map_forward
+  end subroutine brinkman_design_map_forward
 
-  subroutine topopt_design_map_backward(this, sensitivity)
-    class(topopt_design_t), intent(inout) :: this
+  function brinkman_design_get_design(this) result(x)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t) :: x
+    integer :: n
+
+    n = this%size()
+    call x%init(n)
+    call copy(x%x, this%design_indicator%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(x%x_d, this%design_indicator%x_d, n)
+    end if
+
+  end function brinkman_design_get_design
+
+  subroutine brinkman_design_update_design(this, x)
+    class(brinkman_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: x
+    integer :: n
+
+    n = this%size()
+    call copy(this%design_indicator%x, x%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%design_indicator%x_d, x%x_d, n)
+    end if
+
+    call this%map_forward()
+
+    call copy(x%x, this%design_indicator%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(x%x_d, this%design_indicator%x_d, n)
+    end if
+
+  end subroutine brinkman_design_update_design
+
+  subroutine brinkman_design_map_backward(this, sensitivity)
+    class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
     type(field_t), pointer :: df_dchi
     type(field_t), pointer :: dF_dfiltered_design
@@ -431,21 +479,14 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine topopt_design_map_backward
+  end subroutine brinkman_design_map_backward
 
-  subroutine topopt_design_free(this)
-    class(topopt_design_t), target, intent(inout) :: this
-    call this%brinkman_amplitude%free()
-    call this%design_indicator%free()
-
-  end subroutine topopt_design_free
-
-  subroutine topopt_design_write(this, idx)
-    class(topopt_design_t), intent(inout) :: this
+  subroutine brinkman_design_write(this, idx)
+    class(brinkman_design_t), intent(inout) :: this
     integer, intent(in) :: idx
 
     call this%output%sample(real(idx, kind=rp))
 
-  end subroutine topopt_design_write
+  end subroutine brinkman_design_write
 
-end module topopt_design
+end module brinkman_design
