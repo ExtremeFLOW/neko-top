@@ -56,8 +56,6 @@ contains
     type(field_t), pointer :: u, v, w, p, s
     type(json_file) :: json_subdict
 
-    t = 0.0_rp
-
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
     ! ------------------------------------------------------------------------ !
@@ -76,9 +74,13 @@ contains
     ! Reset the timing parameters
     ! ------------------------------------------------------------------------ !
 
+    t = 0.0_rp
+    neko_case%time%t = t
+    neko_case%time%tstep = 0
+
     ! Setup lagged time step parameters
-    neko_case%time%tlag(:) = t
-    neko_case%time%dtlag(:) = neko_case%time%dt
+    neko_case%time%tlag = t
+    neko_case%time%dtlag = neko_case%time%dt
     do i = 1, size(neko_case%time%tlag)
        neko_case%time%tlag(i) = t - i*neko_case%time%dtlag(i)
     end do

@@ -47,6 +47,7 @@ module adjoint_case
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
+  use time_state, only : time_state_t
   use utils, only: neko_error
   use adjoint_scalar_convection_source_term, only: &
        adjoint_scalar_convection_source_term_t
@@ -67,6 +68,7 @@ module adjoint_case
      type(adjoint_scalar_convection_source_term_t), allocatable :: &
           adjoint_convection_term
      type(case_t), pointer :: case
+     type(time_state_t) :: time
 
      ! Fields
      real(kind=rp) :: tol
@@ -212,6 +214,23 @@ contains
     end if
 
     !
+    ! Time step
+    !
+    ! call json_get_or_default(neko_case%params, 'case.variable_timestep', &
+    !      logical_val, .false.)
+    ! if (.not. logical_val) then
+    call json_get(neko_case%params, 'case.timestep', this%time%dt)
+    ! else
+    !    ! randomly set an initial dt to get cfl when dt is variable
+    !    this%time%dt = 1.0_rp
+    ! end if
+
+    !
+    ! End time
+    !
+    call json_get(neko_case%params, 'case.end_time', this%time%end_time)
+
+    !
     ! Setup user defined conditions
     !
     ! if (neko_case%params%valid_path('case.fluid.inflow_condition')) then
@@ -351,6 +370,12 @@ contains
     !         1e10_rp)
     !   call this%output_controller%add(neko_case%f_chkp, real_val, string_val)
     ! end if
+
+    !
+    ! Initialize time and step
+    !
+    this%time%t = 0d0
+    this%time%tstep = 0
 
   end subroutine adjoint_case_init_common
 
