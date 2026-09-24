@@ -271,28 +271,6 @@ contains
     class(scalar_mixing_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
-    !--------------------------------------------------------------------------
-    ! THIS SHOULD BE REPLACED WITH A ZERO CONTRIBUTION AFTER THE DESIGN UPDATE
-    type(field_t), pointer :: work
-    integer :: temp_indices(1)
-
-    call neko_scratch_registry%request_field(work, temp_indices(1))
-
-    ! here it should just be an inner product between the forward and adjoint
-    call field_col3(work, this%u, this%u_adj)
-    call field_addcol3(work, this%v, this%v_adj)
-    call field_addcol3(work, this%w, this%w_adj)
-    ! but negative
-    call field_cmult(work, -1.0_rp)
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
-    else
-       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
-    end if
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
-
   end subroutine scalar_mixing_update_sensitivity
 
 end module scalar_mixing_objective
