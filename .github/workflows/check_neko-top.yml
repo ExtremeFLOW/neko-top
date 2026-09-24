@@ -176,9 +176,13 @@ jobs:
             -DNEKO_DIR=$NEKO_DIR -DPFUNIT_DIR=$PFUNIT_DIR \
             -DBUILD_DOCS=OFF -DBUILD_TESTING=ON -DDEVICE_TYPE=OFF
 
-      - name: Building
+      - name: Building Library
         run: |
           cmake --build build --parallel
+
+      - name: Building Examples
+        run: |
+          cmake --build build --target Examples --parallel
 
       - name: Unit tests
         run: |
