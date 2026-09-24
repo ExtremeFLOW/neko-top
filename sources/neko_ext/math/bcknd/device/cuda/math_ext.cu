@@ -51,6 +51,7 @@ void cuda_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     copy_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
@@ -63,6 +64,7 @@ void cuda_cadd_mask(void* a, real* c, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     cadd_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, *c, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
@@ -75,6 +77,7 @@ void cuda_invcol1_mask(void* a, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     invcol1_mask_kernel<real>
         <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
             (real*)a, *size, mask, *mask_size);
@@ -88,6 +91,7 @@ void cuda_col2_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     col2_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
@@ -101,6 +105,7 @@ void cuda_col3_mask(
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     col3_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
@@ -114,6 +119,7 @@ void cuda_sub3_mask(
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     sub3_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
