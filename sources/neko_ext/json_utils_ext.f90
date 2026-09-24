@@ -8,7 +8,7 @@ module json_utils_ext
   implicit none
   private
 
-  public :: json_key_fallback, json_get_subdict, json_read_file
+  public :: json_key_fallback, json_read_file
 
 contains
 
@@ -31,31 +31,6 @@ contains
     end if
 
   end function json_key_fallback
-
-  !> Extract a sub-object from a json object.
-  subroutine json_get_subdict(json, key, output)
-    type(json_file), intent(inout) :: json
-    character(len=*), intent(in) :: key
-    type(json_file), intent(out) :: output
-
-    type(json_value), pointer :: child
-    logical :: valid
-
-    if (associated(child)) nullify(child)
-
-    valid = .false.
-    call json%get(key, child, valid)
-    if (.not. valid) then
-       call neko_error('Parameter "' // &
-            trim(key) // '" missing from the case file')
-    end if
-
-    call output%initialize()
-    call output%add(child)
-
-    if (associated(child)) nullify(child)
-
-  end subroutine json_get_subdict
 
   !> Read a json file taking mpi into account.
   !! This function reads a json file and broadcasts it to all ranks.
@@ -100,10 +75,12 @@ contains
        if (rank .ne. 0) allocate(character(len=length) :: json_buffer)
        call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, MPI_COMM_WORLD, &
             ierr)
-    end if
 
-    call json%load_from_string(json_buffer)
-    deallocate(json_buffer)
+       if (rank .ne. 0) then
+          call json%load_from_string(json_buffer)
+          deallocate(json_buffer)
+       end if
+    end if
 
   end function json_read_file
 
