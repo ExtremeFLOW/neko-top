@@ -446,6 +446,10 @@ contains
     integer :: n
 
     n = this%size()
+    if (n .ne. values%size()) then
+       call neko_error('Get design: size mismatch')
+    end if
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
     else
@@ -460,6 +464,10 @@ contains
     integer :: n
 
     n = this%size()
+    if (n .ne. values%size()) then
+       call neko_error('Get design: size mismatch')
+    end if
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
     else
@@ -474,6 +482,10 @@ contains
     integer :: n
 
     n = this%size()
+    if (n .ne. x%size()) then
+       call neko_error('Get x: size mismatch')
+    end if
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
     else
@@ -503,6 +515,10 @@ contains
     integer :: n
 
     n = this%size()
+    if (n .ne. y%size()) then
+       call neko_error('Get y: size mismatch')
+    end if
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
     else
@@ -532,6 +548,10 @@ contains
     integer :: n
 
     n = this%size()
+    if (n .ne. z%size()) then
+       call neko_error('Get z: size mismatch')
+    end if
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
     else
