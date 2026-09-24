@@ -32,8 +32,9 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <hip/hip_runtime.h>
 #include "RAMP_mapping_kernel.h"
-#include <device/cuda/check.h>
+#include <device/hip/check.h>
 #include <device/device_config.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,56 +43,60 @@ extern "C" {
 
 /** Fortran wrapper for RAMP (convex down) mapping
  */
-void cuda_convex_down_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
+void hip_convex_down_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
     void* X_out_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    convex_down_RAMP_mapping_apply_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    hipLaunchKernelGGL(convex_down_RAMP_mapping_apply_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
+    HIP_CHECK(hipGetLastError());
 }
+
 /** Fortran wrapper for RAMP (convex down) chain rule
  */
-void cuda_convex_down_RAMP_mapping_apply_backward(real* f_min, real* f_max,
+void hip_convex_down_RAMP_mapping_apply_backward(real* f_min, real* f_max,
     real* q, void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    convex_down_RAMP_mapping_apply_backward_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)sens_out_d,(real*)sens_in_d,
+    hipLaunchKernelGGL(convex_down_RAMP_mapping_apply_backward_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
         (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    HIP_CHECK(hipGetLastError());
 }
+
 /** Fortran wrapper for RAMP (convex up) mapping
  */
-void cuda_convex_up_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
+void hip_convex_up_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
     void* X_out_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    convex_up_RAMP_mapping_apply_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    hipLaunchKernelGGL(convex_up_RAMP_mapping_apply_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
+    HIP_CHECK(hipGetLastError());
 }
+
 /** Fortran wrapper for RAMP (convex up) chain rule
  */
-void cuda_convex_up_RAMP_mapping_apply_backward(real* f_min, real* f_max,
+void hip_convex_up_RAMP_mapping_apply_backward(real* f_min, real* f_max,
     real* q, void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    convex_up_RAMP_mapping_apply_backward_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
+    hipLaunchKernelGGL(convex_up_RAMP_mapping_apply_backward_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
         (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    HIP_CHECK(hipGetLastError());
 }
 }
+

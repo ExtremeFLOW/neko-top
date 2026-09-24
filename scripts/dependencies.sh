@@ -317,12 +317,24 @@ function find_neko() {
                 error "the CUDA installation."
                 exit 1
             fi
+        elif [ "$DEVICE_TYPE" == "HIP" ]; then
+            if [ -d "$HIP_DIR" ]; then
+                FEATURES+=" --with-hip=$HIP_DIR"
+            else
+                error "HIP_DIR is not set."
+                error "Please set HIP_DIR to the directory containing"
+                error "the HIP installation."
+                exit 1
+            fi
         elif [ "$DEVICE_TYPE" != "NONE" ]; then
             printf "Device type not recognized: $DEVICE_TYPE\n"
-            printf "\tValid options are: CUDA, NONE\n"
+            printf "\tValid options are: CUDA, HIP or NONE\n"
             printf "\tPlease submit an issue if you would like to see additional options.\n"
             exit 1
         fi
+
+        # Add additional features to be applied by the user
+        FEATURES+=" ${NEKO_CONFIG_FLAGS[@]}"
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR

@@ -77,6 +77,9 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda_mma_math.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma.cu
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma_kernel.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip_mma_math.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip/mma.hip
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip/mma_kernel.h
 )
 
 # ============================================================================ #
