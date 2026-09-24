@@ -224,7 +224,7 @@ contains
        call ele%facet_order(t_hex, facet_id)
        do n = 1, N_nodes
           v = t_hex%x(n)
-          nodes(:, n) = C%msh%points(v)%x
+          nodes(:, n) = real(C%msh%points(v)%x, kind=rp)
        end do
     end select
 
