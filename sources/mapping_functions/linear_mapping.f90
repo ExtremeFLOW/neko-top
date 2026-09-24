@@ -40,6 +40,7 @@ module linear_mapping
   use json_module, only: json_file
   use field, only: field_t
   use coefs, only: coef_t
+  use json_utils, only: json_get, json_get_or_default
   implicit none
   private
 
@@ -59,9 +60,10 @@ module linear_mapping
      !> Destructor.
      procedure, pass(this) :: free => linear_mapping_free
      !> Apply the forward mapping
-     procedure, pass(this) :: apply_forward => linear_mapping_apply
+     procedure, pass(this) :: forward_mapping => linear_forward_mapping
      !> Apply the adjoint mapping
-     procedure, pass(this) :: apply_backward => linear_mapping_apply_backward
+     procedure, pass(this) :: backward_mapping => &
+          linear_backward_mapping
   end type linear_mapping_t
 
 contains
@@ -71,22 +73,24 @@ contains
     class(linear_mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
+    real(kind=rp) :: f_min, f_max
 
-    ! do the JSON stuff later
-    this%f_min = 0.0_rp
-    this%f_max = 1000.0_rp
+    call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
+    call json_get(json, 'f_max', f_max)
 
     call this%init_base(json, coef)
-    call linear_mapping_init_from_attributes(this, coef)
+    call linear_mapping_init_from_attributes(this, coef, f_min, f_max)
 
   end subroutine linear_mapping_init_from_json
 
   !> Actual constructor.
-  subroutine linear_mapping_init_from_attributes(this, coef)
+  subroutine linear_mapping_init_from_attributes(this, coef, f_min, f_max)
     class(linear_mapping_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
+    real(kind=rp), intent(in) :: f_min, f_max
 
-    ! there's actually nothing to do here.
+    this%f_min = f_min
+    this%f_max = f_max
 
   end subroutine linear_mapping_init_from_attributes
 
@@ -101,7 +105,7 @@ contains
   !> Apply the mapping
   !! @param X_out mapped field
   !! @param X_in unmapped field
-  subroutine linear_mapping_apply(this, X_out, X_in)
+  subroutine linear_forward_mapping(this, X_out, X_in)
     class(linear_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -111,26 +115,26 @@ contains
     call field_cmult(X_out, this%f_max - this%f_min)
     call field_cadd(X_out, this%f_min)
 
-  end subroutine linear_mapping_apply
+  end subroutine linear_forward_mapping
 
 
   !> Apply the  chain rule
   !! @param X_in unmapped field
-  !! @param dF_dX_in is the sensitivity with respect to the unfiltered design
-  !! @param dF_dX_out is the sensitivity with respect to the filtered design
-  subroutine linear_mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
+  !! @param sens_out is the sensitivity with respect to the unfiltered design
+  !! @param sens_in is the sensitivity with respect to the filtered design
+  subroutine linear_backward_mapping(this, sens_out, sens_in, X_in)
     class(linear_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
-    type(field_t), intent(in) :: dF_dX_out
-    type(field_t), intent(inout) :: dF_dX_in
+    type(field_t), intent(in) :: sens_in
+    type(field_t), intent(inout) :: sens_out
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
 
     ! dx_out/dx_in = (f_max - f_min)
 
-    call field_copy(dF_dX_in, dF_dX_out)
-    call field_cmult(dF_dX_in, this%f_max - this%f_min)
+    call field_copy(sens_out, sens_in)
+    call field_cmult(sens_out, this%f_max - this%f_min)
 
-  end subroutine linear_mapping_apply_backward
+  end subroutine linear_backward_mapping
 
 end module linear_mapping
