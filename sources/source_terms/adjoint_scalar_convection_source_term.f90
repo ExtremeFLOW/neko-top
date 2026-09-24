@@ -166,16 +166,16 @@ contains
 
     ! So should the Brinkman term actually....
 
-    call grad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
+    call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
 
     ! TODO
     ! So in principal, the derivatives could have kinks now.
     ! I don't think a gsop will remedy this (or even whether it's a good idea)
     ! But I want to leave this todo as a reminder.
 
-    call field_subcol3(fu,this%s_adj,dsdx)
-    call field_subcol3(fv,this%s_adj,dsdy)
-    call field_subcol3(fw,this%s_adj,dsdz)
+    call field_subcol3(fu, this%s_adj, dsdx)
+    call field_subcol3(fv, this%s_adj, dsdy)
+    call field_subcol3(fw, this%s_adj, dsdz)
 
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)
