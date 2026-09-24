@@ -47,7 +47,6 @@ module adjoint_minimum_dissipation_source_term
   use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_subcol3, field_add2, field_add2s2
-  use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
