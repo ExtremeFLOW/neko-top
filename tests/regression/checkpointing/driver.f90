@@ -39,7 +39,7 @@ program checkpointing_test
   ! Parameters for the checkpointing
   integer :: n_saves_memory = 10
   character(len=256) :: algorithm = "linear"
-  character(len=256) :: filename = "checkpoint.chkp"
+  character(len=256) :: filename = "checkpoint"
 
   !> Log message for errors
   character(len=256) :: log_msg
