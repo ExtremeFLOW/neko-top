@@ -837,6 +837,11 @@ contains
            this%ksp_vel%max_iter)
       call profiler_end_region("Velocity_solve", 4)
 
+      ksp_results(1)%name = 'Adjoint Pressure'
+      ksp_results(2)%name = 'Adjoint Velocity U'
+      ksp_results(3)%name = 'Adjoint Velocity V'
+      ksp_results(4)%name = 'Adjoint Velocity W'
+
       call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
            this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
            dt_controller)
