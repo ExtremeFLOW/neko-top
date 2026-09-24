@@ -320,6 +320,12 @@ function handler() {
 trap 'handler' SIGINT
 
 # ============================================================================ #
+# Compile the example executables
+
+printf "\n\e[4mCompiling the examples.\e[0m\n"
+cmake --build $MAIN_DIR/build --target Examples --parallel
+
+# ============================================================================ #
 # Run the examples
 full_start=$(date +%s.%N)
 QUEUE=""
