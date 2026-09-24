@@ -53,6 +53,7 @@ module volume_constraint
   use mask_ops, only: mask_exterior_const
   use math, only: glsc2
   use device_math, only: device_glsc2
+  use vector_math, only: vector_cmult
   use math_ext, only: glsc2_mask
   use field_math, only: field_rone, field_copy
   use utils, only: neko_error
@@ -193,7 +194,7 @@ contains
     this%sensitivity = 1.0_rp / this%volume_domain
 
     ! Invert the sign if it is a maximum constraint
-    if (.not. this%is_max) this%sensitivity = (-1.0_rp) * this%sensitivity
+    call vector_cmult(this%sensitivity, -1.0_rp)
 
     if (this%has_mask) then
        call mask_exterior_const(this%sensitivity, this%mask, 0.0_rp)
