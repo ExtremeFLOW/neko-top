@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Adjoint Pn/Pn formulation.
-module adjoint_fluid_pnpn
+module adjoint_pnpn
   use, intrinsic :: iso_fortran_env, only: error_unit
   use coefs, only: coef_t
   use symmetry, only: symmetry_t
@@ -46,7 +46,7 @@ module adjoint_fluid_pnpn
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
   ! use adjoint_volflow, only: adjoint_volflow_t
-  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
+  use adjoint_scheme, only: adjoint_scheme_t
   use device_mathops, only: device_opcolv, device_opadd2cm
   use fluid_aux, only: fluid_step_info
   use time_scheme_controller, only: time_scheme_controller_t
@@ -91,7 +91,7 @@ module adjoint_fluid_pnpn
   private
 
 
-  type, public, extends(adjoint_fluid_scheme_t) :: adjoint_fluid_pnpn_t
+  type, public, extends(adjoint_scheme_t) :: adjoint_pnpn_t
 
      !> The right-hand sides in the linear solves.
      type(field_t) :: p_res, u_res, v_res, w_res
@@ -222,23 +222,23 @@ module adjoint_fluid_pnpn
 
    contains
      !> Constructor.
-     procedure, pass(this) :: init => adjoint_fluid_pnpn_init
+     procedure, pass(this) :: init => adjoint_pnpn_init
      !> Destructor.
-     procedure, pass(this) :: free => adjoint_fluid_pnpn_free
+     procedure, pass(this) :: free => adjoint_pnpn_free
      !> Perform a single time-step of the scheme.
-     procedure, pass(this) :: step => adjoint_fluid_pnpn_step
+     procedure, pass(this) :: step => adjoint_pnpn_step
      !> Restart from a previous solution.
-     procedure, pass(this) :: restart => adjoint_fluid_pnpn_restart
+     procedure, pass(this) :: restart => adjoint_pnpn_restart
      !> Set up boundary conditions.
-     procedure, pass(this) :: setup_bcs => adjoint_fluid_pnpn_setup_bcs
+     procedure, pass(this) :: setup_bcs => adjoint_pnpn_setup_bcs
      !> Write a field with boundary condition specifications.
      procedure, pass(this) :: write_boundary_conditions => &
-          adjoint_fluid_pnpn_write_boundary_conditions
+          adjoint_pnpn_write_boundary_conditions
 
      !> Compute the power_iterations field.
      procedure, public, pass(this) :: PW_compute_ => power_iterations_compute
 
-  end type adjoint_fluid_pnpn_t
+  end type adjoint_pnpn_t
 
   interface
      !> Boundary condition factory for pressure.
@@ -250,7 +250,7 @@ module adjoint_fluid_pnpn
      !! @param[in] user The user interface.
      module subroutine pressure_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
-       type(adjoint_fluid_pnpn_t), intent(in) :: scheme
+       type(adjoint_pnpn_t), intent(in) :: scheme
        type(json_file), intent(inout) :: json
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
@@ -267,7 +267,7 @@ module adjoint_fluid_pnpn
      !! @param[in] user The user interface.
      module subroutine velocity_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
-       type(adjoint_fluid_pnpn_t), intent(in) :: scheme
+       type(adjoint_pnpn_t), intent(in) :: scheme
        type(json_file), intent(inout) :: json
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
@@ -276,8 +276,8 @@ module adjoint_fluid_pnpn
 
 contains
 
-  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, time_scheme)
-    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
+  subroutine adjoint_pnpn_init(this, msh, lx, params, user, time_scheme)
+    class(adjoint_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(in) :: lx
     type(json_file), target, intent(inout) :: params
@@ -408,7 +408,7 @@ contains
     call advection_adjoint_factory(this%adv, params, this%c_Xh)
 
     if (params%valid_path('case.fluid.flow_rate_force')) then
-       call neko_error("Flow rate forcing not available for adjoint_fluid_pnpn")
+       call neko_error("Flow rate forcing not available for adjoint_pnpn")
        !  call this%vol_flow%init(this%dm_Xh, params)
     end if
 
@@ -468,10 +468,10 @@ contains
     write(header_line, '(A)') 'Time, Norm, Scaling'
     call this%file_output%set_header(header_line)
 
-  end subroutine adjoint_fluid_pnpn_init
+  end subroutine adjoint_pnpn_init
 
-  subroutine adjoint_fluid_pnpn_restart(this, dtlag, tlag)
-    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
+  subroutine adjoint_pnpn_restart(this, dtlag, tlag)
+    class(adjoint_pnpn_t), target, intent(inout) :: this
     real(kind=rp) :: dtlag(10), tlag(10)
     integer :: i, j, n
 
@@ -621,10 +621,10 @@ contains
     !this%aby1 = this%f_y
     !this%abz1 = this%f_z
 
-  end subroutine adjoint_fluid_pnpn_restart
+  end subroutine adjoint_pnpn_restart
 
-  subroutine adjoint_fluid_pnpn_free(this)
-    class(adjoint_fluid_pnpn_t), intent(inout) :: this
+  subroutine adjoint_pnpn_free(this)
+    class(adjoint_pnpn_t), intent(inout) :: this
 
     !Deallocate velocity and pressure fields
     call this%scheme_free()
@@ -694,7 +694,7 @@ contains
 
     ! call this%vol_flow%free()
 
-  end subroutine adjoint_fluid_pnpn_free
+  end subroutine adjoint_pnpn_free
 
   !> Advance fluid simulation in time.
   !! @param t The time value.
@@ -702,8 +702,8 @@ contains
   !! @param dt The timestep
   !! @param ext_bdf Time integration logic.
   !! @param dt_controller timestep controller
-  subroutine adjoint_fluid_pnpn_step(this, t, tstep, dt, ext_bdf, dt_controller)
-    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
+  subroutine adjoint_pnpn_step(this, t, tstep, dt, ext_bdf, dt_controller)
+    class(adjoint_pnpn_t), target, intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=rp), intent(in) :: dt
@@ -949,16 +949,16 @@ contains
     ! for now I'm commenting this out
     !call this%PW_compute_(t, tstep)
 
-  end subroutine adjoint_fluid_pnpn_step
+  end subroutine adjoint_pnpn_step
 
   ! ========================================================================== !
 
   !> Sets up the boundary condition for the scheme.
   !! @param user The user interface.
-  subroutine adjoint_fluid_pnpn_setup_bcs(this, user, params)
+  subroutine adjoint_pnpn_setup_bcs(this, user, params)
     use mpi_f08, only: MPI_IN_PLACE
 
-    class(adjoint_fluid_pnpn_t), intent(inout) :: this
+    class(adjoint_pnpn_t), intent(inout) :: this
     type(user_t), target, intent(in) :: user
     type(json_file), intent(inout) :: params
     integer :: i, n_bcs, j, zone_size, global_zone_size, ierr
@@ -1055,10 +1055,10 @@ contains
              type is (symmetry_t)
                 ! Symmetry has 3 internal bcs, but only one actually contains
                 ! markings.
-                ! Symmetry's apply_scalar doesn't do anything, so we need to
-                ! mark individual nested bcs to the du,dv,dw, whereas the
-                ! vel_res can just get symmetry as a whole, because on this
-                ! list we call apply_vector.
+                ! Symmetry's apply_scalar doesn't do anything, so we need to mark
+                ! individual nested bcs to the du,dv,dw, whereas the vel_res can
+                ! just get symmetry as a whole, because on this list we call
+                ! apply_vector.
                 ! Additionally we have to mark the special surface bc for p.
                 call this%bclst_vel_res%append(bc_i)
                 call this%bc_du%mark_facets(bc_i%bc_x%marked_facet)
@@ -1167,17 +1167,17 @@ contains
     call MPI_Allreduce(MPI_IN_PLACE, this%prs_dirichlet, 1, &
          MPI_LOGICAL, MPI_LOR, NEKO_COMM)
 
-  end subroutine adjoint_fluid_pnpn_setup_bcs
+  end subroutine adjoint_pnpn_setup_bcs
 
   !> Write a field with boundary condition specifications
-  subroutine adjoint_fluid_pnpn_write_boundary_conditions(this)
+  subroutine adjoint_pnpn_write_boundary_conditions(this)
     use inflow, only: inflow_t
     use field_dirichlet, only: field_dirichlet_t
     use blasius, only: blasius_t
     use field_dirichlet_vector, only: field_dirichlet_vector_t
     use usr_inflow, only: usr_inflow_t
     use dong_outflow, only: dong_outflow_t
-    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
+    class(adjoint_pnpn_t), target, intent(inout) :: this
     type(dirichlet_t) :: bdry_mask
     type(field_t), pointer :: bdry_field
     type(file_t) :: bdry_file
@@ -1309,14 +1309,14 @@ contains
     call bdry_file%write(bdry_field)
 
     call this%scratch%relinquish_field(temp_index)
-  end subroutine adjoint_fluid_pnpn_write_boundary_conditions
+  end subroutine adjoint_pnpn_write_boundary_conditions
 
   ! End of section to verify
   ! ========================================================================== !
 
   subroutine rescale_fluid(fluid_data, scale)
     !> Fluid data
-    class(adjoint_fluid_pnpn_t), intent(inout) :: fluid_data
+    class(adjoint_pnpn_t), intent(inout) :: fluid_data
     !> Scaling factor
     real(kind=rp), intent(in) :: scale
 
@@ -1443,7 +1443,7 @@ contains
   !! @param t The time value.
   !! @param tstep The current time-step
   subroutine power_iterations_compute(this, t, tstep)
-    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
+    class(adjoint_pnpn_t), target, intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
@@ -1516,4 +1516,4 @@ contains
   end subroutine power_iterations_compute
 
 
-end module adjoint_fluid_pnpn
+end module adjoint_pnpn
