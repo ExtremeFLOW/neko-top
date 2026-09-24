@@ -3,7 +3,7 @@ program topopt_user
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
   use json_module, only: json_file
-  use json_utils, only: json_extract_object
+  use json_utils, only: json_get
   use json_utils_ext, only: json_read_file
   use utils, only: neko_error
   use user, only: user_setup
@@ -45,7 +45,7 @@ program topopt_user
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
-  call json_extract_object(parameters, 'optimization.design', design_parameters)
+  call json_get(parameters, 'optimization.design', design_parameters)
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components

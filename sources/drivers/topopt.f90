@@ -5,12 +5,13 @@ program topopt
   use optimizer, only: optimizer_t, optimizer_factory
 
   use json_module, only: json_file
-  use json_utils, only: json_extract_object
+  use json_utils, only: json_get
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
 
   use mpi_f08, only: MPI_Init
+
   implicit none
 
   ! JSON related arguments
@@ -45,7 +46,7 @@ program topopt
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
-  call json_extract_object(parameters, 'optimization.design', design_parameters)
+  call json_get(parameters, 'optimization.design', design_parameters)
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
