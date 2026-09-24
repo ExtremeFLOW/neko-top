@@ -86,7 +86,7 @@ export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
 # Execute the preparation script if it exists and prepare the environment
 
 printf "=%.0s" {1..80} && printf "\n"
-printf "Preparing environment.\n\n"
+printf "Preparing environment.\n"
 
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.env" ]; then
@@ -111,11 +111,11 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Setting up external dependencies\n"
 
-check_system_dependencies          # Check for system dependencies.
-find_json_fortran                  # Re-defines the JSON_FORTRAN_DIR variable.
-find_nek5000                       # Re-defines the NEK5000_DIR variable.
-find_neko                          # Re-defines the NEKO_DIR variable.
-[ "$TEST" == true ] && find_pfunit # Re-defines the PFUNIT_DIR variable.
+check_system_dependencies                      # Check for system dependencies.
+find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
+find_nek5000 $NEK5000_DIR                      # Re-defines the NEK5000_DIR variable.
+find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
+[ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
 # Done settng up external dependencies
 # ============================================================================ #
