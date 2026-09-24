@@ -64,7 +64,7 @@ module lube_term_objective
   use objective, only: objective_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
 
   use num_types, only: rp

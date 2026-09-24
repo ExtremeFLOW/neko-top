@@ -6,7 +6,7 @@ module optimizer
   !-----------------------------------------------------------!
 
   use json_module, only: json_file
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use problem, only: problem_t
   use design, only: design_t
   use num_types, only: rp
