@@ -1,6 +1,6 @@
-name: Setup the Neko-TOP library
+name: Setup the HDF5 library
 description: |
-  This action sets up the Neko-TOP library for use in the main workflow.
+  This action sets up the HDF5 library for use in the main workflow.
 
 # ---------------------------------------------------------------------------- #
 # Define the inputs and outputs for this action. The inputs are used to
@@ -9,29 +9,14 @@ description: |
 
 inputs:
   install-dir:
-    description: "The directory to install the Neko-TOP library."
+    description: "The directory to install the HDF5 library."
     required: false
-    default: "/home/runner/pkg/neko-top"
+    default: "/home/runner/pkg/hdf5"
 
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "/home/runner/tmp/neko-top"
-
-  json-fortran-dir:
-    description: "The directory where the JSON-Fortran library was installed."
-    required: false
-    default: "/home/runner/pkg/json-fortran"
-
-  hdf5-dir:
-    description: "The directory where the HDF5 library was installed."
-    required: false
-    default: "/home/runner/pkg/hdf5"
-
-  neko-dir:
-    description: "The directory where the JSON-Fortran library was installed."
-    required: false
-    default: "/home/runner/pkg/neko"
+    default: "/home/runner/tmp/hdf5"
 
   os:
     description: "The operating system to use."
@@ -48,10 +33,10 @@ inputs:
     required: false
     default: "-O3"
 
-  configure-options:
-    description: "The configuration options to use."
+  c-compiler:
+    description: "The C compiler to use."
     required: false
-    default: ""
+    default: "gcc"
 
   build-options:
     description: "The build option to use."
@@ -64,13 +49,13 @@ inputs:
     default: ""
 
   version:
-    description: "The version of the Neko-TOP library to use."
+    description: "The version of the HDF5 library to use."
     required: false
-    default: "develop"
+    default: "2.0.0"
 
 outputs:
   install-dir:
-    description: "The directory where the Neko-TOP library was installed."
+    description: "The directory where the HDF5 library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
 
 # ---------------------------------------------------------------------------- #
@@ -81,7 +66,7 @@ runs:
   using: composite
   steps:
     # ------------------------------------------------------------------------ #
-    # Setup the cache for the Neko-TOP library.
+    # Setup the cache for the HDF5 library.
     # All following steps should look if the cache was hit and skip if it was.
 
     - name: Create cache key based on version, OS, and compiler
@@ -92,75 +77,58 @@ runs:
         OS: ${{ inputs.os }}
         COMPILER: ${{ inputs.compiler }}
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
-        REPO: https://github.com/ExtremeFLOW/neko-top.git
+        REPO: https://github.com/HDFGroup/hdf5.git
       run: |
         # Get the GIT sha for the current commit
         SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="neko-top-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="hdf5-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
-      id: cache-neko-top
+      id: cache-hdf5
       uses: actions/cache@v4
       with:
         path: ${{ inputs.install-dir }}
         key: ${{ steps.create-key.outputs.key }}
 
     - name: Clone
-      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
-        REPO: https://github.com/ExtremeFLOW/neko-top.git
+        REPO: https://github.com/HDFGroup/hdf5.git
         VERSION: ${{ inputs.version }}
       run: |
-        if [ -d $WORKING_DIR ]; then
-          echo "Working directory already exists. Skipping clone."
-        else
-          git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
-        fi
+        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
 
     # ------------------------------------------------------------------------ #
-    # Setup system dependencies for the Neko-TOP library.
+    # Setup system dependencies for the HDF5 library.
 
-    - name: Get system cache
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: openmpi-bin pkg-config liblapack-dev ninja-build
-        version: 1.0
-
-    - name: Setup non-cache dependencies
+    - name: Setup system dependencies
+      if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
-      run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
+      run: |
+        sudo apt install cmake ninja-build ${{ inputs.compiler }}
 
     # ------------------------------------------------------------------------ #
-    # Configure, build, and install the Neko-TOP library.
+    # Configure, build, and install the HDF5 library.
 
     - name: Configure
-      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
         WORKING_DIR: ${{ inputs.working-dir }}
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
-        NEKO_DIR: ${{ inputs.neko-dir }}
-        JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
-        HDF5_DIR: ${{ inputs.hdf5-dir }}
-        CONFIGURE_OPTIONS: ${{ inputs.configure-options }}
+        CC: ${{ inputs.c-compiler }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
-          --install-prefix $INSTALL_DIR \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_Fortran_COMPILER=$FC \
-          -DCMAKE_Fortran_FLAGS=$FCFLAGS \
-          -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
-          -DNEKO_DIR=$NEKO_DIR \
-          -DHDF5_DIR=$HDF5_DIR \
-          $CONFIGURE_OPTIONS
+            --install-prefix $INSTALL_DIR -DHDF5_ENABLE_PARALLEL=ON \
+            -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF
 
     - name: Build
-      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -168,7 +136,7 @@ runs:
       run: cmake --build $WORKING_DIR/build --config Release $BUILD_OPTIONS
 
     - name: Install
-      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -187,11 +155,10 @@ runs:
       run: |
 
         if [ ! -d ${INSTALL_DIR}/lib ]; then
-          echo "Failed to install Neko-TOP library."
+          echo "Failed to install HDF5 library."
           exit 1
         fi
 
         echo "install-dir=${INSTALL_DIR}"
         echo "install-dir=${INSTALL_DIR}" >> $GITHUB_OUTPUT
-        echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${INSTALL_DIR}/lib/pkgconfig" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}/lib" >> $GITHUB_ENV
+

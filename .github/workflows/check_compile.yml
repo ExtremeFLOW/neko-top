@@ -18,6 +18,10 @@ on:
         description: "The version of pFUnit to use."
         required: true
         type: string
+      hdf5-version:
+        description: "The version of HDF5 to use."
+        required: true
+        type: string
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
@@ -41,17 +45,20 @@ jobs:
         # Default matrix
         precision: [dp]
         backend: [CPU, CUDA, HIP]
-        compiler: [gfortran-13, gfortran-14]
-
-        # Exclude specific combinations
-        exclude:
-          - backend: CUDA
-            compiler: gfortran-13
-          - backend: HIP
-            compiler: gfortran-13
+        compiler: [GNU-13, GNU-14]
 
         # Define the setup jobs
         include:
+          - compiler: GNU-13
+            setup-compiler: |
+              echo "c-compiler=gcc-13" >> $GITHUB_OUTPUT
+              echo "f-compiler=gfortran-13" >> $GITHUB_OUTPUT
+
+          - compiler: GNU-14
+            setup-compiler: |
+              echo "c-compiler=gcc-14" >> $GITHUB_OUTPUT
+              echo "f-compiler=gfortran-14" >> $GITHUB_OUTPUT
+
           - backend: CUDA
             setup-backend: |
               sudo apt-get update
@@ -82,6 +89,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Compiler
+        id: setup-compiler
+        shell: bash
+        run: ${{ matrix.setup-compiler }}
+
       - name: Setup system dependencies
         shell: bash
         run: |
@@ -103,13 +115,21 @@ jobs:
         uses: ./.github/actions/setup_json-fortran
         with:
           version: ${{ inputs.json-fortran-version }}
-          compiler: ${{ matrix.compiler }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
 
       - name: Get ParMETIS
         id: get-parmetis
         uses: ./.github/actions/setup_parmetis
         with:
-          compiler: ${{ matrix.compiler }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+
+      - name: Get HDF5
+        id: get-hdf5
+        uses: ./.github/actions/setup_hdf5
+        with:
+          version: ${{ inputs.hdf5-version }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
 
       - name: Get neko
         id: get-neko
@@ -117,9 +137,10 @@ jobs:
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
+          hdf5-dir: ${{ steps.get-hdf5.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
-          compiler: ${{ matrix.compiler }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
           backend: ${{ matrix.backend }}
           backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
@@ -172,6 +193,7 @@ jobs:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
           PARMETIS_DIR: ${{ steps.get-parmetis.outputs.install-dir }}
+          HDF5_DIR: ${{ steps.get-hdf5.outputs.install-dir }}
         run: |
           # Adjust the end time and max iterations for the rugby ball case
           sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
