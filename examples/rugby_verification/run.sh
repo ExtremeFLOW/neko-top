@@ -21,7 +21,7 @@ for i in "${NPROC[@]}"; do
     # the output to the reference solution.
     diff -q target_$i.txt optimization_data.txt
     if [ $? -ne 0 ]; then
-        echo "Output does not match the reference solution. Exiting." >&2
+        echo "Output $i does not match the reference solution. Exiting." >&2
         exit 1
     fi
 
