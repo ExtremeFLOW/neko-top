@@ -55,7 +55,7 @@ the Neko-TOP library. The script will also compile all the advanced examples and
 run the unit tests if desired.
 
 ```sh
-git clone --recursive https://github.com/ExtremeFlow/Neko-TOP.git neko-top
+git clone https://github.com/ExtremeFlow/Neko-TOP.git neko-top
 cd neko-top
 ./setup.sh
 ```
