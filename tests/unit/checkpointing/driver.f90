@@ -1,3 +1,23 @@
+module checkpointing_test_mod
+  use field, only: field_t
+  use field_math, only: field_glsubnorm
+  use num_types, only: rp
+  implicit none
+  private
+  public :: rmse
+
+contains
+
+  function rmse(field1, field2) result(result)
+    type(field_t), intent(in) :: field1, field2
+    real(kind=rp) :: result
+
+    result = sqrt(field_glsubnorm(field1, field2)**2 / real(field1%size(), rp))
+
+  end function rmse
+
+end module checkpointing_test_mod
+
 program checkpointing_test
   use simulation_m, only: simulation_t
   use simulation_checkpoint, only: simulation_checkpoint_t
@@ -8,6 +28,7 @@ program checkpointing_test
   use num_types, only: dp, rp
   use json_module, only: json_file
   use utils, only: neko_error, neko_warning
+  use json_utils, only: json_get
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
   use time_step_controller, only: time_step_controller_t
@@ -16,7 +37,8 @@ program checkpointing_test
   use math, only: abscmp, NEKO_EPS
   use comm, only: pe_rank
   use mpi_f08, only: MPI_Init, MPI_Wtime
-  use json_utils, only: json_get
+  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
+  use checkpointing_test_mod, only: rmse
   implicit none
 
   ! JSON related arguments
@@ -40,9 +62,11 @@ program checkpointing_test
   integer :: n_saves_memory = 10
   character(len=256) :: algorithm = "linear"
   character(len=256) :: filename = "checkpoint"
+  character(len=8) :: fmt = "chkp"
+  logical :: keep_checkpoints = .false.
 
   !> Log message for errors
-  character(len=256) :: log_msg
+  ! character(len=256) :: log_msg
 
   integer :: n_timesteps, i
   type(field_t), pointer :: p, u, v, w
@@ -58,6 +82,9 @@ program checkpointing_test
   real(kind=rp) :: error_p, error_u, error_v, error_w
   logical :: error
 
+  ! Tolerances for the consistency check
+  real(kind=rp), parameter :: tol_vel = NEKO_EPS
+  real(kind=rp), parameter :: tol_p = NEKO_EPS
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -83,9 +110,6 @@ program checkpointing_test
   call design_factory(des, design_parameters, sim)
   call prob%init(parameters, des, sim)
 
-  ! Initialize the checkpointing
-  call chkp%init(sim%neko_case, algorithm, n_saves_memory, filename)
-
   ! Save some pointers and allocate the fields required for the testing
   p => sim%neko_case%fluid%p
   u => sim%neko_case%fluid%u
@@ -109,15 +133,23 @@ program checkpointing_test
      call w_fields(i)%init(w%dof, field_name)
   end do
 
-  ! -------------------------------------------------------------------------- !
-  ! Run the forward simulation and save the resulting u fields in a list
 
+! -------------------------------------------------------------------------- !
+  ! Initialize the checkpointing
   if (pe_rank .eq. 0) then
      write(*, '(A)') repeat('-', 80)
-     write(*, '(A)') 'Running the forward simulation...'
-     write(*, '(A,I0)') 'Number of time steps: ', n_timesteps
-     write(*, '(A,I0)') 'Number of checkpoints: ', n_saves_memory
+     write(*, '(A, A)') 'Checkpointing algorithm:   ', trim(algorithm)
+     write(*, '(A, A)') 'Checkpointing file format: ', trim(fmt)
+     write(*, '(A,I0)') 'Number of time steps:      ', n_timesteps
+     write(*, '(A,I0)') 'Number of memory saves:    ', n_saves_memory
+     write(*, '(A)') repeat('-', 80)
   end if
+
+  call chkp%init(sim%neko_case, algorithm, n_saves_memory, filename, fmt, &
+       keep_checkpoints)
+
+  ! -------------------------------------------------------------------------- !
+  ! Run the forward simulation and save the resulting u fields in a list
 
   call dt_controller%init(sim%neko_case%params)
   call simulation_init(sim%neko_case, dt_controller)
@@ -141,69 +173,40 @@ program checkpointing_test
   ! Restore to each time step and check the consistency of the u fields
 
   if (pe_rank .eq. 0) then
-     write(*, '(A)') repeat('-', 80)
      write(*, '(A)') 'Checking the consistency of the time steps...'
-     write(*, '(A,I0)') 'Number of time steps: ', n_timesteps
   end if
 
   call dt_controller%init(sim%neko_case%params)
   call simulation_init(sim%neko_case, dt_controller)
 
+  error = .false.
+
   do i = n_timesteps, 1, -1
      call chkp%restore(sim%neko_case, i)
 
-     !  Compute the relative error of the fields
-     error_p = field_glsubnorm(p_fields(i), p) / &
-          max(sqrt(field_glsc2(p_fields(i), p_fields(i))), NEKO_EPS)
-     error_u = field_glsubnorm(u_fields(i), u) / &
-          max(sqrt(field_glsc2(u_fields(i), u_fields(i))), NEKO_EPS)
-     error_v = field_glsubnorm(v_fields(i), v) / &
-          max(sqrt(field_glsc2(v_fields(i), v_fields(i))), NEKO_EPS)
-     error_w = field_glsubnorm(w_fields(i), w) / &
-          max(sqrt(field_glsc2(w_fields(i), w_fields(i))), NEKO_EPS)
+     !  Compute the RMSE between the current fields and the saved ones
+     error_p = rmse(p_fields(i), p)
+     error_u = rmse(u_fields(i), u)
+     error_v = rmse(v_fields(i), v)
+     error_w = rmse(w_fields(i), w)
 
-     error = .false.
-
-     if (.not. abscmp(error_p, 0.0_rp, NEKO_EPS)) then
-        error = .true.
-        write(log_msg, '(A,I0,E12.5)') &
-             'Inconsistency found in time step pressure: ', i, error_p
-        call neko_warning(trim(log_msg))
-     end if
-
-     if (.not. abscmp(error_u, 0.0_rp, NEKO_EPS)) then
-        error = .true.
-        write(log_msg, '(A,I0,E12.5)') &
-             'Inconsistency found in time step velocity u: ', i, error_u
-        call neko_warning(trim(log_msg))
-     end if
-
-     if (.not. abscmp(error_v, 0.0_rp, NEKO_EPS)) then
-        error = .true.
-        write(log_msg, '(A,I0,E12.5)') &
-             'Inconsistency found in time step velocity v: ', i, error_v
-        call neko_warning(trim(log_msg))
-     end if
-
-     if (.not. abscmp(error_w, 0.0_rp, NEKO_EPS)) then
-        error = .true.
-        write(log_msg, '(A,I0,E12.5)') &
-             'Inconsistency found in time step velocity w: ', i, error_w
-        call neko_warning(trim(log_msg))
-     end if
-
-     if (error) then
-        if (pe_rank .eq. 0) then
-           write(*, '(A,E12.5)') '    Error for pressure:   ', error_p
-           write(*, '(A,E12.5)') '    Error for velocity u: ', error_u
-           write(*, '(A,E12.5)') '    Error for velocity v: ', error_v
-           write(*, '(A,E12.5)') '    Error for velocity w: ', error_w
-        end if
-        call neko_error('Inconsistency found in the time step')
-     end if
+     if (.not. abscmp(error_p, 0.0_rp, tol_p)) error = .true.
+     if (.not. abscmp(error_u, 0.0_rp, tol_vel)) error = .true.
+     if (.not. abscmp(error_v, 0.0_rp, tol_vel)) error = .true.
+     if (.not. abscmp(error_w, 0.0_rp, tol_vel)) error = .true.
+     if (error) exit
   end do
 
-  if (pe_rank .eq. 0) then
+  if (error) then
+     if (pe_rank .eq. 0) then
+        write(stderr, '(A,I0)') 'Inconsistency found at time step: ', i
+        write(stderr, '(A,E12.5)') '    Error for pressure:   ', error_p
+        write(stderr, '(A,E12.5)') '    Error for velocity u: ', error_u
+        write(stderr, '(A,E12.5)') '    Error for velocity v: ', error_v
+        write(stderr, '(A,E12.5)') '    Error for velocity w: ', error_w
+     end if
+     error stop 'Checkpointing consistency test failed.'
+  else if (pe_rank .eq. 0) then
      write(*, '(A)') 'All time steps are consistent.'
      write(*, '(A)') repeat('-', 80)
   end if
@@ -222,6 +225,7 @@ program checkpointing_test
   deallocate(v_fields)
   deallocate(w_fields)
 
+  call chkp%free()
   call sim%free()
   call des%free()
   call prob%free()

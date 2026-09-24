@@ -60,7 +60,7 @@ contains
     ! Sample the checkpoint if needed
     if (save_disc .or. neko_case%time%tstep .le. this%first_valid_timestep) then
 
-       call this%chkp_output%set_counter(neko_case%time%tstep -1)
+       call this%chkp_output%set_counter(neko_case%time%tstep)
        call this%chkp_output%sample(neko_case%time%t)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
