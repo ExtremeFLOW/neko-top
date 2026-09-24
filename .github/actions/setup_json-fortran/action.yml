@@ -85,11 +85,10 @@ runs:
     # Setup system dependencies for the JSON-Fortran library.
 
     - name: Setup system dependencies
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }} && ${{ inputs.os == 'ubuntu-latest' }}
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: cmake ninja-build ${{ inputs.compiler }}
-        version: 1.0
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        sudo apt install cmake ninja-build ${{ inputs.compiler }}
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the JSON-Fortran library.
