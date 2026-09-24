@@ -81,7 +81,14 @@
                     -1.0,
                     1.0,
                 ],
-            }
+            },
+            {
+                "name": "initial_ball",
+                "geometry": "cylinder",
+                "start": [0.5, 0.5, -0.5],
+                "end": [0.5, 0.5, 1.5],
+                "radius": 0.25
+            },
         ]
     },
     "optimization": {
@@ -100,7 +107,13 @@
                     "type": "RAMP",
                     "f_max": 100
                 }
-            ]
+            ],
+            "initial_distribution": {
+                "type": "point_zone",
+                "base_value": 0.0,
+                "zone_value": 1.0,
+                "zone_name": "initial_ball"
+            }
         },
         "solver": {
             "type": "mma",
