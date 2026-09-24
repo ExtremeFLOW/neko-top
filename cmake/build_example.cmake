@@ -80,12 +80,26 @@ function(build_example)
         message(STATUS "")
     endif()
 
+    # If the example contains extra sources, set the module directory.
+    if (DEFINED EXTRA_SOURCES)
+        set(CMAKE_Fortran_MODULE_DIRECTORY
+            ${CMAKE_Fortran_MODULE_DIRECTORY}/${EXAMPLE_NAME})
+        # Create the module directory.
+        file(MAKE_DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY})
+    endif()
+
     # ........................................................................ #
     # Construct example name from the folder structure relative to EXAMPLES_DIR.
     set(TARGET_DIRECTORY ${EXAMPLES_DIR}/${EXAMPLE_NAME})
     string(REPLACE "/" "_" EXAMPLE_NAME ${EXAMPLE_NAME})
+    string(CONCAT EXAMPLE_NAME "Examples-" ${EXAMPLE_NAME})
 
-    add_executable(${EXAMPLE_NAME} ${DRIVER} ${EXTRA_SOURCES})
+    add_executable(${EXAMPLE_NAME}
+        EXCLUDE_FROM_ALL
+        ${DRIVER}
+        ${EXTRA_SOURCES}
+        )
+    add_dependencies(Examples ${EXAMPLE_NAME})
 
     # Set the output directory of the executable.
     set_target_properties(${EXAMPLE_NAME}
@@ -109,7 +123,20 @@ function(build_example)
         target_link_libraries(${EXAMPLE_NAME} MPI::MPI_Fortran)
     endif()
 
+    # Import the neko-top static library
+    add_library(neko-top-a STATIC IMPORTED)
+    set_target_properties(neko-top-a PROPERTIES
+        IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libneko-top.a"
+    )
+
+    add_dependencies(${EXAMPLE_NAME} neko-top)
+
     # Link our local Neko-TOP library to the driver
-    target_link_libraries(${EXAMPLE_NAME} neko-top)
+    target_link_libraries(${EXAMPLE_NAME} neko-top-a)
+    target_include_directories(${EXAMPLE_NAME}
+        PRIVATE
+            ${CMAKE_BINARY_DIR}/modules
+            ${CMAKE_Fortran_MODULE_DIRECTORY}
+    )
 
 endfunction()

@@ -15,22 +15,21 @@
 # - "topopt"  : Topology optimization driver.
 
 # ============================================================================ #
-# Determine if we wish to build the examples.
-option(BUILD_EXAMPLES "Build the examples" ON)
-
-if(NOT BUILD_EXAMPLES)
-    return()
-else()
-    message(STATUS "Building examples")
-endif()
-
-# ============================================================================ #
 # Include the build_example function
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(build_example)
 
 # Set the examples directory
 set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory")
+
+# ============================================================================ #
+# Define our custom target.
+
+# Add a custom target for the examples
+add_custom_target(Examples
+    COMMENT "Build all the examples."
+    DEPENDS neko-top
+    )
 
 # ============================================================================ #
 # Add the example directories.
