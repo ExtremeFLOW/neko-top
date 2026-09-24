@@ -90,12 +90,14 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
+  !! @param variable_name The name of the variable where the source term acts.
   subroutine adjoint_mixing_scalar_source_term_init_from_json(this, &
-       json, fields, coef)
+       json, fields, coef, variable_name)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
     type(coef_t), intent(in), target :: coef
+    character(len=*), intent(in) :: variable_name
 
 
   end subroutine adjoint_mixing_scalar_source_term_init_from_json
