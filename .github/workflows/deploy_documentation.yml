@@ -31,9 +31,12 @@ jobs:
           packages: git cmake doxygen graphviz
           version: 1.0
 
+      - name: Configure documentation
+        run: |
+            cmake -DONLY_DOCS=ON -B build -S .
+
       - name: Build documentation
         run: |
-          cmake -DONLY_DOCS=ON -B build -S .
           cmake --build build --target documentation
 
       - name: Upload artifact

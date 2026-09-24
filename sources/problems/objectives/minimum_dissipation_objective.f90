@@ -89,8 +89,8 @@ module minimum_dissipation_objective
   private
 
   !> An objective function corresponding to minimum dissipation
-  ! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  ! |\mathbf{u}|^2 d \Omega $
+  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
+  !! |\mathbf{u}|^2 d \Omega \f$
   type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
@@ -121,7 +121,7 @@ module minimum_dissipation_objective
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
           minimum_dissipation_update_value
-     !> Computes the sensitivity with respect to the coefficient $\chi$.
+     !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           minimum_dissipation_update_sensitivity
 
@@ -130,9 +130,10 @@ module minimum_dissipation_objective
 contains
 
   !> The common constructor using a JSON object.
+  !! @param this the objective.
+  !! @param json the JSON object.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
-  !! @param adjoint the fluid adjoint.
+  !! @param simulation the simulation.
   subroutine minimum_dissipation_init_json(this, json, design, simulation)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
@@ -149,11 +150,13 @@ contains
     call this%init_from_attributes(design, simulation, weight, name, mask_name)
   end subroutine minimum_dissipation_init_json
 
-!> The actual constructor.
-!! @param design the design.
-!! @param simulation the simulation.
-!! @param weight the weight of the objective function.
-!! @param mask_name the name of the mask.
+  !> The actual constructor.
+  !! @param this the objective.
+  !! @param design the design.
+  !! @param simulation the simulation.
+  !! @param weight the weight of the objective function.
+  !! @param name the name of the objective.
+  !! @param mask_name the name of the mask.
   subroutine minimum_dissipation_init_attributes(this, design, simulation, &
        weight, name, mask_name)
     class(minimum_dissipation_objective_t), intent(inout) :: this
@@ -210,9 +213,8 @@ contains
   end subroutine minimum_dissipation_free
 
   !> Compute the objective function.
+  !! @param this the objective.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
-  !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_update_value(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -269,7 +271,8 @@ contains
 
   end subroutine minimum_dissipation_update_value
 
-  !> update_value the sensitivity of the objective function with respect to \f$\chi\f$
+  !> update_value the sensitivity of the objective function with respect to \f\f$\chi\f\f$
+  !! @param this the objective.
   !! @param design the design.
   subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this

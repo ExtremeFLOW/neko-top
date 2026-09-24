@@ -65,10 +65,10 @@ module PDE_filter
   implicit none
   private
 
-  !> A PDE based filter mapping $\rho \mapsto \tilde{\rho}$,
+  !> A PDE based filter mapping \f$\rho \mapsto \tilde{\rho}\f$,
   !! see Lazarov & O. Sigmund 2010,
   !! by solving an equation
-  !! of the form $\f -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$
+  !! of the form \f$ -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$
   type, public, extends(mapping_t) :: PDE_filter_t
      !> Ax
      class(ax_t), allocatable :: Ax
@@ -202,6 +202,7 @@ contains
   end subroutine PDE_filter_free
 
   !> Apply the filter
+  !! @param this the filter
   !! @param X_out filtered field
   !! @param X_in unfiltered field
   subroutine PDE_filter_forward_mapping(this, X_out, X_in)
@@ -295,6 +296,7 @@ contains
   end subroutine PDE_filter_forward_mapping
 
   !> Apply the adjoint filter
+  !! @param this the filter
   !! @param X_in unfiltered field
   !! @param sens_out is the sensitivity with respect to the unfiltered design
   !! @param sens_in is the sensitivity with respect to the filtered design

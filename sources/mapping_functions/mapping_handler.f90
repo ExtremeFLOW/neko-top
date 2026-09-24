@@ -116,6 +116,7 @@ contains
   end subroutine mapping_handler_free
 
   !> apply the cascade of mapping_cascade.
+  !! @param this The handler object
   !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
   !! @param X_in The unmapped field (\f$\rho\f$)
   subroutine mapping_handler_apply_forward(this, X_out, X_in)
@@ -154,7 +155,8 @@ contains
 
   end subroutine mapping_handler_apply_forward
 
-  !> apply the cascade of mapping_cascade.
+  !> Apply the cascade of mapping_cascade.
+  !! @param this The handler object
   !! @param sens_out The sensitivity after applying the chain rule
   !! (\f$\frac{\partial F}{\partial \rho}\f$)
   !! @param sens_in The sensitivity before applying the chain rule
@@ -244,6 +246,7 @@ contains
   end subroutine mapping_handler_add_json_mappings
 
   !> Add new mapping to the list.
+  !! @param this The handler object
   !! @param mapping The mapping to be added.
   subroutine mapping_handler_add_mapping(this, mapping)
     class(mapping_handler_t), intent(inout) :: this

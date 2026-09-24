@@ -15,22 +15,22 @@ a matrix. The method is based on the fact that the largest eigenvalue of a
 matrix is the limit of the ratio of the norm of the matrix to the norm of a
 vector iteratively multiplied by the matrix.
 
-For a given time step `t` we compute $\lambda_t$ based on the perturbation
+For a given time step `t` we compute \f$\lambda_t\f$ based on the perturbation
 field `u`:
 
-$$
+\f[
     \lambda_{t} = \frac{ \sum_{GLL} u_{t} \cdot \bar{u}_{t-1} }
         {\sum_{GLL} \bar{u}_{t-1} \cdot \bar{u}_{t-1}} \\
     \bar{u}_{t} = \frac{ u_{t} }{ ||u_{t}||_2 }\\
     ||u||_2 = \sqrt{ \frac{c}{V} \sum_{GLL} m (u_{t} \cdot u_{t}) }
-$$
+\f]
 
 Where:
-- $u_{t}$ is the perturbation field at time `t`.
-- $\bar{u}_{t}$ is the normalized perturbation field at time `t`.
-- $m$ is the mass matrix component for the gll points.
-- $c$ is a constant which in Nek5000 is set to 0.5.
-- $V$ is the volume of the domain.
+- \f$u_{t}\f$ is the perturbation field at time `t`.
+- \f$\bar{u}_{t}\f$ is the normalized perturbation field at time `t`.
+- \f$m\f$ is the mass matrix component for the gll points.
+- \f$c\f$ is a constant which in Nek5000 is set to 0.5.
+- \f$V\f$ is the volume of the domain.
 
 
 

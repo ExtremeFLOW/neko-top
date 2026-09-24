@@ -79,6 +79,7 @@ module mapping
 
   abstract interface
      !> The common constructor using a JSON dictionary.
+     !! @param this The mapping object.
      !! @param json The JSON with properties.
      !! @param case The case_t object.
      subroutine mapping_init(this, json, coef)
@@ -99,6 +100,7 @@ module mapping
 
   abstract interface
      !> The application of the mapping (\f$\rho \mapsto \tilde{\rho}\f$).
+     !! @param this The mapping object
      !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
      !! @param X_in The unmapped field (\f$\rho\f$)
      subroutine mapping_forward_mapping(this, X_out, X_in)
@@ -113,10 +115,11 @@ module mapping
      !> The application of the mapping backward with chain rule).
      !! \f$\frac{\partial F}{\partial \tilde{\rho}} \mapsto
      !! \frac{\partial F}{\partial \rho}\f$
+     !! @param this The mapping object
      !! @param X_in The original input field (\f$\rho\f$)
-     !! @param sens_in, sensitivity wrt to the mapped field
+     !! @param sens_in sensitivity wrt to the mapped field
      !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
-     !! @param sens_out, sensitivity wrt to the unmapped field
+     !! @param sens_out sensitivity wrt to the unmapped field
      !! (\f$\frac{\partial F}{\partial \rho}\f$)
      subroutine mapping_backward_mapping(this, sens_out, sens_in, X_in)
        import mapping_t, field_t
@@ -127,16 +130,17 @@ module mapping
      end subroutine mapping_backward_mapping
   end interface
 
-  interface
-     !> mapping factory. Both constructs and initializes the object.
-     !! @param json JSON object initializing the mapping.
-     !! @param coef The SEM coefficients.
+  !> mapping factory. Both constructs and initializes the object.
+  !! @param object The mapping object.
+  !! @param json JSON object initializing the mapping.
+  !! @param coef The SEM coefficients.
+  interface mapping_factory
      module subroutine mapping_factory(object, json, coef)
        class(mapping_t), allocatable, intent(inout) :: object
        type(json_file), intent(inout) :: json
        type(coef_t), intent(inout) :: coef
      end subroutine mapping_factory
-  end interface
+  end interface mapping_factory
 
   public :: mapping_factory
 contains
@@ -172,6 +176,7 @@ contains
   end subroutine mapping_wrapper_free
 
   !> Executes `apply_forward`
+  !! @param this The mapping object
   !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
   !! @param X_in The unmapped field (\f$\rho\f$)
   subroutine mapping_apply_forward_wrapper(this, X_out, X_in)
@@ -187,10 +192,10 @@ contains
   !> Executes `apply_backward`
   !! \f$\frac{\partial F}{\partial \tilde{\rho}} \mapsto
   !! \frac{\partial F}{\partial \rho}\f$
-  !! @param X_in The original input field (\f$\rho\f$)
-  !! @param sens_in, sensitivity wrt to the mapped field
+  !! @param this The mapping object
+  !! @param sens_in sensitivity wrt to the mapped field
   !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
-  !! @param sens_out, sensitivity wrt to the unmapped field
+  !! @param sens_out sensitivity wrt to the unmapped field
   !! (\f$\frac{\partial F}{\partial \rho}\f$)
   subroutine mapping_apply_backward_wrapper(this, sens_out, sens_in)
     class(mapping_t), intent(inout) :: this
