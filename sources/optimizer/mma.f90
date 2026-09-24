@@ -153,7 +153,7 @@ contains
     !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
     !                z >= 0,   y_i >= 0,         i = 1,...,m             !
     ! -------------------------------------------------------------------!
-    integer :: m
+    integer :: m = 1
     real(kind=rp), dimension(n) :: xmax, xmin
     real(kind=rp), allocatable :: a(:), c(:), d(:)
 

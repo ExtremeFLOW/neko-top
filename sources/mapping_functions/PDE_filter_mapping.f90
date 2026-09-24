@@ -78,8 +78,6 @@ module PDE_filter
      class(ksp_t), allocatable :: ksp_filt
      !> Filter Preconditioner
      class(pc_t), allocatable :: pc_filt
-     !> They will all be Neumann conditions.
-     type(neumann_t) :: filter_bcs
      !> Filter boundary conditions
      type(bc_list_t) :: bclst_filt
 
@@ -145,33 +143,25 @@ contains
   subroutine PDE_filter_init_from_attributes(this, coef)
     class(PDE_filter_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
-    integer :: n
-    character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
-         bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
+    integer :: n, i
+    type(neumann_t) :: filter_bc
+    real(kind=rp) :: flux = 0.0_rp
+    ! character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
+    !      bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
 
-
-
+    ! set the number of dofs
     n = this%coef%dof%size()
 
-    ! initialize the filter BCs
-    call this%filter_bcs%init_base(this%coef)
+    ! Initialize the Neumann BC
+    call filter_bc%init_from_components(this%coef, flux)
+    do i = 1, size(coef%msh%labeled_zones)
+       call filter_bc%mark_zone(coef%msh%labeled_zones(i))
+    end do
+    call filter_bc%finalize()
 
-    ! Create list with just Neumann bcs
-
-    ! init the list
+    ! Create the BC list
     call this%bclst_filt%init()
-
-    ! Mark ALL the BCs as Neumann, regardless of what's prescribed
-    bc_labels_all_neuman = 'o'
-    call this%filter_bcs%mark_zones_from_list(coef%msh%labeled_zones,&
-         'o', bc_labels_all_neuman)
-
-    ! set the flux to zero
-    call this%filter_bcs%finalize_neumann(0.0_rp)
-
-    ! add them to the filter BCs
-    call this%bclst_filt%append(this%filter_bcs)
-
+    call this%bclst_filt%append(filter_bc)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%Ax, full_formulation = .false.)
@@ -197,8 +187,6 @@ contains
     call krylov_solver_destroy(this%ksp_filt)
 
     call precon_destroy(this%pc_filt)
-
-    call this%filter_bcs%free()
 
     call this%bclst_filt%free()
 
