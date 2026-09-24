@@ -1,4 +1,4 @@
-# Parameter study for Brinkman flow around a cylinder
+# Parameter study for Brinkman flow around a cylinder {#brinkman-parameters}
 
 To run this example please execute the following commands from the root of
 Neko-TOP:
