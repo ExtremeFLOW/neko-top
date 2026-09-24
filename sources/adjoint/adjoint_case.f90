@@ -43,7 +43,7 @@ module adjoint_case
   use file, only: file_t
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default, json_extract_object
-  use json_utils_ext, only: json_key_fallback, json_get_subdict
+  use json_utils_ext, only: json_key_fallback
   implicit none
   private
   public :: adjoint_case_t, adjoint_init, adjoint_free
@@ -108,13 +108,14 @@ contains
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
     logical :: scalar = .false.
-    real(kind=rp) :: real_val
+    real(kind=rp) :: real_val = 0.0_rp
     character(len=:), allocatable :: string_val
     integer :: precision
 
     ! extra things for json
     type(json_file) :: ic_json
     character(len=:), allocatable :: json_key
+
     !
     ! Setup fluid scheme
     !
@@ -168,8 +169,8 @@ contains
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
-    call json_get(neko_case%params, json_key//'.type', string_val)
     call json_extract_object(neko_case%params, json_key, ic_json)
+    call json_get(ic_json, 'type', string_val)
 
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic( &

@@ -6,23 +6,6 @@
 function run {
     set +e # Do not exit on error
 
-    # ------------------------------------------------------------------------ #
-    # Set up the environment and find neko
-    prepare 2>error.log || return 1
-
-    if [ -s ./error.log ]; then
-        printf "ERROR: An error occured during preparation.\n"
-        printf "See error.log for details.\n"
-        return 1
-    fi
-
-    # ------------------------------------------------------------------------ #
-    # Execute the example
-
-    printf "=%.0s" {1..80} && printf "\n"
-    printf "Running example: %s.\n" $example
-    printf "=%.0s" {1..80} && printf "\n"
-
     # Find the case file and define the log file
     casefile=($(find . -name "*.case" -or -name "*.json"))
     if [[ ${#casefile[@]} -eq 0 ]]; then
@@ -39,6 +22,23 @@ function run {
     printf "Executing Neko.\n"
     printf "See $logfile for the status output.\n"
     export NEKO_LOG_FILE=$logfile
+
+    # ------------------------------------------------------------------------ #
+    # Set up the environment and find neko
+    prepare 2>error.log || return 1
+
+    if [ -s ./error.log ]; then
+        printf "ERROR: An error occured during preparation.\n"
+        printf "See error.log for details.\n"
+        return 1
+    fi
+
+    # ------------------------------------------------------------------------ #
+    # Execute the example
+
+    printf "=%.0s" {1..80} && printf "\n"
+    printf "Running example: %s.\n" $example
+    printf "=%.0s" {1..80} && printf "\n"
 
     TIME_START=$(date +%s)
     if [ -f "run.sh" ]; then

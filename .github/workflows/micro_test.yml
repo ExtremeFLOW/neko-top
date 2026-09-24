@@ -1,0 +1,76 @@
+# Description: This file defines the workflow that will be run when a new
+#              merge group is created. The workflow will run the automated
+#              setup and example execution scripts.
+name: Test Scripts
+
+# This workflow is only defined here. It is triggered from other workflows.
+on:
+  push:
+    branches:
+      - test/*
+      - cicd/*
+  workflow_call:
+  merge_group:
+    types: [checks_requested]
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+
+jobs:
+
+  # -------------------------------------------------------------------------- #
+  # Define the compilation and testing job that will be run in this workflow.
+  # This job will build the Neko-TOP code in debug mode and run the unit tests.
+
+  execute-scripts:
+    name: Execute setup and examples
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------------------------------------------------------------------- #
+      # Checkout the repository and setup the environment
+      # ---------------------------------------------------------------------- #
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get system cache
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: openmpi-bin pkg-config liblapack-dev ninja-build
+          version: 1.0
+
+      - name: Setup non-cache dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liblapack-dev libblas-dev libopenmpi-dev pkg-config ninja-build
+
+      # ---------------------------------------------------------------------- #
+      # Run the setup and example execution scripts
+      # ---------------------------------------------------------------------- #
+
+      - name: Setup
+        run: |
+          ./setup.sh
+
+      - name: Adjust end time for examples
+        run: |
+          sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' examples/easy-E/easy-E_1.case
+          sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
+
+      - name: Run a gauntlet of examples
+        run: |
+          ./run.sh -rc easy-E/easy-E_1 rugby_ball
+          if [ -d logs ]; then
+            LOGS=$(find logs/ -type f -name "*.log")
+            for log in ${LOGS[@]}; do
+              echo ""
+              echo "Log file: $log"
+              echo ""
+              cat $log
+              echo ""
+              echo "End of log file: $log"
+            done
+
+            exit 1
+          fi
