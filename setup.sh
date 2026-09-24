@@ -75,7 +75,7 @@ done
 [ "$CLEAN_NEKO" == true ] && CLEAN=true
 
 # Check if the device type has changed
-if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
+if [[ -f "$MAIN_DIR/build/CMakeCache.txt" && $CLEAN != true ]]; then
     CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
     if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
         echo "Device type has changed, cleaning the build directory"
@@ -154,7 +154,9 @@ else
     CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
 fi
 
-cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
+if [ ! -d $MAIN_DIR/build ]; then
+    cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
+fi
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
