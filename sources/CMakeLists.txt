@@ -74,10 +74,10 @@ target_sources(neko-top
 
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
-        # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/mma_io_hdf5.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/mma_device.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/device_mma_math.f90
@@ -100,7 +100,7 @@ target_include_directories(neko-top PUBLIC
 # ............................................................................ #
 # Link to the required libraries.
 
-target_link_libraries(neko-top
+target_link_libraries(neko-top PUBLIC
     PkgConfig::neko
     PkgConfig::json-fortran
     MPI::MPI_Fortran
@@ -110,6 +110,7 @@ target_link_libraries(neko-top
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
+    $<$<BOOL:${HDF5_FOUND}>:PkgConfig::hdf5>
 )
 
 # ============================================================================ #

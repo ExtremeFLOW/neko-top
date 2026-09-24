@@ -264,13 +264,14 @@ function find_hdf5() {
         fi
 
         # Build and install HDF5
-        cmake -B $HDF5_DIR/build -S $HDF5_DIR --install-prefix $HDF5_DIR \
+        cmake -B $HDF5_DIR/build -S $HDF5_DIR \
+            --install-prefix $HDF5_DIR -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
             -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
             -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF \
-            -DCMAKE_BUILD_TYPE=Release
+            -DHDF5_BUILD_TOOLS:BOOL=ON
         cmake --build $HDF5_DIR/build/ --config Release --parallel
-        cmake --install $HDF5_DIR/build/
+        cmake --install $HDF5_DIR/build/ --config Release
         rm -fr $HDF5_DIR/build
     fi
 
