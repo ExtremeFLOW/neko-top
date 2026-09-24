@@ -29,10 +29,44 @@ jobs:
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
 
   neko-top-debug:
-    name: Compile Neko-TOP
-    runs-on: ubuntu-latest
 
+    # ------------------------------------------------------------------------ #
+    # Define the Matrix for the job.
+    # ------------------------------------------------------------------------ #
+
+    strategy:
+      fail-fast: true
+      matrix:
+
+        precision: [dp]
+        backend: [CPU, HIP, CUDA]
+
+        # Define the setup jobs
+        include:
+          - backend: CUDA
+            setup-backend: |
+              sudo apt-get update
+              sudo apt-get install -y nvidia-cuda-toolkit
+              echo "backend-path=/usr" >> $GITHUB_OUTPUT
+
+          - backend: HIP
+            setup-backend: |
+              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
+              sudo apt install ./amdgpu-install_*.deb
+              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
+              ROCM_DIR=$(ls -d /opt/rocm-*)
+              echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
+
+
+    # ------------------------------------------------------------------------ #
+    # Define the job itself.
+    # ------------------------------------------------------------------------ #
+    name: ${{ matrix.backend }} - ${{ matrix.precision }}
+    runs-on: ubuntu-latest
+    env:
+      JOB_NAME: ${{ matrix.backend }}-${{ matrix.precision }}
     steps:
+
       # ---------------------------------------------------------------------- #
       # Checkout the repository and setup the environment
       # ---------------------------------------------------------------------- #
@@ -40,16 +74,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get system cache
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: openmpi-bin pkg-config liblapack-dev ninja-build
-          version: 1.0
-
-      - name: Setup non-cache dependencies
+      - name: Setup system dependencies
         shell: bash
         run: |
-          sudo apt-get install -y libopenblas-dev libopenmpi-dev
+          sudo apt-get update
+          sudo apt-get install -y cmake libopenblas-dev libopenmpi-dev \
+            openmpi-bin pkg-config liblapack-dev ninja-build
+
+      - name: Setup backend
+        id: setup-backend
+        shell: bash
+        run: ${{ matrix.setup-backend }}
 
       # ---------------------------------------------------------------------- #
       # Setup the external dependencies
@@ -67,6 +102,9 @@ jobs:
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
+          precision: ${{ matrix.precision }}
+          backend: ${{ matrix.backend }}
+          backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
       - name: Get pfunit
         id: get-pfunit
@@ -86,28 +124,28 @@ jobs:
         run: |
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTING=ON \
-            -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
-            -DNEKO_DIR=$NEKO_DIR \
-            -DPFUNIT_DIR=$PFUNIT_DIR
+            -DBUILD_TESTING=ON
 
       - name: Building Library
         run: |
           cmake --build build --parallel
 
+      # ---------------------------------------------------------------------- #
+      # Run the tests, which is only done on the CPU backend as the github
+      # runner does not have a GPU available.
+      # ---------------------------------------------------------------------- #
+
       - name: Running Unit Tests
+        if: ${{ matrix.backend == 'cpu' }}
         run: |
           ctest --test-dir build --output-on-failure --parallel -L "Unit"
-
-      # ---------------------------------------------------------------------- #
-      # Run a rugby ball example to ensure everything works as expected
-      # ---------------------------------------------------------------------- #
 
       - name: Building Examples
         run: |
           cmake --build build --target Examples --parallel
 
       - name: Run Rugby Ball
+        if: ${{ matrix.backend == 'cpu' }}
         env:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
@@ -124,7 +162,9 @@ jobs:
       - name: Report errors
         if: failure()
         run: |
-          echo "Errors encountered during script execution. Please check the logs for details."
+          [ ! -d logs ] && exit
+          echo "Errors encountered during script execution."
+          echo "Please check the logs for details."
           logs=($(find logs/ -name "error.log"))
 
           for file in ${logs[@]}; do
@@ -140,6 +180,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: check-compile-logs
+          name: ${{ env.JOB_NAME }}-logs
           path: logs/**/*.log
           overwrite: true
+          if-no-files-found: ignore
