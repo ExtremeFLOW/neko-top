@@ -63,7 +63,7 @@ module adjoint_viscous_dissipation_source_term
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
-  use ax_product, only : ax_t, ax_helm_factory
+  use ax_product, only : ax_t, ax_helm_allocator
 
   implicit none
   private
@@ -186,7 +186,7 @@ contains
     end if
 
     ! Initialize the ax_helm object
-    call ax_helm_factory(this%Ax, full_formulation = .false.)
+    call ax_helm_allocator(this%Ax, type_name = "standard")
 
   end subroutine adjoint_viscous_dissipation_source_term_init_from_components
 
