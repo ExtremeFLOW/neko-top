@@ -43,11 +43,11 @@ endif()
 
 add_subdirectory(${EXAMPLES_DIR}/easy-E)
 add_subdirectory(${EXAMPLES_DIR}/mma)
-add_subdirectory(${EXAMPLES_DIR}/mma_cpu)
 add_subdirectory(${EXAMPLES_DIR}/passive_scalar)
 add_subdirectory(${EXAMPLES_DIR}/rugby_ball)
 add_subdirectory(${EXAMPLES_DIR}/rugby_verification)
 add_subdirectory(${EXAMPLES_DIR}/thermal_mix_channel)
+add_subdirectory(${EXAMPLES_DIR}/1d_beam)
 add_subdirectory(${EXAMPLES_DIR}/static_mixer)
 
 # If the benchmark_mixer folder exists, add it as well

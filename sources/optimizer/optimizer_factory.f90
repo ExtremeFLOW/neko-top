@@ -1,10 +1,10 @@
 
 
 submodule(optimizer) optimizer_factory_mod
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get
   use utils, only: neko_type_error
-
   use mma_optimizer, only: mma_optimizer_t
+
 
   implicit none
 
@@ -30,13 +30,11 @@ contains
        simulation)
     class(optimizer_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: parameters
-    class(problem_t), intent(in) :: problem
+    class(problem_t), intent(inout) :: problem
     class(design_t), intent(in) :: design
-    class(simulation_t), optional, intent(in) :: simulation
+    type(simulation_t), optional, intent(in) :: simulation
 
     character(len=:), allocatable :: type
-    integer :: max_iterations
-    real(kind=rp) :: tolerance
 
     if (allocated(object)) then
        call object%free()
@@ -45,22 +43,16 @@ contains
 
     ! Get the type of the optimizer
     call json_get(parameters, "optimization.solver.type", type)
-    call json_get_or_default(parameters, "optimization.solver.max_iterations", &
-         max_iterations, 100)
-    call json_get_or_default(parameters, "optimization.solver.tolerance", &
-         tolerance, 1.0e-3_rp)
 
     ! Select the optimizer type
     select case (trim(type))
     case ("mma")
        allocate(mma_optimizer_t::object)
-
     case default
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
 
-    call object%init_from_json(parameters, problem, design, &
-         max_iterations, tolerance, simulation)
+    call object%init_from_json(parameters, problem, design, simulation)
 
   end subroutine optimizer_factory
 
