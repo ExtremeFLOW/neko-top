@@ -158,10 +158,10 @@ contains
   end function functional_get_value
 
   !> Get the sensitivity of the function
-  function functional_get_sensitivity(this) result(sensitivity)
+  subroutine functional_get_sensitivity(this, sensitivity)
     class(base_functional_t), intent(in) :: this
-    type(vector_t) :: sensitivity
+    type(vector_t), intent(inout) :: sensitivity
 
     sensitivity = this%sensitivity
-  end function functional_get_sensitivity
+  end subroutine functional_get_sensitivity
 end module base_functional
