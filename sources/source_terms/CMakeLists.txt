@@ -9,7 +9,7 @@
 
 # Add the neko-ext library which collects all the extensions.
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top_source_terms.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/simple_brinkman_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_lube_source_term.f90
