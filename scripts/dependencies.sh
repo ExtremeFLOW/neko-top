@@ -187,7 +187,7 @@ function find_pfunit() {
 
     # Clone pFUnit from the repository if it does not exist.
     if [[ ! -d "$PFUNIT_DIR" || $(ls -A $PFUNIT_DIR | wc -l) -eq 0 ]]; then
-        [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="v4.4.2"
+        [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="v4.12.0"
 
         git clone --depth=1 --branch $PFUNIT_VERSION \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $PFUNIT_DIR
