@@ -12,7 +12,7 @@
             "polynomial_order": 5,
             "dealias": false
         },
-        "adjoint": {
+        "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
                 "value": [
