@@ -272,6 +272,8 @@ contains
        end if
     end if
 
+    this%value = this%value * 0.5_rp
+
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine minimum_dissipation_update_value
