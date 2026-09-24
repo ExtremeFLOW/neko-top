@@ -58,8 +58,6 @@ option(BUILD_TESTING "Build the tests" OFF)
 option(BUILD_EXAMPLES "Build the examples" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 
-
-
 # ............................................................................ #
 # Define compiler flags
 
