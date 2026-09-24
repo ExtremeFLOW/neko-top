@@ -75,7 +75,7 @@ module lube_term_objective
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
@@ -201,16 +201,16 @@ contains
     select type (design)
     type is (brinkman_design_t)
        this%brinkman_amplitude => &
-            neko_field_registry%get_field("brinkman_amplitude")
+            neko_registry%get_field("brinkman_amplitude")
 
 
     class default
        call neko_error('Minimum dissipation only works with brinkman_design')
     end select
 
-    this%u => neko_field_registry%get_field('u')
-    this%v => neko_field_registry%get_field('v')
-    this%w => neko_field_registry%get_field('w')
+    this%u => neko_registry%get_field('u')
+    this%v => neko_registry%get_field('v')
+    this%w => neko_registry%get_field('w')
 
     ! GLL
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh

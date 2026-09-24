@@ -36,7 +36,7 @@ module adjoint_mixing_scalar_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
   use field, only: field_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
   use json_module, only : json_file
   use time_state, only: time_state_t

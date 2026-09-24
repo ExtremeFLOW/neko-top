@@ -9,7 +9,7 @@ module user
   use field_list, only : field_list_t
   use field_dirichlet, only : field_dirichlet_t
   use time_state, only : time_state_t
-  use field_registry, only : neko_field_registry
+  use registry, only : neko_registry
   use math, only : rzero, copy, chsign
   use device_math, only: device_copy, device_cmult
   use neko_config, only: NEKO_BCKND_DEVICE
