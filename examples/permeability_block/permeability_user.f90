@@ -96,8 +96,8 @@ contains
        ! Copy to device
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_map(resistance, resistance_d, f%dm%size())
-          call device_memcpy(resistance, resistance_d, f%dm%size(),&
-                                                                  host_to_device, .true.)
+          call device_memcpy(resistance, resistance_d, f%dm%size(), &
+               host_to_device, .true.)
        end if
     end if
 

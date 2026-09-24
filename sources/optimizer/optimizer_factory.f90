@@ -51,8 +51,8 @@ contains
          tolerance, 1.0e-3_rp)
 
     ! Select the optimizer type
-    select case(trim(type))
-    case("mma")
+    select case (trim(type))
+    case ("mma")
        allocate(mma_optimizer_t::object)
 
     case default

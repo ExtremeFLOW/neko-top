@@ -201,7 +201,8 @@ module adjoint_scheme
      !> Restart from a checkpoint
      procedure(adjoint_scheme_restart_intrf), pass(this), deferred :: restart
      !> Setup boundary conditions
-     procedure(adjoint_scheme_setup_bcs_intrf), pass(this), deferred :: setup_bcs
+     procedure(adjoint_scheme_setup_bcs_intrf), pass(this), deferred :: &
+          setup_bcs
      !> Update variable material properties
      procedure, pass(this) :: update_material_properties => &
           adjoint_scheme_update_material_properties
@@ -567,12 +568,12 @@ contains
                'case.fluid.gradient_jump_penalty.scaling_exponent',&
                GJP_param_b, 4.0_rp)
        end if
-       call this%gradient_jump_penalty_u_adj%init(params, this%dm_Xh, this%c_Xh, &
-            GJP_param_a, GJP_param_b)
-       call this%gradient_jump_penalty_v_adj%init(params, this%dm_Xh, this%c_Xh, &
-            GJP_param_a, GJP_param_b)
-       call this%gradient_jump_penalty_w_adj%init(params, this%dm_Xh, this%c_Xh, &
-            GJP_param_a, GJP_param_b)
+       call this%gradient_jump_penalty_u_adj%init(params, this%dm_Xh, &
+            this%c_Xh, GJP_param_a, GJP_param_b)
+       call this%gradient_jump_penalty_v_adj%init(params, this%dm_Xh, &
+            this%c_Xh, GJP_param_a, GJP_param_b)
+       call this%gradient_jump_penalty_w_adj%init(params, this%dm_Xh, &
+            this%c_Xh, GJP_param_a, GJP_param_b)
     end if
 
     call neko_log%end_section()
@@ -856,8 +857,8 @@ contains
   end subroutine adjoint_scheme_solver_factory
 
   !> Initialize a Krylov preconditioner
-  subroutine adjoint_scheme_precon_factory(this, pc, ksp, coef, dof, gs, bclst, &
-       pctype)
+  subroutine adjoint_scheme_precon_factory(this, pc, ksp, coef, dof, gs, &
+       bclst, pctype)
     class(adjoint_scheme_t), intent(inout) :: this
     class(pc_t), allocatable, target, intent(inout) :: pc
     class(ksp_t), target, intent(inout) :: ksp
@@ -870,13 +871,13 @@ contains
     call precon_factory(pc, pctype)
 
     select type (pcp => pc)
-      type is (jacobi_t)
+    type is (jacobi_t)
        call pcp%init(coef, dof, gs)
-      type is (sx_jacobi_t)
+    type is (sx_jacobi_t)
        call pcp%init(coef, dof, gs)
-      type is (device_jacobi_t)
+    type is (device_jacobi_t)
        call pcp%init(coef, dof, gs)
-      type is (hsmg_t)
+    type is (hsmg_t)
        if (len_trim(pctype) .gt. 4) then
           if (index(pctype, '+') .eq. 5) then
              call pcp%init(dof%msh, dof%Xh, coef, dof, gs, bclst, &
@@ -887,7 +888,7 @@ contains
        else
           call pcp%init(dof%msh, dof%Xh, coef, dof, gs, bclst)
        end if
-      type is (phmg_t)
+    type is (phmg_t)
        call pcp%init(dof%msh, dof%Xh, coef, dof, gs, bclst)
     end select
 

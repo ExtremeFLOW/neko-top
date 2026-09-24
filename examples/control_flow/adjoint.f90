@@ -212,14 +212,14 @@ contains
     ! !
     ! ! @todo no scalar factory for now, probably not needed
     ! if (C%params%valid_path('case.scalar')) then
-    !    call json_get_or_default(C%params, 'case.scalar.enabled', scalar,&
+    !    call json_get_or_default(C%params, 'case.scalar.enabled', scalar, &
     !                             .true.)
     ! end if
 
     ! if (scalar) then
     !    allocate(C%scalar)
     !    call C%scalar%init(C%msh, this%scheme%c_Xh, this%scheme%gs_Xh, &
-    !                       C%params, C%usr,&
+    !                       C%params, C%usr, &
     !                       C%material_properties)
     !    call this%scheme%chkp%add_scalar(C%scalar%s)
     !    this%scheme%chkp%abs1 => C%scalar%abx1
@@ -231,14 +231,14 @@ contains
     ! Setup user defined conditions
     !
     if (C%params%valid_path('case.adjoint.inflow_condition')) then
-       call json_get(C%params, 'case.adjoint.inflow_condition.type',&
+       call json_get(C%params, 'case.adjoint.inflow_condition.type', &
             string_val)
        if (trim(string_val) .eq. 'user') then
           ! call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
        end if
     else
        if (C%params%valid_path('case.fluid.inflow_condition')) then
-          call json_get(C%params, 'case.fluid.inflow_condition.type',&
+          call json_get(C%params, 'case.fluid.inflow_condition.type', &
                string_val)
           if (trim(string_val) .eq. 'user') then
              !  call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
@@ -265,14 +265,14 @@ contains
        call C%params%get("case.adjoint", ptr, found)
        call core%print_to_string(ptr, buffer)
        call adjoint_json%load_from_string(buffer)
-       call json_get(C%params, 'case.adjoint.initial_condition.type',&
+       call json_get(C%params, 'case.adjoint.initial_condition.type', &
             string_val)
     else
        ! this is stupid naming... but here "adjoint_json" would be fluid_json
        call C%params%get("case.fluid", ptr, found)
        call core%print_to_string(ptr, buffer)
        call adjoint_json%load_from_string(buffer)
-       call json_get(C%params, 'case.fluid.initial_condition.type',&
+       call json_get(C%params, 'case.fluid.initial_condition.type', &
             string_val)
     end if
 
@@ -355,7 +355,7 @@ contains
     !
     ! Setup output precision of the field files
     !
-    call json_get_or_default(C%params, 'case.output_precision', string_val,&
+    call json_get_or_default(C%params, 'case.output_precision', string_val, &
          'single')
 
     if (trim(string_val) .eq. 'double') then
@@ -379,7 +379,7 @@ contains
     ! HARRY
     ! We should be using our own output_controller_t,
     ! not the one used internally by neko.
-    call json_get_or_default(C%params, 'case.fluid.output_control',&
+    call json_get_or_default(C%params, 'case.fluid.output_control', &
          string_val, 'org')
 
     if (trim(string_val) .eq. 'org') then
@@ -399,7 +399,7 @@ contains
     ! !
     ! ! Save checkpoints (if nothing specified, default to saving at end of sim)
     ! !
-    ! call json_get_or_default(C%params, 'case.output_checkpoints',&
+    ! call json_get_or_default(C%params, 'case.output_checkpoints', &
     !      logical_val, .true.)
     ! if (logical_val) then
     !    call json_get_or_default(C%params, 'case.checkpoint_format', &
@@ -408,7 +408,7 @@ contains
     !         ! fmt = trim(string_val))
     !    call json_get_or_default(C%params, 'case.checkpoint_control', &
     !         string_val, "simulationtime")
-    !    call json_get_or_default(C%params, 'case.checkpoint_value', real_val,&
+    !    call json_get_or_default(C%params, 'case.checkpoint_value', real_val, &
     !         1e10_rp)
     !   !  call this%s%add(C%f_chkp, real_val, string_val)
     ! end if
@@ -569,7 +569,7 @@ contains
     ! ok this I guess this is techincally where we set the initial condition
     ! of adjoint yeh?
     call this%case%usr%user_init_modules(t_adj, &
-         this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
+         this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
@@ -641,7 +641,7 @@ contains
     end do
     call profiler_stop
 
-    call json_get_or_default(this%case%params, 'case.output_at_end',&
+    call json_get_or_default(this%case%params, 'case.output_at_end', &
          output_at_end, .true.)
     call this%s%execute(t_adj, tstep_adj, output_at_end)
 
@@ -698,7 +698,7 @@ contains
   !   logical :: found
 
   !   call C%params%get('case.restart_file', restart_file, found)
-  !   call C%params%get('case.restart_mesh_file', restart_mesh_file,&
+  !   call C%params%get('case.restart_mesh_file', restart_mesh_file, &
   !        found)
 
   !   if (found) then
@@ -706,7 +706,7 @@ contains
   !      call previous_meshf%read(C%fluid%chkp%previous_mesh)
   !   end if
 
-  !   call C%params%get('case.mesh2mesh_tolerance', tol,&
+  !   call C%params%get('case.mesh2mesh_tolerance', tol, &
   !        found)
 
   !   if (found) C%fluid%chkp%mesh2mesh_tol = tol

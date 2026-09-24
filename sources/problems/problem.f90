@@ -40,12 +40,13 @@ module problem
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get
   use simulation, only: simulation_t
   use logger, only: neko_log
+  use device_math, only: device_copy
 
   implicit none
   private
@@ -535,6 +536,12 @@ contains
     call sensitivity%init(this%n_design, this%n_constraints)
 
     do i = 1, this%n_constraints
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy( &
+               this%constraint_list(i)%constraint%sensitivity%x, &
+               this%constraint_list(i)%constraint%sensitivity%x_d, &
+               this%n_design, DEVICE_TO_HOST, sync = .true.)
+       end if
        do j = 1, this%n_design
           sensitivity%x(j, i) = &
                this%constraint_list(i)%constraint%sensitivity%x(j)
