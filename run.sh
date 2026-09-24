@@ -277,7 +277,7 @@ fi
 function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
-    source $SPATH/functions.sh
+    source functions.sh
     run $1 1>output.log 2>error.log
     cd $CURRENT_DIR
 }
