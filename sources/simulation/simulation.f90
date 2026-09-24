@@ -1,6 +1,6 @@
 !> @file simulation.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -36,47 +36,30 @@
 ! Here, we simply march forward to steady state solutions
 module simulation_m
   use case, only: case_t
-  use neko, only: neko_solve
   use user_access_singleton, only: neko_user_access
   use adjoint_case, only: adjoint_case_t
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
-  use scalar_pnpn, only: scalar_pnpn_t
-  use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
   use adjoint_scalars, only: adjoint_scalars_t
   use scalars, only: scalars_t
-  use scalar_scheme, only: scalar_scheme_t
   use fluid_pnpn, only: fluid_pnpn_t
   use time_step_controller, only: time_step_controller_t
-  use time_state, only: time_state_t
   use field_output, only: field_output_t
-  use chkp_output, only: chkp_output_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
-  use field, only: field_t
-  use registry, only: neko_registry
-  use field_math, only: field_rzero, field_copy
-  use checkpoint, only: chkp_t
-  use file, only: file_t
-  use utils, only: neko_warning, neko_error
-  use comm, only: pe_rank
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
-  use logger, only: LOG_SIZE, neko_log
   use mpi_f08, only: MPI_WTIME
-  use jobctrl, only: jobctrl_time_limit
   use profiler, only: profiler_start, profiler_stop, &
        profiler_start_region, profiler_end_region
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
-  use simulation_checkpoint, only: simulation_checkpoint_t
+  use state_recover, only: state_recover_t, state_recover_factory
   use runtime_stats, only: neko_rt_stats
-  use scratch_registry, only: neko_scratch_registry
-  use registry, only: neko_registry
   implicit none
   private
 
@@ -100,6 +83,18 @@ module simulation_m
      !> An output sampler for the adjoint problem.
      !! This should probably be an output controller at some point instead.
      type(field_output_t), public :: output_adjoint
+     !> Base output filename for Neko's own forward field output
+     !! (`neko_case%f_out`), captured before any design-iteration tag is
+     !! spliced into it, so that tag can be rebuilt fresh on every reset.
+     character(len=:), allocatable :: forward_field_base_fname
+     !> Base output filename for Neko's own adjoint field output
+     !! (`adjoint_case%f_out`), captured before any design-iteration tag is
+     !! spliced into it, so that tag can be rebuilt fresh on every reset.
+     character(len=:), allocatable :: adjoint_field_base_fname
+     !> The current design iteration. Used so that `reset` can keep Neko's
+     !! own field output (`neko_case%f_out` / `adjoint_case%f_out`) from
+     !! overwriting the previous design iteration's output.
+     integer :: current_design_iteration = 0
      !> Whether the simulation is steady or unsteady
      logical :: unsteady = .false.
 
@@ -107,10 +102,10 @@ module simulation_m
      integer :: n_timesteps = 0
 
      ! ----------------------------------------------------------------------- !
-     ! Checkpoint system
+     ! State recovery system
 
-     !> The checkpoint system data
-     type(simulation_checkpoint_t) :: checkpoint
+     !> The state recovery system data
+     class(state_recover_t), allocatable :: state_recover
 
    contains
      !> Initialize the simulation
@@ -126,6 +121,9 @@ module simulation_m
      !> Set simulation output counters.
      procedure, pass(this) :: set_output_counter => &
           simulation_set_output_counter
+     !> Set the current design iteration.
+     procedure, pass(this) :: set_design_iteration => &
+          simulation_set_design_iteration
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
      !> Write current state of the forward simulation to disk
@@ -141,8 +139,8 @@ contains
   subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
-    type(json_file) :: checkpoint_params
-    integer :: i, n_scalars, unsteady_support
+    type(json_file) :: state_recovery_params
+    integer :: i, n_scalars
     character(len=:), allocatable :: output_directory, precision_s, file_format
     integer :: precision
     logical :: unsteady, subdivide
@@ -156,6 +154,13 @@ contains
 
     ! initialize the adjoint
     call this%adjoint_case%init(this%neko_case)
+
+    ! Capture Neko's own field output filenames before any design-iteration
+    ! tag ever gets spliced into them (see `reset`/`neko_ext::reset`).
+    this%forward_field_base_fname = &
+         trim(this%neko_case%f_out%file_%get_base_fname())
+    this%adjoint_field_base_fname = &
+         trim(this%adjoint_case%f_out%file_%get_base_fname())
 
     ! Start the profiler
     call profiler_start
@@ -254,28 +259,13 @@ contains
     call json_get_or_default(parameters, "unsteady", unsteady, .false.)
     this%unsteady = unsteady
 
-    ! Ensure there is a means to deal with unsteadiness
+    ! State recovery is only needed for unsteady runs.
     if (this%unsteady) then
-       unsteady_support = 0
-       if ("checkpoints" .in. parameters) then
-          unsteady_support = unsteady_support + 1
-       end if
-
-       if (unsteady_support .eq. 0) then
-          call neko_error("No support for unsteady simulation provided, \\ &
-          & \\ current options include enabling checkpoints.")
-       end if
-
-       if (unsteady_support .gt. 1) then
-          call neko_error("Too many supports for unsteady simulation \\ &
-          & \\ provided, please select one.")
-       end if
+       call json_get(parameters, 'state_recovery', state_recovery_params)
+       call state_recover_factory(this%state_recover, this%neko_case, &
+            state_recovery_params)
     end if
 
-    if ("checkpoints" .in. parameters) then
-       call json_get(parameters, 'checkpoints', checkpoint_params)
-       call this%checkpoint%init(this%neko_case, checkpoint_params)
-    end if
 
   end subroutine simulation_initialize
 
@@ -286,12 +276,16 @@ contains
     ! Stop the profiler
     call profiler_stop
 
+    if (allocated(this%state_recover)) then
+       call this%state_recover%free()
+       deallocate(this%state_recover)
+    end if
+
     ! Free the objects
     call this%neko_case%free()
     call this%adjoint_case%free()
     call this%output_forward%free()
     call this%output_adjoint%free()
-    call this%checkpoint%free()
 
     ! Nullify pointers
     nullify(this%fluid)
@@ -303,6 +297,13 @@ contains
     this%unsteady = .false.
     this%have_scalar = .false.
     this%n_timesteps = 0
+    this%current_design_iteration = 0
+    if (allocated(this%forward_field_base_fname)) then
+       deallocate(this%forward_field_base_fname)
+    end if
+    if (allocated(this%adjoint_field_base_fname)) then
+       deallocate(this%adjoint_field_base_fname)
+    end if
 
     ! Close global objects
     call neko_simcomps%free()
@@ -328,7 +329,9 @@ contains
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       call this%checkpoint%save(this%neko_case)
+       if (this%unsteady) then
+          call this%state_recover%save()
+       end if
     end do
     call profiler_end_region("Forward simulation")
 
@@ -352,7 +355,9 @@ contains
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
     do i = this%n_timesteps, 1, -1
-       call this%checkpoint%restore(this%neko_case, i)
+       if (this%unsteady) then
+          call this%state_recover%restore(i)
+       end if
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
@@ -367,11 +372,28 @@ contains
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
 
-    call reset(this%neko_case)
-    call reset_adjoint(this%adjoint_case, this%neko_case)
-    call this%checkpoint%reset()
+    call reset(this%neko_case, this%current_design_iteration, &
+         this%forward_field_base_fname)
+    call reset_adjoint(this%adjoint_case, this%neko_case, &
+         this%current_design_iteration, this%adjoint_field_base_fname)
+    if (this%unsteady) then
+       call this%state_recover%reset()
+    end if
 
   end subroutine simulation_reset
+
+  !> Set the current design iteration, so that the next `reset` tags Neko's
+  !! own field output (forward and adjoint) with it instead of overwriting
+  !! the previous design iteration's output.
+  !! @param this The simulation object.
+  !! @param iteration The current design iteration.
+  subroutine simulation_set_design_iteration(this, iteration)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: iteration
+
+    this%current_design_iteration = iteration
+
+  end subroutine simulation_set_design_iteration
 
   subroutine simulation_set_output_counter(this, idx)
     class(simulation_t), intent(inout) :: this

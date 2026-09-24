@@ -18,6 +18,7 @@ module optimizer_checkpoint
   use scratch_registry, only: neko_scratch_registry
   use math, only: NEKO_EPS
   use device, only: DEVICE_TO_HOST
+  use comm, only: pe_rank
 
   implicit none
 
