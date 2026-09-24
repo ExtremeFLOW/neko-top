@@ -207,7 +207,7 @@ contains
     zone => neko_point_zone_registry%get_point_zone(trim(zone_name))
 
     call set_optimization_ic_uniform(fld, base_value)
-    call cfill_mask(fld%x, zone_value, size, zone%mask, zone%size)
+    call cfill_mask(fld%x, zone_value, size, zone%mask%get(), zone%size)
 
   end subroutine set_optimization_ic_point_zone
 
