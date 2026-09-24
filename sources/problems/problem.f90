@@ -47,6 +47,7 @@ module problem
   use simulation, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
+  use vector, only: vector_t
 
   implicit none
   private
@@ -57,7 +58,7 @@ module problem
   !! the optimization problem. The problem is defined by a set of objectives and
   !! constraints that are evaluated based on the design variables. The problem
   !! also handles the output of the problem and the simulation.
-  type, abstract, public :: problem_t
+  type, public :: problem_t
      private
 
      !> The number of design variables.
@@ -72,38 +73,29 @@ module problem
      !> The constraints of the problem.
      class(constraint_wrapper_t), allocatable, dimension(:) :: constraint_list
 
-     !> An output sampler for the problem. This should probably be an output
-     !! controller at some point instead.
-     type(fld_file_output_t), public :: output
-
    contains
 
      ! ----------------------------------------------------------------------- !
      ! Interfaces
 
-     !> Constructor for physics of the problem.
-     procedure(problem_init), pass(this), public, deferred :: init
-     !> Destructor.
-     procedure(problem_free), pass(this), deferred, public :: free
+     !> Constructor for the base class.
+     procedure, pass(this), public :: init => problem_init
+     !> Destructor for the base class.
+     procedure, pass(this), public :: free => problem_free
 
      !> Evaluate the optimization problem.
      !! This is the main function that evaluates the problem. It should be
      !! implemented in the derived classes.
-     procedure(problem_compute), pass(this), public, deferred :: compute
+     procedure, pass(this), public :: compute => problem_compute
 
      !> Evaluate the sensitivity of the optimization problem.
      !! This is the main function that evaluates the problem sensitivity to the
      !! design. It should be implemented in the derived classes.
-     procedure(problem_compute_sensitivity), pass(this), public, deferred :: &
-          compute_sensitivity
+     procedure, pass(this), public :: compute_sensitivity => &
+          problem_compute_sensitivity
 
      ! ----------------------------------------------------------------------- !
      ! Base class methods
-
-     !> Constructor for the base class.
-     procedure, pass(this) :: init_base => problem_init_base
-     !> Destructor for the base class.
-     procedure, pass(this) :: free_base => problem_free_base
 
      !> Read objective json-file.
      procedure, pass(this), public :: read_objectives => problem_read_objectives
@@ -167,62 +159,32 @@ module problem
 
   end type problem_t
 
-  ! -------------------------------------------------------------------------- !
-  ! Interfaces for the derived types
-
-  abstract interface
-     !> Constructor for physics of the problem.
-     !! This is the main constructor for a problem. This should be defined in
-     !! the derived types to initialize the problem. This is based on the
-     !! abstract design type, We suggest that a switch statement is used to
-     !! initialize the problem based on the design type.
-     subroutine problem_init(this, parameters, design, simulation)
-       import problem_t, json_file, simulation_t, design_t
-       class(problem_t), intent(inout) :: this
-       type(json_file), intent(inout) :: parameters
-       class(design_t), intent(in) :: design
-       type(simulation_t), intent(inout) :: simulation
-     end subroutine problem_init
-
-     !> Compute the problem.
-     subroutine problem_compute(this, design)
-       import problem_t, design_t
-       class(problem_t), intent(inout) :: this
-       class(design_t), intent(inout) :: design
-     end subroutine problem_compute
-
-     !> Compute the problem.
-     subroutine problem_compute_sensitivity(this, design)
-       import problem_t, design_t
-       class(problem_t), intent(inout) :: this
-       class(design_t), intent(inout) :: design
-     end subroutine problem_compute_sensitivity
-
-     !> Destructor
-     subroutine problem_free(this)
-       import problem_t
-       class(problem_t), intent(inout) :: this
-     end subroutine problem_free
-  end interface
-
 contains
 
   ! ========================================================================== !
   ! Base class methods
 
-  !> Constructor for the base class
-  subroutine problem_init_base(this, n_design)
+  !> The constructor for the base problem.
+  subroutine problem_init(this, parameters, design, simulation)
     class(problem_t), intent(inout) :: this
-    integer, intent(in) :: n_design
+    type(json_file), intent(inout) :: parameters
+    class(design_t), intent(in) :: design
+    type(simulation_t), intent(inout) :: simulation
 
-    this%n_design = n_design
+    this%n_design = design%size()
     this%n_objectives = 0
     this%n_constraints = 0
 
-  end subroutine problem_init_base
+    ! minimum dissipation objective function
+    call this%read_objectives(parameters, simulation, design)
+
+    ! volume constraint
+    call this%read_constraints(parameters, simulation, design)
+
+  end subroutine problem_init
 
   !> Destructor for the base class
-  subroutine problem_free_base(this)
+  subroutine problem_free(this)
     class(problem_t), intent(inout) :: this
     integer :: i
 
@@ -241,14 +203,13 @@ contains
        end do
        deallocate(this%constraint_list)
     end if
-  end subroutine problem_free_base
+  end subroutine problem_free
 
   !> Sample the fields/design.
   subroutine problem_write(this, idx)
     class(problem_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output%sample(real(idx, kind=rp))
   end subroutine problem_write
 
   ! ========================================================================== !
@@ -373,6 +334,35 @@ contains
     call move_alloc(constraint, this%constraint_list(n + 1)%constraint)
     this%n_constraints = n + 1
   end subroutine problem_add_constraint
+
+  ! ========================================================================== !
+  ! Problem part computation
+
+  !> The computation of the objective function and constraints.
+  subroutine problem_compute(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    call this%update_objectives(design)
+    call this%update_constraints(design)
+
+  end subroutine problem_compute
+
+  !> The computation of the objective function and constraints.
+  subroutine problem_compute_sensitivity(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    type(vector_t) :: objective_sensitivity
+
+    call this%update_objective_sensitivities(design)
+    call this%update_constraint_sensitivities(design)
+
+    call this%get_objective_sensitivities(objective_sensitivity)
+
+    call design%map_backward(objective_sensitivity)
+
+  end subroutine problem_compute_sensitivity
 
   ! ========================================================================== !
   ! Update the objectives and constraints
