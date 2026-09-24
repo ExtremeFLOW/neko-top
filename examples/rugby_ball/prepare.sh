@@ -17,16 +17,14 @@ function help() {
     echo -e ""
     echo -e " Options:"
     echo -e "  -h, --help  Show this help message and exit."
-    echo -e "  -x#         Number of cells in the x direction."
-    echo -e "  -y#         Number of cells in the y direction."
-    echo -e "  -z#         Number of cells in the z direction."
+    echo -e "  -N#         Number of cells in the x and y direction."
     echo -e ""
     echo -e "  See Readme for additional details."
     exit 0
 }
 
 # Handle options
-Nx=20 && Ny=20 && Nz=1
+N=20
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
@@ -36,13 +34,12 @@ for arg in "$@"; do
     elif [ "${arg:0:1}" == "-" ]; then
         case ${arg:1:1} in
         h) help ;;
-        x) Nx=${arg:2} ;;
-        y) Ny=${arg:2} ;;
-        z) Nz=${arg:2} ;;
+        N) N=${arg:2} ;;
         *) echo -e "Invalid option: ${arg:1}" >&2 && help ;;
         esac
     fi
 done
+Nx=$N && Ny=$N && Nz=1
 
 # ============================================================================ #
 # Ensure Neko can be found and set default mesh size
@@ -61,8 +58,12 @@ fi
 # ============================================================================ #
 # Generate mesh and run case
 
+# Compute the depth to retain the aspect ratio of the elements
+# The aspect ratio each element is  1:1:1
+z=$(python3 -c "print(1.0 / $N)")
+
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 1 0 1 0 1 $Nx $Ny $Nz .false. .true. .true.
+genmeshbox 0 1 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
 # End of file
 # ============================================================================ #
