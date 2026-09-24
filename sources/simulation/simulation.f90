@@ -69,6 +69,7 @@ module simulation_m
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
+  use simulation_checkpoint, only: simulation_checkpoint_t
   implicit none
   private
 
@@ -94,25 +95,15 @@ module simulation_m
      type(fld_file_output_t), public :: output_adjoint
 
      logical :: have_scalar = .false.
+     integer :: n_timesteps = 0
 
      ! ----------------------------------------------------------------------- !
-     ! Unsteady simulation parameters
+     ! Checkpoint system
 
-     ! This is used to save the state of the simulation at certain time steps
-     ! to be able to restart the simulation from there. This is used for the
-     ! adjoint simulation.
+     !> Enable checkpoint system
      logical :: checkpoint_enable = .false.
-     integer :: n_saves_memory = 10
-     integer :: n_saves_disc = 0
-     integer :: n_timesteps = 0
-     integer :: first_valid_timestep = 2
-     integer :: loaded_checkpoint = -1
-     type(chkp_output_t) :: chkp_output
-     type(field_t), dimension(:), allocatable :: p_list
-     type(field_t), dimension(:), allocatable :: u_list
-     type(field_t), dimension(:), allocatable :: v_list
-     type(field_t), dimension(:), allocatable :: w_list
-     type(field_t), dimension(:), allocatable :: s_list
+     !> The checkpoint system data
+     type(simulation_checkpoint_t) :: checkpoint
 
    contains
      !> Initialize the simulation
@@ -128,12 +119,7 @@ module simulation_m
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
 
-     !> Save the current state of the simulation to disk
-     procedure, pass(this) :: save_state => simulation_save_state
-     !> Restore the forward simulation state
-     procedure, pass(this) :: restore_state => simulation_restore_state
   end type simulation_t
-
   public :: simulation_t
 contains
 
@@ -141,10 +127,7 @@ contains
   subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
-    integer :: i, j, n_scalars
-    class(scalar_scheme_t), pointer :: scalar_i
-    character(len=10) :: str
-    character(len=:), allocatable :: chkp_file_name
+    integer :: i, n_scalars
 
     ! initialize the primal
     call neko_init(this%neko_case)
@@ -209,47 +192,10 @@ contains
        end do
     end if
 
-    ! ------------------------------------------------------------------------ !
-    ! Handle unsteady simulation
-
     call json_get_or_default(parameters, "checkpoints.enable", &
          this%checkpoint_enable, .false.)
-
     if (this%checkpoint_enable) then
-       ! Read options related to check pointing
-       call json_get_or_default(parameters, "checkpoints.n_memory", &
-            this%n_saves_memory, 10)
-       call json_get_or_default(parameters, "checkpoint.filename", &
-            chkp_file_name, "forward_chkp_")
-
-       call this%chkp_output%init(this%neko_case%chkp, chkp_file_name)
-
-       ! Allocate the RAM Checkpoints
-       allocate(this%p_list(this%n_saves_memory))
-       allocate(this%u_list(this%n_saves_memory))
-       allocate(this%v_list(this%n_saves_memory))
-       allocate(this%w_list(this%n_saves_memory))
-       if (this%have_scalar) then
-          allocate(this%s_list(this%n_saves_memory * n_scalars))
-       end if
-
-       do i = 1, this%n_saves_memory
-          write(str, '(A,I0)') "p_chkp_", i
-          call this%p_list(i)%init(this%neko_case%fluid%p%dof, str)
-          write(str, '(A,I0)') "u_chkp_", i
-          call this%u_list(i)%init(this%neko_case%fluid%u%dof, str)
-          write(str, '(A,I0)') "v_chkp_", i
-          call this%v_list(i)%init(this%neko_case%fluid%v%dof, str)
-          write(str, '(A,I0)') "w_chkp_", i
-          call this%w_list(i)%init(this%neko_case%fluid%w%dof, str)
-          if (this%have_scalar) then
-             do j = 1, n_scalars
-                write(str, '(A,I0,A,I0)') "s_chkp_", i, "_", j
-                scalar_i => this%neko_case%scalars%scalar_fields(j)
-                call this%s_list((i - 1) * n_scalars + j)%init(scalar_i%s%dof, str)
-             end do
-          end if
-       end do
+       call this%checkpoint%init(this%neko_case, parameters)
     end if
 
   end subroutine simulation_initialize
@@ -257,37 +203,10 @@ contains
   !> Free the simulation
   subroutine simulation_free(this)
     class(simulation_t), intent(inout) :: this
-    integer :: i, n_scalars
 
-    ! Free the RAM Checkpoints
     if (this%checkpoint_enable) then
-       do i = 1, this%n_saves_memory
-          call this%p_list(i)%free()
-          call this%u_list(i)%free()
-          call this%v_list(i)%free()
-          call this%w_list(i)%free()
-       end do
-
-       if (this%have_scalar) then
-          n_scalars = size(this%s_list)
-          do i = 1, n_scalars * this%n_saves_memory
-             call this%s_list(i)%free()
-          end do
-       end if
-
-       if (allocated(this%p_list)) deallocate(this%p_list)
-       if (allocated(this%u_list)) deallocate(this%u_list)
-       if (allocated(this%v_list)) deallocate(this%v_list)
-       if (allocated(this%w_list)) deallocate(this%w_list)
-       if (allocated(this%s_list)) deallocate(this%s_list)
-
-       this%checkpoint_enable = .false.
-       this%n_saves_memory = 0
-       this%n_saves_disc = 0
-       this%n_timesteps = 0
-       this%loaded_checkpoint = -1
+       call this%checkpoint%free()
     end if
-
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
 
@@ -306,9 +225,13 @@ contains
     call profiler_start
     loop_start = MPI_WTIME()
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
+       this%n_timesteps = this%n_timesteps + 1
+
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       if (this%checkpoint_enable) call this%save_state(this%neko_case%time)
+       if (this%checkpoint_enable) then
+          call this%checkpoint%save(this%neko_case)
+       end if
     end do
     call profiler_stop
 
@@ -333,7 +256,9 @@ contains
     loop_start = MPI_WTIME()
 
     do i = this%n_timesteps, 1, -1
-       if (this%checkpoint_enable) call this%restore_state(i)
+       if (this%checkpoint_enable) then
+          call this%checkpoint%restore(this%neko_case, i)
+       end if
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
@@ -347,7 +272,7 @@ contains
   !> Reset the simulation
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
-    integer :: i, n_scalars, j
+    integer :: i, n_scalars
 
     call reset(this%neko_case)
 
@@ -369,131 +294,10 @@ contains
        end do
     end if
 
-    ! Reset our checkpoints
     if (this%checkpoint_enable) then
-       this%n_saves_disc = 0
-       this%loaded_checkpoint = -1
-       this%n_timesteps = 0
-
-       do i = 1, this%n_saves_memory
-          call field_rzero(this%p_list(i))
-          call field_rzero(this%u_list(i))
-          call field_rzero(this%v_list(i))
-          call field_rzero(this%w_list(i))
-          if (this%have_scalar) then
-             n_scalars = size(this%s_list)
-             do j = 1, n_scalars
-                call field_rzero(this%s_list((i - 1) * n_scalars + j))
-             end do
-          end if
-       end do
+       call this%checkpoint%reset()
     end if
-
   end subroutine simulation_reset
-
-  !> Save the current state of the simulation to disk
-  subroutine simulation_save_state(this, time)
-    class(simulation_t), intent(inout) :: this
-    type(time_state_t), intent(in) :: time
-
-    ! Update the number of recorded timesteps
-    this%n_timesteps = this%n_timesteps + 1
-
-    ! Sample the checkpoint if needed
-    if (modulo(time%tstep, this%n_saves_memory) .eq. 0 .or. &
-         time%tstep .le. this%first_valid_timestep) then
-
-       call this%chkp_output%set_counter(time%tstep)
-       call this%chkp_output%sample(time%t)
-       this%n_saves_disc = this%n_saves_disc + 1
-    end if
-
-  end subroutine simulation_save_state
-
-  !> Restore the forward simulation state
-  subroutine simulation_restore_state(this, tstep)
-    class(simulation_t), intent(inout) :: this
-    integer, intent(in) :: tstep
-    type(time_step_controller_t) :: dt_controller
-    type(file_t) :: chkp_file
-    character(len=256) :: chkp_file_name
-    real(kind=dp) :: loop_start
-    integer :: j, k, previous_save_state, next_save_state
-    integer :: i_scalars, n_scalars
-    type(field_t), pointer :: u, v, w, p, s
-
-    loop_start = MPI_WTIME()
-
-    u => this%neko_case%fluid%u
-    v => this%neko_case%fluid%v
-    w => this%neko_case%fluid%w
-    p => this%neko_case%fluid%p
-    s => null()
-
-    ! Determine the nearest save states
-    previous_save_state = tstep - modulo(tstep, this%n_saves_memory)
-    next_save_state = previous_save_state + this%n_saves_memory
-
-    if (previous_save_state .le. this%first_valid_timestep) then
-       previous_save_state = min(tstep, this%first_valid_timestep)
-    end if
-
-    if (previous_save_state .lt. this%first_valid_timestep) then
-       next_save_state = previous_save_state + 1
-    end if
-
-    if (this%loaded_checkpoint .ne. previous_save_state) then
-       write(chkp_file_name, '(A,I5.5,A)') 'forward_chkp_', &
-            previous_save_state, '.chkp'
-
-       call chkp_file%init(chkp_file_name)
-       call chkp_file%read(this%neko_case%chkp)
-
-       call dt_controller%init(this%neko_case%params)
-       call simulation_restart(this%neko_case, this%neko_case%chkp)
-       this%neko_case%time%tstep = previous_save_state
-       this%loaded_checkpoint = this%neko_case%time%tstep
-
-       do k = previous_save_state, min(next_save_state - 1, this%n_timesteps)
-
-          if (k .ne. previous_save_state) then
-             if (this%neko_case%time%t .ge. this%neko_case%time%end_time) exit
-             call simulation_step(this%neko_case, dt_controller, loop_start)
-          end if
-
-          j = modulo(k, this%n_saves_memory) + 1
-          call field_copy(this%p_list(j), p)
-          call field_copy(this%u_list(j), u)
-          call field_copy(this%v_list(j), v)
-          call field_copy(this%w_list(j), w)
-          if (this%have_scalar) then
-             n_scalars = size(this%neko_case%scalars%scalar_fields)
-             do i_scalars = 1, n_scalars
-                s => this%neko_case%scalars%scalar_fields(i_scalars)%s
-                call field_copy(this%s_list((j - 1) * n_scalars + i_scalars), s)
-             end do
-          end if
-       end do
-
-    end if
-
-    j = modulo(tstep, this%n_saves_memory) + 1
-
-    call field_copy(p, this%p_list(j))
-    call field_copy(u, this%u_list(j))
-    call field_copy(v, this%v_list(j))
-    call field_copy(w, this%w_list(j))
-    if (this%have_scalar) then
-       n_scalars = size(this%neko_case%scalars%scalar_fields)
-       do i_scalars = 1, n_scalars
-          s => this%neko_case%scalars%scalar_fields(i_scalars)%s
-          call field_copy(s, this%s_list((j - 1) * n_scalars + i_scalars))
-       end do
-    end if
-
-
-  end subroutine simulation_restore_state
-
 
   !> Write current state of the simulation to disk
   subroutine simulation_write(this, idx)
