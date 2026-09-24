@@ -88,6 +88,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
         $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
     )
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
