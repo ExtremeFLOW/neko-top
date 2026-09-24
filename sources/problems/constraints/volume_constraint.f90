@@ -156,10 +156,7 @@ contains
     integer :: temp_indices(1)
 
     ! Initialize the base class
-    call this%init_base(design%size(), mask_name)
-
-    ! Assign the name to constraint
-    this%name = name
+    call this%init_base(name, design%size(), mask_name)
 
     ! Store the attributes
     this%is_max = is_max
@@ -279,6 +276,8 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
     real(kind=rp) :: volume
+
+    volume = 0.0_rp
 
     ! in the future we should be using the mapped design variable
     ! corresponding to this constraint!!!

@@ -87,11 +87,13 @@ contains
   !! @param design_size The number of design variables.
   !! @param weight The weight of the constraint function.
   !! @param[optional] mask_name The name design the mask.
-  subroutine constraint_init_base(this, design_size, mask_name)
+  subroutine constraint_init_base(this, name, design_size, mask_name)
     class(constraint_t), intent(inout) :: this
+    character(len=*), intent(in) :: name
     integer, intent(in) :: design_size
     character(len=*), intent(in), optional :: mask_name
 
+    this%name = name
     this%value = 0.0_rp
     call this%sensitivity%init(design_size)
 
