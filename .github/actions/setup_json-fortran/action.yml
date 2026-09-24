@@ -2,31 +2,47 @@ name: Setup the JSON-Fortran library
 description: |
   This action sets up the JSON-Fortran library for use in the main workflow.
 
+# ---------------------------------------------------------------------------- #
+# Define the inputs and outputs for this action. The inputs are used to
+# configure the action, while the outputs are used to pass information
+# back to the caller.
+
 inputs:
   install-dir:
     description: "The directory to install the JSON-Fortran library."
     required: false
     default: "/home/runner/pkg/json-fortran"
+
   working-dir:
     description: "The directory to work in."
     required: false
     default: "/home/runner/tmp/json-fortran"
+
   os:
     description: "The operating system to use."
     required: false
     default: "${{ runner.os }}"
+
   compiler:
     description: "The compiler to use."
     required: false
     default: "gfortran"
+
   compiler-flags:
     description: "The compiler flag to use."
     required: false
     default: "-O3"
+
   build-options:
     description: "The build option to use."
     required: false
-    default: "--parallel $(nproc)"
+    default: "--parallel"
+
+  install-options:
+    description: "The install option to use."
+    required: false
+    default: ""
+
   version:
     description: "The version of the JSON-Fortran library to use."
     required: false
@@ -37,9 +53,17 @@ outputs:
     description: "The directory where the JSON-Fortran library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
 
+# ---------------------------------------------------------------------------- #
+# Define the steps that will be run in this action. The steps are run in a
+# sequence, where the Cache step is run first. The Set output step runs last.
+
 runs:
   using: composite
   steps:
+    # ------------------------------------------------------------------------ #
+    # Setup the cache for the JSON-Fortran library.
+    # All following steps should look if the cache was hit and skip if it was.
+
     - name: Cache
       id: cache-json-fortran
       uses: actions/cache@v4
@@ -57,6 +81,19 @@ runs:
       run: |
         git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
 
+    # ------------------------------------------------------------------------ #
+    # Setup system dependencies for the JSON-Fortran library.
+
+    - name: Setup system dependencies
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }} && ${{ inputs.os == 'ubuntu-latest' }}
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: cmake ninja-build ${{ inputs.compiler }}
+        version: 1.0
+
+    # ------------------------------------------------------------------------ #
+    # Configure, build, and install the JSON-Fortran library.
+
     - name: Configure
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
@@ -66,21 +103,32 @@ runs:
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
       run: |
-        cmake -B $WORKING_DIR/build -S $WORKING_DIR \
+        cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
+          -DCMAKE_Fortran_COMPILER=$FC \
+          -DCMAKE_Fortran_FLAGS=$FCFLAGS \
           -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
           -DUSE_GNU_INSTALL_CONVENTION=ON \
           -DSKIP_DOC_GEN=ON
+
+    - name: Build
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+        BUILD_OPTIONS: ${{ inputs.build-options }}
+      run: cmake --build $WORKING_DIR/build --config Release $BUILD_OPTIONS
 
     - name: Install
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
-        FC: ${{ inputs.compiler }}
-        FCFLAGS: ${{ inputs.compiler-flags }}
+        INSTALL_OPTIONS: ${{ inputs.install-options }}
       run: |
-        cmake --build $WORKING_DIR/build --config Release ${{ inputs.build-options }}
-        cmake --install $WORKING_DIR/build
+        cmake --install $WORKING_DIR/build --config Release $INSTALL_OPTIONS
+
+    # ------------------------------------------------------------------------ #
+    # Cleanup and set the output.
 
     - name: Cleanup
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
