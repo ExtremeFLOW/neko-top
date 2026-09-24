@@ -20,7 +20,7 @@ jobs:
 
       - name: Configure documentation
         run: |
-          cmake -DONLY_DOCS=ON -B build -S .
+          cmake -DONLY_DOCS=ON -B build -S . -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build documentation
         run: |
