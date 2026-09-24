@@ -108,7 +108,7 @@ module lube_term_objective
    contains
 
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => lube_term_init_json
+     procedure, public, pass(this) :: init_json_sim => lube_term_init_json_sim
      !> The actual constructor.
      procedure, public, pass(this) :: init_from_attributes => &
           lube_term_init_attributes
@@ -130,11 +130,12 @@ contains
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
-  subroutine lube_term_init_json(this, json, design, simulation)
+  subroutine lube_term_init_json_sim(this, json, design, simulation)
     class(lube_term_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
+
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
     real(kind=rp) :: weight, K
@@ -146,7 +147,7 @@ contains
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, K)
-  end subroutine lube_term_init_json
+  end subroutine lube_term_init_json_sim
 
   !> The actual constructor.
   !! @param this The objective.
