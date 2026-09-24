@@ -1,35 +1,67 @@
 program usrneko
-  use mma_optimizer, only : mma_optimizer_t
-  use steady_state_problem, only: steady_state_problem_t
+  use simulation, only: simulation_t
   use topopt_design, only: topopt_design_t
-  use num_types, only : rp
-  use mask_ops, only: mask_exterior_const
+  use steady_state_problem, only: steady_state_problem_t
+  use optimizer, only : optimizer_t, optimizer_factory
 
-  real(kind=rp) :: tolerance
+  use json_module, only: json_file
+  use utils, only: neko_error
+  use json_utils_ext, only: json_read_file
 
-  !> a problem type
+  use mpi_f08, only: MPI_Init
+  implicit none
+
+  ! JSON related arguments
+  integer :: argc
+  type(json_file) :: parameters
+  character(len=256) :: parameter_file
+
+  ! MPI parameters
+  integer :: ierr
+
+  !> The simulation we are working with
+  type(simulation_t) :: simulation
+  !> The problem type
   type(steady_state_problem_t) :: problem
-  !> a design type
+  !> The design type
   type(topopt_design_t) :: design
-  !> an optimizer (in this case mma)
-  type(mma_optimizer_t) :: optimizer
+  !> The optimizer (in this case mma)
+  class(optimizer_t), allocatable :: optimizer
 
-  ! init the problem (base)
-  call problem%init()
+  ! -------------------------------------------------------------------------- !
+  ! Initialize the MPI environment
 
-  ! init the problem, with the design
-  call problem%init_design(design)
+  call MPI_Init(ierr)
 
-  ! init the optimizer
-  call optimizer%init(problem, design)
+  ! -------------------------------------------------------------------------- !
+  ! Read the parameters file as the first terminal argument
 
+  argc = command_argument_count()
+  if (argc .lt. 1) call neko_error('Missing parameter file')
+  call get_command_argument(1, parameter_file)
 
-  tolerance = 1.0e-3_rp
-  max_iter = 100
-  call optimizer%run(problem, tolerance, max_iter)
+  ! Read the parameters file
+  parameters = json_read_file(trim(parameter_file))
 
+  ! -------------------------------------------------------------------------- !
+  ! Initialization of the components
+
+  call simulation%init(parameters)
+  call design%init(parameters, simulation)
+  call problem%init(parameters, design, simulation)
+  call optimizer_factory(optimizer, parameters, problem, design, simulation)
+
+  ! -------------------------------------------------------------------------- !
+  ! Execute the optimization
+
+  call optimizer%run(problem, design, simulation)
+
+  ! -------------------------------------------------------------------------- !
+  ! Clean up the components
+
+  call optimizer%free()
   call problem%free()
   call design%free()
-  call optimizer%free()
+  call simulation%free()
 
 end program usrneko
