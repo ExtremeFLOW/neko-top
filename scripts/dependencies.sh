@@ -49,10 +49,10 @@ function find_json_fortran() {
     # Ensure JSON-Fortran is installed, if not install it.
     JSON_FORTRAN_LIB=$(find $JSON_FORTRAN_DIR -type d -name 'lib*' \
         -exec test -f '{}'/libjsonfortran.so \; -print 2>/dev/null) || true
-    if [[ ! -d $JSON_FORTRAN_LIB ]]; then
+    if [[ ! -d "$JSON_FORTRAN_LIB" ]]; then
 
         # Clone JSON-Fortran from the repository if it does not exist.
-        if [[ ! -d $JSON_FORTRAN_DIR || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
+        if [[ ! -d "$JSON_FORTRAN_DIR" || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
             [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
 
             git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
@@ -102,7 +102,7 @@ function find_nek5000() {
         NEK5000_DIR="$(realpath $EXTERNAL_DIR/nek5000)"
     fi
 
-    if [[ ! -d $NEK5000_DIR || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
+    if [[ ! -d "$NEK5000_DIR" || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
         [ -z "$NEK5000_VERSION" ] && NEK5000_VERSION="master"
 
         git clone --depth 1 --branch $NEK5000_VERSION \
@@ -125,10 +125,10 @@ function find_gslib() {
     # Ensure GSLIB is installed, if not install it.
     GSLIB_LIB=$(find $GSLIB_DIR -type d -name 'lib*' \
         -exec test -f '{}/libgs.a' \; -print 2>/dev/null) || true
-    if [ ! -d $GSLIB_LIB ]; then
+    if [ ! -d "$GSLIB_LIB" ]; then
 
         # Clone GSLIB from the repository if it does not exist.
-        if [ ! -d $GSLIB_DIR ]; then
+        if [ ! -d "$GSLIB_DIR" ]; then
             git clone --depth 1 --branch master \
                 https://github.com/nek5000/gslib.git $GSLIB_DIR
         fi
@@ -176,7 +176,7 @@ function find_pfunit() {
     fi
 
     # Clone pFUnit from the repository if it does not exist.
-    if [[ ! -d $PFUNIT_DIR || $(ls -A $PFUNIT_DIR | wc -l) -eq 0 ]]; then
+    if [[ ! -d "$PFUNIT_DIR" || $(ls -A $PFUNIT_DIR | wc -l) -eq 0 ]]; then
         [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="v4.4.2"
 
         git clone --depth=1 --branch $PFUNIT_VERSION \
@@ -240,10 +240,10 @@ function find_hdf5() {
     # Ensure HDF5 is installed, if not install it.
     HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
         -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
-    if [[ ! -d $HDF5_LIB ]]; then
+    if [[ ! -d "$HDF5_LIB" ]]; then
 
         # Clone HDF5 from the repository if it does not exist.
-        if [ ! -d $HDF5_DIR ]; then
+        if [ ! -d "$HDF5_DIR" ]; then
             [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1.14.6 "
             git clone --depth 1 --branch $HDF5_VERSION \
                 https://github.com/HDFGroup/hdf5.git $HDF5_DIR
@@ -298,10 +298,10 @@ function find_neko() {
     # Check if Neko is installed, if not install it.
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
-    if [[ ! -d $NEKO_LIB || "$CLEAN_NEKO" == true ]]; then
+    if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
 
         # Clone Neko from the repository if it does not exist.
-        if [[ ! -d $NEKO_DIR || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
+        if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
             [ -z "$NEKO_VERSION" ] && NEKO_VERSION="neko-top"
 
             git clone --depth 1 --branch $NEKO_VERSION \
