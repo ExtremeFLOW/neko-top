@@ -40,7 +40,7 @@
 #include <hip/hip_runtime.h>
 
 // Neko includes
-#include <neko/device_config.h>
+#include <neko/device/device_config.h>
 #include <neko/device/hip/check.h>
 #include <neko/math/bcknd/device/device_mpi_op.h>
 #include <neko/math/bcknd/device/device_mpi_reduce.h>

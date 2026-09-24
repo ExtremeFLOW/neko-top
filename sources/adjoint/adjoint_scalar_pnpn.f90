@@ -33,7 +33,8 @@
 !> Contains the `adjoint_scalar_pnpn_t` type.
 
 module adjoint_scalar_pnpn
-  use comm, only: MPI_INTEGER, MPI_MAX, NEKO_COMM, neko_error
+  use comm, only: NEKO_COMM
+  use utils, only: neko_error
   use num_types, only: rp
   use, intrinsic :: iso_fortran_env, only: error_unit
   use rhs_maker, only : rhs_maker_bdf_t, rhs_maker_ext_t, rhs_maker_oifs_t, &
@@ -68,6 +69,7 @@ module adjoint_scalar_pnpn
   use scratch_registry, only : neko_scratch_registry
   use time_state, only : time_state_t
   use bc, only : bc_t
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_MAX
   implicit none
   private
 
