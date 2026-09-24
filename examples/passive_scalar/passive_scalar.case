@@ -1,0 +1,210 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": false,
+        "end_time": 8.0,
+        "timestep": 5e-4,
+        "numerics": {
+            "time_order": 1,
+            "polynomial_order": 6,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 2,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-4,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": "hsmg",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-4,
+                "max_iterations": 800
+            },
+            "boundary_conditions": [
+                {
+                    "type": "user_velocity_pointwise",
+                    "zone_indices": [1]
+                },
+                {
+                    "type": "no_slip",
+                    "zone_indices": [3, 4, 5, 6]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [2]
+                }
+            ],
+            "output_control": "never",
+        },
+        "scalar": {
+            "enabled": true,
+            "Pe": 5000.0,
+            "solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
+            "initial_condition": {
+                "type": "user"
+            },
+            "boundary_conditions": [
+                {
+                    "type": "user_pointwise",
+                    "zone_indices": [1]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [2, 3, 4, 5, 6]
+                },
+            ],
+        },
+        "adjoint_scalar": {
+            "enabled": true,
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 0,
+                    "zone_indices": [1]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [2, 3, 4, 5, 6]
+                }
+            ],
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0,
+            }
+        },
+        "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [0.0, 0.0, 0.0]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [1, 3, 4, 5, 6]
+                },
+                {
+                     "type": "outflow",
+                     "zone_indices": [2]
+                 }
+            ],
+        },
+        "simulation_components": [
+            {
+                "type": "steady",
+                "is_user": true,
+                "tol": 1e-4,
+                "compute_control": "tsteps",
+                "compute_value": 1
+            }
+        ],
+        "point_zones": [
+            {
+                "name": "optimization_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    1.5,
+                    4.5,
+                ],
+                "y_bounds": [
+                    -1.0,
+                     3.8,
+                ],
+                "z_bounds": [
+                   -1.0,
+                    3.0,
+                ],
+            },
+            {
+                "name": "objective_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    5.0,
+                    6.0,
+                ],
+                "y_bounds": [
+                    -1.0,
+                     3.8,
+                ],
+                "z_bounds": [
+                   -1.0,
+                    3.0,
+                ],
+            },
+        ]
+    },
+    "optimization": {
+        "domain": {
+            "type": "point_zone",
+            "zone_name": "optimization_domain"
+            },
+        "design": {
+            "type": "brinkman",
+            "mapping" : [
+                {
+                    "type": "PDE_filter",
+                    "r": 0.01
+                },
+                {
+                    "type": "RAMP",
+                    "f_max": 100
+                }
+            ],
+            "initial_distribution": {
+                "type": "uniform",
+                "value": 0.0
+            }
+        },
+        "solver": {
+            "type": "mma",
+            "max_iterations": 100,
+            "tolerance": 1.0e-3,
+            "mma": {
+                "max_iter": 100,
+                "asyinit": 0.5,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "m": 1,
+                "scale": 100.0,
+                "auto_scale": false,
+                "xmin": 0.0,
+                "xmax": 1.0,
+                "a0": 1.0,
+                "a": 0.0,
+                "c": 100.0,
+                "d": 0.0
+            }
+        },
+        "objectives": [
+            {
+                "type": "scalar_mixing",
+                "mask_name": "objective_domain",
+                "phi_ref": 0.5,
+                "weight": 1.0
+            },
+        ],
+        "constraints": [
+        ],
+    },
+
+}

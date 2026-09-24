@@ -191,20 +191,19 @@ contains
 
     ! if we have the lube term we need to initialize and append that too
 
-    associate(f_adj_x => simulation%adjoint_case%scheme%f_adj_x, &
-         f_adj_y => simulation%adjoint_case%scheme%f_adj_y, &
-         f_adj_z => simulation%adjoint_case%scheme%f_adj_z, &
-         c_Xh => simulation%adjoint_case%scheme%c_Xh)
+    associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
+         f_adj_y => simulation%adjoint_fluid%f_adj_y, &
+         f_adj_z => simulation%adjoint_fluid%f_adj_z, &
+         c_Xh => simulation%adjoint_fluid%c_Xh)
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
-           this%k * this%weight, &
-           this%u, this%v, this%w, &
-           this%mask, this%has_mask, c_Xh)
+           this%k * this%weight, this%u, this%v, this%w, this%mask, &
+           this%has_mask, c_Xh)
 
     end associate
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_case%scheme%source_term%add_source_term(lube_term)
+    call simulation%adjoint_fluid%source_term%add_source_term(lube_term)
 
   end subroutine lube_term_init_attributes
 
