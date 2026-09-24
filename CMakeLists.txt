@@ -59,8 +59,6 @@ option(BUILD_EXAMPLES "Build the examples" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 
 
-set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
-    CACHE STRING "Path to the pFUnit installation")
 
 # ............................................................................ #
 # Define compiler flags
@@ -147,11 +145,29 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
+# ............................................................................ #
+# Setup PFUnit
+
+set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
+    CACHE STRING "Path to the pFUnit installation")
+
 # ============================================================================ #
 # Setup the Neko-TOP library
 # ============================================================================ #
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sources)
+
+# Add a static library target for use in examples and tests
+# This ensures the complete Neko-TOP library is built and linked before any
+# examples or tests are built.
+add_library(neko-top-a STATIC IMPORTED)
+set_target_properties(neko-top-a PROPERTIES
+    IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libneko-top.a"
+)
+add_custom_target(neko-top_ready
+    DEPENDS neko-top
+    COMMENT "Neko-TOP library is ready.")
+add_dependencies(neko-top-a neko-top_ready)
 
 # ============================================================================ #
 # Build the examples
@@ -165,12 +181,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 
 # Setup testing
 include(CTest)
-if (BUILD_TESTING)
-    find_package(PFUNIT REQUIRED
-        HINTS ${PFUNIT_DIR}
-    )
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
-endif()
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # ============================================================================ #
 # Write messages to the user about the options and paths if we are at the top
