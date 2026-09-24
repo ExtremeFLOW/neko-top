@@ -38,7 +38,7 @@
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
-                }
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
@@ -105,7 +105,7 @@
     },
     "mma": {
         "max_iter": 100,
-        "backend": "cuda",
+        "backend": "device",
         "subsolver": "dpip",
         "asyinit": 0.5,
         "asyincr": 1.2,
