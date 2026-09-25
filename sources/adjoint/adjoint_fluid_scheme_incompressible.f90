@@ -37,7 +37,7 @@ module adjoint_fluid_scheme_incompressible
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use gather_scatter, only: gs_t, GS_OP_MIN, GS_OP_MAX
   use neko_config, only: NEKO_BCKND_DEVICE
-  use num_types, only: rp, i8
+  use num_types, only: rp, dp, i8
   use adjoint_source_term, only: adjoint_source_term_t
   use field, only: field_t
   use space, only: space_t, GLL, GL
