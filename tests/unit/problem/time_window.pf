@@ -166,7 +166,6 @@ contains
     functional%start_time = start_time
     functional%end_time = end_time
     call functional%sensitivity%init(1)
-    call functional%sensitivity_old%init(1)
     call functional%reset_value()
     call functional%reset_sensitivity()
 
