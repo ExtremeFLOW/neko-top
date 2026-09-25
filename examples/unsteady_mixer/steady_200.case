@@ -7,7 +7,7 @@
         "output_boundary": false,
         "time": {
             "end_time": 12.0,
-            "timestep": 2.0e-4
+            "timestep": 1.0e-4
         },
         "numerics": {
             "time_order": 3,
@@ -29,7 +29,7 @@
                         "solver": "tamg"
                     }
                 },
-                "absolute_tolerance": 1e-7,
+                "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
             "velocity_solver": {
@@ -184,7 +184,7 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 200,
+            "max_iterations": 25,
             "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
             "mma": {
@@ -193,7 +193,7 @@
                 "xmax": 1.0
             },
             "checkpoint": {
-                "interval": 1
+                "interval": 5
             }
         },
         "objectives": [
@@ -201,15 +201,15 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "weight": 10.8336275609
+                "weight": 11.3503685776
             },
             {
                 "type": "viscous_dissipation",
-                "weight": 1.19703784706
+                "weight": 0.9369508196
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 45.10107562188
+                "weight": 12.5216571753
             }
         ]
     }
