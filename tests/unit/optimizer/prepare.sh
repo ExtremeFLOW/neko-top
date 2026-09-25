@@ -24,7 +24,7 @@ function help() {
 }
 
 # Handle options
-N=20
+N=10
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in

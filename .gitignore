@@ -10,6 +10,9 @@ examples/debug/*
 !examples/debug/debug.case
 !examples/debug/CMakeLists.txt
 
+# IDE Related files
+.vscode/
+
 # Translated unit test files
 tests/unit/**/*.F90
 

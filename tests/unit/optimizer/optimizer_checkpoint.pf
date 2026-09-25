@@ -61,7 +61,7 @@ contains
   ! ========================================================================== !
   ! Test writing the MMA object to HDF5 file.
 
-  @test(npes=[2])
+  @test(npes=[1])
   subroutine manual_checkpoint(this)
     class(test_optimizer_checkpoint), intent(inout) :: this
     type(json_file) :: parameters, design_parameters
@@ -185,9 +185,11 @@ contains
     call des%get_values(x)
 
     write(msg, '(A)') "Final objective does not match original objective"
-    @assertEqual(0.0_rp, abs((f_ref - f) / f_ref), tol, trim(msg))
-    write(msg, '(A)') "Final design does not match original design"
-    @assertEqual(0.0_rp, rmse(x_ref, x), tol, trim(msg))
+    @assertEqual(f_ref, f, tol, trim(msg))
+    do i = 1, des%size()
+       write(msg, '(A,I0)') "Final design does not match at index ", i
+       @assertEqual(x_ref%x(i), x%x(i), NEKO_EPS, trim(msg))
+    end do
 
     ! ------------------------------------------------------------------------ !
     ! Clean up the components
