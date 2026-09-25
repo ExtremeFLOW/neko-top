@@ -1,0 +1,296 @@
+!> Unit tests for the time-window accumulation in `base_functional_t`.
+!!
+!! A functional restricted to a time window should report the average of its
+!! instantaneous value over that window. That average must not depend on how
+!! long the simulation itself runs, nor on the timestep, nor on whether the
+!! window was given as a start time, an end time, both, or neither.
+module time_window
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use neko, only: neko_init
+  use time_state, only: time_state_t
+  use vector, only: vector_t
+  use vector_math, only: vector_cfill
+  use design, only: design_t
+  use base_functional, only: base_functional_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_time_window_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_time_window_case
+
+  !> A minimal concrete design. The accumulation routines only hand the design
+  !! through to `update_value`/`update_sensitivity`, so nothing here is used.
+  type, extends(design_t) :: stub_design_t
+   contains
+     procedure, pass(this) :: free => stub_design_free
+     procedure, pass(this) :: get_values => stub_design_get_values
+     procedure, pass(this) :: update_design => stub_design_update_design
+     procedure, pass(this) :: map_forward => stub_design_map_forward
+     procedure, pass(this) :: map_backward => stub_design_map_backward
+     procedure, pass(this) :: write => stub_design_write
+  end type stub_design_t
+
+  !> A functional whose instantaneous value is the prescribed ramp
+  !! \f$ offset + slope \cdot t \f$, so its exact mean over any window is known
+  !! analytically. The sensitivity is set to the same number, so the two
+  !! accumulation paths can be compared against the same expectation.
+  type, extends(base_functional_t) :: ramp_functional_t
+     !> Time at which the functional is being evaluated.
+     real(kind=rp) :: t_now = 0.0_rp
+     !> Constant part of the ramp.
+     real(kind=rp) :: offset = 0.0_rp
+     !> Slope of the ramp.
+     real(kind=rp) :: slope = 0.0_rp
+   contains
+     procedure, pass(this) :: free => ramp_free
+     procedure, pass(this) :: update_value => ramp_update_value
+     procedure, pass(this) :: update_sensitivity => ramp_update_sensitivity
+  end type ramp_functional_t
+
+  !> Never accumulate outside a window, whatever the run length.
+  real(kind=rp), parameter :: NEVER = huge(0.0_rp)
+
+  logical :: initialized = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_time_window_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_time_window_case), intent(inout) :: this
+
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! The stub design: every deferred binding is a no-op.
+
+  subroutine stub_design_free(this)
+    class(stub_design_t), intent(inout) :: this
+  end subroutine stub_design_free
+
+  subroutine stub_design_get_values(this, values)
+    class(stub_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
+  end subroutine stub_design_get_values
+
+  subroutine stub_design_update_design(this, values)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: values
+  end subroutine stub_design_update_design
+
+  subroutine stub_design_map_forward(this)
+    class(stub_design_t), intent(inout) :: this
+  end subroutine stub_design_map_forward
+
+  subroutine stub_design_map_backward(this, sensitivity)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: sensitivity
+  end subroutine stub_design_map_backward
+
+  subroutine stub_design_write(this, idx)
+    class(stub_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
+  end subroutine stub_design_write
+
+  ! ========================================================================== !
+  ! The ramp functional.
+
+  subroutine ramp_free(this)
+    class(ramp_functional_t), intent(inout) :: this
+
+    call this%sensitivity%free()
+  end subroutine ramp_free
+
+  subroutine ramp_update_value(this, design)
+    class(ramp_functional_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+
+    this%value = this%offset + this%slope * this%t_now
+  end subroutine ramp_update_value
+
+  subroutine ramp_update_sensitivity(this, design)
+    class(ramp_functional_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+
+    call vector_cfill(this%sensitivity, this%offset + this%slope * this%t_now)
+  end subroutine ramp_update_sensitivity
+
+  ! ========================================================================== !
+  ! Harness
+
+  !> Accumulate a ramp functional over a simulated interval, mirroring the
+  !! forward loop in `problem_run_forward_unsteady`: the functional is sampled
+  !! once per completed timestep, at the time reached by that step.
+  !!
+  !! @param offset Constant part of the instantaneous value.
+  !! @param slope Slope of the instantaneous value in time.
+  !! @param sim_end End time of the simulation.
+  !! @param start_time Start of the functional's own window.
+  !! @param end_time End of the functional's own window.
+  !! @param dt Timestep.
+  !! @param value Accumulated value of the functional.
+  !! @param sensitivity Accumulated sensitivity of the functional.
+  subroutine accumulate_ramp(offset, slope, sim_end, start_time, end_time, &
+       dt, value, sensitivity)
+    real(kind=rp), intent(in) :: offset
+    real(kind=rp), intent(in) :: slope
+    real(kind=rp), intent(in) :: sim_end
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
+    real(kind=rp), intent(in) :: dt
+    real(kind=rp), intent(out) :: value
+    real(kind=rp), intent(out) :: sensitivity
+
+    type(ramp_functional_t) :: functional
+    type(stub_design_t) :: design
+    type(time_state_t) :: time
+    integer :: step, n_steps
+
+    functional%offset = offset
+    functional%slope = slope
+    functional%start_time = start_time
+    functional%end_time = end_time
+    call functional%sensitivity%init(1)
+    call functional%reset_value()
+    call functional%reset_sensitivity()
+
+    call time%init(0.0_rp, sim_end, dt)
+
+    n_steps = nint(sim_end / dt)
+    do step = 1, n_steps
+       time%tstep = step
+       time%t = step * dt
+       functional%t_now = time%t
+       call functional%accumulate_value(design, time)
+       call functional%accumulate_sensitivity(design, time)
+    end do
+
+    value = functional%get_value()
+
+    ! The sensitivity is a device-resident array on the device backends, so
+    ! bring it back before reading it. It is deliberately not read through a
+    ! reduction: every rank holds the same rank-local answer here, and a
+    ! collective would couple this to the number of ranks the test runs on.
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(functional%sensitivity%x, &
+            functional%sensitivity%x_d, 1, DEVICE_TO_HOST, sync = .true.)
+    end if
+    sensitivity = functional%sensitivity%x(1)
+
+    call functional%free()
+  end subroutine accumulate_ramp
+
+  ! ========================================================================== !
+  ! Tests
+
+  !> A functional that does not change in time must report the same value
+  !! whatever its window is and however long the run is.
+  @test(npes=[2])
+  subroutine invariant_constant_value(this)
+    class(test_time_window_case), intent(inout) :: this
+    real(kind=rp), parameter :: expected = 0.125_rp
+    real(kind=rp), parameter :: dt = 1.0e-4_rp
+    real(kind=rp) :: value, sensitivity
+
+    ! No window at all, short run.
+    call accumulate_ramp(expected, 0.0_rp, 0.1_rp, 0.0_rp, NEVER, dt, &
+         value, sensitivity)
+    @assertEqual(expected, value, 1.0e-12_rp, "no window, end_time = 0.1")
+
+    ! No window at all, run twice as long.
+    call accumulate_ramp(expected, 0.0_rp, 0.2_rp, 0.0_rp, NEVER, dt, &
+         value, sensitivity)
+    @assertEqual(expected, value, 1.0e-12_rp, "no window, end_time = 0.2")
+
+    ! Only a start time.
+    call accumulate_ramp(expected, 0.0_rp, 0.1_rp, 0.02_rp, NEVER, dt, &
+         value, sensitivity)
+    @assertEqual(expected, value, 1.0e-12_rp, "start_time only")
+
+    ! Only an end time.
+    call accumulate_ramp(expected, 0.0_rp, 0.1_rp, 0.0_rp, 0.08_rp, dt, &
+         value, sensitivity)
+    @assertEqual(expected, value, 1.0e-12_rp, "end_time only")
+
+    ! Both, and the run extended well past the window.
+    call accumulate_ramp(expected, 0.0_rp, 0.1_rp, 0.02_rp, 0.08_rp, dt, &
+         value, sensitivity)
+    @assertEqual(expected, value, 1.0e-12_rp, "start_time and end_time")
+
+    call accumulate_ramp(expected, 0.0_rp, 0.2_rp, 0.02_rp, 0.08_rp, dt, &
+         value, sensitivity)
+    @assertEqual(expected, value, 1.0e-12_rp, "window, end_time = 0.2")
+
+    ! Halving the timestep must not change the average either.
+    call accumulate_ramp(expected, 0.0_rp, 0.2_rp, 0.02_rp, 0.08_rp, &
+         0.5_rp * dt, value, sensitivity)
+    @assertEqual(expected, value, 1.0e-12_rp, "window, halved timestep")
+
+  end subroutine invariant_constant_value
+
+  !> The sensitivity is normalised the same way as the value, so it must be
+  !! invariant under exactly the same changes.
+  @test(npes=[2])
+  subroutine invariant_constant_sensitivity(this)
+    class(test_time_window_case), intent(inout) :: this
+    real(kind=rp), parameter :: expected = 0.125_rp
+    real(kind=rp), parameter :: dt = 1.0e-4_rp
+    real(kind=rp) :: value, sensitivity
+
+    call accumulate_ramp(expected, 0.0_rp, 0.1_rp, 0.0_rp, NEVER, dt, &
+         value, sensitivity)
+    @assertEqual(expected, sensitivity, 1.0e-12_rp, "no window")
+
+    call accumulate_ramp(expected, 0.0_rp, 0.2_rp, 0.02_rp, 0.08_rp, dt, &
+         value, sensitivity)
+    @assertEqual(expected, sensitivity, 1.0e-12_rp, "window, longer run")
+
+    call accumulate_ramp(expected, 0.0_rp, 0.2_rp, 0.02_rp, 0.08_rp, &
+         0.5_rp * dt, value, sensitivity)
+    @assertEqual(expected, sensitivity, 1.0e-12_rp, "window, halved timestep")
+
+  end subroutine invariant_constant_sensitivity
+
+  !> For a value that does change in time, the reported number must be the mean
+  !! over the functional's own window -- not over the simulated interval.
+  @test(npes=[2])
+  subroutine windowed_average(this)
+    class(test_time_window_case), intent(inout) :: this
+    real(kind=rp), parameter :: dt = 1.0e-4_rp
+    real(kind=rp) :: value, sensitivity
+
+    ! value(t) = t on [0.02, 0.08]: mean 0.05, up to the O(dt) rectangle-rule
+    ! error of the accumulation itself.
+    call accumulate_ramp(0.0_rp, 1.0_rp, 0.1_rp, 0.02_rp, 0.08_rp, dt, &
+         value, sensitivity)
+    @assertEqual(0.05_rp, value, dt, "mean over [0.02, 0.08]")
+
+    ! Extending the run must not move it.
+    call accumulate_ramp(0.0_rp, 1.0_rp, 0.5_rp, 0.02_rp, 0.08_rp, dt, &
+         value, sensitivity)
+    @assertEqual(0.05_rp, value, dt, "mean over [0.02, 0.08], longer run")
+
+    ! An open-ended window follows the run, so its mean does move -- to the
+    ! mean over [0.02, sim_end].
+    call accumulate_ramp(0.0_rp, 1.0_rp, 0.1_rp, 0.02_rp, NEVER, dt, &
+         value, sensitivity)
+    @assertEqual(0.06_rp, value, dt, "mean over [0.02, 0.1]")
+
+  end subroutine windowed_average
+
+end module time_window
