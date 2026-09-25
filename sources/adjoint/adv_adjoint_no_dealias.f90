@@ -1,34 +1,36 @@
-! Copyright (c) 2021-2024, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!  * Redistributions of source code must retain the above copyright
-!   notice, this list of conditions and the following disclaimer.
-!
-!  * Redistributions in binary form must reproduce the above
-!   copyright notice, this list of conditions and the following
-!   disclaimer in the documentation and/or other materials provided
-!   with the distribution.
-!
-!  * Neither the name of the authors nor the names of its
-!   contributors may be used to endorse or promote products derived
-!   from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adv_adjoint_no_dealias.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Subroutines to add perturbed advection terms to the RHS of a transport
 !! equation.
@@ -39,7 +41,7 @@ module adv_lin_no_dealias
   use space, only: space_t
   use field, only: field_t
   use coefs, only: coef_t
-  use scratch_registry, only : neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
   use operators, only: opgrad, conv1, cdtp
@@ -66,6 +68,16 @@ module adv_lin_no_dealias
      !! , to
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => adjoint_advection_no_dealias
+     !> Compute the adjoint passive scalar.
+     ! If one integrates by parts, this essentially switches sign and adds some
+     ! boundary terms.
+     ! We keep the differential operator on the test function
+     procedure, pass(this) :: compute_adjoint_scalar => &
+          compute_adjoint_scalar_advection_no_dealias
+     ! NOTE
+     ! This linearized advection term is the same as a normal advection term
+     ! so not sure what to do here...
+
      !> Constructor
      procedure, pass(this) :: init => init_no_dealias
      !> Destructor
@@ -75,6 +87,7 @@ module adv_lin_no_dealias
 contains
 
   !> Constructor
+  !! @param this The object.
   !! @param coef The coefficients of the (space, mesh) pair.
   subroutine init_no_dealias(this, coef)
     class(adv_lin_no_dealias_t), intent(inout) :: this
@@ -104,6 +117,7 @@ contains
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
   !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of adjoint velocity.
   !! @param vy The y component of adjoint velocity.
   !! @param vz The z component of adjoint velocity.
@@ -143,15 +157,15 @@ contains
 
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_scratch_registry%request_field(tduxb, temp_indices(1))
-       call neko_scratch_registry%request_field(tdvxb, temp_indices(2))
-       call neko_scratch_registry%request_field(tdwxb, temp_indices(3))
-       call neko_scratch_registry%request_field(tduyb, temp_indices(4))
-       call neko_scratch_registry%request_field(tdvyb, temp_indices(5))
-       call neko_scratch_registry%request_field(tdwyb, temp_indices(6))
-       call neko_scratch_registry%request_field(tduzb, temp_indices(7))
-       call neko_scratch_registry%request_field(tdvzb, temp_indices(8))
-       call neko_scratch_registry%request_field(tdwzb, temp_indices(9))
+       call neko_scratch_registry%request_field(tduxb, temp_indices(1), .false.)
+       call neko_scratch_registry%request_field(tdvxb, temp_indices(2), .false.)
+       call neko_scratch_registry%request_field(tdwxb, temp_indices(3), .false.)
+       call neko_scratch_registry%request_field(tduyb, temp_indices(4), .false.)
+       call neko_scratch_registry%request_field(tdvyb, temp_indices(5), .false.)
+       call neko_scratch_registry%request_field(tdwyb, temp_indices(6), .false.)
+       call neko_scratch_registry%request_field(tduzb, temp_indices(7), .false.)
+       call neko_scratch_registry%request_field(tdvzb, temp_indices(8), .false.)
+       call neko_scratch_registry%request_field(tdwzb, temp_indices(9), .false.)
        fx_d = fx%x_d
        fy_d = fy%x_d
        fz_d = fz%x_d
@@ -182,23 +196,23 @@ contains
 
        ! \int \grad v . U_b ^ u
        ! with '^' an outer product
-       call adjoint_weak_no_dealias_device(fx_d, vx_d, &
-            vxb%x, vyb%x, vzb%x, &
-            coef, Xh, n, &
-            tduxb, tdvxb, tdwxb, &
-            tduyb, tdvyb, tdwyb)
+       associate(w1 => tduxb, w2 => tdvxb, w3 => tdwxb, &
+            w4 => tduyb, w5 => tdvyb, w6 => tdwyb)
+         call adjoint_weak_no_dealias_device(fx_d, vx_d, &
+              vxb%x, vyb%x, vzb%x, &
+              coef, Xh, n, &
+              w1, w2, w3, w4, w5, w6)
 
-       call adjoint_weak_no_dealias_device(fy_d, vy_d, &
-            vxb%x, vyb%x, vzb%x, &
-            coef, Xh, n, &
-            tduxb, tdvxb, tdwxb, &
-            tduyb, tdvyb, tdwyb)
+         call adjoint_weak_no_dealias_device(fy_d, vy_d, &
+              vxb%x, vyb%x, vzb%x, &
+              coef, Xh, n, &
+              w1, w2, w3, w4, w5, w6)
 
-       call adjoint_weak_no_dealias_device(fz_d, vz_d, &
-            vxb%x, vyb%x, vzb%x, &
-            coef, Xh, n, &
-            tduxb, tdvxb, tdwxb, &
-            tduyb, tdvyb, tdwyb)
+         call adjoint_weak_no_dealias_device(fz_d, vz_d, &
+              vxb%x, vyb%x, vzb%x, &
+              coef, Xh, n, &
+              w1, w2, w3, w4, w5, w6)
+       end associate
 
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
@@ -214,40 +228,44 @@ contains
           do i = 1, Xh%lxyz
              idxx = idx + i
              fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duxb(i) + &
-                  & vy%x(i,1,1,e)*dvxb(i) + &
-                  & vz%x(i,1,1,e)*dwxb(i) )
+                  vx%x(i,1,1,e)*duxb(i) + &
+                  vy%x(i,1,1,e)*dvxb(i) + &
+                  vz%x(i,1,1,e)*dwxb(i) )
 
              fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duyb(i) + &
-                  & vy%x(i,1,1,e)*dvyb(i) + &
-                  & vz%x(i,1,1,e)*dwyb(i))
+                  vx%x(i,1,1,e)*duyb(i) + &
+                  vy%x(i,1,1,e)*dvyb(i) + &
+                  vz%x(i,1,1,e)*dwyb(i))
 
              fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duzb(i) + &
-                  & vy%x(i,1,1,e)*dvzb(i) + &
-                  & vz%x(i,1,1,e)*dwzb(i))
+                  vx%x(i,1,1,e)*duzb(i) + &
+                  vy%x(i,1,1,e)*dvzb(i) + &
+                  vz%x(i,1,1,e)*dwzb(i))
           end do
 
           ! \int \grad v . U_b ^ u
           ! with ^ an outer product
-          call adjoint_weak_no_dealias_cpu( &
-               & fx%x(:,:,:,e), vx%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+          ! use these as work arrays
+          associate(w1 => duxb, w2 => dvxb, w3 => dwxb, &
+               w4 => duyb, w5 => dvyb, w6 => dwyb)
+            call adjoint_weak_no_dealias_cpu( &
+                 fx%x(:,:,:,e), vx%x(1,1,1,e), &
+                 vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+                 e, coef, Xh, Xh%lxyz, &
+                 w1, w2, w3, w4, w5, w6)
 
-          call adjoint_weak_no_dealias_cpu( &
-               & fy%x(:,:,:,e), vy%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+            call adjoint_weak_no_dealias_cpu( &
+                 fy%x(:,:,:,e), vy%x(1,1,1,e), &
+                 vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+                 e, coef, Xh, Xh%lxyz, &
+                 w1, w2, w3, w4, w5, w6)
 
-          call adjoint_weak_no_dealias_cpu( &
-               & fz%x(:,:,:,e), vz%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+            call adjoint_weak_no_dealias_cpu( &
+                 fz%x(:,:,:,e), vz%x(1,1,1,e), &
+                 vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+                 e, coef, Xh, Xh%lxyz, &
+                 w1, w2, w3, w4, w5, w6)
+          end associate
        end do
 
     end if
@@ -350,6 +368,7 @@ contains
   !> Add the linearized advection term for the fluid, i.e.
   !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of perturbed velocity.
   !! @param vy The y component of perturbed velocity.
   !! @param vz The z component of perturbed velocity.
@@ -425,4 +444,63 @@ contains
     end if
 
   end subroutine linear_advection_no_dealias
+
+  !> Add the adjoint advection term for a scalar,
+  !! i.e. \f$ - u \cdot \nabla s^\dagger \f$, to the
+  !! RHS.
+  !! or in weak form, \f$  \int \nabla r \cdot u s^\dagger \f$
+  !! @param this The object.
+  !! @param vxb The x component of velocity.
+  !! @param vyb The y component of velocity.
+  !! @param vzb The z component of velocity.
+  !! @param s The adjoint scalar.
+  !! @param fs The source term.
+  !! @param Xh The function space.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  !! @param n Typically the size of the mesh.
+  !! @param dt Current time-step, not required for this method.
+  subroutine compute_adjoint_scalar_advection_no_dealias(this, vxb, vyb, vzb, &
+       s, fs, Xh, coef, n, dt)
+    class(adv_lin_no_dealias_t), intent(inout) :: this
+    type(field_t), intent(inout) :: vxb, vyb, vzb
+    type(field_t), intent(inout) :: s
+    type(field_t), intent(inout) :: fs
+    type(space_t), intent(inout) :: Xh
+    type(coef_t), intent(inout) :: coef
+    integer, intent(in) :: n
+    real(kind=rp), intent(in), optional :: dt
+    real(kind=rp), dimension(Xh%lxyz) :: w1, w2, w3, w4, w5, w6
+    integer :: e
+    type(field_t), pointer :: w1_d, w2_d, w3_d, w4_d, w5_d, w6_d
+    integer :: temp_indices(6)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call neko_scratch_registry%request_field(w1_d, temp_indices(1), .false.)
+       call neko_scratch_registry%request_field(w2_d, temp_indices(2), .false.)
+       call neko_scratch_registry%request_field(w3_d, temp_indices(3), .false.)
+       call neko_scratch_registry%request_field(w4_d, temp_indices(4), .false.)
+       call neko_scratch_registry%request_field(w5_d, temp_indices(5), .false.)
+       call neko_scratch_registry%request_field(w6_d, temp_indices(6), .false.)
+
+       call adjoint_weak_no_dealias_device(fs%x_d, s%x_d, &
+            vxb%x, vyb%x, vzb%x, &
+            coef, Xh, n, &
+            w1_d, w2_d, w3_d, w4_d, w5_d, w6_d)
+
+       call neko_scratch_registry%relinquish_field(temp_indices)
+
+    else
+       do e = 1, coef%msh%nelv
+          ! \int \grad r . U_b  s
+          !-----------------------------
+          call adjoint_weak_no_dealias_cpu( &
+               fs%x(:,:,:,e), s%x(1,1,1,e), &
+               vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               e, coef, Xh, Xh%lxyz, &
+               w1, w2, w3, w4, w5, w6)
+       end do
+    end if
+
+  end subroutine compute_adjoint_scalar_advection_no_dealias
+
 end module adv_lin_no_dealias

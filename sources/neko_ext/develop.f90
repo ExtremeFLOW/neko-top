@@ -1,3 +1,37 @@
+!> @file develop.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
+
 ! ============================================================================ !
 ! Supporting functions
 ! ============================================================================ !
@@ -60,7 +94,7 @@ contains
     real(kind=rp) :: a
 
     ! Internal variables
-    real(kind=rp), dimension(3) :: v1
+    real(kind=rp), dimension(3) :: v1, e1, e2, tmp
     real(kind=rp) :: cp(3)
     integer :: v
 
@@ -70,7 +104,10 @@ contains
     v1 = vertices(:, 1)
     cp = 0.0
     do v = 2, nv - 1
-       cp = cp + 0.5 * cross((vertices(:, v) - v1), (vertices(:, v + 1) - v1))
+       e1 = (vertices(:, v) - v1)
+       e2 = (vertices(:, v + 1) - v1)
+       tmp = cross(e1, e2)
+       cp = cp + 0.5 * tmp
     end do
 
     a = sqrt(dot(cp, cp))
@@ -198,7 +235,7 @@ contains
     ! Determine the number of nodes in the facet
     N_nodes = 0
     select type (ele => C%msh%elements(element_id)%e)
-      type is (hex_t)
+    type is (hex_t)
        N_nodes = 4
     end select
 
@@ -208,7 +245,7 @@ contains
 
     ! Allocate the nodes array
     if (allocated(nodes) .and. size(nodes, 2) .eq. N_nodes) then
-       nodes = 0.0
+       nodes = 0.0_rp
     else if (.not. allocated(nodes)) then
        allocate (nodes(3, N_nodes))
     else
@@ -217,11 +254,11 @@ contains
 
     ! Get the nodes
     select type (ele => C%msh%elements(element_id)%e)
-      type is (hex_t)
+    type is (hex_t)
        call ele%facet_order(t_hex, facet_id)
        do n = 1, N_nodes
           v = t_hex%x(n)
-          nodes(:, n) = C%msh%points(v)%x
+          nodes(:, n) = real(C%msh%points(v)%x, kind=rp)
        end do
     end select
 
@@ -252,7 +289,7 @@ contains
          target_temperature, 0.5_rp)
 
     ! Initialize the global interpolation
-    call interpolator%init(neko_case%scalar%dm_xh)
+    call interpolator%init(neko_case%scalars%scalar_fields(1)%scalar%dm_xh)
 
     ! Get the list of outlet facets
     call get_facets(neko_case, facet_list)
@@ -284,11 +321,11 @@ contains
 
     ! Find the outlet temperature at the supplied list of points
     call interpolator%find_points_xyz(facet_centers, N_facets)
-    call interpolator%evaluate(temperature_local, neko_case%scalar%s%x)
+    call interpolator%evaluate(temperature_local, &
+         neko_case%scalars%scalar_fields(1)%scalar%s%x, on_host=.false.)
 
-    temperature_mean = average_weighted( &
-         temperature_local - target_temperature, &
-         facet_area)
+    temperature_local = temperature_local - target_temperature
+    temperature_mean = average_weighted(temperature_local, facet_area)
 
     write (log_buf, '(a,f15.7)') &
          "Outlet area-weighted average temperature deviation: ", &

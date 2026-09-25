@@ -5,8 +5,10 @@
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
-        "end_time": 150.0,
-        "timestep": 2.5e-3,
+        "time": {
+            "end_time": 150.0,
+            "timestep": 2.5e-3
+        },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
@@ -16,35 +18,41 @@
             "scheme": "pnpn",
             "Re": 200.0,
             "initial_condition": {
-                "type": "user",
-            },
-            "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0
-                ]
+                "type": "user"
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
             "output_control": "simulationtime",
             "output_value": 2.5,
-            "boundary_types": [
-                "v",
-                "o+dong",
-                "on",
-                "on",
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "outflow+dong",
+                    "zone_indices": [ 2 ]
+                },
+                {
+                    "type": "normal_outflow",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 3, 4 ]
+                }
             ],
             "source_terms": [
                 {
@@ -130,7 +138,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "BL_45.csv",
                 "compute_control": "simulationtime",
@@ -156,7 +164,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "BL_30.csv",
                 "compute_control": "simulationtime",
@@ -182,7 +190,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "BL_60.csv",
                 "compute_control": "simulationtime",
@@ -208,7 +216,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_048.csv",
                 "compute_control": "simulationtime",
@@ -236,7 +244,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_050.csv",
                 "compute_control": "simulationtime",
@@ -264,7 +272,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_0501.csv",
                 "compute_control": "simulationtime",
@@ -291,7 +299,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_0502.csv",
                 "compute_control": "simulationtime",
@@ -318,7 +326,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_0505.csv",
                 "compute_control": "simulationtime",
@@ -345,7 +353,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_051.csv",
                 "compute_control": "simulationtime",
@@ -372,7 +380,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_052.csv",
                 "compute_control": "simulationtime",
@@ -400,7 +408,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_055.csv",
                 "compute_control": "simulationtime",
@@ -415,7 +423,7 @@
                         "amount": 720
                     }
                 ]
-            },
+            }
         ]
     }
 }

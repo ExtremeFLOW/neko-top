@@ -10,8 +10,8 @@ examples/debug/*
 !examples/debug/debug.case
 !examples/debug/CMakeLists.txt
 
-# Translated test files
-tests/**/*.[Ff]90
+# Translated unit test files
+tests/unit/**/*.F90
 
 # Preparation scripts
 prepare.env
@@ -24,6 +24,8 @@ prepare.env
 __pycache__/
 .venv
 *.swp
+test_report.log
+test_report.log.tmp*
 
 # Fortran-specific files
 !*.fprettify.rc
@@ -37,5 +39,7 @@ manim_media/
 *.mp4
 *.gif
 
+# Documentation files
+doxygen.log
 html/
 *.html

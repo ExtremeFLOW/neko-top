@@ -6,23 +6,6 @@
 function run {
     set +e # Do not exit on error
 
-    # ------------------------------------------------------------------------ #
-    # Set up the environment and find neko
-    prepare 2>error.log || return 1
-
-    if [ -s ./error.log ]; then
-        printf "ERROR: An error occured during preparation.\n"
-        printf "See error.log for details.\n"
-        return 1
-    fi
-
-    # ------------------------------------------------------------------------ #
-    # Execute the example
-
-    printf "=%.0s" {1..80} && printf "\n"
-    printf "Running example: %s.\n" $example
-    printf "=%.0s" {1..80} && printf "\n"
-
     # Find the case file and define the log file
     casefile=($(find . -name "*.case" -or -name "*.json"))
     if [[ ${#casefile[@]} -eq 0 ]]; then
@@ -35,35 +18,90 @@ function run {
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
 
+    # Check for recoverable errors in the error log
+    if [ -s error.log ]; then
+        grep "ERROR: Optimizer stopped after reaching the maximum runtime" \
+            error.log >/dev/null || return 1
+
+        # If the error is recoverable, clear the error log and continue
+        echo "" > error.log
+    fi
+
+    if [ -f "$logfile" ]; then
+        # Move old log files to folder with counter padded to 2 digits
+
+        old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)
+        old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
+        mkdir -p ./$old_run
+
+        find ./ -maxdepth 1 -not -empty -type f -name "*.log" \
+            -not -name "output.log" -not -name "error.log" \
+            -exec mv -ft ./$old_run {} \;
+        cp -ft ./$old_run output.log
+        [ -s error.log ] && cp -ft ./$old_run error.log
+
+        # Reset the log files
+        printf "Ready" >./output.log
+    fi
+
     # Run the example
-    printf "Executing Neko.\n"
+    printf "Executing Neko.\n" > ./output.log
     printf "See $logfile for the status output.\n"
     export NEKO_LOG_FILE=$logfile
+
+    # ------------------------------------------------------------------------ #
+    # Set up the environment and find neko
+    prepare 2>error.log || return 1
+    if [ -s ./error.log ]; then
+        printf "ERROR: An error occured during preparation.\n"
+        printf "See error.log for details.\n"
+        return 1
+    fi
+    rm -fr error.log && touch error.log
+
+    # ------------------------------------------------------------------------ #
+    # Execute the example
+
+    printf "=%.0s" {1..80} && printf "\n"
+    printf "Running example: %s.\n" $example
+    printf "=%.0s" {1..80} && printf "\n"
 
     TIME_START=$(date +%s)
     if [ -f "run.sh" ]; then
         ./run.sh 2>error.log
 
-    elif [ ! -z "$SLURM_JOB_NAME" ]; then
-        srun --gpu-bind=single:1 $neko $casefile 2>error.log
+    elif [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
+        srun -u --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
 
-    else
+    elif command -v srun 2>&1 1>/dev/null; then
+        srun -u $neko $casefile 2>error.log
+
+    elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
-        if [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
+        if [ ! -z "$NPROCS" ]; then
+            ncores=$NPROCS
+        elif [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
             ncores=$(echo $CUDA_VISIBLE_DEVICES | tr "," "\n" | wc -l)
         elif [ ! -z "$LSB_DJOB_NUMPROC" ]; then
             ncores=$LSB_DJOB_NUMPROC
-        fi
-
-        if [ -z "$ncores" ]; then
+        else
             nsockets="$(lscpu | grep "Socket(s)" | awk '{print $2}')"
             ncores="$(lscpu | grep "Core(s) per socket" | awk '{print $4}')"
             ncores=$((nsockets * ncores))
         fi
 
-        ncores=1
+        if [ -z "$ncores" ]; then
+            ncores=1
+        fi
 
-        mpirun -n $ncores $neko $casefile 2>error.log
+        mpirun --tag-output -n $ncores $neko $casefile 2>error.log
+
+        # Remove all lines printed from mpi rank > 0 and remove the mpi tag
+        sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
+        sed -i 's/\[1,0\]<stderr>://g' error.log
+
+    else
+        $neko $casefile 2>error.log
 
     fi
     TIME_END=$(date +%s)
@@ -74,12 +112,6 @@ function run {
     if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
-        return 1
-    fi
-
-    normal_end=$(tail -n 10 $logfile | grep "Normal end.")
-    if [[ -z "$normal_end" ]]; then
-        printf >&2 "ERROR: Neko did not end normally.\n"
         return 1
     fi
 
@@ -144,15 +176,9 @@ function prepare {
     # ------------------------------------------------------------------------ #
     # Ensure the environment is set up
 
-    [ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
-    if [ -z "$JSON_FORTRAN_DIR" ]; then
-        JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
-    fi
-
-    JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
-        -exec test -f '{}'/libjsonfortran.so \; -print)
-    export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
-    export PATH="$NEKO_DIR/bin:$PATH"
+    source $MAIN_DIR/scripts/dependencies.sh
+    find_json_fortran
+    find_neko
 
     # ------------------------------------------------------------------------ #
     # Run preparation if it exists
@@ -162,7 +188,17 @@ function prepare {
         printf "Running user provided preparation script.\n"
         printf "=%.0s" {1..80} && printf "\n"
 
-        ./prepare.sh
+        prep_sh=$(realpath ./prepare.sh)
+        if [ -f "./select_gpu" ]; then
+            prep_sh="./select_gpu $prep_sh"
+        fi
+
+        if [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
+            srun --nodes=1 --ntasks=1 $prep_sh
+            sleep 1 # Make sure SLURM have time to clean up.
+        else
+            $prep_sh
+        fi
 
     fi
 
@@ -181,7 +217,7 @@ function prepare {
         printf "Building user Neko based on the following files\n"
         for f in $(ls *.f90); do printf "\t- %s\n" $f; done
 
-        $NEKO_DIR/bin/makeneko *.f90
+        $NEKO_DIR/bin/makeneko *.f90 2>&1 || echo "makeneko failed" >&2
         neko=$(realpath ./neko)
 
     else
@@ -193,6 +229,11 @@ function prepare {
         printf >&2 "ERROR: Neko executable not found."
         return 1
     fi
+
+    if [ -f "./select_gpu" ]; then
+        neko="./select_gpu $neko"
+    fi
+
     export neko
 }
 
@@ -205,6 +246,11 @@ function cleanup {
         printf >&2 "ERROR: Will not clean up due to errors.\n"
         return 1
     fi
+
+    # ------------------------------------------------------------------------ #
+    # Remove links to data files and folders
+
+    find ./ -maxdepth 1 -type l -delete
 
     # ------------------------------------------------------------------------ #
     # Move the results to the results folder
@@ -221,29 +267,51 @@ function cleanup {
     # Move all the nek5000 files to the results folder.
     printf "Archiving nek5000 files.\n"
     for nek in $(find ./ -name "*.nek5000"); do
-        printf "\t- %s\n" $(basename $nek)
+        printf "\t- %s\n" ${nek##*/}
 
-        basename=$(basename $nek)
-        directory=$(dirname $nek)
-        pattern=${basename%.*}
+        base=$(basename ${nek%[0-9]*.*})
+        directory=$(dirname ${nek%[0-9]*.*})
+        pattern=$directory/${base%.*}
 
-        mkdir -p $results/$pattern
-        mv -t $results/$pattern $nek $directory/$pattern.f*
+        mkdir -p $pattern
+        mv -t $pattern $nek ${nek%[0-9]*.*}[0-9]*.f* 2>/dev/null || true
     done
     printf "\n"
 
+    if [ -s ./error.log ]; then
+        printf >&2 "ERROR: An error occurred during archiving.\n"
+        return 1
+    fi
+
     # Move all files which are not the error or executable files to the log
     # folder
-    find ./ -type f \
-        -not -name "output.log" \
+    mkdir -p $results
+
+    # Attempt to move files and directories, but do not fallback to copying.
+    mv -t $results --no-copy $(find ./ -maxdepth 1 -type d) 2>/dev/null || true
+    mv -t $results --no-copy $(find ./ -maxdepth 1 -type f \
         -not -name "error.log" \
-        -not -name "neko" \
-        -not -name "*.chkp" \
+        -not -name "output.log" \
         -not -name "*.smod" \
-        -exec mv -t $results {} +
+        -not -name "neko") 2>/dev/null || true
+
+    # Copy files and directories which could not be moved.
+    rsync -arm --remove-source-files \
+        --include "run_*/*" \
+        --exclude "output.log" \
+        --exclude "error.log" \
+        --exclude "neko" \
+        --exclude "*.smod" \
+        ./ $results
+
+    if [ -s ./error.log ]; then
+        printf >&2 "ERROR: An error occurred during rsync.\n"
+        return 1
+    fi
 
     # Remove all but the log files
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete
+    find ./ -type d -empty -delete
 
     # ------------------------------------------------------------------------ #
     # Last minute checks

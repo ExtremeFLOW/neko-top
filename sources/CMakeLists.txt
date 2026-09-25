@@ -4,89 +4,131 @@
 # Set CMake Variables.
 
 # Setup the global inclusion for fortran
-set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
-include_directories(${CMAKE_Fortran_MODULE_DIRECTORY})
+set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
+    CACHE PATH "Fortran module directory")
 
-add_library(neko-top STATIC)
+# ............................................................................ #
+# Enable devices
 
-# Add the local neko extension library
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
+if (${DEVICE_TYPE} STREQUAL "CUDA")
+    enable_language(CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
+    find_package(CUDAToolkit REQUIRED)
+
+    if(DEFINED ENV{CUDA_ARCH})
+        set(CMAKE_CUDA_ARCHITECTURES "$ENV{CUDA_ARCH}")
+    endif()
+
+    message(STATUS "CUDA architecture(s) set to: ${CMAKE_CUDA_ARCHITECTURES}")
+
+elseif(${DEVICE_TYPE} STREQUAL "HIP")
+    enable_language(HIP)
+    enable_language(C)
+    add_compile_definitions(HAVE_HIP=1)
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+
+    # Keep HIP compiler flags consistent with external Neko when provided.
+    set(NEKO_TOP_HIP_FLAGS "")
+    if(DEFINED ENV{NEKO_HIPCC_FLAGS} AND
+       NOT "$ENV{NEKO_HIPCC_FLAGS}" STREQUAL "")
+        set(NEKO_TOP_HIP_FLAGS "$ENV{NEKO_HIPCC_FLAGS}")
+    elseif(DEFINED ENV{HIP_HIPCC_FLAGS} AND
+           NOT "$ENV{HIP_HIPCC_FLAGS}" STREQUAL "")
+        set(NEKO_TOP_HIP_FLAGS "$ENV{HIP_HIPCC_FLAGS}")
+    endif()
+
+    if(NOT "${NEKO_TOP_HIP_FLAGS}" STREQUAL "")
+        separate_arguments(NEKO_TOP_HIP_FLAGS_LIST NATIVE_COMMAND
+                           "${NEKO_TOP_HIP_FLAGS}")
+        foreach(flag IN LISTS NEKO_TOP_HIP_FLAGS_LIST)
+            add_compile_options($<$<COMPILE_LANGUAGE:HIP>:${flag}>)
+        endforeach()
+    endif()
+
+    find_package(hipblas REQUIRED)
+    find_package(hipsolver REQUIRED)
+
+elseif(NOT ${DEVICE_TYPE} STREQUAL "CPU")
+    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
+endif()
 
 # ============================================================================ #
 # Define the library sources and targets
+
+add_library(neko-top)
+
+# Add our partial libraries to the build.
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/state_recovery)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/design)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/IO)
+
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
 
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_case.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_output.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scheme.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_ic.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_no_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/simulation_adjoint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/topopt_design.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/steady_state_problem.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/mapping.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/linear_mapping.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/minimum_dissipation_objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/volume_constraint.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
-        # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/continuation/continuation_scheduler.f90
 )
 
 # ============================================================================ #
 # Specify compile options
 
-target_include_directories(neko-top
-    PUBLIC
-        ${CMAKE_Fortran_MODULE_DIRECTORY}
+target_include_directories(neko-top PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>
+    $<INSTALL_INTERFACE:include/neko-top>
 )
 
-target_link_libraries(neko-top
-    BLAS::BLAS
-    LAPACK::LAPACK
-    jsonfortran-gnu::jsonfortran
+# ............................................................................ #
+# Link to the required libraries.
+
+target_link_libraries(neko-top PUBLIC
     PkgConfig::neko
+    PkgConfig::json-fortran
+    $<$<BOOL:${HAVE_HDF5}>:HDF5::HDF5>
+    MPI::MPI_Fortran
+    OpenMP::OpenMP_Fortran
+    $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
+    $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cusolver>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
+    $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
+    $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
 )
-
-if(MPI_FOUND)
-    target_link_libraries(neko-top MPI::MPI_Fortran)
-endif()
 
 # ============================================================================ #
 # Specify installation instructions
 
+add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
+
+# Install the neko-top library and its modules.
+# These should adhere to the CMake installation conventions.
+
 install(TARGETS neko-top
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib/
+    EXPORT neko-top-targets
+    ARCHIVE DESTINATION lib/neko-top
+    LIBRARY DESTINATION lib/neko-top
+    RUNTIME DESTINATION bin/neko-top
+    INCLUDES DESTINATION include/neko-top
 )
-install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}
+install(EXPORT neko-top-targets
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION lib/cmake/${PROJECT_NAME}
+)
+install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/
+    DESTINATION include/neko-top
+    FILES_MATCHING PATTERN "*.mod"
 )

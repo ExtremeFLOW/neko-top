@@ -1,15 +1,22 @@
 # ============================================================================ #
+# Find Doxygen
+# ============================================================================ #
+
+if (NOT BUILD_DOCS AND NOT ONLY_DOCS)
+    return()
+endif()
+
+find_package(Doxygen QUIET)
+if (NOT Doxygen_FOUND)
+    message(FATAL_ERROR "Doxygen is needed to build the documentation.")
+endif()
+
+# ============================================================================ #
 # Doxygen Documentation
 # ============================================================================ #
 
 # Check if we wish to build the docs
 message(CHECK_START "Doxygen configuration")
-
-# ============================================================================ #
-# Find Doxygen
-# ============================================================================ #
-
-find_package(Doxygen REQUIRED)
 
 # Use fetch content to download the doxygen theme: doxygen-awesome-css
 include(FetchContent)
@@ -23,26 +30,6 @@ FetchContent_MakeAvailable(doxygen-awesome-css)
 # ============================================================================ #
 # Define warning to assist debugging of missing documentation.
 # ============================================================================ #
-
-if(CMAKE_BUILD_TYPE STREQUAL "Documentation")
-    set(DOXYGEN_QUIET "NO")
-    set(DOXYGEN_WARNINGS "YES")
-    set(DOXYGEN_WARN_AS_ERROR "YES")
-    set(DOXYGEN_WARN_IF_UNDOCUMENTED "YES")
-
-elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(DOXYGEN_QUIET "YES")
-    set(DOXYGEN_WARNINGS "YES")
-    set(DOXYGEN_WARN_AS_ERROR "NO")
-    set(DOXYGEN_WARN_IF_UNDOCUMENTED "YES")
-
-else()
-    set(DOXYGEN_QUIET "YES")
-    set(DOXYGEN_WARNINGS "NO")
-    set(DOXYGEN_WARN_AS_ERROR "NO")
-    set(DOXYGEN_WARN_IF_UNDOCUMENTED "NO")
-
-endif()
 
 # set input and output files
 set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
@@ -61,11 +48,20 @@ configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
 # note the option ALL which allows to build the docs together with the
 # application
 add_custom_target(
-    documentation ALL
+    Documentation
     COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generating API documentation with Doxygen"
     VERBATIM
 )
+set_target_properties(Documentation PROPERTIES FOLDER "Documentation")
+
+# Add the documentation target to ALL if we have "BUILD_DOCS" enabled
+if (BUILD_DOCS)
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
+else()
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
 
 message(CHECK_PASS "done")

@@ -4,23 +4,32 @@ description: |
   Note that the GSLib library is pulled from Nek5000's fork of the GSLib
   library.
 
+# ---------------------------------------------------------------------------- #
+# Define the inputs and outputs for this action. The inputs are used to
+# configure the action, while the outputs are used to pass information
+# back to the caller.
+
 inputs:
   install-dir:
     description: "The directory to install the GSLib library."
     required: false
     default: "/home/runner/pkg/gslib"
+
   working-dir:
     description: "The directory to work in."
     required: false
     default: "/home/runner/tmp/gslib"
+
   os:
     description: "The operating system to use."
     required: false
     default: "${{ runner.os }}"
+
   build-options:
     description: "The build option to use."
     required: false
     default: "--parallel $(nproc)"
+
   version:
     description: "The version of the GSLib library to use."
     required: false
@@ -31,16 +40,36 @@ outputs:
     description: "The directory where the GSLib library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
 
+# ---------------------------------------------------------------------------- #
+# Define the steps that will be run in this action.
+
 runs:
   using: composite
   steps:
+    # ------------------------------------------------------------------------ #
+    # Setup the cache for the GSLib library and clone the repository.
+
+    - name: Create cache key based on version, OS, and compiler
+      id: create-key
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        OS: ${{ inputs.os }}
+        COMPILER: ${{ inputs.compiler }}
+        COMPILER_FLAGS: ${{ inputs.compiler-flags }}
+        REPO: https://github.com/Nek5000/gslib.git
+      run: |
+        # Get the GIT sha for the current commit
+        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
+        key="gslib-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
+
     - name: Cache
       id: cache-gslib
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ inputs.install-dir }}
-        key: |
-          gslib-${{ inputs.version }}-${{ inputs.os }}
+        key: ${{ steps.create-key.outputs.key }}
 
     - name: Clone
       if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
@@ -52,6 +81,18 @@ runs:
       run: |
         git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
         cd $WORKING_DIR
+
+    # ------------------------------------------------------------------------ #
+    # Setup the system for building the GSLib library
+
+    - name: Install dependencies
+      # if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        sudo apt install openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
+
+    # ------------------------------------------------------------------------ #
+    # Configure, build, and install the GSLib library.
 
     - name: Build
       if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
@@ -73,13 +114,8 @@ runs:
         cd $WORKING_DIR
         make CC=mpicc DESTDIR=$INSTALL_DIR install
 
-    - name: Cleanup
-      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: |
-        if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
-          rm -rf ${{ inputs.working-dir }}
-        fi
+    # ------------------------------------------------------------------------ #
+    # Cleanup the working directory if necessary and set the output.
 
     - name: Set output
       shell: bash

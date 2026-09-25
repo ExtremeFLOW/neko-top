@@ -12,9 +12,11 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/math)
 
 # Add the neko-ext library which collects all the extensions.
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/mask_ops.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_ext.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/develop.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/json_utils_ext.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/lapack_interfaces.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/normal_vec_bcs.f90
 )

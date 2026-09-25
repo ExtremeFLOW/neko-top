@@ -1,50 +1,108 @@
-! Copyright (c) 2021-2023, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file device_math_ext.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 module device_math_ext
-  use utils, only : neko_error
-  use num_types, only : rp, c_rp
-  use, intrinsic :: iso_c_binding
+  use utils, only: neko_error
+  use num_types, only: rp, c_rp
+  use, intrinsic :: iso_c_binding, only: c_ptr, c_int
   implicit none
 
-#ifdef HAVE_HIP
+#if HAVE_HIP
+
+  interface
+     subroutine hip_cadd_mask(a_d, c, size, mask_d, mask_size) &
+          bind(c, name = 'hip_cadd_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       real(c_rp) :: c
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_cadd_mask
+  end interface
+  interface
+     subroutine hip_invcol1_mask(a_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_invcol1_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_invcol1_mask
+  end interface
+  interface
+     subroutine hip_col2_mask(a_d, b_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_col2_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: b_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_col2_mask
+  end interface
+  interface
+     subroutine hip_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_col3_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: b_d
+       type(c_ptr), value :: c_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_col3_mask
+  end interface
+  interface
+     subroutine hip_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_sub3_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: b_d
+       type(c_ptr), value :: c_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_sub3_mask
+  end interface
 
 #elif HAVE_CUDA
 
   interface
      subroutine cuda_cadd_mask(a_d, c, size, mask_d, mask_size) &
           bind(c, name = 'cuda_cadd_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        real(c_rp) :: c
        integer(c_int) :: size
@@ -55,8 +113,7 @@ module device_math_ext
   interface
      subroutine cuda_invcol1_mask(a_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_invcol1_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        integer(c_int) :: size
        type(c_ptr), value :: mask_d
@@ -66,8 +123,7 @@ module device_math_ext
   interface
      subroutine cuda_col2_mask(a_d, b_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_col2_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        type(c_ptr), value :: b_d
        integer(c_int) :: size
@@ -78,8 +134,7 @@ module device_math_ext
   interface
      subroutine cuda_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_col3_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        type(c_ptr), value :: b_d
        type(c_ptr), value :: c_d
@@ -91,8 +146,7 @@ module device_math_ext
   interface
      subroutine cuda_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
           bind(c, name = 'cuda_sub3_mask')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d
        type(c_ptr), value :: b_d
        type(c_ptr), value :: c_d
@@ -114,10 +168,12 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_HIP
+    call hip_cadd_mask(a_d, c, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_cadd_mask(a_d, c, size, mask_d, mask_size)
 #else
-    call neko_error('No device backend configured')
+    call neko_error('No device backend configured for device_cadd_mask')
 #endif
   end subroutine device_cadd_mask
 
@@ -126,10 +182,12 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_HIP
+    call hip_invcol1_mask(a_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_invcol1_mask(a_d, size, mask_d, mask_size)
 #else
-    call neko_error('No device backend configured')
+    call neko_error('No device backend configured for device_invcol1_mask')
 #endif
   end subroutine device_invcol1_mask
 
@@ -139,10 +197,12 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_HIP
+    call hip_col2_mask(a_d, b_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_col2_mask(a_d, b_d, size, mask_d, mask_size)
 #else
-    call neko_error('No device backend configured')
+    call neko_error('No device backend configured for device_col2_mask')
 #endif
   end subroutine device_col2_mask
 
@@ -153,10 +213,12 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_HIP
+    call hip_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
 #else
-    call neko_error('No device backend configured')
+    call neko_error('No device backend configured for device_col3_mask')
 #endif
   end subroutine device_col3_mask
 
@@ -167,12 +229,13 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_HIP
+    call hip_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
 #else
-    call neko_error('No device backend configured')
+    call neko_error('No device backend configured for device_sub3_mask')
 #endif
   end subroutine device_sub3_mask
-
 
 end module device_math_ext

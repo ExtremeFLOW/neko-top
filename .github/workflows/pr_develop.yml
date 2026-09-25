@@ -24,26 +24,24 @@
 # - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
 # - NEKO_VERSION: The version of Neko to use.
 
-name: Develop PR Checks
+name: Check PR for Develop Branch
 on:
   pull_request:
-    branches: [develop]
+    branches:
+      - develop
     types:
       - opened
       - synchronize
       - reopened
       - ready_for_review
+  merge_group:
+    types:
+      - checks_requested
 
-# ---------------------------------------------------------------------------- #
-# Define the global environment variables, these control versioning and other
-# useful settings in a unified way. Due to limitations in the GitHub Actions
-# environment, we cannot pass these as inputs to the jobs, so the prepare job
-# will store them in a file that the other jobs can read.
-
-env:
-  PFUNIT_VERSION: v4.4.2
-  JSON_FORTRAN_VERSION: 8.3.0
-  NEKO_VERSION: develop
+  # This allow us to cache parts which can be used by PR checks
+  push:
+    branches:
+      - develop
 
 # ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run
@@ -54,6 +52,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+# sequence, where the Prepare job is run first. The Linting, Formatting, and
+# Compilation jobs run in parallel, and the Complete job runs last.
+
 jobs:
   prepare:
     name: Prepare the environment
@@ -62,6 +65,7 @@ jobs:
       pfunit-version: ${{ steps.store.outputs.pfunit-version }}
       json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
       neko-version: ${{ steps.store.outputs.neko-version }}
+      hdf5-version: ${{ steps.store.outputs.hdf5-version }}
 
     steps:
       - name: Check if PR is a draft
@@ -72,78 +76,165 @@ jobs:
             exit 1
           fi
 
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Store environment variables
         id: store
         run: |
+          source $GITHUB_WORKSPACE/config/dependency-versions.env
+
           echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
           echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
+          echo "hdf5-version=$HDF5_VERSION" >> $GITHUB_OUTPUT
           echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
+
+  # -------------------------------------------------------------------------- #
+  # Code style and documentation checks.
 
   check_lint:
     name: Linting
-    needs:
-      - prepare
-    uses: ./.github/workflows/check_lint.yml
+    needs: prepare
+    uses: ./.github/workflows/check_linting.yml
+
+  check_format:
+    name: Formatting
+    needs: prepare
+    uses: ./.github/workflows/check_formatting.yml
 
   check_documentation:
     name: Documentation
-    needs:
-      - prepare
-    uses: ./.github/workflows/check_documentation.yml
+    needs: prepare
+    uses: ./.github/workflows/documentation.yml
 
-  check_compilation:
+  # -------------------------------------------------------------------------- #
+  # Define the checks to run for the Neko-TOP library.
+
+  check_compile:
     name: Compilation
-    needs:
-      - prepare
-    uses: ./.github/workflows/check_neko-top.yml
+    needs: prepare
+    uses: ./.github/workflows/check_compile.yml
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
-      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+
+  check_scripts:
+    name: Scripting
+    needs: prepare
+    uses: ./.github/workflows/check_scripts.yml
+    with:
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+      neko-top-version: ${{ github.head_ref || github.ref_name }}
+
+  check_valgrind:
+    name: Valgrind Regression
+    needs: prepare
+    uses: ./.github/workflows/check_valgrind.yml
+    with:
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+
+  # -------------------------------------------------------------------------- #
+  # Check if all previous jobs passed. If any of the previous jobs failed, the
+  # Complete job will fail and print out the failed jobs.
 
   check_complete:
     if: ${{ always() }}
     name: Develop PR Ready
     needs:
       - prepare
+      # Code style and documentation checks
       - check_lint
-      # - check_formatting
+      - check_format
       - check_documentation
-      - check_compilation
+      # Neko-TOP library checks
+      - check_compile
+      - check_scripts
+      - check_valgrind
+
     runs-on: ubuntu-latest
     env:
       draft_status: ${{ needs.prepare.result }}
-      flint_status: ${{ needs.check_lint.result }}
-      compile_status: ${{ needs.check_compilation.result }}
+      lint_status: ${{ needs.check_lint.result }}
+      format_status: ${{ needs.check_format.result }}
       documentation_status: ${{ needs.check_documentation.result }}
+      compile_status: ${{ needs.check_compile.result }}
+      scripts_status: ${{ needs.check_scripts.result }}
+      valgrind_status: ${{ needs.check_valgrind.result }}
 
     steps:
-      - name: All checks passed
+      - name: Check status of previous jobs
         run: |
           success=true
           fail=()
+
+          # ------------------------------------------------------------------ #
+          # Check the status of our Code style and documentation checks.
+
           if [ "$draft_status" != "success" ]; then
             fail+=("\t- Draft check: $draft_status")
             success=false
           fi
-          if [ "$flint_status" != "success" ]; then
-            fail+=("\t- Linting check: $flint_status")
+
+          if [ "$lint_status" != "success" ]; then
+            fail+=("\t- Linting check: $lint_status")
             success=false
           fi
-          if [ "$compile_status" != "success" ]; then
-            fail+=("\t- Compilation check: $compile_status")
+
+          if [ "$format_status" != "success" ]; then
+            fail+=("\t- Formatting check: $format_status")
             success=false
           fi
+
           if [ "$documentation_status" != "success" ]; then
             fail+=("\t- Documentation check: $documentation_status")
             success=false
           fi
 
+          # ------------------------------------------------------------------ #
+          # Check the status of our Neko-TOP library checks.
+
+          if [ "$compile_status" != "success" ]; then
+            fail+=("\t- Compilation check: $compile_status")
+            success=false
+          fi
+
+          if [ "$scripts_status" != "success" ]; then
+            fail+=("\t- Scripts check: $scripts_status")
+            success=false
+          fi
+
+          if [ "$valgrind_status" != "success" ]; then
+            fail+=("\t- Valgrind regression check: $valgrind_status")
+            success=false
+          fi
+
+          # ------------------------------------------------------------------ #
+          # If any of the checks failed, print the failed checks and exit with
+          # a non-zero status code. If all checks passed, print a success
+          # message.
+
           if [ "$success" == false ]; then
-            >&2 echo "The following checks failed:"
+            >&2 echo "The following checks did not succeed:"
             for i in "${fail[@]}"; do
               >&2 printf "$i\n"
             done
             exit 1
           fi
           echo "All checks passed"
+
+  # Merge group branches produce caches which are not useable by anyone else.
+  # Therefore we remove all of them after the run have completed.
+  cleanup:
+    if: ${{ github.event_name == 'merge_group' && always() }}
+    name: Cleanup merge group caches
+    needs: check_complete
+    uses: ./.github/workflows/cleanup.yml

@@ -1,50 +1,53 @@
-! Copyright (c) 2021-2024, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adv_adjoint_dealias.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Subroutines to add advection terms to the RHS of a transport equation.
 module adv_lin_dealias
   use advection_adjoint, only: advection_adjoint_t
-  use num_types, only : rp
-  use math, only : vdot3, sub2
-  use space, only : space_t, GL
-  use field, only : field_t
-  use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
+  use num_types, only: rp
+  use math, only: vdot3, sub2
+  use space, only: space_t, GL
+  use field, only: field_t
+  use coefs, only: coef_t
+  use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
-  use operators, only : opgrad, cdtp
-  use interpolation, only : interpolator_t
-  use device_math, only : device_vdot3, device_sub2, device_col3, device_add4
-  use device, only : device_map
-  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
+  use operators, only: opgrad, cdtp
+  use interpolation, only: interpolator_t
+  use device_math, only: device_vdot3, device_sub2, device_col3, device_add4
+  use device, only: device_map
+  use utils, only: neko_error
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
 
@@ -115,7 +118,8 @@ module adv_lin_dealias
      !> Add the linearized advection term for the fluid, i.e.
      !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
      !! the RHS.
-     procedure, pass(this) :: compute_linear => compute_linear_advection_dealias
+     procedure, pass(this) :: compute_linear => &
+          compute_linear_advection_dealias
      !> Add the adjoint advection term for the fluid in weak form, i.e.
      !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
      !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$,
@@ -123,6 +127,15 @@ module adv_lin_dealias
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => &
           compute_adjoint_advection_dealias
+     !> Compute the adjoint passive scalar.
+     ! If one integrates by parts, this essentially switches sign and adds some
+     ! boundary terms.
+     ! We keep the differential operator on the test function
+     procedure, pass(this) :: compute_adjoint_scalar => &
+          compute_adjoint_scalar_advection_dealias
+     ! NOTE
+     ! This linearized advection term is the same as a normal advection term
+     ! so not sure what to do here...
      !> Constructor
      procedure, pass(this) :: init => init_dealias
      !> Destructor
@@ -132,6 +145,7 @@ module adv_lin_dealias
 contains
 
   !> Constructor
+  !! @param this The object.
   !! @param lxd The polynomial order of the space used in the dealiasing.
   !! @param coef The coefficients of the (space, mesh) pair.
   subroutine init_dealias(this, lxd, coef)
@@ -220,6 +234,7 @@ contains
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
   !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of adjoint velocity.
   !! @param vy The y component of adjoint velocity.
   !! @param vz The z component of adjoint velocity.
@@ -464,6 +479,7 @@ contains
   !> Add the linearized advection term for the fluid, i.e.
   !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of perturbed velocity.
   !! @param vy The y component of perturbed velocity.
   !! @param vz The z component of perturbed velocity.
@@ -664,7 +680,111 @@ contains
          end do
       end if
     end associate
-
   end subroutine compute_linear_advection_dealias
 
+  !> Add the adjoint advection term for a scalar,
+  !! i.e. \f$ - u \cdot \nabla s^\dagger \f$, to the
+  !! RHS.
+  !! or in weak form, \f$  \int \nabla r \cdot u s^\dagger \f$
+  !! @param this The object.
+  !! @param vxb The x component of velocity.
+  !! @param vyb The y component of velocity.
+  !! @param vzb The z component of velocity.
+  !! @param s The adjoint scalar.
+  !! @param fs The source term.
+  !! @param Xh The function space.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  !! @param n Typically the size of the mesh.
+  !! @param dt Current time-step, not required for this method.
+  subroutine compute_adjoint_scalar_advection_dealias(this, vxb, vyb, vzb, s, &
+       fs, Xh, coef, n, dt)
+    class(adv_lin_dealias_t), intent(inout) :: this
+    type(field_t), intent(inout) :: vxb, vyb, vzb
+    type(field_t), intent(inout) :: s
+    type(field_t), intent(inout) :: fs
+    type(space_t), intent(inout) :: Xh
+    type(coef_t), intent(inout) :: coef
+    integer, intent(in) :: n
+    real(kind=rp), intent(in), optional :: dt
+
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: vx_GL, vy_GL, vz_GL, s_GL
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: work1, work2, work3
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: w1, w2, w3
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: f_GL
+    integer :: e, i, idx, nel, n_GL
+    real(kind=rp), dimension(this%Xh_GLL%lxyz) :: temp
+
+    nel = coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+
+    associate(c_GL => this%coef_GL)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         ! Map baseflow to GL
+         call this%GLL_to_GL%map(this%txb, vxb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map(this%tyb, vyb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map(this%tzb, vzb%x, nel, this%Xh_GL)
+
+         ! Map adjoint scalar to GL (use tx as adjoint scalar array)
+         call this%GLL_to_GL%map(this%tx, s%x, nel, this%Xh_GL)
+
+         ! Outer product (use duxb, duyb, duzb as temporary arrays)
+         call device_col3(this%duxb_d, this%tx_d, this%txb_d, n_GL)
+         call device_col3(this%duyb_d, this%tx_d, this%tyb_d, n_GL)
+         call device_col3(this%duzb_d, this%tx_d, this%tzb_d, n_GL)
+
+         ! D^T
+         ! vr,vs,vt are temporary arrays
+         call cdtp(this%vr, this%duxb, c_GL%drdx, c_GL%dsdx, c_GL%dtdx, c_GL)
+         call cdtp(this%vs, this%duyb, c_GL%drdy, c_GL%dsdy, c_GL%dtdy, c_GL)
+         call cdtp(this%vt, this%duzb, c_GL%drdz, c_GL%dsdz, c_GL%dtdz, c_GL)
+
+         ! reuse duxb as a temp for summing them
+         call device_add4(this%duxb_d, this%vr_d, this%vs_d, this%vt_d, n_GL)
+
+         ! map back to GLL
+         call this%GLL_to_GL%map(this%temp, this%duxb, nel, this%Xh_GLL)
+
+         !apply
+         call device_sub2(fs%x_d, this%temp_d, n)
+
+
+      else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
+         call neko_error("Adjoint scalar not implemented for SX")
+      else
+         do e = 1, coef%msh%nelv
+            ! Map baseflow to GL
+            call this%GLL_to_GL%map(vx_GL, vxb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map(vy_GL, vyb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map(vz_GL, vzb%x(1,1,1,e), 1, this%Xh_GL)
+
+            ! Map passive scalar velocity to GL
+            call this%GLL_to_GL%map(s_GL, s%x(1,1,1,e), 1, this%Xh_GL)
+
+            do i = 1, this%Xh_GL%lxyz
+               work1(i) = s_GL(i)*vx_GL(i)
+               work2(i) = s_GL(i)*vy_GL(i)
+               work3(i) = s_GL(i)*vz_GL(i)
+            end do
+
+            ! D^T
+            call cdtp(w1, work1, c_GL%drdx, c_GL%dsdx, c_GL%dtdx, c_GL, e, e)
+            call cdtp(w2, work2, c_GL%drdy, c_GL%dsdy, c_GL%dtdy, c_GL, e, e)
+            call cdtp(w3, work3, c_GL%drdz, c_GL%dsdz, c_GL%dtdz, c_GL, e, e)
+
+            ! sum them
+            do i = 1, this%Xh_GL%lxyz
+               f_GL(i) = w1(i) + w2(i) + w3(i)
+            end do
+
+            ! map back to GLL
+            idx = (e-1)*this%Xh_GLL%lxyz+1
+            call this%GLL_to_GL%map(temp, f_GL, 1, this%Xh_GLL)
+            call sub2(fs%x(idx, 1, 1, 1), temp, this%Xh_GLL%lxyz)
+
+         end do
+
+      end if
+    end associate
+
+  end subroutine compute_adjoint_scalar_advection_dealias
 end module adv_lin_dealias

@@ -10,51 +10,53 @@
 # - "user"    : Driver initializing the neko library and calling the user code.
 #                This is equivalent to calling makeneko from the original neko.
 # - "custom"  : Custom driver defined by a f90 file. Either set through the
-#                DRIVER cmake vatiable in the example CMakeLists.txt file or
+#                DRIVER cmake variable in the example CMakeLists.txt file or
 #                stored as a file named "driver.f90" in the example directory.
 # - "topopt"  : Topology optimization driver.
 
 # ============================================================================ #
-# Determine if we wish to build the examples.
-option(BUILD_EXAMPLES "Build the examples" ON)
-
-if(NOT BUILD_EXAMPLES)
-    return()
-else()
-    message(STATUS "Building examples")
-endif()
-
-# ============================================================================ #
 # Include the build_example function
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(build_example)
 
 # Set the examples directory
 set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory")
 
 # ============================================================================ #
+# Define our custom target.
+
+# Add a custom target for the examples
+add_custom_target(Examples
+    COMMENT "Build all the examples."
+    DEPENDS neko-top
+)
+set_target_properties(Examples PROPERTIES FOLDER "Examples")
+
+# Add the documentation target to ALL if we have "BUILD_EXAMPLES" enabled
+if (BUILD_EXAMPLES)
+    set_target_properties(Examples PROPERTIES EXCLUDE_FROM_ALL FALSE)
+else()
+    set_target_properties(Examples PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
+# ============================================================================ #
 # Add the example directories.
 
-# Find all subdirectories in the examples directory
-file(GLOB_RECURSE CASE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} */*.case)
+add_subdirectory(${EXAMPLES_DIR}/easy-E)
+add_subdirectory(${EXAMPLES_DIR}/mma)
+add_subdirectory(${EXAMPLES_DIR}/passive_scalar)
+add_subdirectory(${EXAMPLES_DIR}/rugby_ball)
+add_subdirectory(${EXAMPLES_DIR}/1d_beam)
+add_subdirectory(${EXAMPLES_DIR}/static_mixer)
+add_subdirectory(${EXAMPLES_DIR}/unsteady_mixer)
+add_subdirectory(${EXAMPLES_DIR}/unsteady_rugby_ball)
+add_subdirectory(${EXAMPLES_DIR}/wiggles)
 
-# Save only the directory names
-foreach(EXAMPLE_DIR ${CASE_FILES})
-    get_filename_component(DIRECTORY ${EXAMPLE_DIR} DIRECTORY)
-    # If the directory is already in the list, don't add it again
-    list(FIND EXAMPLES_DIRS ${DIRECTORY} INDEX)
-    if(${INDEX} EQUAL -1)
-        list(APPEND EXAMPLES_DIRS ${DIRECTORY})
-    endif()
-endforeach()
+# If the benchmark_mixer folder exists, add it as well
+if (EXISTS ${EXAMPLES_DIR}/benchmark_mixer/CMakeLists.txt)
+    add_subdirectory(${EXAMPLES_DIR}/benchmark_mixer)
+endif()
 
-# Add each subdirectory, if it contains a CMakelists.txt file otherwise call the
-# build_example function.
-foreach(EXAMPLE_DIR ${EXAMPLES_DIRS})
-
-    # Check if the example directory contains a CMakeLists.txt file
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR}/CMakeLists.txt)
-        add_subdirectory(${EXAMPLE_DIR})
-    endif()
-
-endforeach()
+# Add the benchmark directory if it exists.
+if (EXISTS ${EXAMPLES_DIR}/benchmark/CMakeLists.txt)
+    add_subdirectory(${EXAMPLES_DIR}/benchmark)
+endif()

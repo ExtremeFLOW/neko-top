@@ -1,141 +1,68 @@
+!> @file neko_top.f90
+!! @copyright
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
+
+!> @brief Neko-TOP module.
+!! @details
+!! This module contain the registration routines for Neko-TOP specific
+!! types such as simulation components and source terms.
+!!
+!! This will extend Neko with the custom types defined in Neko-TOP.
 module neko_top
 
-  ! External modules
-  use case, only: case_t
-  use neko, only: neko_init, neko_finalize
-  use simcomp_executor, only: simcomp_executor_t
-  use json_module, only: json_file, json_value, json_core
-  use comm, only: pe_rank
-  use utils, only: neko_error, filename_suffix
-  use user_intf, only: simulation_component_user_settings
-  use num_types, only: rp
-  use logger, only: neko_log
+  !> Registration of custom simulation components used in topology optimization.
+  interface register_simcomps
+     module subroutine register_simcomps()
+     end subroutine register_simcomps
+  end interface register_simcomps
 
-  use design_module, only: design_t
-  use sensitivity, only: sensitivity_t
-  use topology_optimization_user_module, only: neko_user_init
-  use, intrinsic :: iso_fortran_env
-
-  implicit none
-
-  private
-  public :: neko_top_init, neko_top_solve, neko_top_finalize
-
-  type(simcomp_executor_t) :: topopt_components
+  !> Registration of custom source terms used in topology optimization.
+  interface register_source_terms
+     module subroutine register_source_terms()
+     end subroutine register_source_terms
+  end interface register_source_terms
 
 contains
 
-  !> Register user defined functions (see nekos user_intf.f90)
-  subroutine neko_top_init(neko_case)
-    type(case_t), intent(inout) :: neko_case
-    type(json_file) :: design_params
-    type(design_t), allocatable :: design
-    type(json_value), pointer :: simcomp_object
-    type(json_file) :: comp_subdict
-    logical :: found
-    type(json_core) :: core
+  !> @brief Add all known types to the Neko registries.
+  !! @details
+  !! This subroutine adds all known type extensions to the Neko
+  !! registries. It is called at the beginning of all our drivers.
+  subroutine neko_top_register_types()
 
-    call neko_log%section('Initialize Topology Optimization')
+    call register_simcomps()
+    call register_source_terms()
 
-    ! ------------------------------------------------------------------------ !
-    ! Initialize the neko solver
-    ! ------------------------------------------------------------------------ !
-
-    call neko_log%section('Neko')
-
-    call neko_user_init(neko_case)
-    call neko_init(neko_case)
-
-    call neko_log%end()
-
-    ! ------------------------------------------------------------------------ !
-    ! Initialize the topopt components
-    ! ------------------------------------------------------------------------ !
-
-    call neko_log%section('Topology Optimization Components')
-
-    call topopt_components%init(neko_case, 'topology_optimization.components')
-
-    call neko_case%params%get_core(core)
-    call neko_case%params%get('topology_optimization.components', simcomp_object, found)
-    comp_subdict = json_file(simcomp_object)
-
-    ! Allocation of the design
-    allocate(design)
-    design_params = simulation_component_user_settings('design', comp_subdict)
-    call topopt_components%add_user_simcomp(design, design_params)
-
-    call neko_log%end()
-  end subroutine neko_top_init
-
-  subroutine neko_top_solve(neko_case)
-    use neko, only: neko_solve
-    use neko_ext, only: setup_iteration
-    use json_utils, only: json_get_or_default
-    implicit none
-
-    type(case_t), intent(inout) :: neko_case
-
-    integer :: iter, max_iter
-
-    ! Convergence parameter
-    logical :: converged = .false.
-
-    call json_get_or_default(neko_case%params, &
-         'case.topology_optimization.max_iter', &
-         max_iter, 4)
-
-    do iter = 1, max_iter
-       call setup_iteration(neko_case, iter)
-
-       call topopt_components%preprocess(0.0_rp, 1)
-
-       ! Forward analysis
-       call neko_solve(neko_case)
-
-
-
-       ! If converged, exit the loop
-       if (converged) exit
-
-       ! Call the design update routine
-
-
-       call topopt_components%compute(0.0_rp, 1)
-
-       if (converged) exit
-    end do
-  end subroutine neko_top_solve
-
-  subroutine neko_top_finalize(neko_case)
-    use neko, only: neko_finalize
-    use develop, only: estimate_temperature
-    use logger, only: neko_log
-    use json_utils, only: json_get_or_default
-
-    type(case_t), intent(inout) :: neko_case
-
-    logical :: temperature_enabled
-
-    ! ---------------------------------------------------------------------- !
-    ! Compute the outlet area-weighted average temperature
-    ! ---------------------------------------------------------------------- !
-    ! Read the case file for options
-    call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
-         temperature_enabled, .false.)
-
-    if (temperature_enabled) then
-       call estimate_temperature(neko_case)
-    end if
-
-    ! ---------------------------------------------------------------------- !
-    ! Save the design
-    ! ---------------------------------------------------------------------- !
-
-    call neko_finalize(neko_case)
-    call neko_log%end()
-
-  end subroutine neko_top_finalize
+  end subroutine neko_top_register_types
 
 end module neko_top
-

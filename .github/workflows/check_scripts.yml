@@ -1,0 +1,121 @@
+# This workflow checks the compilation of the Neko-TOP library.
+
+name: Scripting Checks
+
+# This workflow is only defined here. It is triggered from other workflows.
+on:
+  workflow_call:
+    inputs:
+      json-fortran-version:
+        description: "The version of json-fortran to use."
+        required: true
+        type: string
+      neko-version:
+        description: "The version of Neko to use."
+        required: true
+        type: string
+      hdf5-version:
+        description: "The version of HDF5 to use."
+        required: true
+        type: string
+      neko-top-version:
+        description: "The version of Neko-TOP to use."
+        required: true
+        type: string
+
+env:
+  # Set the default versions of the dependencies
+  JSON_FORTRAN_VERSION: ${{ inputs.json-fortran-version }}
+  NEKO_VERSION: ${{ inputs.neko-version }}
+  NEKO_TOP_VERSION: ${{ inputs.neko-top-version }}
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+
+jobs:
+  # -------------------------------------------------------------------------- #
+  # Define the compilation and testing job that will be run in this workflow.
+  # This job will build the Neko-TOP code in debug mode and run the unit tests.
+
+  setup-script:
+    name: Check setup script
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------------------------------------------------------------------- #
+      # Checkout the repository and setup the environment
+      # ---------------------------------------------------------------------- #
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Get system cache
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: openmpi-bin pkg-config liblapack-dev ninja-build
+          version: 1.0
+
+      - name: Setup non-cache dependencies
+        run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
+
+      - name: Setup python environment
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+          cache: "pip"
+          cache-dependency-path: tests/**/requirements.txt
+
+      - name: Install python dependencies
+        run: |
+          pip install -r tests/regression/mma/requirements.txt
+
+      # ---------------------------------------------------------------------- #
+      # Build and test the code
+      # ---------------------------------------------------------------------- #
+
+      - name: Setup Neko-TOP
+        run: ./setup.sh --examples --tests
+
+      - name: Run TGV
+        run: ./run.sh -nrc tgv
+
+      - name: Run Rugby Ball
+        run: |
+          # Adjust the end time and max iterations for the rugby ball case
+          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
+          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
+
+          ./run.sh -rc rugby_ball
+
+      - name: Run short tests
+        run: ./tests/test.sh mma unit
+
+      # ---------------------------------------------------------------------- #
+      # Report errors if any step fails
+      # ---------------------------------------------------------------------- #
+
+      - name: Report example errors
+        if: failure()
+        run: |
+          if [ ! -d logs/ ]; then exit 0; fi
+          echo "Errors encountered during script execution."
+          echo "Please check the logs for details."
+          logs=($(find logs/ -name "error.log"))
+
+          for file in ${logs[@]}; do
+            if [[ -s $file ]]; then
+              printf "\nContents of $file:\n" >&2
+              cat $file >&2
+            elif [ -f $file ]; then
+              rm -fr $(dirname $file)
+            fi
+          done
+
+      - name: Save logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: setup-script-logs
+          path: tests/
+          overwrite: true
+          if-no-files-found: ignore
