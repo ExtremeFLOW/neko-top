@@ -114,7 +114,6 @@ contains
     class(ramp_functional_t), intent(inout) :: this
 
     call this%sensitivity%free()
-    call this%sensitivity_old%free()
   end subroutine ramp_free
 
   subroutine ramp_update_value(this, design)
