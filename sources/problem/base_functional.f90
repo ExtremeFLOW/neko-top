@@ -270,10 +270,7 @@ contains
     type(time_state_t), intent(in) :: time
     real(kind=xp) :: value_new, value_old, weight_new, weight_old, dt
 
-    if (.not. this%in_window(time)) then
-       this%value = 0.0_rp
-       return
-    end if
+    if (.not. this%in_window(time)) return
 
     ! Store the old value and compute the new value.
     value_old = real(this%value, kind=xp)
@@ -306,10 +303,7 @@ contains
     type(vector_t), pointer :: sensitivity_new, sensitivity_old
     integer :: n, idx(2)
 
-    if (.not. this%in_window(time)) then
-       call vector_rzero(this%sensitivity)
-       return
-    end if
+    if (.not. this%in_window(time)) return
 
     n = this%sensitivity%size()
     call neko_scratch_registry%request(sensitivity_new, idx(1), n, .false.)
