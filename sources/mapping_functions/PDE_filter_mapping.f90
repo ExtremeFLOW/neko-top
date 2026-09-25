@@ -39,10 +39,11 @@ module PDE_filter_mapping
   use registry, only: neko_registry
   use field, only: field_t
   use coefs, only: coef_t
-  use ax_product, only: ax_t, ax_helm_factory
+  use ax_product, only: ax_t, ax_helm_allocator
   use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
-  use precon, only: pc_t, precon_factory, precon_destroy
+  use precon, only: pc_t, precon_allocator, precon_destroy
   use bc_list, only: bc_list_t
+  use scalar_bc_projector, only: scalar_bc_projector_t
   use neumann, only: neumann_t
   use profiler, only: profiler_start_region, profiler_end_region
   use gather_scatter, only: gs_t, GS_OP_ADD
@@ -81,6 +82,8 @@ module PDE_filter_mapping
      class(pc_t), allocatable :: pc_filt
      !> Filter boundary conditions (they will all be Neumann, so empty)
      type(bc_list_t) :: bclst_filt
+     !> Scalar constraint projector for the filter solve.
+     type(scalar_bc_projector_t) :: bc_projector_filt
 
      ! Inputs from the user
      !> filter radius
@@ -165,7 +168,7 @@ contains
     call this%bclst_filt%init()
 
     ! Setup backend dependent Ax routines
-    call ax_helm_factory(this%Ax, full_formulation = .false.)
+    call ax_helm_allocator(this%Ax, type_name = "standard")
 
     ! set up krylov solver
     call krylov_solver_factory(this%ksp_filt, n, this%ksp_solver, &
@@ -197,6 +200,7 @@ contains
     end if
 
     call this%bclst_filt%free()
+    call this%bc_projector_filt%free()
 
     call this%free_base()
 
@@ -268,13 +272,13 @@ contains
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
 
     ! set BCs
-    call this%bclst_filt%apply_scalar(RHS%x, n)
+    call this%bc_projector_filt%apply(RHS%x, n)
 
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')
     this%ksp_results(1) = &
          this%ksp_filt%solve(this%Ax, d_X_out, RHS%x, n, this%coef, &
-         this%bclst_filt, this%coef%gs_h)
+         this%bc_projector_filt, this%coef%gs_h)
 
     call profiler_end_region
 
@@ -369,13 +373,13 @@ contains
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
 
     ! set BCs
-    call this%bclst_filt%apply_scalar(RHS%x, n)
+    call this%bc_projector_filt%apply(RHS%x, n)
 
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')
     this%ksp_results(1) = &
          this%ksp_filt%solve(this%Ax, delta, RHS%x, n, this%coef, &
-         this%bclst_filt, this%coef%gs_h)
+         this%bc_projector_filt, this%coef%gs_h)
 
     ! add result
     call field_add3(sens_out, sens_in, delta)
@@ -407,7 +411,7 @@ contains
     type(bc_list_t), target, intent(inout) :: bclst
     character(len=*) :: pctype
 
-    call precon_factory(pc, pctype)
+    call precon_allocator(pc, pctype)
 
     select type (pcp => pc)
     type is (jacobi_t)

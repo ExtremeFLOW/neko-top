@@ -36,6 +36,9 @@
 submodule (state_recover) state_recover_fctry
   use json_utils, only: json_get_or_default
   use state_recover_checkpoint, only: state_recover_checkpoint_t
+#if HAVE_ADIOS2
+  use simulation_POD_state_recover, only: POD_state_recover_t
+#endif
   use utils, only: neko_error
   implicit none
 
@@ -71,6 +74,13 @@ contains
     select case (trim(recover_type))
     case ("checkpoint", "simulation_checkpoint")
        allocate(state_recover_checkpoint_t :: recover)
+    case ("pod")
+#if HAVE_ADIOS2
+       allocate(POD_state_recover_t :: recover)
+#else
+       call neko_error("POD state recovery requires ADIOS2. Rebuild with " // &
+            "ADIOS2 enabled.")
+#endif
     case default
        call neko_error("Unknown state recover type: " // trim(recover_type))
     end select

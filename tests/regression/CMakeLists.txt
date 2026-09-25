@@ -12,5 +12,6 @@ add_dependencies(Tests Regression)
 
 # Add each regression test subdirectory
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mpmd_controller)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sensitivity)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/valgrind)

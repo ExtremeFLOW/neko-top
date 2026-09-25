@@ -9,3 +9,8 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint_linear.f90
 )
+
+target_sources(neko-top
+    PRIVATE
+        $<$<BOOL:${HAVE_ADIOS2}>:${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover.f90>
+)

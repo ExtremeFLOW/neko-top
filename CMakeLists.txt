@@ -121,6 +121,62 @@ set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
 pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 
 # ............................................................................ #
+# Optional ADIOS2 support
+
+set(HAVE_ADIOS2 FALSE CACHE INTERNAL "Neko-TOP ADIOS2 support disabled")
+
+if (NOT ADIOS2_DIR AND DEFINED ENV{ADIOS2_DIR})
+    set(ADIOS2_DIR $ENV{ADIOS2_DIR} CACHE STRING
+        "Path to the ADIOS2 installation")
+endif()
+
+if(ADIOS2_DIR)
+    if (NOT IS_ABSOLUTE "${ADIOS2_DIR}")
+        set(ADIOS2_DIR ${EXTERNAL_DIR}/${ADIOS2_DIR}
+            CACHE STRING "Path to the ADIOS2 installation" FORCE)
+    endif()
+
+    find_program(ADIOS2_CONFIG_EXECUTABLE
+        NAMES adios2-config
+        HINTS ${ADIOS2_DIR}/bin
+        NO_DEFAULT_PATH
+    )
+
+    if(NOT ADIOS2_CONFIG_EXECUTABLE)
+        message(FATAL_ERROR "ADIOS2 support was requested, but adios2-config "
+            "was not found in ${ADIOS2_DIR}/bin.")
+    endif()
+
+    add_library(neko_cxx_support INTERFACE)
+    set(HAVE_ADIOS2 TRUE CACHE INTERNAL "Neko-TOP ADIOS2 support enabled")
+    add_compile_definitions(HAVE_ADIOS2=1)
+
+    message(STATUS "Found adios2-config: ${ADIOS2_CONFIG_EXECUTABLE}")
+    enable_language(C CXX)
+
+    execute_process(
+        COMMAND ${ADIOS2_CONFIG_EXECUTABLE} --cxx-libs
+        OUTPUT_VARIABLE ADIOS2_CXX_LIBS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(ADIOS2_CXX_LIBS)
+        message(STATUS "ADIOS2 C++ libs: ${ADIOS2_CXX_LIBS}")
+        separate_arguments(ADIOS2_CXX_LIBS)
+        target_link_libraries(neko_cxx_support INTERFACE ${ADIOS2_CXX_LIBS})
+    endif()
+
+    find_package(MPI REQUIRED COMPONENTS CXX)
+    target_link_libraries(neko_cxx_support INTERFACE MPI::MPI_CXX stdc++)
+
+    find_library(MPI_CXX_LIB NAMES mpi_cxx)
+    if(MPI_CXX_LIB)
+        target_link_libraries(neko_cxx_support INTERFACE ${MPI_CXX_LIB})
+    endif()
+else()
+    message(STATUS "ADIOS2_DIR not set; ADIOS2 support disabled.")
+endif()
+
+# ............................................................................ #
 # Setup of the Neko library
 
 # Set the proper paths for the NEKO_DIR
@@ -168,9 +224,12 @@ else()
 endif()
 
 if (_hdf5_requested AND _hdf5_known_serial)
-    message(fatal_error "Found HDF5 ${HDF5_VERSION}, but it is not parallel.")
+    message(FATAL_ERROR "Found HDF5 ${HDF5_VERSION}, but it is not parallel.")
 elseif (_hdf5_requested AND NOT HDF5_FOUND)
-    message(fatal_error "HDF5 support was requested, but HDF5 was not found.")
+    message(FATAL_ERROR "HDF5 support was requested, but HDF5 was not found.")
+elseif (_hdf5_known_serial)
+    message(STATUS "Found serial HDF5 ${HDF5_VERSION}; disabling Neko-TOP HDF5 support.")
+    set(HAVE_HDF5 FALSE CACHE INTERNAL "Neko-TOP HDF5 support disabled")
 elseif (HDF5_FOUND)
     set(HAVE_HDF5 TRUE CACHE INTERNAL "Neko-TOP HDF5 support enabled")
     add_compile_definitions(HAVE_HDF5=1)
