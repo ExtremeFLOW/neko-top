@@ -63,6 +63,7 @@ module neko_ext
   use fluid_pnpn, only: fluid_pnpn_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scalar_pnpn, only: scalar_pnpn_t
+  use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
 
   implicit none
 
@@ -405,8 +406,8 @@ contains
 
        ! zero out the Adams-Bashforth history, mirroring the fluid above.
        select type (s_scheme => &
-            adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj)
-       type is (scalar_pnpn_t)
+            adjoint_case%adjoint_scalars%adjoint_scalar_fields(1))
+       type is (adjoint_scalar_pnpn_t)
           call field_rzero(s_scheme%abx1)
           call field_rzero(s_scheme%abx2)
        end select
