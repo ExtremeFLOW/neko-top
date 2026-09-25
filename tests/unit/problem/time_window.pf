@@ -201,7 +201,7 @@ contains
   !> A functional that does not change in time must report the same value
   !! whatever its window is and however long the run is.
   @test(npes=[2])
-  subroutine constant_value_is_time_invariant(this)
+  subroutine invariant_constant_value(this)
     class(test_time_window_case), intent(inout) :: this
     real(kind=rp), parameter :: expected = 0.125_rp
     real(kind=rp), parameter :: dt = 1.0e-4_rp
@@ -241,12 +241,12 @@ contains
          0.5_rp * dt, value, sensitivity)
     @assertEqual(expected, value, 1.0e-12_rp, "window, halved timestep")
 
-  end subroutine constant_value_is_time_invariant
+  end subroutine invariant_constant_value
 
   !> The sensitivity is normalised the same way as the value, so it must be
   !! invariant under exactly the same changes.
   @test(npes=[2])
-  subroutine constant_sensitivity_is_time_invariant(this)
+  subroutine invariant_constant_sensitivity(this)
     class(test_time_window_case), intent(inout) :: this
     real(kind=rp), parameter :: expected = 0.125_rp
     real(kind=rp), parameter :: dt = 1.0e-4_rp
@@ -264,12 +264,12 @@ contains
          0.5_rp * dt, value, sensitivity)
     @assertEqual(expected, sensitivity, 1.0e-12_rp, "window, halved timestep")
 
-  end subroutine constant_sensitivity_is_time_invariant
+  end subroutine invariant_constant_sensitivity
 
   !> For a value that does change in time, the reported number must be the mean
   !! over the functional's own window -- not over the simulated interval.
   @test(npes=[2])
-  subroutine windowed_average_is_taken_over_the_window(this)
+  subroutine windowed_average(this)
     class(test_time_window_case), intent(inout) :: this
     real(kind=rp), parameter :: dt = 1.0e-4_rp
     real(kind=rp) :: value, sensitivity
@@ -291,6 +291,6 @@ contains
          value, sensitivity)
     @assertEqual(0.06_rp, value, dt, "mean over [0.02, 0.1]")
 
-  end subroutine windowed_average_is_taken_over_the_window
+  end subroutine windowed_average
 
 end module time_window
