@@ -47,6 +47,7 @@ add_test(NAME unsteady_mixer_valgrind_regression
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
         NEKO_DIR=${neko_PREFIX}
         NEKO_LOG_FILE=neko_valgrind.log
+        NEKO_TOP_LOG_FILE=neko_valgrind_nekotop.log
         OMP_NUM_THREADS=8
         OPENBLAS_NUM_THREADS=1
         VALGRIND_MESH_NX=8
@@ -74,6 +75,7 @@ add_test(NAME unsteady_mixer_valgrind_unsteady_regression
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
         NEKO_DIR=${neko_PREFIX}
         NEKO_LOG_FILE=neko_valgrind.log
+        NEKO_TOP_LOG_FILE=neko_valgrind_nekotop.log
         OMP_NUM_THREADS=8
         OPENBLAS_NUM_THREADS=1
         VALGRIND_MESH_NX=8

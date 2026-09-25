@@ -47,7 +47,7 @@ module Borrvall_Petersson_mapping
        Borrvall_Petersson_mapping_apply_cpu, &
        Borrvall_Petersson_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
-  use logger, only: neko_log
+  use nekotop_logger, only: nekotop_log
   use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
@@ -133,14 +133,14 @@ contains
     this%f_max = f_max
     this%q = q
 
-    call neko_log%section('Borrvall & Petersson Mapping')
+    call nekotop_log%section('Borrvall & Petersson Mapping')
     write(msg, '(A,F8.4)') '  f_min: ', this%f_min
-    call neko_log%message(msg)
+    call nekotop_log%message(msg)
     write(msg, '(A,F8.4)') '  f_max: ', this%f_max
-    call neko_log%message(msg)
+    call nekotop_log%message(msg)
     write(msg, '(A,F8.4)') '  q:     ', this%q
-    call neko_log%message(msg)
-    call neko_log%end_section()
+    call nekotop_log%message(msg)
+    call nekotop_log%end_section()
 
   end subroutine Borrvall_Petersson_mapping_init_from_attributes
 

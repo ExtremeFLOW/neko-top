@@ -13,6 +13,7 @@ module io_hdf5
        device_init
   use neko_mpi_types, only: neko_mpi_types_free
   use logger, only: neko_log
+  use nekotop_logger, only: nekotop_log
   use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
   use vector_math, only: vector_glsc2
@@ -37,6 +38,7 @@ contains
     if (initialized) return
     initialized = .true.
     call neko_init()
+    call nekotop_log%init(env_prefix = "NEKO_TOP")
 
   end subroutine setUp
 
