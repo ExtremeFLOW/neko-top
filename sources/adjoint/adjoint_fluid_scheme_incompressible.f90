@@ -655,8 +655,8 @@ contains
   ! for now.... let's ignore it
   function adjoint_compute_cfl(this, dt) result(c)
     class(adjoint_fluid_scheme_incompressible_t), intent(in) :: this
-    real(kind=rp), intent(in) :: dt
-    real(kind=rp) :: c
+    real(kind=dp), intent(in) :: dt
+    real(kind=dp) :: c
 
     c = cfl(dt, this%u_adj%x, this%v_adj%x, this%w_adj%x, &
          this%Xh, this%c_Xh, this%msh%nelv, this%msh%gdim)
