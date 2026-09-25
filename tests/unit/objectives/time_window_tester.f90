@@ -37,7 +37,7 @@ program time_window_tester
   use json_utils_ext, only: json_read_file
   use utils, only: neko_error
   use neko_top, only: neko_top_register_types
-  use logger, only: neko_log, LOG_SIZE
+  use logger, only: neko_log
 
   ! Modules specific to this test
   use num_types, only: rp

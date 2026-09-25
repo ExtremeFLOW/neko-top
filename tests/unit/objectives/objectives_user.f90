@@ -67,7 +67,7 @@ contains
   !> The scalar concentration at a point, as a smooth split in `z`.
   !! @param z Height.
   !! @return The concentration.
-  pure function split_profile(z) result(phi)
+  elemental function split_profile(z) result(phi)
     real(kind=rp), intent(in) :: z
     real(kind=rp) :: phi
 
@@ -102,6 +102,7 @@ contains
     type(field_dirichlet_t), intent(in) :: bc
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: u, v, w, s
+    real(kind=rp) :: y, z
     integer :: i, idx
 
     if (fields%items(1)%ptr%name .eq. 'u') then
@@ -115,8 +116,9 @@ contains
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
-          u%x(idx, 1, 1, 1) = velocity_profile(u%dof%y(idx, 1, 1, 1), &
-               u%dof%z(idx, 1, 1, 1))
+          y = u%dof%y%x(idx, 1, 1, 1)
+          z = u%dof%z%x(idx, 1, 1, 1)
+          u%x(idx, 1, 1, 1) = velocity_profile(y, z)
           v%x(idx, 1, 1, 1) = 0.0_rp
           w%x(idx, 1, 1, 1) = 0.0_rp
        end do
@@ -132,7 +134,8 @@ contains
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
-          s%x(idx, 1, 1, 1) = split_profile(s%dof%z(idx, 1, 1, 1))
+          z = s%dof%z%x(idx, 1, 1, 1)
+          s%x(idx, 1, 1, 1) = split_profile(z)
        end do
 
        call s%copy_from(HOST_TO_DEVICE, sync = .true.)
@@ -150,14 +153,11 @@ contains
     character(len=*), intent(in) :: scheme_name
     type(field_list_t), intent(inout) :: fields
     type(field_t), pointer :: s
-    integer :: i
 
     if (scheme_name .eq. 'fluid') return
 
     s => fields%get("s")
-    do i = 1, s%dof%size()
-       s%x(i, 1, 1, 1) = split_profile(s%dof%z(i, 1, 1, 1))
-    end do
+    s%x = split_profile(s%dof%z%x)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(s%x, s%x_d, s%size(), HOST_TO_DEVICE, sync = .false.)
