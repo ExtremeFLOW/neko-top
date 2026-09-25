@@ -18,14 +18,23 @@ inputs:
     required: false
     default: "/home/runner/tmp/neko"
 
+  json-fortran-version:
+    description: "The version of the JSON-Fortran library to use."
+    required: true
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
     required: true
 
+  parmetis-version:
+    description: "The version of the ParMETIS library to use."
+    required: true
   parmetis-dir:
     description: "The directory where the ParMETIS library was installed."
     required: true
 
+  hdf5-version:
+    description: "The version of the HDF5 library to use."
+    required: true
   hdf5-dir:
     description: "The directory where the HDF5 library was installed."
     required: true
@@ -101,14 +110,17 @@ runs:
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
         HDF5_DIR: ${{ inputs.hdf5-dir }}
+        PARMETIS_DIR: ${{ inputs.parmetis-dir }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
         # Get the GIT sha for the current commit
         SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key=neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
-        [ -n "$HDF5_DIR" ] && key="$key-hdf5"
+        [ -n "$JSON_FORTRAN_DIR" ] && key="$key-json-fortran-$JSON_FORTRAN_VERSION"
+        [ -n "$PARMETIS_DIR" ] && key="$key-parmetis-$PARMETIS_VERSION"
+        [ -n "$HDF5_DIR" ] && key="$key-hdf5-$HDF5_VERSION"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
@@ -174,6 +186,7 @@ runs:
         [ -n "$HDF5_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-hdf5=$HDF5_DIR"
 
         cd $WORKING_DIR
+        [ -n "$HDF5_DIR" ] && export PKG_CONFIG_PATH="$HDF5_DIR/lib/pkgconfig:${PKG_CONFIG_PATH}"
         ./regen.sh
         ./configure FCFLAGS="-w -O2" $CONFIG_FLAGS
         make ${{ inputs.build-options }}

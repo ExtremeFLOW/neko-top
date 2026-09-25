@@ -40,6 +40,7 @@ add_dependencies(Tests Unit)
 
 # Add the more complex tests that require additional setup or dependencies.
 add_subdirectory(sensitivity)
+add_subdirectory(objectives)
 add_subdirectory(checkpointing)
 add_subdirectory(optimizer)
 add_subdirectory(mapping)
@@ -49,6 +50,8 @@ add_subdirectory(mapping)
 
 # Create a file list of the pFUnit test sources. These should be relative paths.
 set(PFUNIT_TEST_SOURCES "" CACHE INTERNAL "List of pFUnit test source files.")
+
+list(APPEND PFUNIT_TEST_SOURCES problem/time_window.pf)
 
 if (HAVE_HDF5)
     list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
@@ -81,7 +84,7 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     add_pfunit_ctest(${test_name}
         TEST_SOURCES ${pf_file}
         LINK_LIBRARIES Neko-TOP::neko-top
-        MAX_PES 2
+        MAX_PES $<IF:$<STREQUAL:${DEVICE_TYPE},CPU>,2,1>
     )
 
     # Disable treating unused-variable as error for pfunit tests

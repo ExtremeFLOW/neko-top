@@ -20,6 +20,7 @@ program usrneko
   use num_types, only: rp
   use vector, only: vector_t
   use matrix, only: matrix_t
+  use math, only: copy
 
   use comm, only: pe_rank
   use device, only: device_memcpy, HOST_TO_DEVICE
@@ -76,9 +77,9 @@ program usrneko
   call xcoord%init(nloc)
   call ycoord%init(nloc)
   call zcoord%init(nloc)
-  xcoord%x = reshape(neko_field%dof%x, [nloc])
-  ycoord%x = reshape(neko_field%dof%y, [nloc])
-  zcoord%x = reshape(neko_field%dof%z, [nloc])
+  call copy(xcoord%x, neko_field%dof%x%x, nloc)
+  call copy(ycoord%x, neko_field%dof%y%x, nloc)
+  call copy(zcoord%x, neko_field%dof%z%x, nloc)
 
   if (NEKO_BCKND_DEVICE .eq. 1) then
      call device_memcpy(xcoord%x, xcoord%x_d, nloc, &

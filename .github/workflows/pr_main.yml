@@ -1,45 +1,232 @@
-name: Main Checks
+# File: pr_main.yml Date: 2024-08-13
+# ---------------------------------------------------------------------------- #
+# Workflow Overview
+# ---------------------------------------------------------------------------- #
+# This file contains the workflow that checks Release PRs for the main branch.
+# It checks for linting, formatting, and compilation. The workflow is triggered
+# when a PR is opened, synchronized, reopened, or ready for review. A relase PR
+# must come from a release/x.y[.z] branch. We require extensive checks for
+# release PRs, as they are the only PRs that can be merged into main.
 
+# The workflow is split into multiple jobs:
+# - Prepare: Checks if the PR is opened from a supported branch and stores
+#   global environment variables.
+# - Linting: Lints the PR for any changes.
+# - Formatting: Formats the PR for any changes.
+# - Compilation: Compiles the PR for any changes.
+# - Complete: Checks if all previous jobs passed.
+
+# The jobs are run in a sequence, where the Prepare job is run first. The
+# Linting, Formatting, and Compilation jobs run in parallel, and the Complete
+# job runs last.
+
+# The workflow uses the following environment variables:
+# - FLINT_GLOBAL_MINIMUM: The minimum global linting score.
+# - FLINT_CHANGED_FILES_MINIMUM: The minimum linting score for changed files.
+
+name: Main Checks
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+# ---------------------------------------------------------------------------- #
+# Allow only one concurrent deployment, skipping runs queued between the run
+# in-progress and latest queued. We do not wish to waste time on old runs if a
+# newer one is available.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+# sequence, where the Prepare job is run first. The Linting, Formatting, and
+# Compilation jobs run in parallel, and the Complete job runs last.
 
 jobs:
-  check_formatting:
+  prepare:
+    name: Prepare the environment
+    runs-on: ubuntu-latest
+    outputs:
+      pfunit-version: ${{ steps.store.outputs.pfunit-version }}
+      json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
+      neko-version: ${{ steps.store.outputs.neko-version }}
+      hdf5-version: ${{ steps.store.outputs.hdf5-version }}
+
+    steps:
+      - name: Check if PR is from a supported branch
+        shell: bash
+        env:
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          CURRENT_REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ "$HEAD_REPOSITORY" != "$CURRENT_REPOSITORY" ]]; then
+            echo "Error: PR must originate from this repository."
+            exit 1
+          fi
+
+          if [[ ! "${GITHUB_HEAD_REF}" =~ ^release/[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+            echo "Error: PR must be from a release/x.y[.z] branch."
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Store environment variables
+        id: store
+        run: |
+          source $GITHUB_WORKSPACE/config/dependency-versions.env
+
+          echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
+          echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
+          echo "hdf5-version=$HDF5_VERSION" >> $GITHUB_OUTPUT
+          echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
+
+  # -------------------------------------------------------------------------- #
+  # Code style and documentation checks.
+
+  check_lint:
+    name: Linting
+    needs: prepare
+    uses: ./.github/workflows/check_linting.yml
+
+  check_format:
     name: Formatting
+    needs: prepare
     uses: ./.github/workflows/check_formatting.yml
 
   check_documentation:
     name: Documentation
-    uses: ./.github/workflows/check_documentation.yml
+    needs: prepare
+    uses: ./.github/workflows/documentation.yml
 
-  check_compilation:
+  # -------------------------------------------------------------------------- #
+  # Define the checks to run for the Neko-TOP library.
+
+  check_compile:
     name: Compilation
-    uses: ./.github/workflows/check_neko-top.yml
+    needs: prepare
+    uses: ./.github/workflows/check_compile.yml
     with:
-      neko-version: "master"
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+
+  check_scripts:
+    name: Scripting
+    needs: prepare
+    uses: ./.github/workflows/check_scripts.yml
+    with:
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+      neko-top-version: ${{ github.head_ref || github.ref_name }}
+
+  check_valgrind:
+    name: Valgrind Regression
+    needs: prepare
+    uses: ./.github/workflows/check_valgrind.yml
+    with:
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+
+  # -------------------------------------------------------------------------- #
+  # Check if all previous jobs passed. If any of the previous jobs failed, the
+  # Complete job will fail and print out the failed jobs.
 
   check_complete:
-    name: Main Checks
+    if: ${{ always() }}
+    name: Main PR Ready
     needs:
-      - check_formatting
+      - prepare
+      # Code style and documentation checks
+      - check_lint
+      - check_format
       - check_documentation
-      - check_compilation
+      # Neko-TOP library checks
+      - check_compile
+      - check_scripts
+      - check_valgrind
 
     runs-on: ubuntu-latest
     env:
-      check_formatting: ${{ needs.check_formatting.result }}
-      check_documentation: ${{ needs.check_documentation.result }}
-      check_compilation: ${{ needs.check_compilation.result }}
+      prepare_status: ${{ needs.prepare.result }}
+      lint_status: ${{ needs.check_lint.result }}
+      format_status: ${{ needs.check_format.result }}
+      documentation_status: ${{ needs.check_documentation.result }}
+      compile_status: ${{ needs.check_compile.result }}
+      scripts_status: ${{ needs.check_scripts.result }}
+      valgrind_status: ${{ needs.check_valgrind.result }}
 
     steps:
-      - name: All checks passed
+      - name: Check status of previous jobs
         run: |
-          if [ "$check_formatting" != "success" ]; then
-            echo "Formatting check failed"
-            exit 1
-          elif [ "$check_compilation" != "success" ]; then
-            echo "Compilation check failed"
+          success=true
+          fail=()
+
+          # ------------------------------------------------------------------ #
+          # Check the status of our Code style and documentation checks.
+
+          if [ "$prepare_status" != "success" ]; then
+            fail+=("\t- Prepare check: $prepare_status")
+            success=false
+          fi
+
+          if [ "$lint_status" != "success" ]; then
+            fail+=("\t- Linting check: $lint_status")
+            success=false
+          fi
+
+          if [ "$format_status" != "success" ]; then
+            fail+=("\t- Formatting check: $format_status")
+            success=false
+          fi
+
+          if [ "$documentation_status" != "success" ]; then
+            fail+=("\t- Documentation check: $documentation_status")
+            success=false
+          fi
+
+          # ------------------------------------------------------------------ #
+          # Check the status of our Neko-TOP library checks.
+
+          if [ "$compile_status" != "success" ]; then
+            fail+=("\t- Compilation check: $compile_status")
+            success=false
+          fi
+
+          if [ "$scripts_status" != "success" ]; then
+            fail+=("\t- Scripts check: $scripts_status")
+            success=false
+          fi
+
+          if [ "$valgrind_status" != "success" ]; then
+            fail+=("\t- Valgrind regression check: $valgrind_status")
+            success=false
+          fi
+
+          # ------------------------------------------------------------------ #
+          # If any of the checks failed, print the failed checks and exit with
+          # a non-zero status code. If all checks passed, print a success
+          # message.
+
+          if [ "$success" == false ]; then
+            >&2 echo "The following checks did not succeed:"
+            for i in "${fail[@]}"; do
+              >&2 printf "$i\n"
+            done
             exit 1
           fi
           echo "All checks passed"
