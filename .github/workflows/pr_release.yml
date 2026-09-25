@@ -72,7 +72,7 @@ jobs:
             exit 1
           fi
 
-          if [[ ! "${GITHUB_HEAD_REF}" =~ ^release/[0-9]+\.[0-9]+(\.[0-9]+)-rc\.[0-9]+$ ]]; then
+          if [[ ! "${GITHUB_HEAD_REF}" =~ ^release\/[0-9]+(\.[0-9]+)+-rc\.[0-9]+$ ]]; then
             echo "Error: PR must be from a release/x.y[.z]-rc.N branch."
             exit 1
           fi
@@ -149,7 +149,7 @@ jobs:
 
   check_complete:
     if: ${{ always() }}
-    name: Develop PR Ready
+    name: Release PR Ready
     needs:
       - prepare
       # Code style and documentation checks
