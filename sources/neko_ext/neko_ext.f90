@@ -169,6 +169,12 @@ contains
     call json_get(neko_case%params, 'case.fluid.initial_condition', &
          json_subdict)
 
+    ! Reset the fields. The ICs often assumes these are 0.
+    call field_rzero(p)
+    call field_rzero(u)
+    call field_rzero(v)
+    call field_rzero(w)
+
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(u, v, w, p, &
             neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
@@ -215,8 +221,6 @@ contains
        ! zero out RHS
        call field_rzero(neko_case%scalars%scalar_fields(1)%scalar%f_Xh)
        ! zero out the Adams-Bashforth history, mirroring the fluid above.
-       ! Without this a second forward run inherits the extrapolation terms
-       ! from the end of the previous one, and its scalar trajectory differs.
        select type (s_scheme => &
             neko_case%scalars%scalar_fields(1)%scalar)
        type is (scalar_pnpn_t)

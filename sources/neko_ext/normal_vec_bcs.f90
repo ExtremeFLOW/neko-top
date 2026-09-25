@@ -37,7 +37,7 @@ module normal_vec_bcs
   use neko_config, only : NEKO_BCKND_DEVICE
   use vector, only : vector_t
   use coefs, only : coef_t
-  use bc, only : bc_t
+  use bc, only : bc_t, BC_DIRICHLET
   use utils, only : neko_error, nonlinear_index
   use json_module, only : json_file
   use, intrinsic :: iso_c_binding, only : c_ptr, c_null_ptr, c_associated
@@ -95,6 +95,7 @@ contains
     type(coef_t), target, intent(in) :: coef
 
     call this%init_base(coef)
+    this%bc_type = BC_DIRICHLET
   end subroutine normal_vec_bcs_init_from_components
 
   !> No-op scalar apply.
