@@ -391,13 +391,12 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
   const T xgap = xmax_j - xmin_j;
 
   // Clamp helpers
-  const T half_xgap = 0.5 * xgap;
   const T tenth_low_diff = T(0.1) * (xt - low_j);
   const T tenth_upp_diff = T(0.1) * (upp_j - xt);
 
   // Compute alpha and beta with fused max/min and fewer calls
-  T alpha_val = max(max(xmin_j, low_j + tenth_low_diff), xt - half_xgap);
-  T beta_val = min(min(xmax_j, upp_j - tenth_upp_diff), xt + half_xgap);
+  T alpha_val = max(xmin_j, low_j + tenth_low_diff);
+  T beta_val = min(xmax_j, upp_j - tenth_upp_diff);
 
   alpha[tj] = alpha_val;
   beta[tj] = beta_val;
