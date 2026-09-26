@@ -267,8 +267,8 @@ contains
 
       if (iter .lt. 3) then
          ! Initialize the lower and upper asymptotes
-         low = x - this%asyinit * xmax_eff + this%asyinit * xmin_eff
-         upp = x + this%asyinit * xmax_eff - this%asyinit * xmin_eff
+         low = x - this%asyinit * xmax_diff
+         upp = x + this%asyinit * xmax_diff
       else
          do j = 1, this%n
             if ((x(j) - x_1(j)) * (x_1(j) - x_2(j)) .lt. 0.0_rp) then
@@ -308,8 +308,8 @@ contains
          xmin => xmin_eff, xmax => xmax_eff, &
          low => this%low%x, upp => this%upp%x, x => x)
 
-      alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff)
-      beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*x_diff)
+      alpha = max(xmin, low + 0.1_rp*(x - low))
+      beta = min(xmax, upp - 0.1_rp*(upp - x))
     end associate
 
     ! ------------------------------------------------------------------------ !
