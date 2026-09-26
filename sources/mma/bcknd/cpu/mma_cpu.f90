@@ -267,8 +267,8 @@ contains
 
       if (iter .lt. 3) then
          ! Initialize the lower and upper asymptotes
-         low = x - this%asyinit * x_diff
-         upp = x + this%asyinit * x_diff
+         low = x - this%asyinit * xmax_eff + this%asyinit * xmin_eff
+         upp = x + this%asyinit * xmax_eff - this%asyinit * xmin_eff
       else
          do j = 1, this%n
             if ((x(j) - x_1(j)) * (x_1(j) - x_2(j)) .lt. 0.0_rp) then
