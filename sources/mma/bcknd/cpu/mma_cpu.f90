@@ -308,8 +308,8 @@ contains
          xmin => xmin_eff, xmax => xmax_eff, &
          low => this%low%x, upp => this%upp%x, x => x)
 
-      alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff)
-      beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*x_diff)
+      alpha = max(xmin, low + 0.1_rp*(x - low))
+      beta = min(xmax, upp - 0.1_rp*(upp - x))
     end associate
 
     ! ------------------------------------------------------------------------ !
