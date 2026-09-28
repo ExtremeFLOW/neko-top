@@ -28,6 +28,18 @@ authors:
     affiliation: Technical University of Denmark, Department of Mechanical Engineering
     orcid: https://orcid.org/0000-0002-3042-0036
 
+  - family-names: Schlatter
+    given-names: Philipp
+
+  - family-names: Berggren
+    given-names: Martin
+
+  - family-names: Wadbroe
+    given-names: Eddie
+
+  - family-names: Henningson
+    given-names: Dan
+
 identifiers:
   - type: doi
     value: 10.5281/zenodo.6631055
