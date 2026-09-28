@@ -5,20 +5,36 @@ cff-version: 1.2.0
 title: Neko-TOP
 message: "If you use Neko-TOP, please cite it as below."
 type: software
+
+# Authors, listed in alphabetical order by family name.
 authors:
   - family-names: Nobis
     given-names: Harrison
+
   - family-names: Mousavi
     given-names: Seyedabbas
+
   - family-names: Olsen
     given-names: Tim Felle
+    affiliation: Technical University of Denmark, Department of Mechanical Engineering
     orcid: https://orcid.org/0000-0002-4531-7226
+
+  - family-names: Andreasen
+    given-names: Casper Schousboe
+    affiliation: Technical University of Denmark, Department of Mechanical Engineering
+    orcid: https://orcid.org/0000-0002-9949-9782
+  - family-names: Aage
+    given-names: Niels
+    affiliation: Technical University of Denmark, Department of Mechanical Engineering
+    orcid: https://orcid.org/0000-0002-3042-0036
+
 identifiers:
   - type: doi
     value: 10.5281/zenodo.6631055
   - type: url
     value: https://github.com/ExtremeFlow/Neko-TOP
 license: BSD-3-Clause
+
 # preferred-citation:
 #   authors:
 #     - family-names: Jansson
