@@ -1,7 +1,8 @@
 # Neko-TOP (Topology Optimization in Neko)
 
-[![GitHub Release](https://img.shields.io/github/release/ExtremeFlow/Neko-TOP.svg?style=flat)](https://github.com/ExtremeFlow/Neko-TOP/releases)
+[![Latest Release](https://img.shields.io/github/release/ExtremeFlow/Neko-TOP.svg?style=flat)](https://github.com/ExtremeFlow/Neko-TOP/releases)
 [![DOI](https://zenodo.org/badge/748243004.svg)](https://doi.org/10.5281/zenodo.22961896)
+[![Documentation](https://img.shields.io/badge/Documentation-gray?logo=github)](https://extremeflow.github.io/neko-top/)
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
 spectral element solver. The Neko-TOP library is designed to solve topology
@@ -18,13 +19,14 @@ The Neko-TOP library is dependent on the following libraries:
 - Fortran 2008  
     We assume gfortran, use `FC` environment variable to override.
 - MPI: We tested with OpenMPI 3.1.
-- [Neko](https://github.com/ExtremeFlow/Neko)
-    - [![Neko: Neko-TOP branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko-top.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko-top.yml)
-    - [![Neko: Develop branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml)
-    - [![Neko: Master branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml)
-
+- [Neko](https://github.com/ExtremeFlow/Neko).
 - [JSON-Fortran](https://github.com/jacobwilliams/json-fortran).
-- CUDA; Optional for GPU acceleration in Neko.
+- [HDF5](https://www.hdfgroup.org/downloads/hdf5/).
+- Device backend for GPU acceleration in Neko-TOP is provided through Neko.
+  - [CUDA](https://developer.nvidia.com/cuda-toolkit); Optional for GPU acceleration in Neko.
+  - [OpenCL](https://www.khronos.org/opencl/); Optional for GPU acceleration in Neko.
+  - [HIP](https://github.com/ROCm-Developer-Tools/HIP); Optional for GPU acceleration in Neko.
+  - [Metal](https://developer.apple.com/metal/); Optional for GPU acceleration in Neko.
 
 The Neko-TOP library is also dependent on the following libraries for testing:
 
