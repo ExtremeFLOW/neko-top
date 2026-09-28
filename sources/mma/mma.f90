@@ -96,6 +96,7 @@ module mma
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
+     logical :: robust_asymptotes = .false.
      type(scratch_registry_t) :: scratch
      character(len=:), allocatable :: subsolver, bcknd
 
@@ -295,6 +296,7 @@ contains
     call json_get_or_default(json, 'mma.a', a_const, a_default)
     call json_get_or_default(json, 'mma.c', c_const, c_default)
     call json_get_or_default(json, 'mma.d', d_const, d_default)
+    call json_get_or_default(json, 'mma.move_limit', move_limit, move_limit_default)
     call json_get_or_default(json, 'mma.move_limit', move_limit, move_limit_default)
 
     call json_get_or_default(json, 'mma.scale', scale, scale_default)

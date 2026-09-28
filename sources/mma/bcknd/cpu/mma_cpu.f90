@@ -283,14 +283,34 @@ contains
             upp(j) = x(j) + asy_factor * (upp(j) - x_1(j))
          end do
 
-
          ! Setting a minimum and maximum for the low and upp
          ! asymptotes (eq3.9)
+         if (.not. this%robust_asymptotes) then
          low = max(low, x - 10.0_rp * x_diff)
          low = min(low, x - 0.01_rp * x_diff)
-
          upp = min(upp, x + 10.0_rp * x_diff)
          upp = max(upp, x + 0.01_rp * x_diff)
+         else
+                low = max(low, x - 100.0 * x_diff)
+                low = min(low, x - 1.0e-4 * x_diff)
+                upp = max(upp, x + 1.0e-4 * x_diff)
+                upp = min(upp, x + 100.0 * x_diff)
+                block
+                    real(kind=rp) :: xmi, xma
+                    integer :: i
+                    do i = 1, n
+                xmi   = xmin_eff(i) - 1.0e-5
+                xma   = xmax_eff(i) + 1.0e-5
+                if (x < xmin_eff) then
+                    low(i) = x(i) - (xma(i) - x(i)) / 0.9
+                    upp(i) = x(i) + (xma(i) - x(i)) / 0.9
+                else if (x > xmax_eff) then
+                    low(i) = x(i) - (x(i) - xmi(i)) / 0.9
+                    upp(i) = x(i) + (x(i) - xmi(i)) / 0.9
+                end if
+            end do
+                end block
+            end if
       end if
 
     end associate
