@@ -1,6 +1,6 @@
 # Neko-TOP (Topology Optimization in Neko)
 
-[![Documentation](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml/badge.svg?branch=develop&event=push)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml)
+[![GitHub Release](https://img.shields.io/github/release/ExtremeFlow/Neko-TOP.svg?style=flat)](https://github.com/ExtremeFlow/Neko-TOP/releases)
 [![DOI](https://zenodo.org/badge/748243004.svg)](https://doi.org/10.5281/zenodo.22961896)
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
