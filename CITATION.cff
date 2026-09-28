@@ -12,33 +12,39 @@ authors:
     given-names: Harrison
 
   - family-names: Mousavi
-    given-names: Seyedabbas
+    given-names: Abbas
 
   - family-names: Olsen
     given-names: Tim Felle
-    affiliation: Technical University of Denmark, Department of Mechanical Engineering
     orcid: https://orcid.org/0000-0002-4531-7226
 
   - family-names: Andreasen
     given-names: Casper Schousboe
-    affiliation: Technical University of Denmark, Department of Mechanical Engineering
     orcid: https://orcid.org/0000-0002-9949-9782
+
   - family-names: Aage
     given-names: Niels
-    affiliation: Technical University of Denmark, Department of Mechanical Engineering
     orcid: https://orcid.org/0000-0002-3042-0036
 
   - family-names: Schlatter
     given-names: Philipp
+    orcid: https://orcid.org/0000-0001-9627-5903
 
   - family-names: Berggren
     given-names: Martin
+    orcid: https://orcid.org/0000-0003-0473-3263
 
   - family-names: Wadbroe
     given-names: Eddie
+    orcid: https://orcid.org/0000-0001-8704-9584
 
   - family-names: Henningson
     given-names: Dan
+    orcid: https://orcid.org/0000-0001-7864-3071
+
+  - family-names: Lu
+    given-names: Pan
+    orcid: https://orcid.org/0000-0002-9128-4728
 
 identifiers:
   - type: doi
