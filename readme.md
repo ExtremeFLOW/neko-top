@@ -23,10 +23,6 @@ The Neko-TOP library is dependent on the following libraries:
 - [JSON-Fortran](https://github.com/jacobwilliams/json-fortran).
 - [HDF5](https://www.hdfgroup.org/downloads/hdf5/).
 - Device backend for GPU acceleration in Neko-TOP is provided through Neko.
-  - [CUDA](https://developer.nvidia.com/cuda-toolkit); Optional for GPU acceleration in Neko.
-  - [OpenCL](https://www.khronos.org/opencl/); Optional for GPU acceleration in Neko.
-  - [HIP](https://github.com/ROCm-Developer-Tools/HIP); Optional for GPU acceleration in Neko.
-  - [Metal](https://developer.apple.com/metal/); Optional for GPU acceleration in Neko.
 
 The Neko-TOP library is also dependent on the following libraries for testing:
 
