@@ -8,43 +8,36 @@ type: software
 
 # Authors, listed in alphabetical order by family name.
 authors:
-  - family-names: Nobis
-    given-names: Harrison
-
-  - family-names: Mousavi
-    given-names: Abbas
-
-  - family-names: Olsen
-    given-names: Tim Felle
-    orcid: https://orcid.org/0000-0002-4531-7226
-
-  - family-names: Andreasen
-    given-names: Casper Schousboe
-    orcid: https://orcid.org/0000-0002-9949-9782
-
   - family-names: Aage
     given-names: Niels
     orcid: https://orcid.org/0000-0002-3042-0036
-
-  - family-names: Schlatter
-    given-names: Philipp
-    orcid: https://orcid.org/0000-0001-9627-5903
-
+  - family-names: Andreasen
+    given-names: Casper Schousboe
+    orcid: https://orcid.org/0000-0002-9949-9782
   - family-names: Berggren
     given-names: Martin
     orcid: https://orcid.org/0000-0003-0473-3263
-
-  - family-names: Wadbroe
-    given-names: Eddie
-    orcid: https://orcid.org/0000-0001-8704-9584
-
   - family-names: Henningson
-    given-names: Dan
+    given-names: Dan S
     orcid: https://orcid.org/0000-0001-7864-3071
-
   - family-names: Lu
     given-names: Pan
     orcid: https://orcid.org/0000-0002-9128-4728
+  - family-names: Mousavi
+    given-names: Abbas
+    orcid: https://orcid.org/0009-0006-4965-4963
+  - family-names: Nobis
+    given-names: Harrison
+    orcid: https://orcid.org/0000-0002-7760-2523
+  - family-names: Olsen
+    given-names: Tim Felle
+    orcid: https://orcid.org/0000-0002-4531-7226
+  - family-names: Schlatter
+    given-names: Philipp
+    orcid: https://orcid.org/0000-0001-9627-5903
+  - family-names: Wadbroe
+    given-names: Eddie
+    orcid: https://orcid.org/0000-0001-8704-9584
 
 identifiers:
   - type: doi
