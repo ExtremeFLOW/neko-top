@@ -438,17 +438,12 @@ function find_adios2() {
         export PYTHONPATH="$ADIOS2_DIR/lib64/python${pyver}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
     fi
 
-    echo "Using ADIOS2_DIR=$ADIOS2_DIR"
-    echo "Using Python=${pyexe:-<not found>}"
-    echo "done"
-}
 
-# Return ADIOS2's C++ link flags in a form that libtool keeps in LIBS.  The
-# installed adios2-config emits absolute library filenames, which libtool moves
-# ahead of libneko.a and which are then discarded by linkers using --as-needed.
-# Converting those filenames to -L/-l pairs preserves their position after
-# libneko.a in the final link command.
-function get_neko_adios2_link_flags() {
+    # Return ADIOS2's C++ link flags in a form that libtool keeps in LIBS.  The
+    # installed adios2-config emits absolute library filenames, which libtool moves
+    # ahead of libneko.a and which are then discarded by linkers using --as-needed.
+    # Converting those filenames to -L/-l pairs preserves their position after
+    # libneko.a in the final link command.
     local adios2_config_flags
     local adios2_flag
     local adios2_lib_dir
@@ -478,6 +473,10 @@ function get_neko_adios2_link_flags() {
     done
 
     printf '%s ' "${adios2_libs[@]}"
+    
+    echo "Using ADIOS2_DIR=$ADIOS2_DIR"
+    echo "Using Python=${pyexe:-<not found>}"
+    echo "done"
 }
 
 # ============================================================================ #
