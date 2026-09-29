@@ -167,14 +167,10 @@ if(ADIOS2_DIR)
 
     # MPI C++ and the standard C++ runtime are needed by Neko's ADIOS2 code.
     find_package(MPI REQUIRED COMPONENTS CXX)
-    target_link_libraries(neko_cxx_support INTERFACE MPI::MPI_CXX stdc++)
-
-    # Some MPI wrappers (e.g., mpifort) do not link libmpi_cxx automatically.
-    # Add it explicitly when available so libneko's C++ MPI symbols resolve.
-    find_library(MPI_CXX_LIB NAMES mpi_cxx)
-    if(MPI_CXX_LIB)
-        target_link_libraries(neko_cxx_support INTERFACE ${MPI_CXX_LIB})
-    endif()
+    target_link_libraries(neko_cxx_support INTERFACE
+        $<$<BOOL:${HAVE_ADIOS2}>:MPI::MPI_CXX>
+        stdc++
+    )
 else()
     message(STATUS "ADIOS2_DIR not set; ADIOS2 support disabled.")
 endif()
