@@ -37,7 +37,7 @@ module adjoint_fluid_scheme_incompressible
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use gather_scatter, only: gs_t, GS_OP_MIN, GS_OP_MAX
   use neko_config, only: NEKO_BCKND_DEVICE
-  use num_types, only: rp, i8
+  use num_types, only: rp, dp, i8
   use adjoint_source_term, only: adjoint_source_term_t
   use field, only: field_t
   use space, only: space_t, GLL, GL
@@ -655,8 +655,8 @@ contains
   ! for now.... let's ignore it
   function adjoint_compute_cfl(this, dt) result(c)
     class(adjoint_fluid_scheme_incompressible_t), intent(in) :: this
-    real(kind=rp), intent(in) :: dt
-    real(kind=rp) :: c
+    real(kind=dp), intent(in) :: dt
+    real(kind=dp) :: c
 
     c = cfl(dt, this%u_adj%x, this%v_adj%x, this%w_adj%x, &
          this%Xh, this%c_Xh, this%msh%nelv, this%msh%gdim)

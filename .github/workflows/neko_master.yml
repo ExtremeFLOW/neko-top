@@ -38,10 +38,7 @@ on:
 # will store them in a file that the other jobs can read.
 
 env:
-  PFUNIT_VERSION: v4.12.0
-  JSON_FORTRAN_VERSION: 9.2.1
   NEKO_VERSION: master
-  HDF5_VERSION: hdf5_1_14_6
 
 # ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run
@@ -68,9 +65,16 @@ jobs:
       hdf5-version: ${{ steps.store.outputs.hdf5-version }}
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Store environment variables
         id: store
         run: |
+          source $GITHUB_WORKSPACE/config/dependency-versions.env
+
           echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
           echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
           echo "hdf5-version=$HDF5_VERSION" >> $GITHUB_OUTPUT
