@@ -35,7 +35,7 @@
 # ============================================================================ #
 
 cmake_minimum_required(VERSION 3.21)
-project(Neko-TOP VERSION 1.0.0 LANGUAGES Fortran)
+project(Neko-TOP VERSION 1.0.1 LANGUAGES Fortran)
 
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
