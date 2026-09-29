@@ -36,45 +36,16 @@ function check_system_dependencies() {
 
 # Resolve the Python executable and export it for CMake/configure callers.
 function find_python_executable() {
-    local candidate
-    local resolved_python
-    local python_path
-
-    if [ -n "${PYTHON_BIN:-}" ]; then
-        if [ -x "${PYTHON_BIN}" ]; then
-            if [[ "${PYTHON_BIN}" = /* ]]; then
-                resolved_python="${PYTHON_BIN}"
-            elif [[ "${PYTHON_BIN}" == */* ]]; then
-                python_path=$(cd "$(dirname "${PYTHON_BIN}")" && pwd)
-                resolved_python="${python_path}/$(basename "${PYTHON_BIN}")"
-            else
-                resolved_python=$(command -v "${PYTHON_BIN}")
-            fi
-            export PYTHON_EXECUTABLE="${resolved_python}"
-            printf '%s\n' "${PYTHON_EXECUTABLE}"
-            return 0
-        elif command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
-            resolved_python=$(command -v "${PYTHON_BIN}")
-            export PYTHON_EXECUTABLE="${resolved_python}"
-            printf '%s\n' "${PYTHON_EXECUTABLE}"
-            return 0
-        fi
-
-        error "PYTHON_BIN is set but not executable:"
-        error "\t${PYTHON_BIN}"
+    if [ -f "${PYTHON_BIN}" ]; then
+        export PYTHON_EXECUTABLE=$(realpath ${PYTHON_BIN})
+    elif command -v python3 >/dev/null 2>&1; then
+        export PYTHON_EXECUTABLE="$(which python3)"
+    elif command -v python >/dev/null 2>&1; then
+        export PYTHON_EXECUTABLE="$(which python)"
+    else
+        error "Could not find python"
         return 1
     fi
-
-    for candidate in python3 python; do
-        if command -v "${candidate}" >/dev/null 2>&1; then
-            resolved_python=$(command -v "${candidate}")
-            export PYTHON_EXECUTABLE="${resolved_python}"
-            printf '%s\n' "${PYTHON_EXECUTABLE}"
-            return 0
-        fi
-    done
-
-    return 1
 }
 
 # ============================================================================ #
