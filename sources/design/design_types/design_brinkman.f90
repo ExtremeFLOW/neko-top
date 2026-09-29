@@ -559,9 +559,9 @@ contains
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
+       call device_copy(x%x_d, this%design_indicator%dof%x%x_d, n)
     else
-       call copy(x%x, this%design_indicator%dof%x, n)
+       call copy(x%x, this%design_indicator%dof%x%x, n)
     end if
 
   end subroutine brinkman_design_get_x
@@ -577,7 +577,7 @@ contains
        call neko_error('brinkman_design_get_x_i: index out of bounds')
     end if
 
-    x_i = this%design_indicator%dof%x(i,1,1,1)
+    x_i = this%design_indicator%dof%x%x(i,1,1,1)
 
   end function brinkman_design_get_x_i
 
@@ -592,9 +592,9 @@ contains
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
+       call device_copy(y%x_d, this%design_indicator%dof%y%x_d, n)
     else
-       call copy(y%x, this%design_indicator%dof%y, n)
+       call copy(y%x, this%design_indicator%dof%y%x, n)
     end if
 
   end subroutine brinkman_design_get_y
@@ -610,7 +610,7 @@ contains
        call neko_error('brinkman_design_get_y_i: index out of bounds')
     end if
 
-    y_i = this%design_indicator%dof%y(i,1,1,1)
+    y_i = this%design_indicator%dof%y%x(i,1,1,1)
 
   end function brinkman_design_get_y_i
 
@@ -625,9 +625,9 @@ contains
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
+       call device_copy(z%x_d, this%design_indicator%dof%z%x_d, n)
     else
-       call copy(z%x, this%design_indicator%dof%z, n)
+       call copy(z%x, this%design_indicator%dof%z%x, n)
     end if
 
   end subroutine brinkman_design_get_z
@@ -643,7 +643,7 @@ contains
        call neko_error('brinkman_design_get_z_i: index out of bounds')
     end if
 
-    z_i = this%design_indicator%dof%z(i,1,1,1)
+    z_i = this%design_indicator%dof%z%x(i,1,1,1)
 
   end function brinkman_design_get_z_i
 

@@ -314,7 +314,7 @@ contains
     data_line%x = [norm_l2]
     call C%norm_output_file%write(data_line, time_output%t)
     call neko_scratch_registry%relinquish(idx)
-    call C%norm_output_ctrl%register_execution()
+    call C%norm_output_ctrl%register_execution(time_output)
   end subroutine simulation_adjoint_norm_output
 
   !> Write a checkpoint at joblimit

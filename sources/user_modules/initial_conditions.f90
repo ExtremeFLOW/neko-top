@@ -62,7 +62,7 @@ contains
     integer :: i
 
     do i = 1, s%dof%size()
-       z_value = s%dof%z(i, 1, 1, 1)
+       z_value = s%dof%z%x(i, 1, 1, 1)
 
        if (z_value .gt. split_value) then
           s%x(i, 1, 1, 1) = value_above

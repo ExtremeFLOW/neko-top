@@ -285,7 +285,19 @@ function cleanup {
 
     # Move all files which are not the error or executable files to the log
     # folder
-    rsync -a --no-links --remove-source-files \
+    mkdir -p $results
+
+    # Attempt to move files and directories, but do not fallback to copying.
+    mv -t $results --no-copy $(find ./ -maxdepth 1 -type d) 2>/dev/null || true
+    mv -t $results --no-copy $(find ./ -maxdepth 1 -type f \
+        -not -name "error.log" \
+        -not -name "output.log" \
+        -not -name "*.smod" \
+        -not -name "neko") 2>/dev/null || true
+
+    # Copy files and directories which could not be moved.
+    rsync -arm --remove-source-files \
+        --include "run_*/*" \
         --exclude "output.log" \
         --exclude "error.log" \
         --exclude "neko" \
