@@ -432,11 +432,15 @@ function find_adios2() {
     fi
 
 
-    # Return ADIOS2's C++ link flags in a form that libtool keeps in LIBS.  The
-    # installed adios2-config emits absolute library filenames, which libtool moves
-    # ahead of libneko.a and which are then discarded by linkers using --as-needed.
-    # Converting those filenames to -L/-l pairs preserves their position after
-    # libneko.a in the final link command.
+    set_neko_adios2_link_flags
+
+    echo "Using ADIOS2_DIR=$ADIOS2_DIR"
+    echo "Using Python=${pyexe:-<not found>}"
+    echo "done"
+}
+
+# Convert ADIOS2's C++ link flags into a form that libtool keeps in LIBS.
+function set_neko_adios2_link_flags() {
     local adios2_config_flags
     local adios2_flag
     local adios2_lib_dir
@@ -466,10 +470,6 @@ function find_adios2() {
     done
 
     neko_adios2_link_flags="$(printf '%s ' "${adios2_libs[@]}")${NEKO_ADIOS2_EXTRA_LINK_FLAGS:-}"
-    
-    echo "Using ADIOS2_DIR=$ADIOS2_DIR"
-    echo "Using Python=${pyexe:-<not found>}"
-    echo "done"
 }
 
 # ============================================================================ #
