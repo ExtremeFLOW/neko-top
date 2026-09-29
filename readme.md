@@ -22,11 +22,11 @@ The Neko-TOP library is dependent on the following libraries:
 - [Neko](https://github.com/ExtremeFlow/Neko).
 - [JSON-Fortran](https://github.com/jacobwilliams/json-fortran).
 - [HDF5](https://www.hdfgroup.org/downloads/hdf5/).
+
+Optionally we support the following libraries:
+
+- pFUnit for unit testing. See the `tests` folder for more information.
 - Device backend for GPU acceleration in Neko-TOP is provided through Neko.
-
-The Neko-TOP library is also dependent on the following libraries for testing:
-
-- pFUnit         (Built through CMake if unavailable)
 
 ## Quick-start compilation
 
