@@ -35,6 +35,31 @@ function check_system_dependencies() {
 }
 
 # ============================================================================ #
+# Find a Python executable for dependencies that install Python bindings.
+function find_python_executable() {
+    local candidate
+
+    if [ -n "${PYTHON_BIN:-}" ]; then
+        if command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+            command -v "$PYTHON_BIN"
+            return 0
+        elif [ -x "$PYTHON_BIN" ]; then
+            realpath "$PYTHON_BIN"
+            return 0
+        fi
+    fi
+
+    for candidate in python3 python; do
+        if command -v "$candidate" >/dev/null 2>&1; then
+            command -v "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
+# ============================================================================ #
 # Ensure JSON-Fortran is installed, if not install it.
 function find_json_fortran() {
     check_environment
@@ -313,6 +338,172 @@ function find_hdf5() {
 }
 
 # ============================================================================ #
+# Ensure ADIOS2 is installed, if not install it.
+function find_adios2() {
+    check_environment
+
+    local pyexe
+    local pyver
+    local current_dir
+    local hdf5_prefix
+    local cmake_args=()
+
+    pyexe=$(find_python_executable 2>/dev/null || true)
+    if [ -n "${pyexe}" ]; then
+        pyver=$("${pyexe}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+    fi
+
+    if [[ $# -ge 1 && -n "$1" ]]; then
+        ADIOS2_DIR="$1"
+    fi
+
+    if [ -z "${ADIOS2_DIR:-}" ] && command -v adios2-config >/dev/null 2>&1; then
+        ADIOS2_CONFIG=$(realpath "$(command -v adios2-config)")
+        ADIOS2_DIR=$(dirname "$(dirname "$ADIOS2_CONFIG")")
+    else
+        if [ -z "${ADIOS2_DIR:-}" ]; then
+            ADIOS2_DIR="$EXTERNAL_DIR/adios2"
+        fi
+
+        if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
+            ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
+        fi
+
+        mkdir -p "$ADIOS2_DIR"
+        ADIOS2_DIR=$(realpath "$ADIOS2_DIR")
+        ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
+    fi
+
+    if [[ ! -x "$ADIOS2_CONFIG" ]]; then
+        [ -z "${ADIOS2_VERSION:-}" ] && ADIOS2_VERSION="2.10.1"
+        [ -z "${ADIOS2_ENABLE_FORTRAN:-}" ] && ADIOS2_ENABLE_FORTRAN="ON"
+        [ -z "${ADIOS2_ENABLE_PYTHON:-}" ] && ADIOS2_ENABLE_PYTHON="ON"
+        [ -z "${ADIOS2_ENABLE_SST:-}" ] && ADIOS2_ENABLE_SST="ON"
+
+        if [ -z "${pyexe}" ]; then
+            error "Could not find python3 or python in PATH."
+            exit 1
+        fi
+
+        current_dir=$(pwd)
+        cd "$ADIOS2_DIR" || exit 1
+
+        if [ ! -d ADIOS2/.git ]; then
+            rm -rf ADIOS2
+            git clone --depth 1 --branch "v${ADIOS2_VERSION}" \
+                https://github.com/ornladios/ADIOS2.git ADIOS2
+        fi
+
+        cmake_args=(
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+            -DCMAKE_INSTALL_PREFIX="$ADIOS2_DIR"
+            -DCMAKE_INSTALL_PYTHONDIR="lib/python${pyver}/site-packages"
+            -DADIOS2_BUILD_EXAMPLES=OFF
+            -DADIOS2_USE_MPI=ON
+            -DADIOS2_USE_SST="$ADIOS2_ENABLE_SST"
+            -DADIOS2_USE_Python="$ADIOS2_ENABLE_PYTHON"
+            -DADIOS2_USE_Fortran="$ADIOS2_ENABLE_FORTRAN"
+            -DADIOS2_USE_BZip2=OFF
+            -DBUILD_TESTING=OFF
+            -DPython3_EXECUTABLE="$pyexe"
+            -DPython_EXECUTABLE="$pyexe"
+            -DPYTHON_EXECUTABLE="$pyexe"
+            -DPython3_FIND_STRATEGY=LOCATION
+            -DPython_FIND_STRATEGY=LOCATION
+            -DCMAKE_C_COMPILER="${MPICC:-${CC:-cc}}"
+            -DCMAKE_CXX_COMPILER="${MPICXX:-${CXX:-c++}}"
+        )
+
+        hdf5_prefix="${HDF5_ROOT:-${HDF5_DIR:-}}"
+        if [ -n "$hdf5_prefix" ]; then
+            cmake_args+=(
+                -DADIOS2_USE_HDF5=ON
+                -DHDF5_ROOT="$hdf5_prefix"
+            )
+        else
+            cmake_args+=(
+                -DADIOS2_USE_HDF5=OFF
+            )
+        fi
+
+        cmake -S ADIOS2 -B build "${cmake_args[@]}"
+        cmake --build build --parallel
+        cmake --install build
+        rm -rf build
+
+        cd "$current_dir" || exit 1
+        ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
+    fi
+
+    if [ ! -x "$ADIOS2_CONFIG" ]; then
+        error "ADIOS2 not found at:"
+        error "\t$ADIOS2_DIR"
+        error "Please set ADIOS2_DIR to the directory containing"
+        error "the ADIOS2 installation."
+        exit 1
+    fi
+
+    export ADIOS2_DIR="$(realpath "$ADIOS2_DIR")"
+    export ADIOS2_PATH="$ADIOS2_DIR"
+    export ADIOS2_FORTRAN_DIR="$ADIOS2_DIR"
+    export PATH="$ADIOS2_DIR/bin:$PATH"
+
+    [ -d "$ADIOS2_DIR/lib/pkgconfig" ] && \
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+    [ -d "$ADIOS2_DIR/lib64/pkgconfig" ] && \
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib64/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
+    [ -d "$ADIOS2_DIR/lib" ] && \
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    [ -d "$ADIOS2_DIR/lib64" ] && \
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+    if [ -n "${pyver:-}" ] && [ -d "$ADIOS2_DIR/lib/python${pyver}/site-packages" ]; then
+        export PYTHONPATH="$ADIOS2_DIR/lib/python${pyver}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+    fi
+    if [ -n "${pyver:-}" ] && [ -d "$ADIOS2_DIR/lib64/python${pyver}/site-packages" ]; then
+        export PYTHONPATH="$ADIOS2_DIR/lib64/python${pyver}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+    fi
+}
+
+function get_neko_adios2_link_flags() {
+    local adios2_config_flags
+    local adios2_flag
+    local adios2_lib_dir
+    local adios2_lib_name
+    local adios2_libs=()
+    local has_stdcxx=false
+
+    if ! adios2_config_flags=$("$ADIOS2_CONFIG" --cxx-libs); then
+        error "Failed to query ADIOS2 C++ libraries from $ADIOS2_CONFIG."
+        exit 1
+    fi
+
+    for adios2_flag in $adios2_config_flags; do
+        case "$adios2_flag" in
+            *.so*|*.a)
+                adios2_lib_dir=$(dirname "$adios2_flag")
+                adios2_lib_name=$(basename "$adios2_flag")
+                adios2_lib_name=${adios2_lib_name#lib}
+                adios2_lib_name=${adios2_lib_name%%.so*}
+                adios2_lib_name=${adios2_lib_name%%.a}
+                adios2_libs+=("-L$adios2_lib_dir" "-l$adios2_lib_name")
+                ;;
+            *)
+                adios2_libs+=("$adios2_flag")
+                ;;
+        esac
+
+        if [ "$adios2_flag" = "-lstdc++" ]; then
+            has_stdcxx=true
+        fi
+    done
+
+    [ "$has_stdcxx" != true ] && adios2_libs+=("-lstdc++")
+    printf '%s ' "${adios2_libs[@]}"
+}
+
+# ============================================================================ #
 # Ensure ParMETIS is installed, if not install it.
 
 function find_parmetis() {
@@ -380,11 +571,16 @@ function find_parmetis() {
 # Ensure Neko is installed, if not install it.
 function find_neko() {
     check_environment
+    local neko_adios2_link_flags=""
 
     # Find the required dependencies for Neko
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
+    if [ -n "${ADIOS2_DIR:-}" ] || [ "${NEKO_WITH_ADIOS2:-false}" == true ]; then
+        find_adios2 "${ADIOS2_DIR:-}"
+        neko_adios2_link_flags="$(get_neko_adios2_link_flags)${NEKO_ADIOS2_EXTRA_LINK_FLAGS:-}"
+    fi
     find_parmetis $PARMETIS_DIR
     [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
 
@@ -425,6 +621,7 @@ function find_neko() {
         [ -n "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
+        [ -n "$ADIOS2_DIR" ] && FEATURES+=" --with-adios2=$ADIOS2_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
         [ -n "$PFUNIT_DIR" ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
@@ -478,7 +675,8 @@ function find_neko() {
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
                 CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
-                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
+                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS" \
+                LIBS="$neko_adios2_link_flags ${LIBS:-}"
         fi
 
         # Update compile dependencies if makedepf90 is installed
