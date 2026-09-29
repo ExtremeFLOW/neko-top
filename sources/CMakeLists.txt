@@ -107,6 +107,9 @@ target_link_libraries(neko-top PUBLIC
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
+    "$<$<BOOL:${HAVE_ADIOS2}>:${ADIOS2_CXX_LIBS}>"
+    $<$<BOOL:${HAVE_ADIOS2}>:MPI::MPI_CXX>
+    $<$<BOOL:${HAVE_ADIOS2}>:stdc++>
 )
 
 # ============================================================================ #

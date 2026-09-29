@@ -121,6 +121,54 @@ set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
 pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 
 # ............................................................................ #
+# Optional ADIOS2 support
+
+set(HAVE_ADIOS2 FALSE CACHE INTERNAL "Neko-TOP ADIOS2 support disabled")
+
+if (NOT ADIOS2_DIR AND DEFINED ENV{ADIOS2_DIR})
+    set(ADIOS2_DIR $ENV{ADIOS2_DIR} CACHE STRING
+        "Path to the ADIOS2 installation")
+endif()
+
+if(ADIOS2_DIR)
+    if (NOT IS_ABSOLUTE "${ADIOS2_DIR}")
+        set(ADIOS2_DIR ${EXTERNAL_DIR}/${ADIOS2_DIR}
+            CACHE STRING "Path to the ADIOS2 installation" FORCE)
+    endif()
+
+    find_program(ADIOS2_CONFIG_EXECUTABLE
+        NAMES adios2-config
+        HINTS ${ADIOS2_DIR}/bin
+        NO_DEFAULT_PATH
+    )
+
+    if(NOT ADIOS2_CONFIG_EXECUTABLE)
+        message(FATAL_ERROR "ADIOS2 support was requested, but adios2-config "
+            "was not found in ${ADIOS2_DIR}/bin.")
+    endif()
+
+    set(HAVE_ADIOS2 TRUE CACHE INTERNAL "Neko-TOP ADIOS2 support enabled")
+
+    message(STATUS "Found adios2-config: ${ADIOS2_CONFIG_EXECUTABLE}")
+    enable_language(C CXX)
+
+    execute_process(
+        COMMAND ${ADIOS2_CONFIG_EXECUTABLE} --cxx-libs
+        OUTPUT_VARIABLE ADIOS2_CXX_LIBS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(ADIOS2_CXX_LIBS)
+        message(STATUS "ADIOS2 C++ libs: ${ADIOS2_CXX_LIBS}")
+        separate_arguments(ADIOS2_CXX_LIBS)
+    endif()
+
+    # MPI C++ and the standard C++ runtime are needed by Neko's ADIOS2 code.
+    find_package(MPI REQUIRED COMPONENTS CXX)
+else()
+    message(STATUS "ADIOS2_DIR not set; ADIOS2 support disabled.")
+endif()
+
+# ............................................................................ #
 # Setup of the Neko library
 
 # Set the proper paths for the NEKO_DIR
