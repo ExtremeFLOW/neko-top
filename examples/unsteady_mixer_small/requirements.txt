@@ -1,0 +1,6 @@
+ipykernel
+matplotlib
+pandas
+numpy
+nbformat
+nbconvert

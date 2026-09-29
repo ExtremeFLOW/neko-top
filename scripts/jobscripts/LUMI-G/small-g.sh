@@ -41,7 +41,9 @@
 
 set -e
 
-if [[ -z "$SLURM_JOB_NAME" && (($# > 0)) ]]; then
+if [[ ! -f "functions.sh" ]]; then
+    exit 0
+elif [[ -z "$SLURM_JOB_NAME" && (($# > 0)) ]]; then
     example=$1
 elif [ ! -z "$SLURM_JOB_NAME" ]; then
     example=$SLURM_JOB_NAME
