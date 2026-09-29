@@ -40,6 +40,15 @@ module cuda_mma_math
   public
 
   interface
+     subroutine mma_unconstrained_kkt_cuda(rex, x, xmin, xmax, df0dx, eps, n) &
+          bind(c, name="mma_unconstrained_kkt_cuda")
+       import c_rp, c_ptr, c_int
+       type(c_ptr), value :: rex, x, xmin, xmax, df0dx
+       real(c_rp) :: eps
+       integer(c_int) :: n
+     end subroutine mma_unconstrained_kkt_cuda
+
+
      subroutine mma_update_hessian_z_cuda(Hess_d, a_d, m) &
           bind(C, name="mma_update_hessian_z_cuda")
        use iso_c_binding

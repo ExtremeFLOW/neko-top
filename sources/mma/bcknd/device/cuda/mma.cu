@@ -57,7 +57,20 @@ extern "C" {
   int mma_red_s = 0;
   real* mma_bufred = NULL;
   real* mma_bufred_d = NULL;
-  
+
+  void mma_unconstrained_kkt_cuda(void* rex, void* x, void* xmin, void* xmax,
+                                  void* df0dx, real* eps, int* n) {
+    const int N = *n;
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((N + 1024 - 1) / 1024, 1, 1);
+
+    mma_unconstrained_kkt_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
+        (real*)rex, (const real*)x, (const real*)xmin, (const real*)xmax,
+        (const real*)df0dx, *eps, N);
+
+    CUDA_CHECK(cudaGetLastError());
+  }
+
   void mma_update_hessian_z_cuda(void* Hess, void* a, int* m) {
     const int M = *m;
     // This function is called ONLY if dot(lambda,a) > 0
