@@ -147,8 +147,6 @@ if(ADIOS2_DIR)
             "was not found in ${ADIOS2_DIR}/bin.")
     endif()
 
-    # Interface target to collect all C++/ADIOS2 deps needed by libneko.
-    add_library(neko_cxx_support INTERFACE)
     set(HAVE_ADIOS2 TRUE CACHE INTERNAL "Neko-TOP ADIOS2 support enabled")
 
     message(STATUS "Found adios2-config: ${ADIOS2_CONFIG_EXECUTABLE}")
@@ -162,15 +160,10 @@ if(ADIOS2_DIR)
     if(ADIOS2_CXX_LIBS)
         message(STATUS "ADIOS2 C++ libs: ${ADIOS2_CXX_LIBS}")
         separate_arguments(ADIOS2_CXX_LIBS)
-        target_link_libraries(neko_cxx_support INTERFACE ${ADIOS2_CXX_LIBS})
     endif()
 
     # MPI C++ and the standard C++ runtime are needed by Neko's ADIOS2 code.
     find_package(MPI REQUIRED COMPONENTS CXX)
-    target_link_libraries(neko_cxx_support INTERFACE
-        $<$<BOOL:${HAVE_ADIOS2}>:MPI::MPI_CXX>
-        stdc++
-    )
 else()
     message(STATUS "ADIOS2_DIR not set; ADIOS2 support disabled.")
 endif()
