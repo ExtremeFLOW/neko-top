@@ -465,7 +465,7 @@ function find_adios2() {
         esac
     done
 
-    printf '%s ' "${adios2_libs[@]}"
+    neko_adios2_link_flags="$(printf '%s ' "${adios2_libs[@]}")${NEKO_ADIOS2_EXTRA_LINK_FLAGS:-}"
     
     echo "Using ADIOS2_DIR=$ADIOS2_DIR"
     echo "Using Python=${pyexe:-<not found>}"
@@ -550,13 +550,6 @@ function find_neko() {
     find_adios2 $ADIOS2_DIR
     find_parmetis $PARMETIS_DIR
     [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
-
-    # ADIOS2 is available only after find_adios2 has run.  Keep its libraries
-    # and any explicitly requested compatibility flags after libneko.a.
-    if [ -n "$ADIOS2_DIR" ]; then
-        neko_adios2_link_flags=$(get_neko_adios2_link_flags)
-        neko_adios2_link_flags+="${NEKO_ADIOS2_EXTRA_LINK_FLAGS:-}"
-    fi
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
