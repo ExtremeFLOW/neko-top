@@ -287,7 +287,7 @@ function find_hdf5() {
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
             -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
             -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF \
-            -DHDF5_BUILD_TOOLS:BOOL=ON
+            -DHDF5_BUILD_TOOLS:BOOL=ON -DHDF5_BUILD_HL_LIB=OFF
         cmake --build $HDF5_ROOT/build/ --config Release --parallel
         cmake --install $HDF5_ROOT/build/ --config Release
         rm -fr $HDF5_ROOT/build
