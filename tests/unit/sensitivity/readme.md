@@ -25,8 +25,43 @@ The test is done through a few common files:
   `optimization` (optional, JSON) overrides the default assertion tolerance
   — linear/state-independent functionals (e.g. the volume constraint) can use
   a tight round-off tolerance; PDE-coupled objectives need a looser one
-  matched to their discretisation/steady-state floor (determine this
-  empirically per case, don't guess).
+  matched to their discretisation and noise floor. Determine it empirically
+  per case, not by guessing, from the FD check's error column `e`,
+  `(FD - adjoint) / |adjoint|` at the probed dof:
+
+  1. The model is `e = C + A m^p` with `m = |eps|` (the perturbation
+     magnitude; the harness may use negative perturbations). For two
+     points `a` (larger `m`) and `b`, Richardson extrapolation gives
+     `A = (e_a - e_b) / (m_a^p - m_b^p)` and `C = e_b - A m_b^p`.
+  2. Order the sweep by decreasing `m` and set `d_k = e_k - e_(k+1)`; the
+     order of the ratio `d_k / d_(k+1)` is the `p` solving
+     `d_k / d_(k+1) = (m_k^p - m_(k+1)^p) / (m_(k+1)^p - m_(k+2)^p)`
+     (the sweeps are not geometric; ratio `k` uses points `k`, `k+1`
+     and `k+2`). Take the longest (the first, if tied) run of at
+     least two consecutive ratios whose order lies within 0.1 of 1;
+     `p` is the median order over the run (for an even count, the
+     mean of the two middle values). A run's points are every point
+     used by one of its ratios; `C` and `A` come from the two
+     smallest of them, i.e. the last two points used by the run's
+     last ratio. Omit the Richardson term if there is no run.
+  3. Set `tol = max(2|e(m_min)|, 2(|C| + |A| m_min^p), tol_min)`,
+     rounded up to one significant figure, where `m_min` is the
+     smallest perturbation magnitude probed. `tol_min` is the
+     reachable-tolerance floor: `tol_min = sqrt(40 N |A1|)`, where `A1`
+     is the `m` coefficient of a least-squares fit
+     `e = c0 + A1 m + B m^2` over the four smallest points, and `N` is
+     the median of `|e - fit| m` over the six smallest points (every
+     point, if the sweep has fewer), `fit` being the same model
+     refitted to those points.
+  4. Read these from the last `perturbation,F,dFdx,error` block of
+     `FD_check_<case>.csv` (the file is appended per run); the
+     regression suite (`tests/regression/sensitivity`) applies the
+     same rule to its own `FD_check_<case>.csv` or its committed
+     `reference_data/ref_FD_check_<case>.csv`.
+
+  Re-derive the tolerance whenever the case's mesh resolution, rank
+  count, Neko version, linear-solver tolerance, steady-state tolerance,
+  polynomial order or perturbation sweep changes.
 - `CMakeLists.txt`: Defines the build process and, via the `test_list`
   variable, registers one CTest per case file.
 
@@ -61,9 +96,10 @@ Reuse the existing generic driver — you almost never need new Fortran code:
    fluid to have reached the same steady state the objective is evaluated
    at, or the comparison is ill-posed; those two cases run to `end_time =
    5.0` because their `steady` simulation component only freezes around
-   `t = 2.25` on the default mesh. Tune `end_time` and `fd_test_tolerance`
-   empirically by running the case and reading the per-perturbation `error`
-   output, not by guessing.
+   `t = 2.25` on the default mesh. Tune `end_time` by running the case and
+   confirming the fluid has reached steady state; derive `fd_test_tolerance`
+   from the per-perturbation `error` output using the rule above, not by
+   guessing.
 2. Add the case file name to the `test_list` variable in `CMakeLists.txt`:
    ```cmake
    set(test_list

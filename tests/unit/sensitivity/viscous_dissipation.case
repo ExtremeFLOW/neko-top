@@ -89,7 +89,15 @@
         ]
     },
     "optimization": {
-        "fd_test_tolerance": 1.0e-2,
+        // fd_test_tolerance: at m_min = 1e-4 the FD estimate differs from the
+        // adjoint sensitivity by -2.866e-5, relative to |adjoint| (the FD
+        // check's error column). Set to the reachable-tolerance floor tol_min
+        // (5.75e-4, rounded up to 1 s.f.), guarding against a gross error (e.g.
+        // a sign error or dropped term), not a bias of order 1e-4. Rule and
+        // symbols: readme.md. Derived on a 16x8x1-element mesh (prepare.sh
+        // -N8), 1 rank, Neko 7eeba5e64; re-derive under the conditions listed
+        // in readme.md.
+        "fd_test_tolerance": 6.0e-4,
         "domain": {
             "type": "point_zone",
             "zone_name": "optimization_domain"
