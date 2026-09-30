@@ -5,7 +5,7 @@
 !! code. It is not part of the neko library itself.
 !!
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,7 @@ module neko_ext
   use field, only: field_t
   use chkp_output, only: chkp_output_t
   use output_controller, only: output_controller_t
-  use math, only: copy
+  use math, only: copy, rzero
   use device_math, only: device_copy
   use neko_config, only : NEKO_BCKND_DEVICE
   use vector, only: vector_t
@@ -359,6 +359,11 @@ contains
     call field_rzero(u_adj)
     call field_rzero(v_adj)
     call field_rzero(w_adj)
+
+    ! On device builds field_rzero clears only the device copy, and
+    ! set_flow_ic copies the host pressure to the device, so a stale host
+    ! p_adj would be restored. Zero the host copy as well.
+    call rzero(p_adj%x, p_adj%size())
 
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(u_adj, v_adj, w_adj, p_adj, &

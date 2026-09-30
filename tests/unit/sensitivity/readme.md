@@ -42,22 +42,28 @@ Currently, we have added tests for the following components:
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
 scalar-scheme fix first — see `known-bugs-backlog.md` #9). The heavier,
-realistic (~1000-timestep) versions of these and other cases
-(`dissipation`, `dissipation_weights`, unsteady variants) live in
-`tests/regression/sensitivity/` instead — that suite is opt-in
-(`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`) and not part of the default/PR-blocking
-test budget, since it's too slow to gate every PR.
+higher-order, higher-Reynolds-number (and more tightly converged) versions
+of these and other cases (`dissipation`, `dissipation_weights`, unsteady
+variants) live in `tests/regression/sensitivity/` instead — that suite is
+opt-in (`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`) and not part of the
+default/PR-blocking test budget, since it's too slow to gate every PR.
 
 ## Adding New Tests
 
 Reuse the existing generic driver — you almost never need new Fortran code:
 
 1. Add a new `.case` file exercising the objective/constraint you want to
-   cover. Keep `time.end_time`/`time.timestep` short (a handful of steps, not
-   a physically converged run — see `volume.case` and
-   `viscous_dissipation.case` for the pattern) so the test stays fast; tune
-   this and `fd_test_tolerance` empirically by running the case and reading
-   the per-perturbation `error` output, not by guessing.
+   cover. For a linear, state-independent functional (e.g. the volume
+   constraint), keep `time.end_time`/`time.timestep` short — a handful of
+   steps, not a physically converged run (see `volume.case`) — so the test
+   stays fast. For a PDE-coupled objective (e.g. `viscous_dissipation.case`,
+   `brinkman_dissipation.case`), the finite-difference check needs the
+   fluid to have reached the same steady state the objective is evaluated
+   at, or the comparison is ill-posed; those two cases run to `end_time =
+   5.0` because their `steady` simulation component only freezes around
+   `t = 2.25` on the default mesh. Tune `end_time` and `fd_test_tolerance`
+   empirically by running the case and reading the per-perturbation `error`
+   output, not by guessing.
 2. Add the case file name to the `test_list` variable in `CMakeLists.txt`:
    ```cmake
    set(test_list
