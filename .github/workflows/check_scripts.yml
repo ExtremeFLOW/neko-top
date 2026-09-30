@@ -88,7 +88,10 @@ jobs:
           ./run.sh -rc rugby_ball
 
       - name: Run short tests
-        run: ./tests/test.sh mma unit
+        env:
+          OMP_NUM_THREADS: 1
+          NEKO_GS_COMM: "MPI"
+        run: ./tests/test.sh --procs 2 mma unit
 
       # ---------------------------------------------------------------------- #
       # Report errors if any step fails
