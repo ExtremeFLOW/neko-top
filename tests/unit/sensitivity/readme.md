@@ -76,12 +76,14 @@ Currently, we have added tests for the following components:
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
-scalar-scheme fix first — see `known-bugs-backlog.md` #9). The heavier,
+scalar-scheme fix first — see `known-bugs-backlog.md` #9). The
 higher-order, higher-Reynolds-number (and more tightly converged) versions
 of these and other cases (`dissipation`, `dissipation_weights`, unsteady
-variants) live in `tests/regression/sensitivity/` instead — that suite is
-opt-in (`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`) and not part of the
-default/PR-blocking test budget, since it's too slow to gate every PR.
+variants) live in `tests/regression/sensitivity/` instead. There the two
+unsteady cases take seconds and run in a local `ctest` without opt-in,
+though no CI workflow runs them; the rest are opt-in
+(`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`), since each takes minutes to half
+an hour.
 
 ## Adding New Tests
 
