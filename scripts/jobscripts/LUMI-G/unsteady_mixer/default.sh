@@ -24,7 +24,7 @@
 #SBATCH --mem=0
 
 # Time specifications (dd-hh:mm:ss)
-#SBATCH --time 00-00:05:00
+#SBATCH --time 00-01:00:00
 
 # -- Notification options
 
@@ -75,6 +75,7 @@ export CPU_BIND="${CPU_BIND}"
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export MPICH_GPU_SUPPORT_ENABLED=1
 export NEKO_GS_COMM=MPIGPU
+export NEKO_GS_STRTGY=3
 
 mkdir -p checkpoints
 lfs setstripe -c -1 -S 4M checkpoints
