@@ -133,6 +133,13 @@ if [ "$NEKO" == true ]; then
     export LPATH="$LPATH/neko"
 fi
 
+# Setup variables used when submitting jobs to a cluster
+if [ $CLUSTER == "MN5" ]; then
+    export SBATCH_ACCOUNT=${MN5_ACCOUNT:-$SBATCH_ACCOUNT}
+elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
+    export SBATCH_ACCOUNT=${LUMI_ACCOUNT:-$SBATCH_ACCOUNT}
+fi
+
 # End of user inputs
 # ============================================================================ #
 # Find the examples to run
@@ -302,31 +309,10 @@ function Submit() {
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
 
-    if [ $CLUSTER == "MN5" ]; then
-        if [ -z "$MN5_ACCOUNT" ]; then
-            printf >&2 "No account specified for Marenostrum5.\n"
-            printf >&2 "Using SLURM environment variables if available\n"
-            printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
-            printf >&2 "this message."
-        else
-            export SBATCH_ACCOUNT="$MN5_ACCOUNT"
-        fi
-
-    elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
-        if [ -z "$LUMI_ACCOUNT" ]; then
-            printf >&2 "No account specified for LUMI.\n"
-            printf >&2 "Using SLURM environment variables if available\n"
-            printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
-            printf >&2 "this message."
-        else
-            export SBATCH_ACCOUNT="$LUMI_ACCOUNT"
-        fi
-    fi
-
     if [ -n "$(which bsub 2>/dev/null)" ]; then
         bsub -J $1 -env "all" <job_script.sh
     elif [ -n "$(which sbatch 2>/dev/null)" ]; then
-        if [ "$(squeue -h --name=$1 --me | wc -l)" -gt 0 ]; then
+        if [ "$(squeue -h --name=$1 --account=$SBATCH_ACCOUNT --me | wc -l)" -gt 0 ]; then
             printf '\t%-12s %-s\n' "In queue:" "$1"
             cd $CURRENT_DIR
             return
@@ -408,7 +394,7 @@ for case in ${example_list[@]}; do
 
     case "$CLUSTER" in
         "MN5" | "LUMI-C" | "LUMI-G")
-            if [[ "$(squeue -h --name=$example --me | wc -l)" -gt 0 ]]; then
+            if [[ "$(squeue -h --name=$example --account=$SBATCH_ACCOUNT --me | wc -l)" -gt 0 ]]; then
                 printf '\t\e[1;33m%-12s\e[m %s %-s\n' "In queue:" "$example"
                 continue
             fi
