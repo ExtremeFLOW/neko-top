@@ -97,7 +97,7 @@ contains
     ! Minimize  f_0(x) + a_0*z +                            !
     !                       sum(c_i*y_i + 0.5*d_i*(y_i)^2)!
     !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
-    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
+    !         xmin_j <= x_j <= xmax_j,    j = 1,...,n       !
     !        z >= 0,   y_i >= 0,         i = 1,...,m        !
     !                                                       !
     !                                                       !
@@ -138,7 +138,7 @@ contains
     ! Minimize  f_0(x) + a_0*z +                            !
     !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
     !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
-    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
+    !         xmin_j <= x_j <= xmax_j,    j = 1,...,n       !
     !        z >= 0,   y_i >= 0,         i = 1,...,m        !
     !                                                       !
     !                                                       !
@@ -192,19 +192,24 @@ contains
   ! point method (dip) subsolve of MMA algorithm.
   module subroutine mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
-    ! Compute the KKT condition right hand side for a given !
-    ! designx x and set the max and norm values of the      !
-    ! residue of KKT system to this%residumax and           !
-    ! this%residunorm.                                      !
+    ! Compute the KKT residual of the original problem for  !
+    ! the design x and set its max and 2-norm to            !
+    ! this%residumax and this%residunorm.                   !
     !                                                       !
-    ! The left hand sides of the KKT conditions are computed!
-    ! for the following nonlinear programming problem:      !
-    ! Minimize  f_0(x) + a_0*z +                            !
-    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
-    !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
-    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
-    !        z >= 0,   y_i >= 0,         i = 1,...,m        !
-    !                                                       !
+    ! This follows MMA::KKTresidual in the Cpp code by      !
+    ! Niels (topopt_in_petsc). The multipliers lambda and   !
+    ! the artificial variables y and z are those of the     !
+    ! last subproblem. The residual consists of:            !
+    !   - stationarity w.r.t. x_j:                          !
+    !       df0dx_j + sum_i lambda_i*dfdx_ij - xsi_j + eta_j!
+    !     where the bound multipliers xsi_j, eta_j are      !
+    !     estimated for x_j within 1e-5 of xmin_j, xmax_j,  !
+    !   - complementarity of the bounds:                    !
+    !       xsi_j*(x_j - xmin_j) and eta_j*(xmax_j - x_j),  !
+    !   - complementarity of the constraints:               !
+    !       sum_i lambda_i*(a_i*z + y_i - f_i(x)).          !
+    ! The true bounds xmin, xmax are used, not the move     !
+    ! limited ones.                                         !
     !                                                       !
     ! Note that before calling this function, the function  !
     ! values (f0val, fval, dfdx, ...) should be updated     !
@@ -216,17 +221,56 @@ contains
     real(kind=rp), dimension(this%m), intent(in) :: fval
     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
-    real(kind=rp), dimension(this%m) :: relambda, remu
-    real(kind=rp), dimension(2*this%m) :: residual
+    real(kind=rp) :: rex, resi, xsi, eta, relambda
+    real(kind=rp) :: residual_max, residual_sq_norm
+    integer :: i, j, ierr
 
+    residual_max = 0.0_rp
+    residual_sq_norm = 0.0_rp
 
-    relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
-    ! Compute residual for mu (eta in the paper)
-    remu = this%lambda%x * this%mu%x
+    associate(xmin => this%xmin%x, xmax => this%xmax%x, &
+         lambda => this%lambda%x)
 
-    residual = abs([relambda, remu])
-    this%residumax = maxval(residual)
-    this%residunorm = norm2(residual)
+      do j = 1, this%n
+         ! Gradient of the Lagrangian w.r.t. x_j
+         rex = df0dx(j)
+         do i = 1, this%m
+            rex = rex + lambda(i) * dfdx(i, j)
+         end do
+
+         ! Estimate the bound multipliers where x_j is at a bound
+         xsi = 0.0_rp
+         if (x(j) .lt. xmin(j) + 1.0e-5_rp .and. rex .gt. 0.0_rp) xsi = rex
+         eta = 0.0_rp
+         if (x(j) .gt. xmax(j) - 1.0e-5_rp .and. rex .lt. 0.0_rp) eta = -rex
+         rex = rex + (-xsi + eta)
+
+         residual_sq_norm = residual_sq_norm + rex**2
+         residual_max = max(abs(rex), residual_max)
+         resi = xsi * (x(j) - xmin(j))
+         residual_sq_norm = residual_sq_norm + resi**2
+         residual_max = max(abs(resi), residual_max)
+         resi = eta * (xmax(j) - x(j))
+         residual_sq_norm = residual_sq_norm + resi**2
+         residual_max = max(abs(resi), residual_max)
+      end do
+
+    end associate
+
+    call MPI_Allreduce(MPI_IN_PLACE, residual_sq_norm, 1, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
+         mpi_real_precision, MPI_MAX, neko_comm, ierr)
+
+    ! Complementarity of the constraints, a global quantity
+    relambda = 0.0_rp
+    do i = 1, this%m
+       relambda = relambda + this%lambda%x(i) * &
+            (this%a%x(i) * this%z + this%y%x(i) - fval(i))
+    end do
+
+    this%residumax = max(abs(relambda), residual_max)
+    this%residunorm = sqrt(residual_sq_norm + relambda**2)
 
   end subroutine mma_dip_KKT_cpu
 
@@ -320,16 +364,51 @@ contains
          pij => this%pij%x, qij => this%qij%x, &
          low => this%low%x, upp => this%upp%x)
 
-      p0j = (upp - x)**2 * (max(df0dx, 0.0_rp) + 0.001_rp*abs(df0dx) &
-           + 0.5_rp*1.0e-6_rp/(upp - low))
-      q0j = (x - low)**2 * (max(-df0dx, 0.0_rp) + 0.001_rp*abs(df0dx) &
-           + 0.5_rp*1.0e-6_rp/(upp - low))
-      do j = 1, this%n
-         do i = 1, this%m
-            pij(i, j) = (upp(j) - x(j))**2 * max(dfdx(i, j), 0.0_rp)
-            qij(i, j) = (x(j) - low(j))**2 * max(-dfdx(i, j), 0.0_rp)
+      if (this%subsolver .eq. "dip") then
+         ! Following MMA::GenSub in the Cpp code by Niels (topopt_in_petsc,
+         ! constraintModification = false): only the objective is
+         ! regularised, by 0.5e-6/(upp - low).
+         p0j = (upp - x)**2 * (max(df0dx, 0.0_rp) + 0.001_rp*abs(df0dx) &
+              + 0.5_rp*1.0e-6_rp/(upp - low))
+         q0j = (x - low)**2 * (max(-df0dx, 0.0_rp) + 0.001_rp*abs(df0dx) &
+              + 0.5_rp*1.0e-6_rp/(upp - low))
+         do j = 1, this%n
+            do i = 1, this%m
+               pij(i, j) = (upp(j) - x(j))**2 * max(dfdx(i, j), 0.0_rp)
+               qij(i, j) = (x(j) - low(j))**2 * max(-dfdx(i, j), 0.0_rp)
+            end do
          end do
-      end do
+      else
+         ! Following mmasub by Svanberg: the objective and all constraints
+         ! are regularised by 1e-5/max(x_diff, 1e-5).
+         p0j = ( &
+              1.001_rp * max(df0dx, 0.0_rp) &
+              + 0.001_rp * max(-df0dx, 0.0_rp) &
+              + 0.00001_rp / max(x_diff, 0.00001_rp) &
+              ) * (upp - x)**2
+
+         q0j = ( &
+              0.001_rp * max(df0dx, 0.0_rp) &
+              + 1.001_rp * max(-df0dx, 0.0_rp) &
+              + 0.00001_rp / max(x_diff, 0.00001_rp)&
+              ) * (x - low)**2
+
+         do j = 1, this%n
+            do i = 1, this%m
+               pij(i, j) = ( &
+                    1.001_rp * max(dfdx(i, j), 0.0_rp) &
+                    + 0.001_rp * max(-dfdx(i, j), 0.0_rp) &
+                    + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
+                    ) * (upp(j) - x(j))**2
+
+               qij(i, j) = ( &
+                    0.001_rp * max(dfdx(i, j), 0.0_rp) &
+                    + 1.001_rp * max(-dfdx(i, j), 0.0_rp) &
+                    + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
+                    ) * (x(j) - low(j))**2
+            end do
+         end do
+      end if
 
     end associate
 
@@ -763,14 +842,14 @@ contains
     ! Definition of the Lagrangian function:                                   !
     ! (Note that the equation is slightly different with d(i)=1 and a quadratic!
     ! term for z. This is done to ensure that we have quadratic terms for both !
-    ! y and z.)                                                                !
+    ! y and z. The weight 0.05 of z^2 follows the Cpp code by Niels.)          !
     !                                                                          !
     !     L(x, y, z, λ) =                                                      !
     !       sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * p_{ij}) / (u_j - x_j)!
     !                   + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / (x_j - l_j) ]!
     !       - sum_{i=1}^{m} λ_i * b_i                                          !
     !       + sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ]                !
-    !       + (a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2                  !
+    !       + (a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.05 * z^2                 !
     !                                                                          !
     ! Breakdown of terms:                                                      !
     !   - Terms related to x:  L_x (the first three lines of L(x, y, z, λ))    !
@@ -818,14 +897,15 @@ contains
     integer, dimension(this%m+1) :: ipiv
 
     ! Parameters for global communication
-    real(kind=rp) :: minimal_epsilon, err_stale
+    real(kind=rp) :: minimal_epsilon
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
 
     epsi = 1.0_rp !100
-    ! x = 0.5_rp * (this%alpha%x + this%beta%x)
+    ! The design is kept if no iteration is performed, as in the Cpp code
+    x = designx
     y = 1.0_rp
     z = 0.0_rp
     lambda = max(1.0_rp, 0.5_rp * this%c%x)
@@ -837,10 +917,12 @@ contains
     ! Computing the minimal epsilon and choose the most conservative one
 
     minimal_epsilon = this%epsimin
-    err_stale = 1.0_rp
-
     call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
          mpi_real_precision, MPI_MIN, neko_comm, ierr)
+
+    ! As in the Cpp code by Niels, the residual starts at 1 and is carried
+    ! over from one epsilon level to the next.
+    residual_max = 1.0_rp
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
@@ -848,9 +930,9 @@ contains
     do while (epsi .gt. minimal_epsilon)
 
        ! --------------------------------------------------------------------- !
-       ! Calculating residuals based on
-       ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
-       ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
+       ! Compute x(λ), y(λ), z(λ) for the current λ. The residual is carried
+       ! over from the previous epsilon level (initially 1), as in
+       ! MMA::SolveDIP in the Cpp code by Niels.
 
        associate(p0j => this%p0j%x, q0j => this%q0j%x, &
             pij => this%pij%x, qij => this%qij%x, &
@@ -860,7 +942,7 @@ contains
             a0 => this%a0, a => this%a%x, &
             bi => this%bi%x)
          ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
-         ! the initial value of λ
+         ! the current value of λ
 
          ! Comput the value of y that minimizes L_y for the current λ
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ])
@@ -868,12 +950,12 @@ contains
          y = max(0.0_rp, lambda - c)
 
          ! Comput the value of z that minimizes L_z for the current λ
-         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
+         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.05 * z^2)
          ! ensure z>=0
-         z = max(0.0_rp,dot_product(lambda, a) - a0)
+         z = max(0.0_rp, 10.0_rp * (dot_product(lambda, a) - a0))
 
          ! Comput the value of x that minimizes L_x for the current λ
-         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} ����_i *
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
          ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
          pjlambda = (p0j + matmul(transpose(pij), lambda))
@@ -885,30 +967,12 @@ contains
          x = merge(alpha, x, x .lt. alpha)
          x = merge(beta, x, x .gt. beta)
 
-         ! Compute the residual for the lambda and mu using eq(9) and eq(15)
-         relambda = matmul(pij, 1.0_rp / (upp - x)) + &
-              matmul(qij, 1.0_rp / (x - low))
-
-         ! Global comminucation for relambda values
-         call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
-              mpi_real_precision, mpi_sum, neko_comm, ierr)
-         relambda = relambda - bi - y - a * z + mu
-
-         ! Compute residual for mu (eta in the paper)
-         remu = mu * lambda - epsi
-
-         residual_max = maxval(abs([relambda, remu]))
-         call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
-              mpi_real_precision, MPI_MAX, neko_comm, ierr)
-
          ! ------------------------------------------------------------------- !
-         residual_max = err_stale
-
-         ! Internal loop
+         ! Internal loop, the residual of the previous epsilon level is used
+         ! for the first check, following the Cpp code by Niels.
          do iter = 1, this%max_iter
 
             !Check the condition
-
             if (.not. (residual_max .gt. 0.9_rp * epsi)) exit
 
             ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
@@ -947,7 +1011,8 @@ contains
             do i = 1, this%m
                do j = 1, this%m
                   ! Compute the (i, j) element of AA
-                  do k = 1, this%n !this n is global
+                  ! this n is local, the sum over the ranks follows below
+                  do k = 1, this%n
                      Hess(i, j) = Hess(i, j) &
                           + hijx(i, k) * (Ljjxinv(k)) * hijx(j, k)
                   end do
@@ -959,11 +1024,12 @@ contains
 
             !---------------contributions of z terms to Hess-------------------!
             ! Only for inactive constraint, we consider contributions to Hess
-            ! based on the cpp code by Niels.
+            ! based on the cpp code by Niels. The factor 10 is the inverse of
+            ! the weight 2 * 0.05 of z^2 in L_z.
             if (dot_product(lambda, a) .gt. 0.0_rp) then
                do i = 1, this%m
                   do j = 1, this%m
-                     Hess(i, j) = Hess(i, j) - a(i) * a(j)
+                     Hess(i, j) = Hess(i, j) - 10.0_rp * a(i) * a(j)
                   end do
                end do
             end if
@@ -1026,9 +1092,9 @@ contains
 
 
             ! Comput the value of z that minimizes L_z for the current λ
-            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
+            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.05 * z^2)
             ! ensure z>=0
-            z = max(0.0_rp,dot_product(lambda, a) - a0)
+            z = max(0.0_rp, 10.0_rp * (dot_product(lambda, a) - a0))
 
             ! Comput the value of x that minimizes L_x for the current λ
             ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
@@ -1057,7 +1123,6 @@ contains
             residual_max = maxval(abs([relambda, remu]))
             call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                  mpi_real_precision, MPI_MAX, neko_comm, ierr)
-            err_stale = residual_max
          end do
        end associate
 

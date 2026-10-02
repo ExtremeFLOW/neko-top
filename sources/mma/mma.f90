@@ -233,9 +233,9 @@ contains
     ! m: number of constraints                              !
     !                                                       !
     ! Note that residumax & residunorm of the KKT conditions!
-    ! are initialized with 10^5. This is done to avoid      !
-    ! unnecessary extera computation of KKT norms for the   !
-    ! initial design.                                       !
+    ! are initialized with huge(0.0_rp). This is done to    !
+    ! avoid unnecessary extera computation of KKT norms for !
+    ! the initial design.                                   !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
@@ -361,9 +361,9 @@ contains
     ! m: number of constraints                              !
     !                                                       !
     ! Note that residumax & residunorm of the KKT conditions!
-    ! are initialized with 10^5. This is done to avoid      !
-    ! unnecessary extera computation of KKT norms for the   !
-    ! initial design.                                       !
+    ! are initialized with huge(0.0_rp). This is done to    !
+    ! avoid unnecessary extera computation of KKT norms for !
+    ! the initial design.                                   !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
@@ -421,6 +421,8 @@ contains
     call this%mu%init(m)
     call this%xsi%init(n)
     call this%eta%init(n)
+    this%z = 0.0_rp
+    this%zeta = 0.0_rp
 
     this%a0 = a0
     this%a%x = a
@@ -481,6 +483,11 @@ contains
     if (present(move_limit)) this%move_limit = move_limit
     if (present(bcknd)) this%bcknd = bcknd
     if (present(subsolver)) this%subsolver = subsolver
+
+    ! The subsolvers reduce epsilon towards epsimin by factors of 10
+    if (.not. (this%epsimin .gt. 0.0_rp)) then
+       call neko_error("MMA: epsimin must be positive.")
+    end if
 
     call neko_log%section('MMA Parameters')
 
