@@ -253,8 +253,7 @@ contains
 
     call chkpf%init(trim(restart_file))
     call chkpf%read(C%fluid_adj%chkp)
-    C%time%dtlag = C%fluid_adj%chkp%dtlag
-    C%time%tlag = C%fluid_adj%chkp%tlag
+    call C%fluid_adj%chkp%set_time_state(C%time)
 
     ! Free the previous mesh, dont need it anymore
     do i = 1, size(C%time%dtlag)
@@ -267,7 +266,6 @@ contains
        call C%adjoint_scalars%restart(C%case%chkp)
     end if
 
-    C%time%t = real(C%case%fluid%chkp%restart_time(), kind=rp)
     call neko_log%section('Restarting from checkpoint')
     write(log_buf, '(A,A)') 'File :   ', trim(restart_file)
     call neko_log%message(log_buf)
