@@ -146,7 +146,7 @@ module mma
 
   real(kind=rp), parameter :: a0_default = 1.0_rp
   real(kind=rp), parameter :: a_default = 0.0_rp
-  real(kind=rp), parameter :: c_default = 100.0_rp
+  real(kind=rp), parameter :: c_default = 1000.0_rp
   real(kind=rp), parameter :: d_default = 0.0_rp
   real(kind=rp), parameter :: xmin_default = 0.0_rp
   real(kind=rp), parameter :: xmax_default = 1.0_rp

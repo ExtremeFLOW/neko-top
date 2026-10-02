@@ -320,31 +320,14 @@ contains
          pij => this%pij%x, qij => this%qij%x, &
          low => this%low%x, upp => this%upp%x)
 
-      p0j = ( &
-           1.001_rp * max(df0dx, 0.0_rp) &
-           + 0.001_rp * max(-df0dx, 0.0_rp) &
-           + 0.00001_rp / max(x_diff, 0.00001_rp) &
-           ) * (upp - x)**2
-
-      q0j = ( &
-           0.001_rp * max(df0dx, 0.0_rp) &
-           + 1.001_rp * max(-df0dx, 0.0_rp) &
-           + 0.00001_rp / max(x_diff, 0.00001_rp)&
-           ) * (x - low)**2
-
+      p0j = (upp - x)**2 * (max(df0dx, 0.0_rp) + 0.001_rp*abs(df0dx) &
+           + 0.5_rp*1.0e-6_rp/(upp - low))
+      q0j = (x - low)**2 * (max(-df0dx, 0.0_rp) + 0.001_rp*abs(df0dx) &
+           + 0.5_rp*1.0e-6_rp/(upp - low))
       do j = 1, this%n
          do i = 1, this%m
-            pij(i, j) = ( &
-                 1.001_rp * max(dfdx(i, j), 0.0_rp) &
-                 + 0.001_rp * max(-dfdx(i, j), 0.0_rp) &
-                 + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
-                 ) * (upp(j) - x(j))**2
-
-            qij(i, j) = ( &
-                 0.001_rp * max(dfdx(i, j), 0.0_rp) &
-                 + 1.001_rp * max(-dfdx(i, j), 0.0_rp) &
-                 + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
-                 ) * (x(j) - low(j))**2
+            pij(i, j) = (upp(j) - x(j))**2 * max(dfdx(i, j), 0.0_rp)
+            qij(i, j) = (x(j) - low(j))**2 * max(-dfdx(i, j), 0.0_rp)
          end do
       end do
 
@@ -835,7 +818,7 @@ contains
     integer, dimension(this%m+1) :: ipiv
 
     ! Parameters for global communication
-    real(kind=rp) :: minimal_epsilon
+    real(kind=rp) :: minimal_epsilon, err_stale
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -853,7 +836,9 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
-    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    minimal_epsilon = this%epsimin
+    err_stale = 1.0_rp
+
     call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
          mpi_real_precision, MPI_MIN, neko_comm, ierr)
 
@@ -917,11 +902,14 @@ contains
               mpi_real_precision, MPI_MAX, neko_comm, ierr)
 
          ! ------------------------------------------------------------------- !
+         residual_max = err_stale
+
          ! Internal loop
          do iter = 1, this%max_iter
 
             !Check the condition
-            if (residual_max .lt. epsi) exit
+
+            if (.not. (residual_max .gt. 0.9_rp * epsi)) exit
 
             ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
 
@@ -1069,6 +1057,7 @@ contains
             residual_max = maxval(abs([relambda, remu]))
             call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                  mpi_real_precision, MPI_MAX, neko_comm, ierr)
+            err_stale = residual_max
          end do
        end associate
 
