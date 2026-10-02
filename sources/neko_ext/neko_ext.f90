@@ -63,6 +63,7 @@ module neko_ext
   use fluid_pnpn, only: fluid_pnpn_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scalar_pnpn, only: scalar_pnpn_t
+  use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
 
   implicit none
 
@@ -220,6 +221,7 @@ contains
        end if
        ! zero out RHS
        call field_rzero(neko_case%scalars%scalar_fields(1)%scalar%f_Xh)
+
        ! zero out the Adams-Bashforth history, mirroring the fluid above.
        select type (s_scheme => &
             neko_case%scalars%scalar_fields(1)%scalar)
@@ -227,6 +229,7 @@ contains
           call field_rzero(s_scheme%abx1)
           call field_rzero(s_scheme%abx2)
        end select
+
        ! reset the forward scalar
        call json_get(neko_case%params, &
             'case.scalar.initial_condition.type', string_val)
@@ -351,6 +354,12 @@ contains
     call json_get(neko_case%params, 'case.adjoint_fluid.initial_condition', &
          json_subdict)
 
+    ! Zero the adjoint pressure first, for the same reason as in `reset`.
+    call field_rzero(p_adj)
+    call field_rzero(u_adj)
+    call field_rzero(v_adj)
+    call field_rzero(w_adj)
+
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(u_adj, v_adj, w_adj, p_adj, &
             adjoint_case%fluid_adj%c_Xh, adjoint_case%fluid_adj%gs_Xh, &
@@ -394,6 +403,15 @@ contains
        ! zero out lag terms
        call field_rzero( &
             adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%f_Xh)
+
+       ! zero out the Adams-Bashforth history, mirroring the fluid above.
+       select type (s_scheme => &
+            adjoint_case%adjoint_scalars%adjoint_scalar_fields(1))
+       type is (adjoint_scalar_pnpn_t)
+          call field_rzero(s_scheme%abx1)
+          call field_rzero(s_scheme%abx2)
+       end select
+
        ! reset the forward scalar
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
