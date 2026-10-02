@@ -400,6 +400,7 @@ contains
   end subroutine adjoint_scalar_scheme_init
 
   !> Register this scalar scheme with the checkpoint.
+  !! @param this The object.
   !! @param chkp Checkpoint object to register with.
   subroutine adjoint_scalar_scheme_register_checkpoint(this, chkp)
     class(adjoint_scalar_scheme_t), target, intent(inout) :: this
