@@ -57,6 +57,7 @@ int main(int argc, char** argv) {
     std::string out = (argc > 1) ? argv[1] : "ref";
     int nit = (argc > 2) ? atoi(argv[2]) : 20;
     double movlim = (argc > 3) ? atof(argv[3]) : -1.0;
+    double aval = (argc > 4) ? atof(argv[4]) : 0.0;   // a_i for all constraints (z term)
 
     std::vector<int> idx(ncon);
     fill_idx(idx, ncon, ncon, n);
@@ -72,7 +73,7 @@ int main(int argc, char** argv) {
     VecSet(x, 0.5); VecSet(xmin, 0.0); VecSet(xmax, 1.0);
     VecDuplicate(x, &xminL); VecDuplicate(x, &xmaxL); VecCopy(xmin, xminL); VecCopy(xmax, xmaxL);
     PetscScalar a[m], c[m], d[m], gx[m];
-    for (int i = 0; i < m; i++) { a[i] = 0.0; c[i] = 1000.0; d[i] = 1.0; }
+    for (int i = 0; i < m; i++) { a[i] = aval; c[i] = 1000.0; d[i] = 1.0; }
     MMA* mma = new MMA(n, m, x, a, c, d);   // default asymptotes 0.5 / 0.7 / 1.2
 
     double f0;
