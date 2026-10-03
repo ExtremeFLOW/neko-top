@@ -37,7 +37,7 @@ submodule (mma) mma_device
   use device_math, only: device_copy, device_cmult, device_cadd, device_cfill, &
        device_add2, device_add3s2, device_invcol2, device_col2, device_col3, &
        device_sub2, device_sub3, device_add2s2, device_cadd2, device_pwmax2, &
-       device_pwmin2, device_cpwmax2, device_glsum, device_cmult2
+       device_pwmin2, device_cpwmax2, device_cmult2
   use device_mma_math, only: device_maxval, device_norm, device_lcsc2, &
        device_maxval2, device_maxval3, device_mma_gensub3, &
        device_mma_gensub4, device_mma_max, device_max2, device_rex, &
@@ -787,7 +787,7 @@ contains
     real(kind=rp) :: epsi, residumax, z, steg
     ! vectors with size m
     type(vector_t), pointer :: y, lambda, mu, relambda, remu, dlambda, dmu, &
-         gradlambda, zerom, dd, dummy_m
+         gradlambda, dummy_m
     ! vectors with size n
     type(vector_t), pointer :: x, pjlambda, qjlambda
 
@@ -796,7 +796,7 @@ contains
     type(matrix_t), pointer :: hijx ! ∇_x hij
     type(matrix_t), pointer :: Hess
 
-    integer :: info, ind(17)
+    integer :: info, ind(15)
 
     real(kind=rp) :: minimal_epsilon
 
@@ -808,26 +808,26 @@ contains
     call this%scratch%request(dlambda, ind(6), this%m, .false.)
     call this%scratch%request(dmu, ind(7), this%m, .false.)
     call this%scratch%request(gradlambda, ind(8), this%m, .false.)
-    call this%scratch%request(zerom, ind(9), this%m, .false.)
-    call this%scratch%request(dd, ind(10), this%m, .false.)
-    call this%scratch%request(dummy_m, ind(11), this%m, .false.)
+    call this%scratch%request(dummy_m, ind(9), this%m, .false.)
 
-    call this%scratch%request(x, ind(12), this%n, .false.)
-    call this%scratch%request(pjlambda,ind(13), this%n, .false.)
-    call this%scratch%request(qjlambda, ind(14), this%n, .false.)
+    call this%scratch%request(x, ind(10), this%n, .false.)
+    call this%scratch%request(pjlambda, ind(11), this%n, .false.)
+    call this%scratch%request(qjlambda, ind(12), this%n, .false.)
 
-    call this%scratch%request(Ljjxinv, ind(15), this%n, .false.)
+    call this%scratch%request(Ljjxinv, ind(13), this%n, .false.)
 
-    call this%scratch%request(hijx, ind(16), this%m, this%n, .false.)
-    call this%scratch%request(Hess, ind(17), this%m, this%m, .false.)
+    call this%scratch%request(hijx, ind(14), this%m, this%n, .false.)
+    call this%scratch%request(Hess, ind(15), this%m, this%m, .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
 
     epsi = 1.0_rp !100
+    ! The design is kept if no iteration is performed, as in the Cpp code
+    call device_copy(x%x_d, designx_d, this%n)
     call device_cfill(y%x_d, 1.0_rp, this%m)
-    ! initialize lambda with an array of ones (change to this%c%x/2 if needed!)
+    ! lambda = max(1, 0.5 * c)
     call device_cfill(lambda%x_d, 1.0_rp, this%m)
     call device_cmult2(dummy_m%x_d, this%c%x_d, 0.5_rp, this%m)
     call device_pwmax2(lambda%x_d, dummy_m%x_d, this%m)
@@ -838,17 +838,21 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
-    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    minimal_epsilon = this%epsimin
     call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
          mpi_real_precision, mpi_min, neko_comm, ierr)
+
+    ! As in the Cpp code by Niels, the residual starts at 1 and is carried
+    ! over from one epsilon level to the next.
+    residumax = 1.0_rp
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
 
     outer: do while (epsi .gt. minimal_epsilon)
-       ! calculating residuals based on
-       ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
-       ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
+       ! Compute x(λ), y(λ), z(λ) for the current λ. The residual is carried
+       ! over from the previous epsilon level (initially 1), as in
+       ! MMA::SolveDIP in the Cpp code by Niels.
        associate(p0j => this%p0j, q0j => this%q0j, &
             pij => this%pij, qij => this%qij, &
             low => this%low, upp => this%upp, &
@@ -856,73 +860,65 @@ contains
             c => this%c, a0 => this%a0, a => this%a)
 
          ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
-         ! the initial value of λ
+         ! the current value of λ
 
          ! Comput the value of y that minimizes L_y for the current λ
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ])
          ! dL_y/dy =0   => y= (λ_i - c_i), ensure y>=0
          call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-         call device_pwmax2(y%x_d, zerom%x_d, this%m)
+         call device_cpwmax2(y%x_d, 0.0_rp, this%m)
 
-         ! Comput the value of z that minimizes L_z for the current λ
-         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
-         ! ensure z>=0
-         call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
-         z = device_glsum(dummy_m%x_d, this%m)
-         z = max(0.0_rp, z - a0)
+         ! Compute the value of z that minimises L_z for the current λ
+         ! minimise ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.05 * z^2)
+         ! ensure z>=0. λ and a are replicated on all ranks, hence the dot
+         ! product is computed rank locally.
+         z = max(0.0_rp, &
+              10.0_rp * (device_lcsc2(lambda%x_d, a%x_d, this%m) - a0))
 
          ! Comput the value of x that minimizes L_x for the current λ
          ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
          ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
-         call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, this%m, this%n)
-         call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, this%m, this%n)
+         call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, &
+              this%m, this%n)
+         call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, &
+              this%m, this%n)
          call device_add2(pjlambda%x_d, p0j%x_d, this%n)
          call device_add2(qjlambda%x_d, q0j%x_d, this%n)
 
          call device_mma_dipsolvesub1(x%x_d, pjlambda%x_d, qjlambda%x_d, &
               low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
 
-         call device_cfill(relambda%x_d, 0.0_rp, this%m)
-         call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
-              low%x_d, pij%x_d, qij%x_d, this%n, this%m)
-
-         ! Global comminucation for relambda values
-
-         call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-              sync = .true.)
-         call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
-              mpi_real_precision, mpi_sum, neko_comm, ierr)
-         call device_memcpy(relambda%x, relambda%x_d, this%m, &
-              HOST_TO_DEVICE, sync = .true.)
-
-         call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
-         call device_sub2(relambda%x_d, y%x_d, this%m)
-         call device_add2(relambda%x_d, mu%x_d, this%m)
-         call device_sub2(relambda%x_d, this%bi%x_d, this%m)
-
-         call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
-         call device_cadd(remu%x_d, -epsi, this%m)
-
-         residumax = maxval([device_maxval(relambda%x_d, this%m), &
-              device_maxval(remu%x_d, this%m)])
-
          ! ------------------------------------------------------------------- !
-         ! Internal loop
+         ! Internal loop, the residual of the previous epsilon level is used
+         ! for the first check, following the Cpp code by Niels.
          do iter = 1, this%max_iter
             !Check the condition
-            if (residumax .lt. epsi) exit
+            if (.not. (residumax .gt. 0.9_rp * epsi)) exit
 
             ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
             ! based on the implementation in the following paper by Niels
             ! https://doi.org/10.1007/s00158-012-0869-2
             ! (https://github.com/topopt/TopOpt_in_PETSc/blob/master/MMA.cc)
-            ! The formula for gradlambda and relambda are basically the same:
-            ! thus, we utilise gradlambda = relambda - mu for efficiency
-            call device_copy(gradlambda%x_d, relambda%x_d, this%m)
-            call device_sub2(gradlambda%x_d, mu%x_d, this%m)
+            call device_cfill(gradlambda%x_d, 0.0_rp, this%m)
+            call device_relambda(gradlambda%x_d, x%x_d, this%upp%x_d, &
+                 low%x_d, pij%x_d, qij%x_d, this%n, this%m)
+
+            ! Global communication for gradlambda values
+            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, &
+                 DEVICE_TO_HOST, sync = .true.)
+            call MPI_Allreduce(MPI_IN_PLACE, gradlambda%x, this%m, &
+                 mpi_real_precision, mpi_sum, neko_comm, ierr)
+            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, &
+                 HOST_TO_DEVICE, sync = .true.)
+
+            ! gradlambda = gradlambda - bi - y - a * z
+            call device_sub2(gradlambda%x_d, this%bi%x_d, this%m)
+            call device_sub2(gradlambda%x_d, y%x_d, this%m)
+            call device_add2s2(gradlambda%x_d, this%a%x_d, -z, this%m)
 
             ! Update gradlambda as the right hand side for Newton's method(eq10)
+            ! gradlambda = - gradlambda - epsi / lambda
             call device_cfill(dummy_m%x_d, epsi, this%m)
             call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
             call device_add2(gradlambda%x_d, dummy_m%x_d, this%m)
@@ -942,8 +938,8 @@ contains
             call device_Hess(Hess%x_d, hijx%x_d, Ljjxinv%x_d, this%n, this%m)
 
             ! download Hess to CPU, mpi reduce, upload to the device
-            call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
+            call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
+                 DEVICE_TO_HOST, sync = .true.)
             call MPI_Allreduce(MPI_IN_PLACE, Hess%x, &
                  this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
             call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
@@ -951,9 +947,9 @@ contains
 
             !---------------contributions of z terms to Hess-------------------!
             ! Only for inactive constraint, we consider contributions to Hess
-            ! based on the cpp code by Niels.
-            call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
-            if (device_glsum(dummy_m%x_d, this%m) .gt. 0.0_rp) then
+            ! based on the cpp code by Niels. The factor 10 is the inverse of
+            ! the weight 2 * 0.05 of z^2 in L_z.
+            if (device_lcsc2(lambda%x_d, a%x_d, this%m) .gt. 0.0_rp) then
                call device_update_hessian_z(Hess%x_d, a%x_d, this%m)
             end if
 
@@ -979,14 +975,15 @@ contains
             call device_copy(dlambda%x_d, gradlambda%x_d, this%m)
 
             ! based on eq(11) for delta eta
+            ! dmu = -mu + epsi / lambda - dlambda * mu / lambda
             call device_copy(dummy_m%x_d, dlambda%x_d, this%m)
             call device_col2(dummy_m%x_d, mu%x_d, this%m)
             call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
 
             call device_cfill(dmu%x_d, epsi, this%m)
             call device_invcol2(dmu%x_d, lambda%x_d, this%m)
-            call device_add2s2(dmu%x_d, dummy_m%x_d, -1.0_rp, this%m)
             call device_sub2(dmu%x_d, mu%x_d, this%m)
+            call device_add2s2(dmu%x_d, dummy_m%x_d, -1.0_rp, this%m)
 
             steg = maxval([1.005_rp, device_maxval2(dlambda%x_d, lambda%x_d, &
                  -1.01_rp, this%m), device_maxval2(dmu%x_d, mu%x_d, -1.01_rp, &
@@ -1003,21 +1000,23 @@ contains
             ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ])
             ! dL_y/dy =0   => y= (λ_i - c_i), ensure y>=0
             call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-            call device_pwmax2(y%x_d, zerom%x_d, this%m)
+            call device_cpwmax2(y%x_d, 0.0_rp, this%m)
 
-            ! Comput the value of z that minimizes L_z for the current λ
-            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
-            ! ensure z>=0
-            call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
-            z = device_glsum(dummy_m%x_d, this%m)
-            z = max(0.0_rp, z - a0)
+            ! Compute the value of z that minimises L_z for the current λ
+            ! minimise ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.05 * z^2)
+            ! ensure z>=0. λ and a are replicated on all ranks, hence the dot
+            ! product is computed rank locally.
+            z = max(0.0_rp, &
+                 10.0_rp * (device_lcsc2(lambda%x_d, a%x_d, this%m) - a0))
 
             ! Comput the value of x that minimizes L_x for the current λ
             ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
             ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
             ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
-            call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, this%m, this%n)
-            call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, this%m, this%n)
+            call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, &
+                 this%m, this%n)
+            call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, &
+                 this%m, this%n)
             call device_add2(pjlambda%x_d, p0j%x_d, this%n)
             call device_add2(qjlambda%x_d, q0j%x_d, this%n)
 
@@ -1030,25 +1029,29 @@ contains
             call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
                  low%x_d, pij%x_d, qij%x_d, this%n, this%m)
 
-            ! Global comminucation for relambda values
+            ! Global communication for relambda values
 
-            call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
+            call device_memcpy(relambda%x, relambda%x_d, this%m, &
+                 DEVICE_TO_HOST, sync = .true.)
             call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
                  mpi_real_precision, mpi_sum, neko_comm, ierr)
             call device_memcpy(relambda%x, relambda%x_d, this%m, &
                  HOST_TO_DEVICE, sync = .true.)
 
-            call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
-            call device_sub2(relambda%x_d, y%x_d, this%m)
-            call device_add2(relambda%x_d, mu%x_d, this%m)
+            ! relambda = relambda - bi - y - a * z + mu
             call device_sub2(relambda%x_d, this%bi%x_d, this%m)
+            call device_sub2(relambda%x_d, y%x_d, this%m)
+            call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
+            call device_add2(relambda%x_d, mu%x_d, this%m)
 
+            ! Compute residual for mu (eta in the paper)
             call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
             call device_cadd(remu%x_d, -epsi, this%m)
 
             residumax = maxval([device_maxval(relambda%x_d, this%m), &
                  device_maxval(remu%x_d, this%m)])
+            call MPI_Allreduce(MPI_IN_PLACE, residumax, 1, &
+                 mpi_real_precision, MPI_MAX, neko_comm, ierr)
          end do
        end associate
        epsi = 0.1_rp * epsi

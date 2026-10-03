@@ -74,7 +74,8 @@ module device_mma_math
        device_mma_gensub3_dip
 
 contains
-  !> Update Hessian for dual solver with z-term contribution: Hess -= a * a^T
+  !> Update Hessian for dual solver with z-term contribution:
+  !! Hess -= 10 * a * a^T
   subroutine device_update_hessian_z(Hess_d, a_d, m)
     use iso_c_binding
     type(c_ptr), intent(in) :: Hess_d
@@ -185,8 +186,8 @@ contains
   !!                                  (2*qjlambda/(x - low)**3))
   !!
   !! And then remove the sensitivity for the active primal constraints
-  !! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)
-  !! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)
+  !! Ljjxinv = merge(0.0_rp, Ljjxinv, x - alpha < NEKO_EPS)
+  !! Ljjxinv = merge(0.0_rp, Ljjxinv, beta - x < NEKO_EPS)
   subroutine device_mma_Ljjxinv(Ljjxinv_d,pjlambda_d, qjlambda_d, x_d, &
        low_d, upp_d, alpha_d, beta_d, n)
     type(c_ptr) :: Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &

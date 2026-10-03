@@ -37,6 +37,10 @@
 #ifndef MMA_CUDA_KERNEL_H
 #define MMA_CUDA_KERNEL_H
 
+#include <cfloat>
+
+// z term of the Hessian of the dip subsolver, Hess -= 10 * a * a^T. The
+// factor 10 is the inverse of the weight 2 * 0.05 of z^2 in L_z.
 template <typename T>
 __global__ void mma_update_hessian_z_kernel(
     T* __restrict__ Hess,
@@ -51,7 +55,7 @@ __global__ void mma_update_hessian_z_kernel(
     int i = tid % m;
     int j = tid / m;
 
-    Hess[tid] -= a[i] * a[j];
+    Hess[tid] -= T(10.0) * a[i] * a[j];
 }
 
 template<typename T>
@@ -252,9 +256,12 @@ __global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
   T denom = 2.0 * pj / diff_u3 + 2.0 * qj / diff_l3;
   T val = -1.0 / denom;
 
-  // Mask out active primal constraints
-  bool active = (fabs(xt - alpha[tj]) <= T(1e-16)) ||
-              (fabs(xt - beta[tj])  <= T(1e-16));
+  // Mask out active primal constraints, as mma_subsolve_dip_cpu with
+  // NEKO_EPS = epsilon(1.0_rp)
+  const T eps = (sizeof(T) == sizeof(float)) ?
+    static_cast<T>(FLT_EPSILON) :
+    static_cast<T>(DBL_EPSILON);
+  bool active = (xt - alpha[tj] < eps) || (beta[tj] - xt < eps);
 
   Ljjxinv[tj] = active ? T(0.0) : val;
 }

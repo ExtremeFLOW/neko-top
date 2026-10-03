@@ -1,7 +1,7 @@
 /**
  * @file mma_kernel.h
  * @copyright
- * Copyright (c) 2025, The Neko-TOP Authors
+ * Copyright (c) 2025-2026, The Neko-TOP Authors
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +37,8 @@
 #ifndef MMA_HIP_KERNEL_H
 #define MMA_HIP_KERNEL_H
 
+// z term of the Hessian of the dip subsolver, Hess -= 10 * a * a^T. The
+// factor 10 is the inverse of the weight 2 * 0.05 of z^2 in L_z.
 template <typename T>
 __global__ void mma_update_hessian_z_kernel(
     T* __restrict__ Hess,
@@ -51,7 +53,7 @@ __global__ void mma_update_hessian_z_kernel(
     int i = tid % m;
     int j = tid / m;
 
-    Hess[tid] -= a[i] * a[j];
+    Hess[tid] -= T(10.0) * a[i] * a[j];
 }
 
 template<typename T>
