@@ -484,6 +484,12 @@ contains
     if (present(bcknd)) this%bcknd = bcknd
     if (present(subsolver)) this%subsolver = subsolver
 
+    ! The backend selects the implementation of the update and the KKT check
+    if (this%bcknd .ne. "cpu" .and. this%bcknd .ne. "device") then
+       call neko_error("MMA: unknown backend '" // trim(this%bcknd) // &
+            "', expected 'cpu' or 'device'.")
+    end if
+
     ! The subsolvers reduce epsilon towards epsimin by factors of 10
     if (.not. (this%epsimin .gt. 0.0_rp)) then
        call neko_error("MMA: epsimin must be positive.")
@@ -568,6 +574,9 @@ contains
 
     case ("device")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
+    case default
+       call neko_error('mma_update_vector: Unknown backend: ' // &
+            trim(this%bcknd))
     end select
 
   end subroutine mma_update_vector
@@ -595,6 +604,9 @@ contains
        call mma_KKT_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
     case ("device")
        call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
+    case default
+       call neko_error('mma_KKT_vector: Unknown backend: ' // &
+            trim(this%bcknd))
     end select
   end subroutine mma_KKT_vector
 
