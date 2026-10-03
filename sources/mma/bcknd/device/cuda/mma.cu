@@ -163,7 +163,21 @@ extern "C" {
   void cuSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     cusolverDnHandle_t handle;
     cusolverStatus_t status;
-    cusolverDnCreate(&handle);
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+    if (cusolverDnCreate(&handle) != CUSOLVER_STATUS_SUCCESS) {
+        *jj = -1;
+        return;
+    }
+
+    // Solve on Neko's stream, ordered after the kernels assembling A and b.
+    // The stream is non-blocking, so the info values are also copied on it.
+    // A failure is returned through jj, which the caller reports.
+    status = cusolverDnSetStream(handle, stream);
+    if (status != CUSOLVER_STATUS_SUCCESS) {
+        cusolverDnDestroy(handle);
+        *jj = -1;
+        return;
+    }
 
     int lwork;
     double* workspace;
@@ -184,13 +198,17 @@ extern "C" {
     cusolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
 
     // Copy info from device to host to check if factorization succeeded
-    cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpyAsync(&host_info, info, sizeof(int),
+                               cudaMemcpyDeviceToHost, stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
 
     if (host_info == 0) {
         // Only solve if factorization was successful
         cusolverDnDgetrs(handle, CUBLAS_OP_N, n, 1, (double*)A, n, ipiv, (double*)b, n, info);
         // Copy the final info value
-        cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
+        CUDA_CHECK(cudaMemcpyAsync(&host_info, info, sizeof(int),
+                                   cudaMemcpyDeviceToHost, stream));
+        CUDA_CHECK(cudaStreamSynchronize(stream));
     }
 
 
