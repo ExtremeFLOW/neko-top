@@ -1,7 +1,7 @@
 /**
  * @file mma.cu
  * @copyright
- * Copyright (c) 2025, The Neko-TOP Authors
+ * Copyright (c) 2025-2026, The Neko-TOP Authors
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -354,6 +354,22 @@ extern "C" {
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
     mma_sub3_kernel<real><<<nblcks, nthrds, 0,
+         (cudaStream_t)glb_cmd_queue>>>(
+         (real*)x, (real*)df0dx, (real*)dfdx, (real*)low,
+         (real*)upp, (real*)xmin, (real*)xmax, (real*)alpha,
+         (real*)beta, (real*)p0j, (real*)q0j, (real*)pij,
+         (real*)qij, *n, *m);
+
+    CUDA_CHECK(cudaGetLastError());
+  }
+
+  void mma_gensub3_dip_cuda(void* x, void* df0dx, void* dfdx, void* low,
+       void* upp, void* xmin, void* xmax, void* alpha, void* beta,
+       void* p0j, void* q0j, void* pij, void* qij, int* n, int* m) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+
+    mma_sub3_dip_kernel<real><<<nblcks, nthrds, 0,
          (cudaStream_t)glb_cmd_queue>>>(
          (real*)x, (real*)df0dx, (real*)dfdx, (real*)low,
          (real*)upp, (real*)xmin, (real*)xmax, (real*)alpha,

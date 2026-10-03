@@ -1,7 +1,7 @@
 /**
  * @file mma_kernel.h
  * @copyright
- * Copyright (c) 2025, The Neko-TOP Authors
+ * Copyright (c) 2025-2026, The Neko-TOP Authors
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -432,6 +432,60 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
          T(0.001) * max_neg + eps * inv_xgap);
     qij[idx] = x_minus_low_sq * (T(0.001) * max_pos +
          T(1.001) * max_neg + eps * inv_xgap);
+  }
+}
+
+// As mma_sub3_kernel, but with the p0j, q0j, pij and qij of the dip
+// subsolver (mma_gensub_cpu): following MMA::GenSub in topopt_in_petsc
+// (constraintModification = false), only the objective is regularised,
+// by 0.5e-6/(upp - low).
+template <typename T>
+__global__ void mma_sub3_dip_kernel( const T* __restrict__ x,
+    const T* __restrict__ df0dx, const T* __restrict__ dfdx,
+    T* __restrict__ low, T* __restrict__ upp, const T* __restrict__ xmin,
+    const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
+    T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
+    T* __restrict__ qij, const int n, const int m) {
+  int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj >= n) return;
+
+  // Load into registers once
+  const T xt    = x[tj];
+  const T xmin_j = xmin[tj];
+  const T xmax_j = xmax[tj];
+  const T low_j = low[tj];
+  const T upp_j = upp[tj];
+  const T df0 = df0dx[tj];
+
+  // Clamp helpers
+  const T tenth_low_diff = T(0.1) * (xt - low_j);
+  const T tenth_upp_diff = T(0.1) * (upp_j - xt);
+
+  // Compute alpha and beta with fused max/min and fewer calls
+  T alpha_val = max(xmin_j, low_j + tenth_low_diff);
+  T beta_val = min(xmax_j, upp_j - tenth_upp_diff);
+
+  alpha[tj] = alpha_val;
+  beta[tj] = beta_val;
+
+  const T upp_minus_x = upp_j - xt;
+  const T x_minus_low = xt - low_j;
+  const T upp_minus_x_sq = upp_minus_x * upp_minus_x;
+  const T x_minus_low_sq = x_minus_low * x_minus_low;
+
+  // Regularisation of the objective, a true division as in mma_gensub_cpu
+  const T reg = T(0.5) * T(1.0e-6) / (upp_j - low_j);
+
+  p0j[tj] = upp_minus_x_sq * (max(df0, T(0)) + T(0.001) * abs(df0) + reg);
+  q0j[tj] = x_minus_low_sq * (max(-df0, T(0)) + T(0.001) * abs(df0) + reg);
+
+  // The constraints are not regularised
+  for (int i = 0; i < m; ++i) {
+    const int idx = i + tj * m;
+    const T dfdx_val = dfdx[idx];
+
+    pij[idx] = upp_minus_x_sq * max(dfdx_val, T(0));
+    qij[idx] = x_minus_low_sq * max(-dfdx_val, T(0));
   }
 }
 

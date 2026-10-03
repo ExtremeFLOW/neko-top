@@ -1,6 +1,6 @@
 !> @file device_mma_math.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,7 @@ module device_mma_math
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
        cuSOLVER_wrapper, mma_prepare_hessian_cuda, mma_prepare_aa_matrix_cuda, &
-       cuda_custom_solver, mma_update_hessian_z_cuda
+       cuda_custom_solver, mma_update_hessian_z_cuda, mma_gensub3_dip_cuda
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -70,7 +70,8 @@ module device_mma_math
        device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, &
        device_solve_linear_system, device_prepare_hessian, &
-       device_prepare_aa_matrix, device_update_hessian_z
+       device_prepare_aa_matrix, device_update_hessian_z, &
+       device_mma_gensub3_dip
 
 contains
   !> Update Hessian for dual solver with z-term contribution: Hess -= a * a^T
@@ -299,6 +300,41 @@ contains
     call neko_error('no device backend configured3')
 #endif
   end subroutine device_mma_gensub3
+
+  !> Compute the move limits alpha and beta and the coefficients p0j, q0j,
+  !! pij and qij of the subproblem of the dip subsolver, as mma_gensub_cpu.
+  !! Only the objective is regularised, by 0.5e-6/(upp - low).
+  !! @param x_d Current design.
+  !! @param df0dx_d Sensitivities of the objective.
+  !! @param dfdx_d Sensitivities of the constraints, m x n.
+  !! @param low_d Lower asymptotes.
+  !! @param upp_d Upper asymptotes.
+  !! @param min_d Lower bounds of the design, with the move limit applied.
+  !! @param max_d Upper bounds of the design, with the move limit applied.
+  !! @param alpha_d Lower bounds of the subproblem (output).
+  !! @param beta_d Upper bounds of the subproblem (output).
+  !! @param p0j_d Coefficients p0j of the objective (output).
+  !! @param q0j_d Coefficients q0j of the objective (output).
+  !! @param pij_d Coefficients pij of the constraints, m x n (output).
+  !! @param qij_d Coefficients qij of the constraints, m x n (output).
+  !! @param n Number of local design variables.
+  !! @param m Number of constraints.
+  subroutine device_mma_gensub3_dip(x_d, df0dx_d, dfdx_d, low_d, upp_d, &
+       min_d, max_d, alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m)
+    type(c_ptr) :: x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, max_d, &
+         alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d
+    integer(c_int) :: n, m
+#if HAVE_HIP
+    call neko_error('device_mma_gensub3_dip: not yet ported to HIP')
+#elif HAVE_CUDA
+    call mma_gensub3_dip_cuda(x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, &
+         max_d, alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_mma_gensub3_dip
 
   subroutine device_mma_gensub4(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d)
     type(c_ptr) :: x_d, low_d, upp_d, pij_d, qij_d, bi_d

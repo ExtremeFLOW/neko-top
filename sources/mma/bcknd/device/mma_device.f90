@@ -1,6 +1,6 @@
 !> @file mma_device.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -46,7 +46,8 @@ submodule (mma) mma_device
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
-       device_prepare_hessian, device_prepare_aa_matrix, device_update_hessian_z
+       device_prepare_hessian, device_prepare_aa_matrix, &
+       device_update_hessian_z, device_mma_gensub3_dip
 
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_DEVICE_MPI
   use device, only: DEVICE_TO_HOST
@@ -275,10 +276,22 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Calculate p0j, q0j, pij, qij, alpha, and beta
 
-    call device_mma_gensub3(x, df0dx, dfdx, this%low%x_d, &
-         this%upp%x_d, xmin_eff%x_d, xmax_eff%x_d, this%alpha%x_d, &
-         this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, &
-         this%qij%x_d, this%n, this%m)
+    if (this%subsolver .eq. "dip") then
+       ! Following MMA::GenSub in the Cpp code by Niels (topopt_in_petsc,
+       ! constraintModification = false): only the objective is
+       ! regularised, by 0.5e-6/(upp - low).
+       call device_mma_gensub3_dip(x, df0dx, dfdx, this%low%x_d, &
+            this%upp%x_d, xmin_eff%x_d, xmax_eff%x_d, this%alpha%x_d, &
+            this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, &
+            this%qij%x_d, this%n, this%m)
+    else
+       ! Following mmasub by Svanberg: the objective and all constraints
+       ! are regularised by 1e-5/max(x_diff, 1e-5).
+       call device_mma_gensub3(x, df0dx, dfdx, this%low%x_d, &
+            this%upp%x_d, xmin_eff%x_d, xmax_eff%x_d, this%alpha%x_d, &
+            this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, &
+            this%qij%x_d, this%n, this%m)
+    end if
 
     ! ------------------------------------------------------------------------ !
     ! Computing bi as defined in page 5
