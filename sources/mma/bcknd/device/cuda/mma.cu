@@ -735,6 +735,19 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
+  void mma_dip_kkt_cuda(void* res, void* x, void* df0dx, void* dfdx,
+       void* xmin, void* xmax, void* lambda, int* n, int* m) {
+    if (*n < 1) return;
+
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    mma_dip_kkt_kernel<real><<<nblcks, nthrds, 0,
+         (cudaStream_t)glb_cmd_queue>>>(
+         (real*)res, (real*)x, (real*)df0dx, (real*)dfdx, (real*)xmin,
+         (real*)xmax, (real*)lambda, *n, *m);
+    CUDA_CHECK(cudaGetLastError());
+  }
+
   void cuda_maxcons(void* a, real* b, real* c, void* d, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);

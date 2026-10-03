@@ -47,13 +47,14 @@ submodule (mma) mma_device
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
        device_prepare_hessian, device_prepare_aa_matrix, &
-       device_update_hessian_z, device_mma_gensub3_dip
+       device_update_hessian_z, device_mma_gensub3_dip, device_mma_dip_kkt
 
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_DEVICE_MPI
   use device, only: DEVICE_TO_HOST
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
 
   implicit none
 
@@ -111,28 +112,55 @@ contains
   !> Implementation of the KKT residual computation for dual interior
   ! point method (dip) subsolve of MMA algorithm.
   module subroutine mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
+    ! ----------------------------------------------------- !
+    ! Compute the KKT residual of the original problem for  !
+    ! the design x and set its max and 2-norm to            !
+    ! this%residumax and this%residunorm, as                !
+    ! mma_dip_KKT_cpu (MMA::KKTresidual in the Cpp code by  !
+    ! Niels, topopt_in_petsc).                              !
+    ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
-    type(vector_t), pointer :: relambda, remu
-    integer :: ind(2)
+    type(vector_t), pointer :: residual, slack
+    real(kind=rp) :: relambda, residual_max, residual_sq_norm
+    integer :: ierr, ind(2)
 
-    call this%scratch%request(relambda, ind(1), this%m, .false.)
-    call this%scratch%request(remu, ind(2), this%m, .false.)
+    call this%scratch%request(residual, ind(1), 3 * this%n, .false.)
+    call this%scratch%request(slack, ind(2), this%m, .false.)
 
-    ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
-    call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
+    ! Stationarity and complementarity of the bounds for each design
+    ! variable, with the true bounds xmin and xmax
+    call device_mma_dip_kkt(residual%x_d, x, df0dx, dfdx, this%xmin%x_d, &
+         this%xmax%x_d, this%lambda%x_d, this%n, this%m)
+
+    ! A rank without design variables only takes part in the reductions
+    residual_sq_norm = 0.0_rp
+    residual_max = 0.0_rp
+    if (this%n .gt. 0) then
+       residual_sq_norm = device_norm(residual%x_d, 3 * this%n)
+       residual_max = device_maxval(residual%x_d, 3 * this%n)
+    end if
+
+    call MPI_Allreduce(MPI_IN_PLACE, residual_sq_norm, 1, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
+         mpi_real_precision, MPI_MAX, neko_comm, ierr)
+
+    ! Complementarity of the constraints, a global quantity. The m-vectors
+    ! are replicated on all ranks, hence no reduction over the ranks.
+    ! relambda = sum_i lambda_i * (a_i * z + y_i - fval_i)
+    call device_add3s2(slack%x_d, this%a%x_d, this%y%x_d, this%z, 1.0_rp, &
          this%m)
-    call device_sub2(relambda%x_d, this%y%x_d, this%m)
-    call device_add2(relambda%x_d, this%mu%x_d, this%m)
+    call device_sub2(slack%x_d, fval, this%m)
+    relambda = device_lcsc2(this%lambda%x_d, slack%x_d, this%m)
 
-    ! Compute residual for mu (eta in the paper)
-    call device_col3(remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
+    this%residumax = max(abs(relambda), residual_max)
+    this%residunorm = sqrt(residual_sq_norm + relambda**2)
 
-    this%residumax = maxval([device_maxval(relambda%x_d, this%m), &
-         device_maxval(remu%x_d, this%m)])
-    this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
-         device_norm(remu%x_d, this%m))
+    ! device_maxval, MAX and MPI_MAX can drop a NaN, which would then read as
+    ! convergence, while the 2-norm keeps it
+    if (ieee_is_nan(this%residunorm)) this%residumax = this%residunorm
 
     call this%scratch%relinquish(ind)
   end subroutine mma_dip_KKT_device

@@ -46,7 +46,8 @@ module device_mma_math
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
        cuSOLVER_wrapper, mma_prepare_hessian_cuda, mma_prepare_aa_matrix_cuda, &
-       cuda_custom_solver, mma_update_hessian_z_cuda, mma_gensub3_dip_cuda
+       cuda_custom_solver, mma_update_hessian_z_cuda, mma_gensub3_dip_cuda, &
+       mma_dip_kkt_cuda
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -71,7 +72,7 @@ module device_mma_math
        device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, &
        device_solve_linear_system, device_prepare_hessian, &
        device_prepare_aa_matrix, device_update_hessian_z, &
-       device_mma_gensub3_dip
+       device_mma_gensub3_dip, device_mma_dip_kkt
 
 contains
   !> Update Hessian for dual solver with z-term contribution:
@@ -721,6 +722,36 @@ contains
     call neko_error('no device backend configured')
 #endif
   end subroutine device_kkt_rex
+
+  !> Compute the residuals of the KKT conditions of the original problem
+  !! for each local design variable, as mma_dip_KKT_cpu: the stationarity
+  !! in res(1:n) and the complementarity of the lower and upper bounds in
+  !! res(n+1:2n) and res(2n+1:3n). The bound multipliers are estimated
+  !! where x is within 1e-5 of the bounds.
+  !! @param res_d Residuals, of size 3n (output).
+  !! @param x_d Current design.
+  !! @param df0dx_d Sensitivities of the objective.
+  !! @param dfdx_d Sensitivities of the constraints, m x n.
+  !! @param xmin_d Lower bounds of the design.
+  !! @param xmax_d Upper bounds of the design.
+  !! @param lambda_d Multipliers of the constraints.
+  !! @param n Number of local design variables.
+  !! @param m Number of constraints.
+  subroutine device_mma_dip_kkt(res_d, x_d, df0dx_d, dfdx_d, xmin_d, xmax_d, &
+       lambda_d, n, m)
+    type(c_ptr) :: res_d, x_d, df0dx_d, dfdx_d, xmin_d, xmax_d, lambda_d
+    integer(c_int) :: n, m
+#if HAVE_HIP
+    call neko_error('device_mma_dip_kkt: not yet ported to HIP')
+#elif HAVE_CUDA
+    call mma_dip_kkt_cuda(res_d, x_d, df0dx_d, dfdx_d, xmin_d, xmax_d, &
+         lambda_d, n, m)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_mma_dip_kkt
 
 ! #endif
 
