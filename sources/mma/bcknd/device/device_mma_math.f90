@@ -56,7 +56,8 @@ module device_mma_math
        mma_gensub3_hip, mma_gensub4_hip, mattrans_v_mul_hip, &
        mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess, delta_1dbeam_hip, &
        hip_custom_solver, mma_prepare_hessian_hip, &
-       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper, mma_update_hessian_z_hip
+       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper, mma_update_hessian_z_hip, &
+       mma_gensub3_dip_hip
 
   implicit none
   private
@@ -327,7 +328,8 @@ contains
          alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('device_mma_gensub3_dip: not yet ported to HIP')
+    call mma_gensub3_dip_hip(x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, &
+         max_d, alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m)
 #elif HAVE_CUDA
     call mma_gensub3_dip_cuda(x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, &
          max_d, alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m)
