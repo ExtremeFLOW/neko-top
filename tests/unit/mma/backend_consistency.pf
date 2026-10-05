@@ -1,0 +1,1207 @@
+!> @file backend_consistency.pf
+!! @brief Cross-check the MMA optimizer's cpu and device backends.
+!! @details
+!! The cpu and device `dip` subsolvers both follow Aage's
+!! topopt_in_petsc MMA.cc (see sources/mma/bcknd/cpu/mma_cpu.f90,
+!! sources/mma/bcknd/device/, documentation/pages/theory/MMA.md). This
+!! test drives a cpu-backend and a device-backend mma_t through an
+!! identical trajectory on the same synthetic problem and compares
+!! every iterate -- it is the permanent guard that device == cpu. The
+!! thresholds below are fixed from measurements taken on the ported
+!! tree and must not be retuned afterwards -- see the derivations next
+!! to each TOL_* constant.
+!!
+!! Before the device port, this test was red: dip_a0, dip_a1 and
+!! dip_movelimit (the device backend ran the pre-alignment dip
+!! algorithm entirely) exceeded every TOL_* but TOL_Z below by >= 100x
+!! (e.g. dip_a0 dx=8.1633e-02, ~8.2e10xTOL_X; dip_movelimit
+!! dy=6.7895e+00, ~6.8e7xTOL_Y), and TOL_Z only on dip_a1
+!! (dz=1.6930e+04, ~1.7e11xTOL_Z; z is 0 on both backends in the other
+!! two cases, where a = 0); the device z path summed lambda.a over
+!! every rank instead of keeping it rank-local, inflating z whenever a
+!! is nonzero at more than one rank; and the device pdip backtracking
+!! line search reduced its trial residual with MPI_SUM where the cpu
+!! backend uses MPI_MIN (pdip_a0 at npes=2: dx=9.1644e-12, ~9.2xTOL_X
+!! -- see that case's own docstring for why this margin is small). On
+!! the ported tree every case below passes; reproduce with
+!! `./setup.sh -d CUDA -t && ctest --test-dir build -R
+!! mma-backend_consistency --output-on-failure`.
+!!
+!! On a cpu-only build there is no device backend to compare against,
+!! so each case returns immediately -- see dip_a0's own guard below for
+!! why -- rather than instantiating a 'device' mma_t, which would hit
+!! neko_error('no device backend configured').
+!!
+!! Runtime. The dip dual-interior-point subsolve's cost is set by two
+!! independent levers, both investigated empirically on this tree
+!! before picking SUBSOLVE_EPSIMIN/SUBSOLVE_MAX_ITER below, rather than
+!! guessed:
+!!   - SUBSOLVE_EPSIMIN sets the number of barrier levels (epsi shrinks
+!!     by a factor of 10 at each level, from 1.0 down to epsimin): the
+!!     subsolve's own default, ~1e-9*sqrt(m+n) ~= 7.7e-8 for this
+!!     problem, needs 8 levels; SUBSOLVE_EPSIMIN = 1e-3 needs only 4,
+!!     which is still enough for every per-case sanity check below
+!!     (n_bound_hit, z_cpu_positive, the move-limit clamp) to hold at
+!!     n_outer = 6, confirmed by running the suite at that setting;
+!!   - SUBSOLVE_MAX_ITER caps the inner Newton loop per barrier level
+!!     (library default 100): once the residual is near its own noise
+!!     floor, further Newton steps buy nothing, on EITHER backend, but
+!!     the loop still spends them. Measured on this tree (RTX A3000
+!!     sm_86), a run of the dip cases (dip_a0, dip_a1, dip_movelimit
+!!     and the Newton-free dip_epsimin_barrier; n_outer = 6, both npes,
+!!     SUBSOLVE_EPSIMIN = 1e-3) took 123.8s at the library default
+!!     max_iter = 100, and 40.4s capped to 30 -- same pass/fail
+!!     outcome, so the cap trims only wasted iterations.
+!!   - at 2 ranks, every one of the dip subsolve's many small, syncing
+!!     kernel launches per Newton step serialises against the other
+!!     rank's on the single GPU both ranks share (no MPS): isolated
+!!     timing of dip_a0 alone (pdip and every other case disabled; FINAL
+!!     settings, SUBSOLVE_MAX_ITER = 30 included) measured 3.8s at
+!!     npes=1 versus 9.2s at npes=2 for the same 6 outer iterations --
+!!     ~0.6 vs ~1.5s/outer-iteration, a ~2.4x gap from GPU context-switch
+!!     contention between the two ranks, not from MPI communication
+!!     (m_con is tiny). The gap was larger (~5x) before
+!!     SUBSOLVE_MAX_ITER was introduced, since every wasted Newton step
+!!     paid the same per-rank contention cost.
+!! With both levers applied, the full file (7 cases, both npes) measured
+!! 58.2s and 66.2s on two repeated runs -- comfortably inside the 600s
+!! ctest TIMEOUT and the target of a few minutes.
+module backend_consistency
+  ! Renamed on use: pfunit already brings in its own copies of
+  ! MPI_IN_PLACE/MPI_SUM/MPI_MAX/MPI_INTEGER (and a restricted
+  ! MPI_Allreduce generic) via mpi_f08_types, so importing the mpi_f08
+  ! names unchanged makes them ambiguous references / leaves no matching
+  ! specific subroutine for the call. The f08_* aliases are unique names
+  ! that always resolve to mpi_f08's own, unrestricted definitions.
+  use mpi_f08, only: f08_allreduce => MPI_Allreduce, &
+       f08_in_place => MPI_IN_PLACE, f08_sum => MPI_SUM, &
+       f08_max => MPI_MAX, f08_integer => MPI_INTEGER
+  use pfunit
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use mma, only: mma_t
+  use vector, only: vector_t
+  use matrix, only: matrix_t
+  use num_types, only: rp
+  use comm, only: pe_rank, pe_size, NEKO_COMM, MPI_REAL_PRECISION
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST, device_init
+  use logger, only: neko_log
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_value, &
+       ieee_quiet_nan
+  ! dip_nan_guard below deliberately computes with NaN operands and reads
+  ! them back; under -ffpe-trap=invalid (cmake/GNU.cmake's "Testing"
+  ! build type) that would SIGFPE inside the library before the NaN can
+  ! be read, so the case saves/disables/restores the ieee_invalid
+  ! halting mode around itself.
+  use, intrinsic :: ieee_exceptions, only: ieee_get_halting_mode, &
+       ieee_set_halting_mode, ieee_set_flag, ieee_invalid
+  ! This test mixes npes=1 and npes=2 sub-tests in the same file, so a
+  ! one-shot, process-global neko_init() (whose comm_init() collectively
+  ! dups MPI_COMM_WORLD) deadlocks: ranks sitting out the npes=1 variant
+  ! never reach that dup. Neko's own multi-npes parallel unit tests (e.g.
+  ! tests/unit/math/test_math_parallel.pf) use pfunit_comm_utils instead,
+  ! which (re-)establishes NEKO_COMM from the test's OWN, correctly-sized
+  ! sub-communicator every single test; see comm_init_test/comm_free_test
+  ! below.
+  use pfunit_comm_utils, only: comm_init_test, comm_free_test
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_backend_consistency_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_backend_consistency_case
+
+  logical :: initialized = .false.
+
+  !> Global number of design variables and number of constraints shared by
+  !! every case. n_local is ~3000 (npes=2) to 6000 (npes=1), so device
+  !! reductions span several 1024-thread blocks either way; m_con >= 3.
+  integer, parameter :: n_global = 6000
+  integer, parameter :: m_con = 4
+
+  !> Barrier floor and Newton-step cap for the three dip-type cases (see
+  !! the "Runtime" paragraph above for the measurements behind both).
+  !! pdip_a0 keeps the subsolve's own default epsimin (a tighter floor,
+  !! affordable there because pdip converges in far fewer Newton steps
+  !! per level); dip_epsimin_barrier keeps its own epsimin = 2.0, which
+  !! is the no-Newton-iteration case under test and unrelated to this
+  !! runtime tuning.
+  real(kind=rp), parameter :: SUBSOLVE_EPSIMIN = 1.0e-03_rp
+  integer, parameter :: SUBSOLVE_MAX_ITER = 30
+
+  ! ========================================================================= !
+  ! Tolerances.
+  !
+  ! Measured on the ported tree, reproducibly, with:
+  !   ./setup.sh -d CUDA -t
+  !   ctest --test-dir build -R mma-backend_consistency --output-on-failure
+  ! at the final settings in this file (SUBSOLVE_EPSIMIN, SUBSOLVE_MAX_ITER,
+  ! n_outer as passed below). Two repeated runs produced BYTE-IDENTICAL
+  ! per-iteration output (deterministic), so the floor below is not noise
+  ! that got lucky once. The floor is the max, over every iteration, rank
+  ! count (1 and 2) and case (dip_a0, dip_a1, dip_movelimit, pdip_a0;
+  ! dip_epsimin_barrier is an exact-zero check, see its own comment) of
+  ! the device-vs-cpu deviation of each tracked quantity on the GREEN
+  ! (ported) tree -- i.e. round-off / reduction-order noise, not a
+  ! correctness bug:
+  !   dx       : 3.1641e-15   dkktmax (rel): 6.9702e-13
+  !   dlambda  : 3.6198e-10   dkktnorm (rel): 1.9825e-13
+  !   dy       : 3.6198e-10   dz           : 4.9113e-10
+  ! Rule: TOL_* = the measured floor above x 100, rounded UP to the next
+  ! power of ten. This is a fixed, mechanical rule, applied the same way
+  ! to every constant below -- it is not tuned per-constant to pass or
+  ! fail anything. A single TOL_KKT_REL covers both dkktmax and dkktnorm,
+  ! so it is derived from the larger of their two floors (dkktmax's).
+  ! Before accepting each TOL_* value, the corresponding RED (unported
+  ! tree) deviation was confirmed to exceed it: by >= 100x on all three
+  ! dip cases, for every tolerance except TOL_Z, which only dip_a1
+  ! exercises (z is 0 elsewhere when a = 0); and by ~9x on pdip_a0, for
+  ! TOL_X only, at two ranks (see the module header for the inline RED
+  ! figures and pdip_a0's own docstring for why that case's margin is
+  ! small); never derived from the RED numbers themselves, which are
+  ! the bug this test exists to catch.
+  real(kind=rp), parameter :: TOL_X = 1.0e-12_rp
+  real(kind=rp), parameter :: TOL_KKT_REL = 1.0e-10_rp
+  real(kind=rp), parameter :: TOL_LAMBDA = 1.0e-07_rp
+  real(kind=rp), parameter :: TOL_Y = 1.0e-07_rp
+  real(kind=rp), parameter :: TOL_Z = 1.0e-07_rp
+
+  !> Minimum global design movement (summed |max change| over all outer
+  !! iterations) required of each backend on the four non-degenerate
+  !! cases, guarding against a vacuous pass from an optimizer that never
+  !! actually moved (see case_dip_epsimin_barrier for the one case where
+  !! zero movement is instead the thing being asserted).
+  real(kind=rp), parameter :: MIN_CHANGE = 1.0e-03_rp
+
+contains
+
+  subroutine setUp(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+
+    ! Every test, regardless of npes: (re-)establish NEKO_COMM from this
+    ! test's own sub-communicator (see the module-level comment on
+    ! pfunit_comm_utils above).
+    call comm_init_test(this%getMpiCommunicator())
+
+    ! Once per process: the comm-independent pieces of neko_init().
+    ! device_init() has no MPI calls and no rank-based device selection
+    ! (it only asserts device_count() == 1), so it does not need to be
+    ! redone per communicator; neko_log is a process-wide singleton.
+    if (initialized) return
+    initialized = .true.
+    call device_init()
+    call neko_log%init()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+
+    ! Undo setUp's comm_init_test so the next test's call starts clean.
+    ! neko_finalize()/device_finalize() are never called from this test:
+    ! a pre-existing driver (tests/regression/mma/driver.f90) calls
+    ! neko_finalize() before freeing its mma_t/vector_t/matrix_t objects
+    ! and crashes in device_unmap at exit; io_hdf5.pf avoids that by never
+    ! finalising either, and this test follows that same, proven pattern
+    ! -- every mma_t/vector_t/matrix_t created below is freed at the end
+    ! of run_case(), well before process exit.
+    call comm_free_test()
+  end subroutine tearDown
+
+  ! ========================================================================= !
+  ! Synthetic problem.
+  !
+  ! Smooth, deterministic, analytic-gradient problem, closed-form in the
+  ! GLOBAL index of each design variable so it does not depend on how
+  ! n_global is partitioned over ranks:
+  !   f0(x)   = sum_j w_j (x_j - t_j)^2
+  !   f_i(x)  = sum_j G_ij x_j - budget_i,    i = 1..m_con
+  ! A period-7 pattern of global indices has a target t_j outside
+  ! [xmin, xmax] (1 in 7 below xmin, 1 in 7 above xmax), which pins those
+  ! variables to a bound -- this exercises the KKT bound-multiplier
+  ! estimate near xmin/xmax. G_ij > 0 (a "volume-like" constraint, as is
+  ! typical in topology optimization); budget_i (see compute_budget) is a
+  ! fraction of the constraint's value at the uniform initial design
+  ! x0 = 0.5, so every constraint starts violated and the tightest one
+  ! stays active near the solution.
+
+  !> Standard contiguous block partition of a global index range over
+  !! pe_size ranks.
+  !! @param n        Out: local number of design variables.
+  !! @param offset   Out: global index offset of this rank's first
+  !!                 variable.
+  !! @param n_total  In, optional: total number of design variables to
+  !!                 partition; defaults to the module's n_global (used
+  !!                 by every case except dip_kkt_bounds, which
+  !!                 partitions its own, much smaller problem).
+  subroutine partition(n, offset, n_total)
+    integer, intent(out) :: n, offset
+    integer, intent(in), optional :: n_total
+    integer :: base, rem, n_tot
+
+    n_tot = n_global
+    if (present(n_total)) n_tot = n_total
+
+    base = n_tot / pe_size
+    rem = modulo(n_tot, pe_size)
+    if (pe_rank .lt. rem) then
+       n = base + 1
+       offset = pe_rank * (base + 1)
+    else
+       n = base
+       offset = rem * (base + 1) + (pe_rank - rem) * base
+    end if
+  end subroutine partition
+
+  !> Evaluate the synthetic problem and its analytic gradients at a host
+  !! design x. fval/dfdx are globally consistent (reduced across ranks,
+  !! identical on every rank); df0dx is purely local (no reduction
+  !! needed).
+  !! @param n       Local number of design variables.
+  !! @param offset  Global index offset of this rank's first variable.
+  !! @param m       Number of constraints.
+  !! @param budget  The m constraint budgets (see compute_budget).
+  !! @param x       Local design variables (host, in).
+  !! @param df0dx   Local objective gradient (host, out).
+  !! @param fval    Global constraint values (host, out).
+  !! @param dfdx    Local constraint gradients dfdx(i,j) (host, out).
+  subroutine eval_problem(n, offset, m, budget, x, df0dx, fval, dfdx)
+    integer, intent(in) :: n, offset, m
+    real(kind=rp), intent(in) :: budget(m)
+    real(kind=rp), intent(in) :: x(n)
+    real(kind=rp), intent(out) :: df0dx(n)
+    real(kind=rp), intent(out) :: fval(m)
+    real(kind=rp), intent(out) :: dfdx(m, n)
+
+    integer :: i, j, jg, ierr
+    real(kind=rp) :: jgr, w, t
+
+    do j = 1, n
+       jg = offset + j
+       jgr = real(jg, rp)
+
+       select case (modulo(jg - 1, 7))
+       case (0)
+          t = -0.5_rp
+       case (3)
+          t = 1.5_rp
+       case default
+          t = 0.5_rp + 0.3_rp * sin(0.233_rp * jgr + 0.7_rp)
+       end select
+       w = 1.0_rp + 0.2_rp * cos(0.057_rp * jgr)
+
+       df0dx(j) = 2.0_rp * w * (x(j) - t)
+
+       do i = 1, m
+          dfdx(i, j) = 1.0_rp + 0.5_rp * sin(0.013_rp * real(i, rp) * jgr &
+               + 0.31_rp * real(i, rp))
+       end do
+    end do
+
+    fval = 0.0_rp
+    do j = 1, n
+       do i = 1, m
+          fval(i) = fval(i) + dfdx(i, j) * x(j)
+       end do
+    end do
+
+    call f08_allreduce(f08_in_place, fval, m, MPI_REAL_PRECISION, f08_sum, &
+         NEKO_COMM, ierr)
+    fval = fval - budget
+  end subroutine eval_problem
+
+  !> Compute the constraint budgets so that every constraint starts
+  !! violated at the uniform initial design x0 = 0.5, by a different
+  !! fraction for each i (so the constraints are not simple multiples of
+  !! one another and the dual solution is not degenerate). Deterministic
+  !! and partition-independent: a direct loop over the GLOBAL index range
+  !! (cheap: m_con * n_global), identical on every rank, no communication
+  !! needed.
+  !! @param m       Number of constraints.
+  !! @param budget  Out: the m constraint budgets.
+  subroutine compute_budget(m, budget)
+    integer, intent(in) :: m
+    real(kind=rp), intent(out) :: budget(m)
+    integer :: i, jg
+    real(kind=rp) :: jgr, gij, frac
+
+    budget = 0.0_rp
+    do jg = 1, n_global
+       jgr = real(jg, rp)
+       do i = 1, m
+          gij = 1.0_rp + 0.5_rp * sin(0.013_rp * real(i, rp) * jgr &
+               + 0.31_rp * real(i, rp))
+          budget(i) = budget(i) + gij * 0.5_rp
+       end do
+    end do
+
+    do i = 1, m
+       frac = 0.9_rp - 0.15_rp * real(i - 1, rp)
+       budget(i) = frac * budget(i)
+    end do
+  end subroutine compute_budget
+
+  ! ========================================================================= !
+  ! Driver: run both backends side by side and record the worst deviation.
+
+  !> Drive a cpu-backend and a device-backend mma_t through n_outer
+  !! identical-problem iterations and record the worst (max-over-
+  !! iterations, max-over-ranks) deviation between them for each tracked
+  !! quantity. Both objects' max_iter is fixed to SUBSOLVE_MAX_ITER (see
+  !! its declaration above for why).
+  !! @param case_name      Label used in diagnostic log messages.
+  !! @param n_outer        Number of outer MMA iterations to run.
+  !! @param a_const        MMA a_i parameter (same value for every i).
+  !! @param move_limit     MMA move limit; 0 disables the clamp (matches
+  !!                       the topopt_in_petsc default used as the
+  !!                       baseline; see documentation/pages/theory/MMA.md).
+  !! @param epsimin        MMA barrier floor.
+  !! @param subsolver      'dip' or 'pdip'.
+  !! @param max_dx         Out: max_t max_rank max_j |x_dev - x_cpu|.
+  !! @param max_dkkt_max   Out: max relative deviation of residumax.
+  !! @param max_dkkt_norm  Out: max relative deviation of residunorm.
+  !! @param max_dlambda    Out: max_t max_rank max_i |lambda_dev-lambda_cpu|
+  !! @param max_dy         Out: max_t max_rank max_i |y_dev - y_cpu|.
+  !! @param max_dz         Out: max_t |z_dev - z_cpu|.
+  !! @param z_cpu_positive Out: .true. iff the cpu object's z exceeded 0
+  !!                       at any iteration.
+  !! @param cpu_change     Out: sum over iterations of the global max
+  !!                       |x_cpu design change| that iteration (exactly
+  !!                       0 iff the cpu design never moved at all).
+  !! @param dev_change     Out: as cpu_change, for the device object.
+  !! @param n_violated0    Out: number of constraints violated at x0.
+  !! @param n_bound_hit    Out: number of (global) cpu design variables
+  !!                       within 1e-4 of xmin or xmax after the final
+  !!                       iteration.
+  subroutine run_case(case_name, n_outer, a_const, move_limit, epsimin, &
+       subsolver, max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda, &
+       max_dy, max_dz, z_cpu_positive, cpu_change, dev_change, &
+       n_violated0, n_bound_hit)
+    character(len=*), intent(in) :: case_name, subsolver
+    integer, intent(in) :: n_outer
+    real(kind=rp), intent(in) :: a_const, move_limit, epsimin
+    real(kind=rp), intent(out) :: max_dx, max_dkkt_max, max_dkkt_norm
+    real(kind=rp), intent(out) :: max_dlambda, max_dy, max_dz
+    logical, intent(out) :: z_cpu_positive
+    real(kind=rp), intent(out) :: cpu_change, dev_change
+    integer, intent(out) :: n_violated0, n_bound_hit
+
+    type(mma_t) :: cpu_obj, dev_obj
+    type(vector_t) :: x0, x_cpu, x_dev, df0dx, fval
+    type(matrix_t) :: dfdx
+    real(kind=rp) :: a_arr(m_con), c_arr(m_con), d_arr(m_con)
+    real(kind=rp), allocatable :: xmin(:), xmax(:)
+    real(kind=rp) :: budget(m_con)
+    real(kind=rp), allocatable :: x_before(:)
+    real(kind=rp), allocatable :: lambda_cpu(:), lambda_dev(:)
+    real(kind=rp), allocatable :: y_cpu(:), y_dev(:)
+    integer :: n, offset, iter, i, ierr
+    real(kind=rp) :: v, rmax_cpu, rmax_dev, rnorm_cpu, rnorm_dev
+    real(kind=rp) :: z_cpu, z_dev, floor_r
+    real(kind=rp) :: dx_i, dkktmax_i, dkktnorm_i, dlambda_i, dy_i, dz_i
+    character(len=200) :: msg
+
+    call partition(n, offset)
+    allocate(xmin(n), xmax(n), x_before(n))
+
+    a_arr = a_const
+    c_arr = 1000.0_rp
+    d_arr = 0.0_rp
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+
+    call compute_budget(m_con, budget)
+
+    call x0%init(n)
+    x0%x = 0.5_rp
+    call x0%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    call x_cpu%init(n)
+    x_cpu = x0
+    call x_dev%init(n)
+    x_dev = x0
+
+    call df0dx%init(n)
+    call fval%init(m_con)
+    call dfdx%init(m_con, n)
+
+    call cpu_obj%init_from_components(x0, n, m_con, 1.0_rp, a_arr, c_arr, &
+         d_arr, xmin, xmax, bcknd = 'cpu', subsolver = subsolver, &
+         move_limit = move_limit, epsimin = epsimin, &
+         max_iter = SUBSOLVE_MAX_ITER)
+    call dev_obj%init_from_components(x0, n, m_con, 1.0_rp, a_arr, c_arr, &
+         d_arr, xmin, xmax, bcknd = 'device', subsolver = subsolver, &
+         move_limit = move_limit, epsimin = epsimin, &
+         max_iter = SUBSOLVE_MAX_ITER)
+
+    ! Problem sanity check at x0: how many constraints start violated.
+    call eval_problem(n, offset, m_con, budget, x0%x, df0dx%x, fval%x, &
+         dfdx%x)
+    n_violated0 = 0
+    do i = 1, m_con
+       if (fval%x(i) .gt. 0.0_rp) n_violated0 = n_violated0 + 1
+    end do
+
+    max_dx = 0.0_rp
+    max_dkkt_max = 0.0_rp
+    max_dkkt_norm = 0.0_rp
+    max_dlambda = 0.0_rp
+    max_dy = 0.0_rp
+    max_dz = 0.0_rp
+    z_cpu_positive = .false.
+    cpu_change = 0.0_rp
+    dev_change = 0.0_rp
+    floor_r = 1.0e-10_rp
+
+    do iter = 1, n_outer
+
+       ! --------------------------- cpu object ------------------------- !
+       call x_cpu%copy_from(DEVICE_TO_HOST, sync = .true.)
+       x_before = x_cpu%x
+       call eval_problem(n, offset, m_con, budget, x_cpu%x, df0dx%x, &
+            fval%x, dfdx%x)
+       call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+       call cpu_obj%update(iter, x_cpu, df0dx, fval, dfdx)
+       call x_cpu%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+       v = maxval(abs(x_cpu%x - x_before))
+       if (any(ieee_is_nan(x_cpu%x - x_before))) v = huge(v)
+       call f08_allreduce(f08_in_place, v, 1, MPI_REAL_PRECISION, f08_max, &
+            NEKO_COMM, ierr)
+       cpu_change = cpu_change + v
+
+       call eval_problem(n, offset, m_con, budget, x_cpu%x, df0dx%x, &
+            fval%x, dfdx%x)
+       call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+       call cpu_obj%kkt(x_cpu, df0dx, fval, dfdx)
+
+       z_cpu = cpu_obj%get_z()
+       if (z_cpu .gt. 0.0_rp) z_cpu_positive = .true.
+
+       ! -------------------------- device object ------------------------ !
+       call x_dev%copy_from(DEVICE_TO_HOST, sync = .true.)
+       x_before = x_dev%x
+       call eval_problem(n, offset, m_con, budget, x_dev%x, df0dx%x, &
+            fval%x, dfdx%x)
+       call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+       call dev_obj%update(iter, x_dev, df0dx, fval, dfdx)
+       call x_dev%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+       v = maxval(abs(x_dev%x - x_before))
+       if (any(ieee_is_nan(x_dev%x - x_before))) v = huge(v)
+       call f08_allreduce(f08_in_place, v, 1, MPI_REAL_PRECISION, f08_max, &
+            NEKO_COMM, ierr)
+       dev_change = dev_change + v
+
+       call eval_problem(n, offset, m_con, budget, x_dev%x, df0dx%x, &
+            fval%x, dfdx%x)
+       call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+       call dev_obj%kkt(x_dev, df0dx, fval, dfdx)
+
+       z_dev = dev_obj%get_z()
+
+       ! ------------------------------ compare ---------------------------!
+       ! Every deviation below is made NaN-safe (set to huge(.)) BEFORE its
+       ! max()/MPI_MAX reduction: maxval/MAX/MPI_MAX all compare against a
+       ! running value, and a NaN compares false against anything, so a
+       ! bare max()/MPI_MAX silently drops a NaN entry instead of
+       ! propagating it (this is the exact failure mode dip_nan_guard
+       ! below exists to catch inside the library; without the guard
+       ! here, a device run that returned NaN for x, lambda, y, z or the
+       ! residuals would otherwise pass every TOL_* check).
+       dx_i = maxval(abs(x_cpu%x - x_dev%x))
+       if (any(ieee_is_nan(x_cpu%x - x_dev%x))) dx_i = huge(dx_i)
+       call f08_allreduce(f08_in_place, dx_i, 1, MPI_REAL_PRECISION, &
+            f08_max, NEKO_COMM, ierr)
+       max_dx = max(max_dx, dx_i)
+
+       rmax_cpu = cpu_obj%get_residumax()
+       rmax_dev = dev_obj%get_residumax()
+       rnorm_cpu = cpu_obj%get_residunorm()
+       rnorm_dev = dev_obj%get_residunorm()
+
+       dkktmax_i = abs(rmax_dev - rmax_cpu) / max(abs(rmax_cpu), floor_r)
+       if (ieee_is_nan(dkktmax_i)) dkktmax_i = huge(dkktmax_i)
+       call f08_allreduce(f08_in_place, dkktmax_i, 1, MPI_REAL_PRECISION, &
+            f08_max, NEKO_COMM, ierr)
+       max_dkkt_max = max(max_dkkt_max, dkktmax_i)
+
+       dkktnorm_i = abs(rnorm_dev-rnorm_cpu) / max(abs(rnorm_cpu), floor_r)
+       if (ieee_is_nan(dkktnorm_i)) dkktnorm_i = huge(dkktnorm_i)
+       call f08_allreduce(f08_in_place, dkktnorm_i, 1, MPI_REAL_PRECISION, &
+            f08_max, NEKO_COMM, ierr)
+       max_dkkt_norm = max(max_dkkt_norm, dkktnorm_i)
+
+       lambda_cpu = cpu_obj%get_lambda()
+       lambda_dev = dev_obj%get_lambda()
+       dlambda_i = maxval(abs(lambda_cpu - lambda_dev))
+       if (any(ieee_is_nan(lambda_cpu - lambda_dev))) &
+            dlambda_i = huge(dlambda_i)
+       call f08_allreduce(f08_in_place, dlambda_i, 1, MPI_REAL_PRECISION, &
+            f08_max, NEKO_COMM, ierr)
+       max_dlambda = max(max_dlambda, dlambda_i)
+
+       y_cpu = cpu_obj%get_y()
+       y_dev = dev_obj%get_y()
+       dy_i = maxval(abs(y_cpu - y_dev))
+       if (any(ieee_is_nan(y_cpu - y_dev))) dy_i = huge(dy_i)
+       call f08_allreduce(f08_in_place, dy_i, 1, MPI_REAL_PRECISION, &
+            f08_max, NEKO_COMM, ierr)
+       max_dy = max(max_dy, dy_i)
+
+       dz_i = abs(z_dev - z_cpu)
+       if (ieee_is_nan(dz_i)) dz_i = huge(dz_i)
+       call f08_allreduce(f08_in_place, dz_i, 1, MPI_REAL_PRECISION, &
+            f08_max, NEKO_COMM, ierr)
+       max_dz = max(max_dz, dz_i)
+
+       if (pe_rank .eq. 0) then
+          write(msg, '(A,1X,A,1X,I0,1X,6(A,ES12.4))') &
+               'mma-backend-consistency', trim(case_name), iter, &
+               ' dx=', dx_i, ' dkktmax=', dkktmax_i, &
+               ' dkktnorm=', dkktnorm_i, ' dlambda=', dlambda_i, &
+               ' dy=', dy_i, ' dz=', dz_i
+          call neko_log%message(trim(msg))
+       end if
+    end do
+
+    ! Number of (global) cpu design variables pinned at a bound.
+    n_bound_hit = 0
+    do i = 1, n
+       if (x_cpu%x(i) .lt. 1.0e-4_rp .or. &
+            x_cpu%x(i) .gt. 1.0_rp - 1.0e-4_rp) then
+          n_bound_hit = n_bound_hit + 1
+       end if
+    end do
+    call f08_allreduce(f08_in_place, n_bound_hit, 1, f08_integer, f08_sum, &
+         NEKO_COMM, ierr)
+
+    call x0%free()
+    call x_cpu%free()
+    call x_dev%free()
+    call df0dx%free()
+    call fval%free()
+    call dfdx%free()
+    call cpu_obj%free()
+    call dev_obj%free()
+  end subroutine run_case
+
+  ! ========================================================================= !
+  ! Cases.
+
+  !> Case 1: dip, a = 0, no move limit (baseline). Both the cpu and
+  !! device backends run Aage's aligned GenSub/KKTresidual (see the
+  !! module header), so every tracked quantity is expected to agree
+  !! within TOL_* (round-off / reduction-order noise), not diverge.
+  @test(npes=[1,2])
+  subroutine dip_a0(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+    real(kind=rp) :: max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda
+    real(kind=rp) :: max_dy, max_dz, cpu_change, dev_change, epsimin
+    logical :: z_cpu_positive
+    integer :: n_violated0, n_bound_hit
+
+    ! No device backend to compare against on a cpu-only build: running
+    ! the comparison would instantiate a 'device' mma_t and hit
+    ! neko_error('no device backend configured'). Pass trivially.
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+
+    epsimin = SUBSOLVE_EPSIMIN
+    call run_case('dip_a0', 6, 0.0_rp, 0.0_rp, epsimin, 'dip', max_dx, &
+         max_dkkt_max, max_dkkt_norm, max_dlambda, max_dy, max_dz, &
+         z_cpu_positive, cpu_change, dev_change, n_violated0, n_bound_hit)
+
+    @assertTrue(n_violated0 .gt. 0, "dip_a0: problem sanity n_violated0")
+    @assertTrue(n_bound_hit .gt. 0, "dip_a0: problem sanity n_bound_hit")
+    @assertTrue(cpu_change .gt. MIN_CHANGE, "dip_a0: vacuous cpu_change")
+    @assertTrue(dev_change .gt. MIN_CHANGE, "dip_a0: vacuous dev_change")
+
+    @assertTrue(max_dx .lt. TOL_X, "dip_a0: max|x_dev-x_cpu|")
+    @assertTrue(max_dkkt_max .lt. TOL_KKT_REL, "dip_a0: residumax rel.")
+    @assertTrue(max_dkkt_norm .lt. TOL_KKT_REL, "dip_a0: residunorm rel.")
+    @assertTrue(max_dlambda .lt. TOL_LAMBDA, "dip_a0: max|lambda diff|")
+    @assertTrue(max_dy .lt. TOL_Y, "dip_a0: max|y diff|")
+    @assertTrue(max_dz .lt. TOL_Z, "dip_a0: max|z diff|")
+  end subroutine dip_a0
+
+  !> Case 2: dip, a = 1, so that a_0 - sum_i lambda_i a_i can go negative
+  !! and z = max(0, 10 (sum_i lambda_i a_i - a_0)) > 0 on the cpu object
+  !! -- otherwise the z path is never exercised. Same expectation as
+  !! dip_a0 otherwise.
+  @test(npes=[1,2])
+  subroutine dip_a1(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+    real(kind=rp) :: max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda
+    real(kind=rp) :: max_dy, max_dz, cpu_change, dev_change, epsimin
+    logical :: z_cpu_positive
+    integer :: n_violated0, n_bound_hit
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+
+    epsimin = SUBSOLVE_EPSIMIN
+    call run_case('dip_a1', 6, 1.0_rp, 0.0_rp, epsimin, 'dip', max_dx, &
+         max_dkkt_max, max_dkkt_norm, max_dlambda, max_dy, max_dz, &
+         z_cpu_positive, cpu_change, dev_change, n_violated0, n_bound_hit)
+
+    @assertTrue(n_violated0 .gt. 0, "dip_a1: problem sanity n_violated0")
+    @assertTrue(n_bound_hit .gt. 0, "dip_a1: problem sanity n_bound_hit")
+    @assertTrue(cpu_change .gt. MIN_CHANGE, "dip_a1: vacuous cpu_change")
+    @assertTrue(dev_change .gt. MIN_CHANGE, "dip_a1: vacuous dev_change")
+    @assertTrue(z_cpu_positive, "dip_a1: cpu z never exceeded 0 -- the " // &
+         "z path was not exercised")
+
+    @assertTrue(max_dx .lt. TOL_X, "dip_a1: max|x_dev-x_cpu|")
+    @assertTrue(max_dkkt_max .lt. TOL_KKT_REL, "dip_a1: residumax rel.")
+    @assertTrue(max_dkkt_norm .lt. TOL_KKT_REL, "dip_a1: residunorm rel.")
+    @assertTrue(max_dlambda .lt. TOL_LAMBDA, "dip_a1: max|lambda diff|")
+    @assertTrue(max_dy .lt. TOL_Y, "dip_a1: max|y diff|")
+    @assertTrue(max_dz .lt. TOL_Z, "dip_a1: max|z diff|")
+  end subroutine dip_a1
+
+  !> Case 3: dip, a = 0, move limit 0.2 (distinct from dip_a0's disabled
+  !! move limit): exercises the xmin_eff/xmax_eff move-limit clamp in
+  !! gensub, which is applied identically by both backends' gensub, so
+  !! this probes whether the move-limit path itself is a source of
+  !! divergence distinct from the subsolver/z/KKT differences already
+  !! covered by dip_a0.
+  @test(npes=[1,2])
+  subroutine dip_movelimit(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+    real(kind=rp) :: max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda
+    real(kind=rp) :: max_dy, max_dz, cpu_change, dev_change, epsimin
+    logical :: z_cpu_positive
+    integer :: n_violated0, n_bound_hit
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+
+    epsimin = SUBSOLVE_EPSIMIN
+    call run_case('dip_movelimit', 6, 0.0_rp, 0.2_rp, epsimin, 'dip', &
+         max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda, max_dy, &
+         max_dz, z_cpu_positive, cpu_change, dev_change, n_violated0, &
+         n_bound_hit)
+
+    @assertTrue(n_violated0 .gt. 0, "movelimit: problem sanity nviol0")
+    @assertTrue(cpu_change .gt. MIN_CHANGE, "movelimit: vacuous cpu_change")
+    @assertTrue(dev_change .gt. MIN_CHANGE, "movelimit: vacuous dev_change")
+
+    @assertTrue(max_dx .lt. TOL_X, "movelimit: max|x_dev-x_cpu|")
+    @assertTrue(max_dkkt_max .lt. TOL_KKT_REL, "movelimit: residumax rel.")
+    @assertTrue(max_dkkt_norm .lt. TOL_KKT_REL, "movelimit: residunorm rel")
+    @assertTrue(max_dlambda .lt. TOL_LAMBDA, "movelimit: max|lambda diff|")
+    @assertTrue(max_dy .lt. TOL_Y, "movelimit: max|y diff|")
+    @assertTrue(max_dz .lt. TOL_Z, "movelimit: max|z diff|")
+  end subroutine dip_movelimit
+
+  !> Case 4: pdip, a = 0, no move limit. Unlike dip, pdip was NOT
+  !! realigned -- both backends still run Svanberg's original gensub
+  !! and KKT formula (both backends keep Svanberg's mmasub for pdip;
+  !! see documentation/pages/theory/MMA.md), so it is the same
+  !! algorithm on both backends at every npes and is expected to pass
+  !! within TOL_* like the dip cases. While the device pdip
+  !! backtracking line search reduced its trial residual with MPI_SUM
+  !! instead of the cpu backend's MPI_MIN, this case was red at
+  !! npes=2 only, and only barely: TOL_X was the only one of the six
+  !! deviations that caught it there (measured max|x_dev-x_cpu|
+  !! ~9.2e-12, about 9x TOL_X = 1e-12 -- nowhere near the dip cases'
+  !! >=100x margin), with dkkt/dlambda/dy/dz all at round-off. That
+  !! small, line-search-only margin was the honest size of the bug
+  !! this case exercises at pe_size = 2 on this synthetic problem;
+  !! the dip cases above are what carry this test's liveness margin,
+  !! not this one.
+  @test(npes=[1,2])
+  subroutine pdip_a0(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+    real(kind=rp) :: max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda
+    real(kind=rp) :: max_dy, max_dz, cpu_change, dev_change, epsimin
+    logical :: z_cpu_positive
+    integer :: n_violated0, n_bound_hit
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+
+    epsimin = 1.0e-9_rp * sqrt(real(m_con + n_global, rp))
+    call run_case('pdip_a0', 12, 0.0_rp, 0.0_rp, epsimin, 'pdip', max_dx, &
+         max_dkkt_max, max_dkkt_norm, max_dlambda, max_dy, max_dz, &
+         z_cpu_positive, cpu_change, dev_change, n_violated0, n_bound_hit)
+
+    @assertTrue(n_violated0 .gt. 0, "pdip_a0: problem sanity n_violated0")
+    @assertTrue(cpu_change .gt. MIN_CHANGE, "pdip_a0: vacuous cpu_change")
+    @assertTrue(dev_change .gt. MIN_CHANGE, "pdip_a0: vacuous dev_change")
+
+    @assertTrue(max_dx .lt. TOL_X, "pdip_a0: max|x_dev-x_cpu|")
+    @assertTrue(max_dkkt_max .lt. TOL_KKT_REL, "pdip_a0: residumax rel.")
+    @assertTrue(max_dkkt_norm .lt. TOL_KKT_REL, "pdip_a0: residunorm rel.")
+    @assertTrue(max_dlambda .lt. TOL_LAMBDA, "pdip_a0: max|lambda diff|")
+    @assertTrue(max_dy .lt. TOL_Y, "pdip_a0: max|y diff|")
+    @assertTrue(max_dz .lt. TOL_Z, "pdip_a0: max|z diff|")
+  end subroutine pdip_a0
+
+  !> Case 5: dip, epsimin = 2.0 -- above the subsolve's initial barrier
+  !! level (epsi = 1.0), so "do while (epsi > minimal_epsilon)" is false
+  !! from the start and no Newton iteration ever runs. On EITHER object
+  !! this is a true no-op: designx is set to the input design before the
+  !! loop, and the loop body never runs, so the output is bit-identical
+  !! to the input. x, lambda, y and z are therefore exact-zero-
+  !! difference checks, not a tolerance: the same arithmetic (none) runs
+  !! over the same input design/subproblem state on both backends, so
+  !! the correct answer is exactly zero difference, not merely close --
+  !! cpu_change and dev_change over n_outer such calls, max_dx,
+  !! max_dlambda, max_dy and max_dz must therefore be exactly 0 (an
+  !! unported/buggy device object that still moved x, or moved it to a
+  !! different place than the cpu object, must be caught here, not just
+  !! waved through by the other cases' tolerances). residumax/residunorm
+  !! are NOT part of that guarantee: run_case() calls %kkt() every
+  !! iteration regardless of whether the design moved, and %kkt() still
+  !! reduces real, backend-specific arithmetic over an unchanged design.
+  !! device_maxval itself is exact, and the cross-rank MPI_SUM is the
+  !! same operation on both backends; what actually differs is the
+  !! LOCAL summation order (device_norm/device_lcsc2 against the cpu
+  !! backend's sequential loops) and nvcc's default fused multiply-add,
+  !! which rounds differently than the host compiler -- so cpu and
+  !! device can still disagree at round-off there exactly as in the
+  !! other cases -- confirmed on a Release+LTO build, where
+  !! max_dkkt_max/max_dkkt_norm measured ~1.19e-16 at npes=2 (still
+  !! exactly 0 at npes=1, and -O0 also measures exactly 0, but neither
+  !! is guaranteed the way x/lambda/y/z are). TOL_KKT_REL, the same
+  !! bound the other cases use, covers both.
+  @test(npes=[1,2])
+  subroutine dip_epsimin_barrier(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+    real(kind=rp) :: max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda
+    real(kind=rp) :: max_dy, max_dz, cpu_change, dev_change
+    logical :: z_cpu_positive
+    integer :: n_violated0, n_bound_hit
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+
+    call run_case('epsimin_barrier', 3, 0.0_rp, 0.0_rp, 2.0_rp, 'dip', &
+         max_dx, max_dkkt_max, max_dkkt_norm, max_dlambda, max_dy, &
+         max_dz, z_cpu_positive, cpu_change, dev_change, n_violated0, &
+         n_bound_hit)
+
+    @assertEqual(0.0_rp, cpu_change, 0.0_rp, &
+         "epsimin_barrier: cpu design must be exactly unchanged")
+    @assertEqual(0.0_rp, dev_change, 0.0_rp, &
+         "epsimin_barrier: device design must be exactly unchanged")
+    @assertEqual(0.0_rp, max_dx, 0.0_rp, &
+         "epsimin_barrier: max|x_dev-x_cpu| must be exactly 0")
+    @assertTrue(max_dkkt_max .lt. TOL_KKT_REL, &
+         "epsimin_barrier: residumax rel.")
+    @assertTrue(max_dkkt_norm .lt. TOL_KKT_REL, &
+         "epsimin_barrier: residunorm rel.")
+    @assertEqual(0.0_rp, max_dlambda, 0.0_rp, &
+         "epsimin_barrier: max|lambda diff| must be exactly 0")
+    @assertEqual(0.0_rp, max_dy, 0.0_rp, &
+         "epsimin_barrier: max|y diff| must be exactly 0")
+    @assertEqual(0.0_rp, max_dz, 0.0_rp, &
+         "epsimin_barrier: max|z diff| must be exactly 0")
+  end subroutine dip_epsimin_barrier
+
+  !> Case 6: NaN guard. device_maxval, MAX and MPI_MAX can drop a NaN
+  !! entry instead of propagating it (NaN compares false against any
+  !! running maximum, so it never updates one), in both the local
+  !! per-rank reduction and the MPI_MAX across ranks that feed
+  !! residumax; only residunorm's sum-of-squares path (device_norm,
+  !! reduced across ranks with MPI_SUM, and relambda**2, both of which
+  !! DO propagate a NaN through addition) still carries it.
+  !! mma_dip_KKT_device recovers the dropped signal with
+  !! "if (ieee_is_nan(this%residunorm)) this%residumax = this%residunorm"
+  !! once both are computed. This case puts a NaN in one rank's local
+  !! df0dx -- so that at npes=2 the OTHER rank's residumax must also
+  !! come out NaN, via the MPI_SUM-reduced residual_sq_norm inside
+  !! residunorm, not just the rank that held it -- and, as a second
+  !! sub-check, a NaN in fval (already a global, replicated quantity, so
+  !! every rank holds the same NaN directly), and asserts that NEITHER
+  !! lets residumax read as a finite, converged value. This guard has no
+  !! cpu-side equivalent to compare against (a pre-existing hole in the
+  !! cpu backend, out of scope here), so, like the other cases, it is
+  !! device-only.
+  !!
+  !! Sub-check 2 (the fval NaN) is not reliably SHOWN failing without
+  !! the guard, and whether it is depends on code generation, not
+  !! simply on the optimisation level: fval does not reach residual_max
+  !! at all (device_mma_dip_kkt never takes fval as an argument), so
+  !! with the guard removed, residumax there reduces to a bare
+  !! "max(abs(relambda), residual_max)" with relambda = NaN, and small,
+  !! separate reproductions of that same max() pattern have disagreed
+  !! with each other on whether an unoptimised or an optimised build
+  !! keeps or drops the NaN operand -- "-O0 keeps it, -O2/-O3 drop it"
+  !! is not a rule this file can rely on. What is confirmed here: an
+  !! unoptimised (-O0) build propagates the NaN through regardless of
+  !! the guard, so sub-check 2 alone cannot distinguish "guard present"
+  !! from "guard removed" at that build -- only sub-check 1 can, there.
+  !! The guard is still doing real, load-bearing work for sub-check 2
+  !! (residunorm is NaN regardless of code generation, and only the
+  !! guard reads that back into residumax); it is sub-check 2 AS A
+  !! REGRESSION TEST, at an unoptimised build, that cannot be shown to
+  !! catch the guard's removal here. The four logicals below are
+  !! logged before the asserts, so a run where sub-check 1 fails first
+  !! still reports sub-check 2's own outcome.
+  @test(npes=[1,2])
+  subroutine dip_nan_guard(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+    type(mma_t) :: dev_obj
+    type(vector_t) :: x0, x, df0dx, fval
+    type(matrix_t) :: dfdx
+    real(kind=rp) :: a_arr(m_con), c_arr(m_con), d_arr(m_con)
+    real(kind=rp), allocatable :: xmin(:), xmax(:)
+    real(kind=rp) :: budget(m_con), nan, residumax
+    integer :: n, offset
+    logical :: halting_invalid
+    logical :: sub1_is_nan, sub1_not_converged
+    logical :: sub2_is_nan, sub2_not_converged
+    character(len=200) :: msg
+
+    ! Mirrors mma_optimizer_t's own default 'tolerance' (see
+    ! sources/optimizer/mma_optimizer.f90) and its convergence predicate
+    ! "this%mma%get_residumax() .lt. this%tolerance" -- a NaN residumax
+    ! must never satisfy that predicate, on any tolerance.
+    real(kind=rp), parameter :: OPTIMIZER_TOLERANCE = 1.0e-03_rp
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+
+    ! This case deliberately creates and reads back NaN residuals (see
+    ! the module-level use of ieee_exceptions above): disable the
+    ! invalid-operand trap for the duration of the case, restoring the
+    ! caller's halting mode (and clearing whatever flag that leaves set)
+    ! before this subroutine returns, on every exit path -- including an
+    ! early return via a failed assertion, which is why the restore
+    ! below happens before the asserts, not after them.
+    call ieee_get_halting_mode(ieee_invalid, halting_invalid)
+    call ieee_set_halting_mode(ieee_invalid, .false.)
+
+    nan = ieee_value(nan, ieee_quiet_nan)
+
+    call partition(n, offset)
+    allocate(xmin(n), xmax(n))
+    a_arr = 0.0_rp
+    c_arr = 1000.0_rp
+    d_arr = 0.0_rp
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+    call compute_budget(m_con, budget)
+
+    call x0%init(n)
+    x0%x = 0.5_rp
+    call x0%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call x%init(n)
+    x = x0
+    ! x = x0 above (vector_t's assignment, src/math/vector.f90) copies
+    ! only the device array; the host array x%x is left at its init()
+    ! default (0, not 0.5) until refreshed explicitly, exactly as
+    ! run_case does after every %update()/%copy_from(DEVICE_TO_HOST)
+    ! call above. Without this, the host-side eval_problem call below
+    ! would run at x = 0, not x0 = 0.5.
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    call df0dx%init(n)
+    call fval%init(m_con)
+    call dfdx%init(m_con, n)
+
+    call dev_obj%init_from_components(x0, n, m_con, 1.0_rp, a_arr, c_arr, &
+         d_arr, xmin, xmax, bcknd = 'device', subsolver = 'dip', &
+         move_limit = 0.0_rp, epsimin = SUBSOLVE_EPSIMIN, &
+         max_iter = SUBSOLVE_MAX_ITER)
+
+    ! One real update first, so lambda/y/z hold a non-trivial iterate
+    ! when the NaN is introduced, as an optimizer run would reach this
+    ! point -- not a freshly initialised, all-zero object.
+    call eval_problem(n, offset, m_con, budget, x%x, df0dx%x, fval%x, &
+         dfdx%x)
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call dev_obj%update(1, x, df0dx, fval, dfdx)
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    ! Sub-check 1: a NaN in this rank's local df0dx only.
+    call eval_problem(n, offset, m_con, budget, x%x, df0dx%x, fval%x, &
+         dfdx%x)
+    if (pe_rank .eq. 0) df0dx%x(1) = nan
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call dev_obj%kkt(x, df0dx, fval, dfdx)
+    residumax = dev_obj%get_residumax()
+    sub1_is_nan = ieee_is_nan(residumax)
+    sub1_not_converged = .not. (residumax .lt. OPTIMIZER_TOLERANCE)
+
+    ! Sub-check 2: a NaN in fval, with df0dx restored to finite values.
+    call eval_problem(n, offset, m_con, budget, x%x, df0dx%x, fval%x, &
+         dfdx%x)
+    fval%x(1) = nan
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call dev_obj%kkt(x, df0dx, fval, dfdx)
+    residumax = dev_obj%get_residumax()
+    sub2_is_nan = ieee_is_nan(residumax)
+    sub2_not_converged = .not. (residumax .lt. OPTIMIZER_TOLERANCE)
+
+    ! Logged before the frees/asserts below (see that comment) so a run
+    ! where sub-check 1's assert returns first still reports sub-check
+    ! 2's own outcome -- see that sub-check's own docstring above for
+    ! why it is not reliably shown failing without the guard on every
+    ! build.
+    if (pe_rank .eq. 0) then
+       write(msg, '(A,4(1X,A,L1))') &
+            'mma-backend-consistency dip_nan_guard', &
+            'sub1_is_nan=', sub1_is_nan, &
+            'sub1_not_converged=', sub1_not_converged, &
+            'sub2_is_nan=', sub2_is_nan, &
+            'sub2_not_converged=', sub2_not_converged
+       call neko_log%message(trim(msg))
+    end if
+
+    ! Free everything and restore the ieee halting mode BEFORE any
+    ! assertion below: pFUnit expands "@assertTrue(...)" to
+    ! "call assertTrue(...); if (anyExceptions()) return", so a failed
+    ! assertion returns immediately -- if frees or the mode restore sat
+    ! after the asserts, a failing case would leak the device buffers
+    ! below and leave -ffpe-trap=invalid disabled for every later test.
+    call x0%free()
+    call x%free()
+    call df0dx%free()
+    call fval%free()
+    call dfdx%free()
+    call dev_obj%free()
+    call ieee_set_flag(ieee_invalid, .false.)
+    call ieee_set_halting_mode(ieee_invalid, halting_invalid)
+
+    @assertTrue(sub1_is_nan, &
+         "nan_guard: NaN in df0dx did not read as NaN in residumax")
+    @assertTrue(sub1_not_converged, &
+         "nan_guard: NaN in df0dx read as converged")
+    @assertTrue(sub2_is_nan, &
+         "nan_guard: NaN in fval did not read as NaN in residumax")
+    @assertTrue(sub2_not_converged, &
+         "nan_guard: NaN in fval read as converged")
+  end subroutine dip_nan_guard
+
+
+  !> Case 7: a direct, deterministic probe of the dip KKT kernel's
+  !! bound-proximity threshold -- a design variable within 1e-5 of xmin
+  !! or xmax gets its bound multiplier (xsi or eta) estimated (see
+  !! mma_dip_KKT_cpu's own comment in
+  !! sources/mma/bcknd/cpu/mma_cpu.f90, and mma_dip_kkt_kernel in
+  !! sources/mma/bcknd/device/cuda/mma_kernel.h, which both read
+  !! "x(j) < xmin(j) + 1e-5 .and. rex > 0" / "x(j) > xmax(j) - 1e-5 .and.
+  !! rex < 0", strict inequality, relative to the TRUE bounds). The
+  !! trajectory cases above leave each design variable either exactly
+  !! at a bound or well away from it, almost never near the 1e-5
+  !! threshold itself (moving the threshold to 2e-5 in the device
+  !! kernel went unnoticed by them), so a wrong threshold on either
+  !! backend would go unnoticed there. This case instead places two
+  !! design variables DIRECTLY at five distances from their bound --
+  !! one at xmin + offset, one at xmax - offset, one per rank at
+  !! npes=2 (the usual contiguous-block partition, reused via
+  !! partition()'s n_total argument) -- at 0.5e-5 and 0.99e-5 (inside
+  !! the band), then 1.01e-5, 1.5e-5 and 2.5e-5 (outside it),
+  !! straddling the threshold on purpose.
+  !!
+  !! df0dx is set to a huge, correctly-signed value at each tested
+  !! variable, so that lambda's actual, nonzero magnitude from a prior
+  !! warm-up update (needed so "nonzero multipliers" is really
+  !! exercised, not the all-zero value mma_t initialises it to) can
+  !! never flip the "rex .gt./.lt. 0" half of either variable's
+  !! activation condition. fval is set so that relambda (the unrelated
+  !! constraint-complementarity term) is exactly 0 on each backend,
+  !! leaving residumax/residunorm driven only by the two variables'
+  !! stationarity/bound-complementarity residuals.
+  !!
+  !! residumax (the max norm) and residunorm (the 2-norm) are both
+  !! global over BOTH straddled variables, not just one: with the
+  !! xmin-side variable's |rex| (~1.01e5, offset-dependent) larger
+  !! than the xmax-side one's (~9.9e4), residumax tracks the xmin side
+  !! only -- an xmin-side misclassification moves residumax by ~2%, an
+  !! xmax-side-only one leaves residumax unchanged and shows up only in
+  !! residunorm, by ~29%. Both margins are still >= 1e8 x TOL_KKT_REL
+  !! (whose own floor measures exactly 0 at every offset and both npes
+  !! on the ported tree), so either kind of misclassification is
+  !! caught; it is not the "~5 orders of magnitude" swing a single
+  !! mis-activation produces when it hits both variables at once.
+  !! TOL_KKT_REL, the same bound the other cases use, is reused here
+  !! rather than a new, looser constant for this case specifically.
+  @test(npes=[1,2])
+  subroutine dip_kkt_bounds(this)
+    class(test_backend_consistency_case), intent(inout) :: this
+    type(mma_t) :: cpu_obj, dev_obj
+    type(vector_t) :: x0, x, df0dx, fval
+    type(matrix_t) :: dfdx
+    real(kind=rp) :: a_arr(1), c_arr(1), d_arr(1)
+    real(kind=rp), allocatable :: xmin(:), xmax(:)
+    real(kind=rp), allocatable :: lambda_cpu(:), lambda_dev(:)
+    real(kind=rp), allocatable :: y_cpu(:), y_dev(:)
+    real(kind=rp) :: rmax_cpu, rmax_dev, rnorm_cpu, rnorm_dev
+    real(kind=rp) :: dkktmax, dkktnorm, floor_r
+    integer :: n_local, g_offset, j, jg, k
+    character(len=200) :: msg
+    character(len=64) :: assert_msg
+    integer, parameter :: n_bounds_global = 2
+    real(kind=rp), parameter :: straddle_offsets(5) = &
+         [0.5e-5_rp, 0.99e-5_rp, 1.01e-5_rp, 1.5e-5_rp, 2.5e-5_rp]
+    real(kind=rp), parameter :: BIG_GRAD = 1.0e+05_rp
+    ! Stored instead of asserted inline below: %kkt() is collective (an
+    ! MPI_Allreduce inside residunorm at npes=2), so every rank must
+    ! call it the same number of times. An assert's pFUnit-generated
+    ! "if (anyExceptions()) return" returning early on only one rank
+    ! would leave the other rank(s) alone in that collective on the
+    ! next loop iteration (a deadlock to the ctest TIMEOUT, not a clean
+    ! failure) and would skip the frees further down (a device-memory
+    ! leak). So every outcome below is stored here and only asserted
+    ! after the loop, once every rank has finished every call in it and
+    ! every object/vector has been freed.
+    logical :: lambda_ok(2)
+    logical :: rmax_ok(5), kktmax_ok(5), kktnorm_ok(5)
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+
+    call partition(n_local, g_offset, n_total = n_bounds_global)
+    allocate(xmin(n_local), xmax(n_local))
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+    a_arr = 0.0_rp
+    c_arr = 1000.0_rp
+    d_arr = 0.0_rp
+
+    call x0%init(n_local)
+    x0%x = 0.5_rp
+    call x0%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call x%init(n_local)
+    call df0dx%init(n_local)
+    call fval%init(1)
+    call dfdx%init(1, n_local)
+
+    call cpu_obj%init_from_components(x0, n_local, 1, 1.0_rp, a_arr, &
+         c_arr, d_arr, xmin, xmax, bcknd = 'cpu', subsolver = 'dip', &
+         move_limit = 0.0_rp, epsimin = SUBSOLVE_EPSIMIN, &
+         max_iter = SUBSOLVE_MAX_ITER)
+    call dev_obj%init_from_components(x0, n_local, 1, 1.0_rp, a_arr, &
+         c_arr, d_arr, xmin, xmax, bcknd = 'device', subsolver = 'dip', &
+         move_limit = 0.0_rp, epsimin = SUBSOLVE_EPSIMIN, &
+         max_iter = SUBSOLVE_MAX_ITER)
+
+    ! One shared warm-up update per object, purely so lambda holds a
+    ! nonzero multiplier for every %kkt() call below.
+    df0dx%x = 1.0_rp
+    dfdx%x = 1.0_rp
+    fval%x = 0.6_rp
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    x = x0
+    call cpu_obj%update(1, x, df0dx, fval, dfdx)
+    x = x0
+    call dev_obj%update(1, x, df0dx, fval, dfdx)
+
+    lambda_cpu = cpu_obj%get_lambda()
+    lambda_dev = dev_obj%get_lambda()
+    lambda_ok(1) = abs(lambda_cpu(1)) .gt. 0.0_rp
+    lambda_ok(2) = abs(lambda_dev(1)) .gt. 0.0_rp
+
+    ! fval := this object's own y, so relambda = lambda*(a*z+y-fval) = 0
+    ! exactly on each backend (a = 0 already zeroes the a*z term) --
+    ! isolating residumax/residunorm to the two straddled variables'
+    ! stationarity/bound-complementarity residuals, with no contribution
+    ! from the unrelated constraint-complementarity term (already
+    ! covered by the other cases above).
+    y_cpu = cpu_obj%get_y()
+    y_dev = dev_obj%get_y()
+
+    floor_r = 1.0e-10_rp
+
+    ! %kkt() below is collective (see the declaration comment above):
+    ! this loop never asserts or returns early -- every outcome is
+    ! stored in rmax_ok/kktmax_ok/kktnorm_ok and only checked in the
+    ! second loop below, after every rank has finished every call here
+    ! and every object/vector has been freed.
+    do k = 1, 5
+       do j = 1, n_local
+          jg = g_offset + j
+          if (modulo(jg, 2) .eq. 1) then
+             ! xmin-side: x = xmin + offset; rex must be > 0 to activate
+             ! xsi.
+             x%x(j) = xmin(j) + straddle_offsets(k)
+             df0dx%x(j) = BIG_GRAD
+          else
+             ! xmax-side: x = xmax - offset; rex must be < 0 to activate
+             ! eta.
+             x%x(j) = xmax(j) - straddle_offsets(k)
+             df0dx%x(j) = -BIG_GRAD
+          end if
+          dfdx%x(1, j) = 1.0_rp
+       end do
+       call x%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+       fval%x(1) = y_cpu(1)
+       call fval%copy_from(HOST_TO_DEVICE, sync = .true.)
+       call cpu_obj%kkt(x, df0dx, fval, dfdx)
+
+       fval%x(1) = y_dev(1)
+       call fval%copy_from(HOST_TO_DEVICE, sync = .true.)
+       call dev_obj%kkt(x, df0dx, fval, dfdx)
+
+       rmax_cpu = cpu_obj%get_residumax()
+       rmax_dev = dev_obj%get_residumax()
+       rnorm_cpu = cpu_obj%get_residunorm()
+       rnorm_dev = dev_obj%get_residunorm()
+
+       rmax_ok(k) = rmax_cpu .gt. 0.0_rp
+
+       dkktmax = abs(rmax_dev - rmax_cpu) / max(abs(rmax_cpu), floor_r)
+       if (ieee_is_nan(dkktmax)) dkktmax = huge(dkktmax)
+       dkktnorm = abs(rnorm_dev-rnorm_cpu) / max(abs(rnorm_cpu), floor_r)
+       if (ieee_is_nan(dkktnorm)) dkktnorm = huge(dkktnorm)
+       kktmax_ok(k) = dkktmax .lt. TOL_KKT_REL
+       kktnorm_ok(k) = dkktnorm .lt. TOL_KKT_REL
+
+       if (pe_rank .eq. 0) then
+          write(msg, '(A,1X,ES9.2,1X,4(A,ES12.4))') &
+               'mma-backend-consistency dip_kkt_bounds offset=', &
+               straddle_offsets(k), ' rmax_cpu=', rmax_cpu, &
+               ' rmax_dev=', rmax_dev, ' dkktmax=', dkktmax, &
+               ' dkktnorm=', dkktnorm
+          call neko_log%message(trim(msg))
+       end if
+    end do
+
+    call x0%free()
+    call x%free()
+    call df0dx%free()
+    call fval%free()
+    call dfdx%free()
+    call cpu_obj%free()
+    call dev_obj%free()
+
+    @assertTrue(lambda_ok(1), &
+         "dip_kkt_bounds: vacuous -- warm-up cpu lambda is exactly 0")
+    @assertTrue(lambda_ok(2), &
+         "dip_kkt_bounds: vacuous -- warm-up device lambda is exactly 0")
+
+    do k = 1, 5
+       write(assert_msg, '(A,I0)') &
+            "dip_kkt_bounds: vacuous cpu residumax, offset index ", k
+       @assertTrue(rmax_ok(k), trim(assert_msg))
+       write(assert_msg, '(A,I0)') &
+            "dip_kkt_bounds: residumax rel. deviation, offset index ", k
+       @assertTrue(kktmax_ok(k), trim(assert_msg))
+       write(assert_msg, '(A,I0)') &
+            "dip_kkt_bounds: residunorm rel. deviation, offset index ", k
+       @assertTrue(kktnorm_ok(k), trim(assert_msg))
+    end do
+  end subroutine dip_kkt_bounds
+
+end module backend_consistency

@@ -44,6 +44,7 @@ add_subdirectory(objectives)
 add_subdirectory(checkpointing)
 add_subdirectory(optimizer)
 add_subdirectory(mapping)
+add_subdirectory(mma)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
@@ -104,3 +105,13 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     )
     add_dependencies(Unit ${test_name})
 endforeach()
+
+# mma-backend_consistency is registered in tests/unit/mma/CMakeLists.txt
+# instead of the generic loop above (see add_subdirectory(mma) further up):
+# it needs settings the generic loop does not give every test -- MAX_PES 2
+# unconditionally rather than the generic MAX_PES expression
+# ($<IF:$<STREQUAL:${DEVICE_TYPE},CPU>,2,1>, which launches only 1 rank on
+# device builds and would fail every npes=2 pFUnit variant in that file), a
+# longer TIMEOUT, and RUN_SERIAL TRUE -- following the same per-test
+# CMakeLists.txt convention tests/unit/optimizer/ and
+# tests/unit/checkpointing/ already use.
