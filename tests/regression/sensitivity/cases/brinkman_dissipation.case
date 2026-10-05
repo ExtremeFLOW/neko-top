@@ -84,15 +84,6 @@
         ]
     },
     "optimization": {
-        // fd_test_tolerance: at m_min = 1e-4 the FD estimate differs from the
-        // adjoint sensitivity by +8.598e-6, relative to |adjoint| (the FD
-        // check's error column). Set to 2(|C| + |A| m_min^p), p the median
-        // order over the run (about 1), from Richardson extrapolation (2.02e-5,
-        // rounded up to 1 s.f.). Rule and symbols:
-        // tests/unit/sensitivity/readme.md. Derived on a 16x8x1-element mesh, 2
-        // MPI ranks, Neko 7eeba5e64; re-derive under the conditions listed in
-        // tests/unit/sensitivity/readme.md.
-        "fd_test_tolerance": 3.0e-5,
         "domain": {
             "type": "point_zone",
             "zone_name": "optimization_domain"
