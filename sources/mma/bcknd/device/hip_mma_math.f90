@@ -286,6 +286,15 @@ module hip_mma_math
        integer(c_int) :: n, m
      end subroutine hip_kkt_rex
 
+     !> Binding of mma_dip_kkt_hip, see device_mma_dip_kkt.
+     subroutine mma_dip_kkt_hip(res_d, x_d, df0dx_d, dfdx_d, xmin_d, xmax_d, &
+          lambda_d, n, m) bind(c, name = 'mma_dip_kkt_hip')
+       import c_int, c_ptr
+       type(c_ptr), value :: res_d, x_d, df0dx_d, dfdx_d, xmin_d, xmax_d, &
+            lambda_d
+       integer(c_int) :: n, m
+     end subroutine mma_dip_kkt_hip
+
 
      subroutine hip_maxcons(a_d, b, c, d_d, n) bind(c, name = 'hip_maxcons')
        import c_rp, c_int, c_ptr

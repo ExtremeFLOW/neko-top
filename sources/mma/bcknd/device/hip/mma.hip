@@ -811,6 +811,19 @@ void hip_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
   HIP_CHECK(hipGetLastError());
 }
 
+void mma_dip_kkt_hip(void* res, void* x, void* df0dx, void* dfdx,
+       void* xmin, void* xmax, void* lambda, int* n, int* m) {
+  if (*n < 1) return;
+
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  hipLaunchKernelGGL(mma_dip_kkt_kernel<real>, nblcks, nthrds, 0,
+       (hipStream_t)glb_cmd_queue,
+       (real*)res, (real*)x, (real*)df0dx, (real*)dfdx, (real*)xmin,
+       (real*)xmax, (real*)lambda, *n, *m);
+  HIP_CHECK(hipGetLastError());
+}
+
 
 // a_d = max(b, c * d_d)
 void hip_maxcons(void* a, real* b, real* c, void* d, int* n) {

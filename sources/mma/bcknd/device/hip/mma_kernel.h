@@ -1204,6 +1204,42 @@ __global__ void kkt_rex_kernel(T* __restrict__ rex, const T* __restrict__ df0dx,
   }
 }
 
+// KKT residual of the original problem for the dip subsolver, as
+// mma_dip_KKT_cpu (MMA::KKTresidual in topopt_in_petsc), for each local
+// design variable j: the stationarity in res[j] and the complementarity
+// of the lower and upper bounds in res[n + j] and res[2n + j]. The bound
+// multipliers are estimated where x_j is within 1e-5 of the true bounds.
+template <typename T>
+__global__ void mma_dip_kkt_kernel(T* __restrict__ res,
+     const T* __restrict__ x, const T* __restrict__ df0dx,
+     const T* __restrict__ dfdx, const T* __restrict__ xmin,
+     const T* __restrict__ xmax, const T* __restrict__ lambda,
+     const int n, const int m) {
+  const int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj >= n) return;
+
+  const T xt = x[tj];
+  const T xmin_j = xmin[tj];
+  const T xmax_j = xmax[tj];
+
+  // Gradient of the Lagrangian w.r.t. x_j
+  T rex = df0dx[tj];
+  for (int i = 0; i < m; i++) {
+    rex = rex + lambda[i] * dfdx[i + tj * m];
+  }
+
+  // Estimate the bound multipliers where x_j is at a bound
+  T xsi = T(0.0);
+  if (xt < xmin_j + T(1.0e-5) && rex > T(0.0)) xsi = rex;
+  T eta = T(0.0);
+  if (xt > xmax_j - T(1.0e-5) && rex < T(0.0)) eta = -rex;
+  rex = rex + (-xsi + eta);
+
+  res[tj] = rex;
+  res[n + tj] = xsi * (xt - xmin_j);
+  res[2 * n + tj] = eta * (xmax_j - xt);
+}
+
 
 template <typename T>
 __global__ void maxcons_kernel(T* __restrict__ a, const T b,
