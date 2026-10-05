@@ -80,9 +80,10 @@ q_{ij} &\sim \max\!\left(-\frac{\partial f_i}{\partial x_j}, 0\right) \cdot (x_j
 with small regularization terms added for numerical stability. The exact
 form depends on the subsolver.
 
-For the `dip` subsolver on the CPU backend it follows `MMA::GenSub` in the
-topopt_in_petsc code by Aage (with `constraintModification = false`): only the objective
-(\f$ i = 0 \f$) is regularized,
+For the `dip` subsolver, on both the CPU and device backends, it follows
+`MMA::GenSub` in the topopt_in_petsc code by Aage (with
+`constraintModification = false`): only the objective (\f$ i = 0 \f$) is
+regularized,
 
 \f[
 \begin{aligned}
@@ -110,9 +111,9 @@ q_{ij} &= \max\!\left(-\frac{\partial f_i}{\partial x_j}, 0\right) (x_j - l_j)^2
 
 for \f$ i = 1, \dots, m \f$.
 
-For the `pdip` subsolver, and for both subsolvers on the device backend, it
-follows `mmasub` by Svanberg, where the objective
-and all constraints (\f$ i = 0, \dots, m \f$) are regularized:
+For the `pdip` subsolver, on both the CPU and device backends, it follows
+`mmasub` by Svanberg, where the objective and all constraints
+(\f$ i = 0, \dots, m \f$) are regularized:
 
 \f[
 \begin{aligned}
@@ -215,11 +216,12 @@ The update is governed by:
 
 The convex subproblem is solved using a **primal-dual interior point method** `"pdip"` and a pure **dual interior point method** `"dip"`.
 
-In this implementation both subsolvers support both **CPU and device (GPU)** execution.
-The alignment of the `dip` subsolver with the topopt_in_petsc code (see the
-sections below) is so far only done on the CPU backend. The device backend
-still uses the approximation of `mmasub`, the term \f$ \frac{1}{2} z^2 \f$ and
-the earlier convergence measure.
+In this implementation both subsolvers support both **CPU and device (GPU)**
+execution, and the alignment of the `dip` subsolver with the topopt_in_petsc
+code (see the sections below) applies to both: the device backend reproduces
+the same subproblem, subsolver and KKT residual as the CPU backend, on both
+the CUDA and HIP backends; see Relation to the topopt_in_petsc implementation
+below for their verification status.
 
 ---
 
@@ -234,8 +236,9 @@ The optimizer stops when `residumax` is below `optimization.solver.tolerance`.
 The residual is evaluated at the updated design, with the multipliers of the
 last subproblem.
 
-For the `dip` subsolver on the CPU backend the residual follows
-`MMA::KKTresidual` in the topopt_in_petsc code by Aage. It consists of
+For the `dip` subsolver, on both the CPU and device backends, the residual
+follows `MMA::KKTresidual` in the topopt_in_petsc code by Aage. It consists
+of
 - the gradient of the Lagrangian,
   \f$ \partial f_0 / \partial x_j + \sum_{i} \lambda_i \partial f_i / \partial x_j
   - \xi_j + \eta_j \f$,
@@ -247,6 +250,13 @@ For the `dip` subsolver on the CPU backend the residual follows
   \f$ \sum_{i} \lambda_i (a_i z + y_i - f_i(x)) \f$.
 
 The true bounds \f$ x^{\min}, x^{\max} \f$ are used, not the move limited ones.
+
+For the `dip` subsolver, the device backend also sets `residumax` to
+`residunorm` whenever the latter is NaN: the maximum reductions can
+drop a NaN, while the 2-norm keeps it, so a NaN in the design, the
+sensitivities or the constraint values never reads as convergence. The
+CPU backend does not have this guard.
+
 Since each subproblem is only solved down to the barrier parameter `epsimin`,
 the constraint term does not drop much below \f$ m \f$ times the last barrier
 level, which is the smallest power of ten above `epsimin` (between `epsimin`
@@ -331,7 +341,8 @@ L(x,y,z,\lambda) =
 
 
 so the quadratic terms for \f$y_i\f$ and \f$z\f$ are enforced to make sure that we can solve the minimization problems, analytically.
-On the CPU backend the weight \f$ 1/20 \f$ of \f$ z^2 \f$ follows the topopt_in_petsc code by Aage, which gives
+On both the CPU and device backends the weight \f$ 1/20 \f$ of \f$ z^2 \f$
+follows the topopt_in_petsc code by Aage, which gives
 \f$ z = \max\left(0, 10 \left(\sum_{i} \lambda_i a_i - a_0\right)\right) \f$.
 
 
@@ -347,10 +358,10 @@ Compared to a standard primal MMA subsolve:
 
 ### Relation to the topopt_in_petsc implementation
 
-The `dip` subsolver on the CPU backend follows `MMA.cc` in the topopt_in_petsc
-code by Aage (subproblem, dual solver and its stopping rules, KKT residual), and
-reproduces its iterates to round-off on the same input. The remaining
-differences are
+The `dip` subsolver follows `MMA.cc` in the topopt_in_petsc code by Aage
+(subproblem, dual solver and its stopping rules, KKT residual). On the CPU
+backend it reproduces the iterates of `MMA.cc` to round-off on the same
+input. The remaining differences from `MMA.cc` are
 - the default asymptote parameters: Neko-TOP uses `0.2`, `1.05`, `0.65` for
   `asyinit`, `asyincr`, `asydecr`, while `MMA.cc` uses `0.5`, `1.2`, `0.7`,
 - the initial multipliers are \f$ \lambda_i = \max(1, c_i/2) \f$ instead of
@@ -362,6 +373,14 @@ differences are
   \f$ \beta_j \f$ are treated as active in the dual Hessian, where `MMA.cc` tests
   whether the unclamped minimizer lies outside \f$ [\alpha_j, \beta_j] \f$,
 - the dual Newton system is solved with a pivoted LU factorization (LAPACK).
+
+The device backend implements the same `dip` subproblem, dual subsolver,
+stopping rule and KKT residual as the CPU backend, and agrees with it to
+round-off on the same finite input; the linear system is instead factorized
+with cuSOLVER (CUDA) or hipSOLVER (HIP). Both the CUDA and HIP backends
+implement this; it is verified on CUDA hardware, and the HIP kernels mirror
+the CUDA ones but have not been compiled or run on AMD hardware, so HIP's
+agreement with the CPU and CUDA backends is unverified.
 
 The topopt_in_petsc driver stops when the largest design change drops below
 \f$ 0.01 \f$ and does not evaluate the KKT residual. In Neko-TOP the design
