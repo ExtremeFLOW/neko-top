@@ -137,8 +137,7 @@ contains
     lx = lx + 1 ! add 1 to get number of gll points
 
     call this%chkp%init()
-    this%chkp%tlag => this%time%tlag
-    this%chkp%dtlag => this%time%dtlag
+    call this%chkp%add_time_state(this%time)
 
     ! Checked before the adjoint fluid is initialised, which assumes a
     ! three-dimensional mesh.
@@ -207,7 +206,7 @@ contains
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
                neko_case%fluid%gs_Xh, scalar_params_adjoint, &
                scalar_params_primal, numerics_params, neko_case%user, &
-               neko_case%chkp, neko_case%fluid%ulag, neko_case%fluid%vlag, &
+               this%chkp, neko_case%fluid%ulag, neko_case%fluid%vlag, &
                neko_case%fluid%wlag, neko_case%fluid%ext_bdf, &
                neko_case%fluid%rho)
           ! allocate the coupling term
@@ -239,7 +238,7 @@ contains
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
                scalar_params_adjoint, scalar_params_primal, numerics_params, &
-               neko_case%user, neko_case%chkp, neko_case%fluid%ulag, &
+               neko_case%user, this%chkp, neko_case%fluid%ulag, &
                neko_case%fluid%vlag, neko_case%fluid%wlag, &
                neko_case%fluid%ext_bdf, neko_case%fluid%rho)
           call neko_error('The adjoint scaling coupling term have not yet' // &

@@ -39,7 +39,7 @@ module adjoint_fluid_pnpn
   use symmetry_aligned, only: symmetry_aligned_t
   use registry, only: neko_registry
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use krylov, only: ksp_monitor_t
   use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
        adjoint_pnpn_vel_res_t, adjoint_pnpn_prs_res_factory, &
@@ -68,6 +68,7 @@ module adjoint_fluid_pnpn
   use facet_normal, only: facet_normal_t
   use non_normal_aligned, only: non_normal_aligned_t
   use checkpoint, only: chkp_t
+  use checkpoint_payload, only : checkpoint_payload_t
   use mesh, only: mesh_t
   use user_intf, only: user_t
   use time_step_controller, only: time_step_controller_t
@@ -284,6 +285,8 @@ contains
     logical :: monitor, found
     logical :: advection
     type(json_file) :: numerics_params, precon_params
+    type(checkpoint_payload_t), pointer :: payload
+    real(kind=dp), pointer :: tlag(:), dtlag(:)
 
     ! Temporary field pointers
     character(len=:), allocatable :: file_name
@@ -433,23 +436,28 @@ contains
     call neko_log%section("Advection factory")
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
     call json_get(params, 'case.numerics', numerics_params)
+    call chkp%get_time_history(tlag, dtlag)
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
          this%ulag, this%vlag, this%wlag, &
-         chkp%dtlag, chkp%tlag, this%ext_bdf, &
+         dtlag, tlag, this%ext_bdf, &
          .not. advection)
     ! Should be in init_base maybe?
     this%chkp => chkp
-    ! This is probably scheme specific
-    ! Should not be init really, but more like, add fluid or something...
-    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
-
-    this%chkp%abx1 => this%abx1
-    this%chkp%abx2 => this%abx2
-    this%chkp%aby1 => this%aby1
-    this%chkp%aby2 => this%aby2
-    this%chkp%abz1 => this%abz1
-    this%chkp%abz2 => this%abz2
-    call this%chkp%add_lag(this%ulag, this%vlag, this%wlag)
+    ! Register the scheme state for checkpointing.
+    payload => this%chkp%add_payload("adjoint_fluid")
+    call payload%add_field(this%u_adj)
+    call payload%add_field(this%v_adj)
+    call payload%add_field(this%w_adj)
+    call payload%add_field(this%p_adj)
+    call payload%add_field(this%abx1)
+    call payload%add_field(this%abx2)
+    call payload%add_field(this%aby1)
+    call payload%add_field(this%aby2)
+    call payload%add_field(this%abz1)
+    call payload%add_field(this%abz2)
+    call payload%add_series(this%ulag)
+    call payload%add_series(this%vlag)
+    call payload%add_series(this%wlag)
 
     call neko_log%end_section()
 
@@ -489,11 +497,7 @@ contains
   subroutine adjoint_fluid_pnpn_restart(this, chkp)
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(chkp_t), intent(inout) :: chkp
-    real(kind=rp) :: dtlag(10), tlag(10)
     integer :: i, n
-
-    dtlag = chkp%dtlag
-    tlag = chkp%tlag
 
     n = this%u_adj%dof%size()
     if (allocated(this%chkp%previous_mesh%elements) .or. &
