@@ -159,7 +159,6 @@ contains
     type(vector_t), pointer :: x
     integer :: ind
     character(len=32) :: extra_headers(3)
-    class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
 
@@ -167,16 +166,7 @@ contains
     this%unconstrained_problem = problem%get_n_constraints() .eq. 0
     if (this%unconstrained_problem) then
        call neko_log%message('Unconstrained problem detected. ' // &
-            'Adding a dummy constraint to enable MMA optimization.')
-
-       allocate(dummy_constraint_t::dummy_con)
-       select type (con => dummy_con)
-       type is (dummy_constraint_t)
-          call con%init_from_attributes(design)
-       end select
-
-       call problem%add_constraint(dummy_con)
-       if (allocated(dummy_con)) deallocate(dummy_con)
+            'Switching to explicit closed-form MMA subsolver and KKT.')
     end if
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
@@ -394,6 +384,8 @@ contains
 
     type(vector_t), pointer :: constraint_values
     integer :: ind
+
+    if (this%unconstrained_problem) return
 
     call neko_scratch_registry%request(constraint_values, ind, &
          problem%get_n_constraints(), .false.)
