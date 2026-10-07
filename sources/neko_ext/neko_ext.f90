@@ -41,7 +41,7 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
-  use adjoint_case, only: adjoint_case_t
+  use perturb_case, only: perturb_case_t
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp
   use simcomp_executor, only: neko_simcomps
@@ -58,10 +58,10 @@ module neko_ext
   use utils, only: neko_error, filename_suffix_pos, filename_suffix
   use json_module, only : json_file
   use scalars, only: scalars_t
-  use adjoint_scalars, only: adjoint_scalars_t
+  use perturb_scalars, only: perturb_scalars_t
   use field_math, only: field_rzero, field_copy
   use fluid_pnpn, only: fluid_pnpn_t
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use perturb_fluid_pnpn, only: perturb_fluid_pnpn_t
 
   implicit none
 
@@ -257,20 +257,20 @@ contains
   !! @details This subroutine resets the adjoint case data structure. It is
   !! called at the beginning of each iteration. It is used to reset the time
   !! step counter, the lagged time step parameters, the external BDF
-  !! coefficients, the adjoint fluid_adj and adjoint scalar fields.
+  !! coefficients, the adjoint fluid_pert and adjoint scalar fields.
   !!
-  !! @param[inout] adjoint_case Adjoint case data structure.
+  !! @param[inout] perturb_case Adjoint case data structure.
   !! @param[in] neko_case Primal case.
   !! @param[in] design_iteration The current design iteration. Spliced into
-  !! `adjoint_case%f_out`'s filename so each design iteration's adjoint
+  !! `perturb_case%f_out`'s filename so each design iteration's adjoint
   !! output is kept, rather than every iteration overwriting the same
   !! numbered files.
-  !! @param[in] output_base_fname `adjoint_case%f_out`'s pristine base
+  !! @param[in] output_base_fname `perturb_case%f_out`'s pristine base
   !! filename, as configured from the case file (i.e. before any
   !! design-iteration tag has ever been spliced into it).
-  subroutine reset_adjoint(adjoint_case, neko_case, design_iteration, &
+  subroutine reset_adjoint(perturb_case, neko_case, design_iteration, &
        output_base_fname)
-    type(adjoint_case_t), intent(inout) :: adjoint_case
+    type(perturb_case_t), intent(inout) :: perturb_case
     type(case_t), intent(inout) :: neko_case
     integer, intent(in) :: design_iteration
     character(len=*), intent(in) :: output_base_fname
@@ -278,53 +278,53 @@ contains
     integer :: i
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
-    type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
+    type(field_t), pointer :: u_pert, v_pert, w_pert, p_pert, s_pert
     type(json_file) :: json_subdict
 
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
     ! ------------------------------------------------------------------------ !
 
-    u_adj => adjoint_case%fluid_adj%u_adj
-    v_adj => adjoint_case%fluid_adj%v_adj
-    w_adj => adjoint_case%fluid_adj%w_adj
-    p_adj => adjoint_case%fluid_adj%p_adj
-    if (allocated(adjoint_case%adjoint_scalars)) then
-       s_adj => adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj
+    u_pert => perturb_case%fluid_pert%u_pert
+    v_pert => perturb_case%fluid_pert%v_pert
+    w_pert => perturb_case%fluid_pert%w_pert
+    p_pert => perturb_case%fluid_pert%p_pert
+    if (allocated(perturb_case%perturb_scalars)) then
+       s_pert => perturb_case%perturb_scalars%perturb_scalar_fields(1)%s_pert
     else
-       nullify(s_adj)
+       nullify(s_pert)
     end if
 
     ! ------------------------------------------------------------------------ !
     ! Reset the timing parameters
     ! ------------------------------------------------------------------------ !
 
-    call adjoint_case%time%reset()
-    t = adjoint_case%time%start_time
-    do i = 1, size(adjoint_case%time%tlag)
-       adjoint_case%time%tlag(i) = t - i*adjoint_case%time%dtlag(i)
+    call perturb_case%time%reset()
+    t = perturb_case%time%start_time
+    do i = 1, size(perturb_case%time%tlag)
+       perturb_case%time%tlag(i) = t - i*perturb_case%time%dtlag(i)
     end do
 
     ! Tag the field output filename with the design iteration, so this
     ! iteration's adjoint field output does not overwrite the previous one.
     ! See the equivalent call in `reset` for why the base
     ! `generic_file_t%init` is called directly here.
-    call adjoint_case%f_out%file_%file_type%init( &
+    call perturb_case%f_out%file_%file_type%init( &
          trim(design_iteration_fname(output_base_fname, design_iteration)))
 
     ! Reset the time step counter
-    call adjoint_case%output_controller%set_counter(adjoint_case%time)
-    if (adjoint_case%norm_output_enabled) then
-       call adjoint_case%norm_output_ctrl%set_counter(adjoint_case%time)
+    call perturb_case%output_controller%set_counter(perturb_case%time)
+    if (perturb_case%norm_output_enabled) then
+       call perturb_case%norm_output_ctrl%set_counter(perturb_case%time)
     end if
 
     ! Keep per-design-iteration output numbering anchored at 0.
-    call adjoint_case%f_out%set_start_counter(0)
-    call adjoint_case%f_out%set_counter(-1)
+    call perturb_case%f_out%set_start_counter(0)
+    call perturb_case%f_out%set_counter(-1)
 
     ! Reset the external BDF coefficients
-    do i = 1, size(adjoint_case%time%dtlag)
-       call adjoint_case%fluid_adj%ext_bdf%set_coeffs(adjoint_case%time%dtlag)
+    do i = 1, size(perturb_case%time%dtlag)
+       call perturb_case%fluid_pert%ext_bdf%set_coeffs(perturb_case%time%dtlag)
     end do
 
     ! ------------------------------------------------------------------------ !
@@ -338,20 +338,20 @@ contains
          json_subdict)
 
     if (trim(string_val) .ne. 'user') then
-       call set_flow_ic(u_adj, v_adj, w_adj, p_adj, &
-            adjoint_case%fluid_adj%c_Xh, adjoint_case%fluid_adj%gs_Xh, &
+       call set_flow_ic(u_pert, v_pert, w_pert, p_pert, &
+            perturb_case%fluid_pert%c_Xh, perturb_case%fluid_pert%gs_Xh, &
             string_val, json_subdict)
     else
        call neko_error("adjoint user initial conditions not supported")
     end if
 
     ! set lags to IC
-    call adjoint_case%fluid_adj%ulag%set(u_adj)
-    call adjoint_case%fluid_adj%vlag%set(v_adj)
-    call adjoint_case%fluid_adj%wlag%set(w_adj)
+    call perturb_case%fluid_pert%ulag%set(u_pert)
+    call perturb_case%fluid_pert%vlag%set(v_pert)
+    call perturb_case%fluid_pert%wlag%set(w_pert)
     ! zero out RHS etc
-    select type (f => adjoint_case%fluid_adj)
-    type is (adjoint_fluid_pnpn_t)
+    select type (f => perturb_case%fluid_pert)
+    class is (perturb_fluid_pnpn_t)
        call field_rzero(f%abx1)
        call field_rzero(f%aby1)
        call field_rzero(f%abz1)
@@ -360,10 +360,10 @@ contains
        call field_rzero(f%abz2)
     end select
     ! zero out all lags etc
-    ! (not sure what to do with the abx's_adj)
-    call field_rzero(adjoint_case%fluid_adj%f_adj_x)
-    call field_rzero(adjoint_case%fluid_adj%f_adj_y)
-    call field_rzero(adjoint_case%fluid_adj%f_adj_z)
+    ! (not sure what to do with the abx's_pert)
+    call field_rzero(perturb_case%fluid_pert%f_pert_x)
+    call field_rzero(perturb_case%fluid_pert%f_pert_y)
+    call field_rzero(perturb_case%fluid_pert%f_pert_z)
     ! ------------------------------------------------------------------------ !
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
@@ -373,13 +373,13 @@ contains
          has_scalar, .false.)
 
     if (has_scalar) then
-       ! check for multiple adjoint_scalars
-       if (size(adjoint_case%adjoint_scalars%adjoint_scalar_fields) .gt. 1) then
+       ! check for multiple perturb_scalars
+       if (size(perturb_case%perturb_scalars%perturb_scalar_fields) .gt. 1) then
           call neko_error('Multiple adjoint scalars not supported')
        end if
        ! zero out lag terms
        call field_rzero( &
-            adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%f_Xh)
+            perturb_case%perturb_scalars%perturb_scalar_fields(1)%f_Xh)
        ! reset the forward scalar
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
@@ -389,21 +389,21 @@ contains
           if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
                'temperature') then
              call set_scalar_ic( &
-                  adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-                  adjoint_case%fluid_adj%c_Xh, adjoint_case%fluid_adj%gs_Xh, &
+                  perturb_case%perturb_scalars%perturb_scalar_fields(1)%s_pert, &
+                  perturb_case%fluid_pert%c_Xh, perturb_case%fluid_pert%gs_Xh, &
                   string_val, json_subdict, 0)
           else
              call set_scalar_ic( &
-                  adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-                  adjoint_case%fluid_adj%c_Xh, adjoint_case%fluid_adj%gs_Xh, &
+                  perturb_case%perturb_scalars%perturb_scalar_fields(1)%s_pert, &
+                  perturb_case%fluid_pert%c_Xh, perturb_case%fluid_pert%gs_Xh, &
                   string_val, json_subdict, 1)
           end if
        else
           call neko_error("adjoint scalar user IC not supported")
        end if
        ! set lags to IC
-       call adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj_lag% &
-            set(adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj)
+       call perturb_case%perturb_scalars%perturb_scalar_fields(1)%s_pert_lag% &
+            set(perturb_case%perturb_scalars%perturb_scalar_fields(1)%s_pert)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -413,7 +413,7 @@ contains
     call json_get_or_default(neko_case%params, &
          'case.adjoint_fluid.freeze_flow', freezeflow, .false.)
 
-    adjoint_case%fluid_adj%freeze = freezeflow
+    perturb_case%fluid_pert%freeze = freezeflow
 
   end subroutine reset_adjoint
 
@@ -467,34 +467,34 @@ contains
 
   !> @brief get scalar indices
   !! @details Given a primal scalar name, return the indices in the scalars
-  !! and adjoint_scalars list corresponding to this pair.
+  !! and perturb_scalars list corresponding to this pair.
   !! @param[out] i_primal Index in the primal scalar list.
   !! @param[out] i_adjoint Index in the adjoint scalar list.
   !! @param[inout] scalars Primal scalars list.
-  !! @param[inout] adjoint_scalars Adjoint scalars list.
+  !! @param[inout] perturb_scalars Adjoint scalars list.
   !! @param[in] primal_name Name of the primal scalar.
   subroutine get_scalar_indicies(i_primal, i_adjoint, scalars, &
-       adjoint_scalars, primal_name)
+       perturb_scalars, primal_name)
     integer, intent(out) :: i_primal
     integer, intent(out) :: i_adjoint
     type(scalars_t), intent(inout) :: scalars
-    type(adjoint_scalars_t), intent(inout) :: adjoint_scalars
+    type(perturb_scalars_t), intent(inout) :: perturb_scalars
     character(len=*), intent(in) :: primal_name
-    integer :: i, n_primal_scalars, n_adjoint_scalars
+    integer :: i, n_primal_scalars, n_perturb_scalars
 
     i_primal = -1
     i_adjoint = -1
-    n_adjoint_scalars = size(adjoint_scalars%adjoint_scalar_fields)
+    n_perturb_scalars = size(perturb_scalars%perturb_scalar_fields)
     n_primal_scalars = size(scalars%scalar_fields)
 
-    if ((n_adjoint_scalars .eq. 1) .and. (n_primal_scalars .eq. 1)) then
+    if ((n_perturb_scalars .eq. 1) .and. (n_primal_scalars .eq. 1)) then
        i_primal = 1
        i_adjoint = 1
        return
     end if
 
-    do i = 1, n_adjoint_scalars
-       if (adjoint_scalars%adjoint_scalar_fields(i)%primal_name &
+    do i = 1, n_perturb_scalars
+       if (perturb_scalars%perturb_scalar_fields(i)%primal_name &
             .eq. primal_name) then
           i_adjoint = i
           exit

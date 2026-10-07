@@ -55,8 +55,8 @@ module problem
   use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
   use time_step_controller, only: time_step_controller_t
-  use simulation_adjoint, only: simulation_adjoint_init, &
-       simulation_adjoint_step, simulation_adjoint_finalize
+  use simulation_perturb, only: simulation_adjoint_step, &
+       simulation_perturb_init, simulation_perturb_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
@@ -346,7 +346,7 @@ contains
        select type(ALO => objective)
        class is (augmented_lagrangian_objective_t)
           call json_get_or_default(parameters, &
-               "adjoint_fluid.dealias_sensitivity", dealias, .true.)
+               "perturb_fluid.dealias_sensitivity", dealias, .true.)
           call ALO%init_from_attributes(design, simulation, weight = 1.0_rp, &
                name = "Augmented Lagrangian", mask_name = "", &
                dealias = dealias)
@@ -552,51 +552,51 @@ contains
 
     call dt_controller%init(simulation%neko_case%params)
 
-    call simulation_adjoint_init(simulation%adjoint_case, dt_controller)
+    call simulation_perturb_init(simulation%perturb_case, dt_controller)
 
     ! Reset the sensitivity value to zero
     call this%reset_objective_sensitivities()
 
-    cfl = simulation%adjoint_case%fluid_adj%compute_cfl(simulation%adjoint_case%time%dt)
+    cfl = simulation%perturb_case%fluid_pert%compute_cfl(simulation%perturb_case%time%dt)
     loop_start = MPI_WTIME()
 
     ! Total time of the forward simulation
-    total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
+    total_time = simulation%n_timesteps * simulation%perturb_case%time%dt
 
     call profiler_start_region("Adjoint simulation")
 
     ! TODO. IC's need to be handled rather carefully, we should take a
     ! checkpoint at i = 0. However, 99% of the time we use an initial condition
-    ! for the fluid of u=0, so this doesn't matter. Then we use u_adj = 0 on
+    ! for the fluid of u=0, so this doesn't matter. Then we use u_pert = 0 on
     ! the other end.
     !
     ! we have:
     !  - n    time steps to compute
     !  - n+1  fields to consider
-    !  - n-1  non-zero contributions to u * u_adj
+    !  - n-1  non-zero contributions to u * u_pert
     !
     !              non-zero
     !             |--------|
     !  primal  o--x--x--x--x--x
     !          x--x--x--x--x--o  adjoint
     !          ^              ^
-    !         u=0          u_adj=0
+    !         u=0          u_pert=0
 
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
        call simulation%checkpoint%restore(simulation%neko_case, i)
        ! accumulate objective sensitivity
-       accumulation_time = simulation%adjoint_case%time
-       accumulation_time%t = total_time - simulation%adjoint_case%time%t
+       accumulation_time = simulation%perturb_case%time
+       accumulation_time%t = total_time - simulation%perturb_case%time%t
        call this%accumulate_objective_sensitivities(design, accumulation_time)
        ! step the adjoint backwards
-       call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
+       call simulation_adjoint_step(simulation%perturb_case, dt_controller, &
             cfl, loop_start, total_time)
     end do
 
     call profiler_end_region("Adjoint simulation")
 
-    call simulation_adjoint_finalize(simulation%adjoint_case)
+    call simulation_perturb_finalize(simulation%perturb_case)
 
   end subroutine problem_run_backward_unsteady
 

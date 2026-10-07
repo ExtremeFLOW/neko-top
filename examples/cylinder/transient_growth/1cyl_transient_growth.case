@@ -1,0 +1,93 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "newton.nmsh",
+        "output_directory": "viz",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": true,
+        "time": {
+            "end_time": 18.0,
+            "timestep": 0.01
+        },
+        "numerics": {
+            "time_order": 1,
+            "polynomial_order": 5,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 40.0,
+            "initial_condition": {
+                "type": "field",
+                "file_name": "baseflow_newton_Re400.f00000"
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1.0e-4,
+                "max_iterations": 20
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "phmg",
+                    "pcoarsening_schedule": [ 3, 2, 1 ],
+                    "coarse_grid": {
+                        "solver": "tamg"
+                    }
+                },
+                "absolute_tolerance": 1.0e-4,
+                "max_iterations": 20
+            },
+            "output_control": "never",
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 2, 4, 5 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 3 ]
+                }
+            ]
+        },
+        "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2, 4, 5 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 3 ]
+                }
+            ]
+        },
+        "lightkrylov": {
+            "transient_growth": {
+                "number_of_singular_values": 4,
+                "krylov_dimension": 512,
+                "tolerance": 1.0e-8,
+                "write_intermediate": true
+            }
+        }
+    },
+    "checkpoints": {
+        "enabled": false,
+        "n_memory": 100,
+        "path": "checkpoints/",
+        "filename": "transient_growth"
+    }
+}

@@ -39,7 +39,7 @@ module brinkman_design
   use json_module, only: json_file
   use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use perturb_fluid_pnpn, only: perturb_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
@@ -429,29 +429,29 @@ contains
          simulation%fluid%v, &
          simulation%fluid%w, &
          simulation%fluid%c_Xh, &
-         simulation%adjoint_fluid%c_Xh_GL, &
-         simulation%adjoint_fluid%GLL_to_GL, &
-         dealias, simulation%adjoint_fluid%scratch_GL)
+         simulation%perturb_fluid%c_Xh_GL, &
+         simulation%perturb_fluid%GLL_to_GL, &
+         dealias, simulation%perturb_fluid%scratch_GL)
     ! append brinkman source term to the forward problem
     call simulation%fluid%source_term%add(forward_brinkman)
 
     ! init the simple brinkman term for the adjoint
     call adjoint_brinkman%init_from_components( &
-         simulation%adjoint_fluid%f_adj_x, &
-         simulation%adjoint_fluid%f_adj_y, &
-         simulation%adjoint_fluid%f_adj_z, &
+         simulation%perturb_fluid%f_pert_x, &
+         simulation%perturb_fluid%f_pert_y, &
+         simulation%perturb_fluid%f_pert_z, &
          this%brinkman_amplitude, &
-         simulation%adjoint_fluid%u_adj, &
-         simulation%adjoint_fluid%v_adj, &
-         simulation%adjoint_fluid%w_adj, &
-         simulation%adjoint_fluid%c_Xh, &
-         simulation%adjoint_fluid%c_Xh_GL, &
-         simulation%adjoint_fluid%GLL_to_GL, &
-         dealias, simulation%adjoint_fluid%scratch_GL)
+         simulation%perturb_fluid%u_pert, &
+         simulation%perturb_fluid%v_pert, &
+         simulation%perturb_fluid%w_pert, &
+         simulation%perturb_fluid%c_Xh, &
+         simulation%perturb_fluid%c_Xh_GL, &
+         simulation%perturb_fluid%GLL_to_GL, &
+         dealias, simulation%perturb_fluid%scratch_GL)
     ! append brinkman source term based on design
 
-    select type (f => simulation%adjoint_fluid)
-    type is (adjoint_fluid_pnpn_t)
+    select type (f => simulation%perturb_fluid)
+    class is (perturb_fluid_pnpn_t)
        call f%source_term%add(adjoint_brinkman)
     class default
     end select

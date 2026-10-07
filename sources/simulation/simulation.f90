@@ -38,13 +38,13 @@ module simulation_m
   use case, only: case_t
   use neko, only: neko_solve
   use user_access_singleton, only: neko_user_access
-  use adjoint_case, only: adjoint_case_t
+  use perturb_case, only: perturb_case_t
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
-  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use perturb_fluid_scheme, only: perturb_fluid_scheme_t
+  use perturb_fluid_pnpn, only: perturb_fluid_pnpn_t
   use scalar_pnpn, only: scalar_pnpn_t
-  use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
-  use adjoint_scalars, only: adjoint_scalars_t
+  use perturb_scalar_pnpn, only: perturb_scalar_pnpn_t
+  use perturb_scalars, only: perturb_scalars_t
   use scalars, only: scalars_t
   use scalar_scheme, only: scalar_scheme_t
   use fluid_pnpn, only: fluid_pnpn_t
@@ -70,8 +70,8 @@ module simulation_m
   use jobctrl, only: jobctrl_time_limit
   use profiler, only: profiler_start, profiler_stop, &
        profiler_start_region, profiler_end_region
-  use simulation_adjoint, only: simulation_adjoint_init, &
-       simulation_adjoint_step, simulation_adjoint_finalize
+  use simulation_perturb, only: simulation_adjoint_step, &
+       simulation_perturb_init, simulation_perturb_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
   use simulation_checkpoint, only: simulation_checkpoint_t
@@ -86,31 +86,31 @@ module simulation_m
      !> and primal case
      type(case_t), public :: neko_case
      !> and adjoint case
-     type(adjoint_case_t), public :: adjoint_case
+     type(perturb_case_t), public :: perturb_case
      !> The fluid
      class(fluid_scheme_incompressible_t), public, pointer :: fluid => null()
      !> The scalar
      type(scalars_t), public, pointer :: scalars => null()
      !> The adjoint fluid
-     class(adjoint_fluid_scheme_t), public, pointer :: adjoint_fluid => null()
+     class(perturb_fluid_scheme_t), public, pointer :: perturb_fluid => null()
      !> The adjoint scalar
-     type(adjoint_scalars_t), public, pointer :: adjoint_scalars => null()
+     type(perturb_scalars_t), public, pointer :: perturb_scalars => null()
      !> An output sampler for the forward problem.
      !! This should probably be an output controller at some point instead.
      type(field_output_t), public :: output_forward
      !> An output sampler for the adjoint problem.
      !! This should probably be an output controller at some point instead.
-     type(field_output_t), public :: output_adjoint
+     type(field_output_t), public :: output_perturb
      !> Base output filename for Neko's own forward field output
      !! (`neko_case%f_out`), captured before any design-iteration tag is
      !! spliced into it, so that tag can be rebuilt fresh on every reset.
      character(len=:), allocatable :: forward_field_base_fname
      !> Base output filename for Neko's own adjoint field output
-     !! (`adjoint_case%f_out`), captured before any design-iteration tag is
+     !! (`perturb_case%f_out`), captured before any design-iteration tag is
      !! spliced into it, so that tag can be rebuilt fresh on every reset.
-     character(len=:), allocatable :: adjoint_field_base_fname
+     character(len=:), allocatable :: perturb_field_base_fname
      !> The current design iteration. Used so that `reset` can keep Neko's
-     !! own field output (`neko_case%f_out` / `adjoint_case%f_out`) from
+     !! own field output (`neko_case%f_out` / `perturb_case%f_out`) from
      !! overwriting the previous design iteration's output.
      integer :: current_design_iteration = 0
      !> Whether the simulation is steady or unsteady
@@ -174,14 +174,14 @@ contains
     call neko_simcomps%init(this%neko_case)
 
     ! initialize the adjoint
-    call this%adjoint_case%init(this%neko_case)
+    call this%perturb_case%init(this%neko_case)
 
     ! Capture Neko's own field output filenames before any design-iteration
     ! tag ever gets spliced into them (see `reset`/`neko_ext::reset`).
     this%forward_field_base_fname = &
          trim(this%neko_case%f_out%file_%get_base_fname())
-    this%adjoint_field_base_fname = &
-         trim(this%adjoint_case%f_out%file_%get_base_fname())
+    this%perturb_field_base_fname = &
+         trim(this%perturb_case%f_out%file_%get_base_fname())
 
     ! Start the profiler
     call profiler_start
@@ -191,17 +191,17 @@ contains
        this%fluid => fluid
     end select
 
-    select type (adjoint_fluid => this%adjoint_case%fluid_adj)
-    type is (adjoint_fluid_pnpn_t)
-       this%adjoint_fluid => adjoint_fluid
+    select type (perturb_fluid => this%perturb_case%fluid_pert)
+    class is (perturb_fluid_pnpn_t)
+       this%perturb_fluid => perturb_fluid
     end select
 
     if (allocated(this%neko_case%scalars)) then
        this%scalars => this%neko_case%scalars
     end if
 
-    if (allocated(this%adjoint_case%adjoint_scalars)) then
-       this%adjoint_scalars => this%adjoint_case%adjoint_scalars
+    if (allocated(this%perturb_case%perturb_scalars)) then
+       this%perturb_scalars => this%perturb_case%perturb_scalars
     end if
 
     !---------------------------------------------------------
@@ -254,25 +254,25 @@ contains
          'case.adjoint_fluid.output_subdivide', subdivide, .false.)
 
     n_scalars = 0
-    if (allocated(this%adjoint_case%adjoint_scalars)) then
-       n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
+    if (allocated(this%perturb_case%perturb_scalars)) then
+       n_scalars = size(this%perturb_case%perturb_scalars%perturb_scalar_fields)
     end if
-    call this%output_adjoint%init('adjoint_fields', 4 + n_scalars, &
+    call this%output_perturb%init('perturb_fields', 4 + n_scalars, &
          precision = precision, &
          path = trim(output_directory), &
          format = trim(file_format))
-    call this%output_adjoint%file_%set_subdivide(subdivide)
+    call this%output_perturb%file_%set_subdivide(subdivide)
 
-    call this%output_adjoint%fields%assign(1, this%adjoint_fluid%p_adj)
-    call this%output_adjoint%fields%assign(2, this%adjoint_fluid%u_adj)
-    call this%output_adjoint%fields%assign(3, this%adjoint_fluid%v_adj)
-    call this%output_adjoint%fields%assign(4, this%adjoint_fluid%w_adj)
+    call this%output_perturb%fields%assign(1, this%perturb_fluid%p_pert)
+    call this%output_perturb%fields%assign(2, this%perturb_fluid%u_pert)
+    call this%output_perturb%fields%assign(3, this%perturb_fluid%v_pert)
+    call this%output_perturb%fields%assign(4, this%perturb_fluid%w_pert)
 
     ! Assign all scalar fields
-    if (allocated(this%adjoint_case%adjoint_scalars)) then
+    if (allocated(this%perturb_case%perturb_scalars)) then
        do i = 1, n_scalars
-          call this%output_adjoint%fields%assign(4 + i, &
-               this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+          call this%output_perturb%fields%assign(4 + i, &
+               this%perturb_scalars%perturb_scalar_fields(i)%s_pert)
        end do
     end if
 
@@ -315,16 +315,16 @@ contains
     ! Free the objects
     call neko_user_access%free()
     call this%neko_case%free()
-    call this%adjoint_case%free()
+    call this%perturb_case%free()
     call this%output_forward%free()
-    call this%output_adjoint%free()
+    call this%output_perturb%free()
     call this%checkpoint%free()
 
     ! Nullify pointers
     nullify(this%fluid)
     nullify(this%scalars)
-    nullify(this%adjoint_fluid)
-    nullify(this%adjoint_scalars)
+    nullify(this%perturb_fluid)
+    nullify(this%perturb_scalars)
 
     ! Reset flags and counters
     this%unsteady = .false.
@@ -334,8 +334,8 @@ contains
     if (allocated(this%forward_field_base_fname)) then
        deallocate(this%forward_field_base_fname)
     end if
-    if (allocated(this%adjoint_field_base_fname)) then
-       deallocate(this%adjoint_field_base_fname)
+    if (allocated(this%perturb_field_base_fname)) then
+       deallocate(this%perturb_field_base_fname)
     end if
 
     ! Close global objects
@@ -375,25 +375,26 @@ contains
     class(simulation_t), intent(inout) :: this
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
-    real(kind=rp) :: cfl
+    real(kind=rp) :: cfl, total_time
     integer :: i
 
     call dt_controller%init(this%neko_case%params)
 
-    call simulation_adjoint_init(this%adjoint_case, dt_controller)
+    call simulation_perturb_init(this%perturb_case, dt_controller)
 
     call profiler_start_region("Adjoint simulation")
-    cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
+    cfl = this%perturb_case%fluid_pert%compute_cfl(this%perturb_case%time%dt)
+    total_time = this%n_timesteps * this%perturb_case%time%dt
     loop_start = MPI_WTIME()
     do i = this%n_timesteps, 1, -1
        call this%checkpoint%restore(this%neko_case, i)
 
-       call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
-            loop_start)
+       call simulation_adjoint_step(this%perturb_case, dt_controller, cfl, &
+            loop_start, total_time)
     end do
     call profiler_end_region("Adjoint simulation")
 
-    call simulation_adjoint_finalize(this%adjoint_case)
+    call simulation_perturb_finalize(this%perturb_case)
 
   end subroutine simulation_run_backward
 
@@ -403,8 +404,8 @@ contains
 
     call reset(this%neko_case, this%current_design_iteration, &
          this%forward_field_base_fname)
-    call reset_adjoint(this%adjoint_case, this%neko_case, &
-         this%current_design_iteration, this%adjoint_field_base_fname)
+    call reset_adjoint(this%perturb_case, this%neko_case, &
+         this%current_design_iteration, this%perturb_field_base_fname)
     call this%checkpoint%reset()
 
   end subroutine simulation_reset
@@ -413,8 +414,8 @@ contains
   subroutine simulation_reset_adjoint(this)
     class(simulation_t), intent(inout) :: this
 
-    call reset_adjoint(this%adjoint_case, this%neko_case, &
-         this%current_design_iteration, this%adjoint_field_base_fname)
+    call reset_adjoint(this%perturb_case, this%neko_case, &
+         this%current_design_iteration, this%perturb_field_base_fname)
 
   end subroutine simulation_reset_adjoint
 
@@ -446,7 +447,7 @@ contains
     integer, intent(in) :: idx
 
     call this%output_forward%set_counter(idx)
-    call this%output_adjoint%set_counter(idx)
+    call this%output_perturb%set_counter(idx)
 
   end subroutine simulation_set_output_counter
 
@@ -456,7 +457,7 @@ contains
     integer, intent(in) :: idx
 
     call this%output_forward%sample(real(idx, kind=rp))
-    call this%output_adjoint%sample(real(idx, kind=rp))
+    call this%output_perturb%sample(real(idx, kind=rp))
 
   end subroutine simulation_write
 
@@ -474,7 +475,7 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_adjoint%sample(real(idx, kind=rp))
+    call this%output_perturb%sample(real(idx, kind=rp))
 
   end subroutine simulation_write_adjoint
 

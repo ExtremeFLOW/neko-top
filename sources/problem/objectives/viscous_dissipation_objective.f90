@@ -69,13 +69,13 @@ module viscous_dissipation_objective
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
        field_copy
   use operators, only: grad
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use perturb_fluid_pnpn, only: perturb_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
   use adjoint_viscous_dissipation_source_term, only: &
        adjoint_viscous_dissipation_source_term_t
   use objective, only: objective_t
   use simulation_m, only: simulation_t
-  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
+  use perturb_fluid_scheme, only: perturb_fluid_scheme_t
   use coefs, only: coef_t
   use registry, only: neko_registry
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -194,9 +194,9 @@ contains
     this%v => neko_registry%get_field('v')
     this%w => neko_registry%get_field('w')
     this%c_Xh => simulation%fluid%c_Xh
-    this%adjoint_u => neko_registry%get_field('u_adj')
-    this%adjoint_v => neko_registry%get_field('v_adj')
-    this%adjoint_w => neko_registry%get_field('w_adj')
+    this%adjoint_u => neko_registry%get_field('u_pert')
+    this%adjoint_v => neko_registry%get_field('v_pert')
+    this%adjoint_w => neko_registry%get_field('w_pert')
     this%viscosity = simulation%fluid%mu%x(1,1,1,1)
 
     ! compute the volume of the objective domain
@@ -210,16 +210,16 @@ contains
     ! append a source term based on the viscous dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
-         simulation%adjoint_fluid%f_adj_x, &
-         simulation%adjoint_fluid%f_adj_y, &
-         simulation%adjoint_fluid%f_adj_z, &
+         simulation%perturb_fluid%f_pert_x, &
+         simulation%perturb_fluid%f_pert_y, &
+         simulation%perturb_fluid%f_pert_z, &
          this%u, this%v, this%w, this%weight * this%viscosity, &
          this%mask, this%has_mask, &
          this%c_Xh, this%volume, this%start_time, this%end_time)
 
     ! append adjoint forcing term based on objective function
-    select type (f => simulation%adjoint_fluid)
-    type is (adjoint_fluid_pnpn_t)
+    select type (f => simulation%perturb_fluid)
+    class is (perturb_fluid_pnpn_t)
        call f%source_term%add_source_term(adjoint_forcing)
     end select
 

@@ -45,7 +45,7 @@ module brinkman_dissipation_objective
   use simulation_m, only: simulation_t
   use adjoint_brinkman_dissipation_source_term, only: &
        adjoint_brinkman_dissipation_source_term_t
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use perturb_fluid_pnpn, only: perturb_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
@@ -215,13 +215,13 @@ contains
     this%gdim = this%c_Xh_GLL%msh%gdim
 
     ! GL
-    this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%c_Xh_GL => simulation%perturb_case%fluid_pert%c_Xh_GL
     this%Xh_GL => this%c_Xh_GL%Xh
 
     ! GLL to GL
-    this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
+    this%GLL_to_GL => simulation%perturb_case%fluid_pert%GLL_to_GL
 
-    this%scratch_GL => simulation%adjoint_case%fluid_adj%scratch_GL
+    this%scratch_GL => simulation%perturb_case%fluid_pert%scratch_GL
 
     ! compute the volume of the objective domain
     if (this%has_mask) then
@@ -232,12 +232,12 @@ contains
 
     ! if we have the Brinkman dissipation we initialize and append it too
 
-    associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
-         f_adj_y => simulation%adjoint_fluid%f_adj_y, &
-         f_adj_z => simulation%adjoint_fluid%f_adj_z)
+    associate(f_pert_x => simulation%perturb_fluid%f_pert_x, &
+         f_pert_y => simulation%perturb_fluid%f_pert_y, &
+         f_pert_z => simulation%perturb_fluid%f_pert_z)
 
-      call brinkman_dissipation%init_from_components(f_adj_x, f_adj_y, &
-           f_adj_z, design, this%weight, this%u, this%v, this%w, this%mask, &
+      call brinkman_dissipation%init_from_components(f_pert_x, f_pert_y, &
+           f_pert_z, design, this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
            this%dealias_forcing, this%volume, this%scratch_GL, this%gdim, &
            this%start_time, this%end_time)
@@ -245,8 +245,8 @@ contains
     end associate
 
     ! append adjoint forcing term based on objective function
-    select type (f => simulation%adjoint_fluid)
-    type is (adjoint_fluid_pnpn_t)
+    select type (f => simulation%perturb_fluid)
+    class is (perturb_fluid_pnpn_t)
        call f%source_term%add_source_term(brinkman_dissipation)
     end select
 

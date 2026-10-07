@@ -1,0 +1,94 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "../../_shared/1cyl.nmsh",
+        "output_directory": "viz",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": true,
+        "time": {
+            "end_time": 1.0,
+            "timestep": 0.01
+        },
+        "numerics": {
+            "time_order": 1,
+            "polynomial_order": 5,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 50.0,
+            "initial_condition": {
+                "type": "field",
+                "file_name": "BF_1cyl0.f00001"
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1.0e-9,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "phmg",
+                    "pcoarsening_schedule": [ 3, 2, 1 ],
+                    "coarse_grid": {
+                        "solver": "tamg"
+                    }
+                },
+                "absolute_tolerance": 1.0e-7,
+                "max_iterations": 800
+            },
+            "output_control": "never",
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 2, 4, 5 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 3 ]
+                }
+            ]
+        },
+        "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2, 4, 5 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 3 ]
+                }
+            ]
+        },
+        "lightkrylov": {
+            "analysis": {
+                "adjoint": false
+            },
+            "eigensolver": {
+                "number_of_eigenvalues": 2,
+                "tolerance": 1.0e-10
+            }
+        }
+    },
+    "checkpoints": {
+        "enabled": false,
+        "n_memory": 100,
+        "path": "checkpoints/",
+        "filename": "direct_forward"
+    }
+}

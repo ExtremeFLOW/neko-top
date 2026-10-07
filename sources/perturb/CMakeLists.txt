@@ -1,0 +1,30 @@
+# Contains the Neko-TOP perturbation functionality
+#
+target_sources(neko-top
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_case.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_output.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_scheme.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_scheme_incompressible.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_pnpn_bc_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/lns/lns_fluid_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/lns/lns_advection_no_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/lns/lns_advection_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fluid_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_advection_no_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_advection_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_advection.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_advection_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/simulation_perturb.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_scalar_scheme.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_scalar_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_scalar_pnpn_bc_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/perturb_scalars.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn_res.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn_res_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/bcknd/cpu/adjoint_pnpn_res_cpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/bcknd/device/adjoint_pnpn_res_device.F90
+)

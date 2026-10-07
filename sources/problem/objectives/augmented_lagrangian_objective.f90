@@ -167,9 +167,9 @@ contains
     this%u => simulation%neko_case%fluid%u
     this%v => simulation%neko_case%fluid%v
     this%w => simulation%neko_case%fluid%w
-    this%adjoint_u => simulation%adjoint_case%fluid_adj%u_adj
-    this%adjoint_v => simulation%adjoint_case%fluid_adj%v_adj
-    this%adjoint_w => simulation%adjoint_case%fluid_adj%w_adj
+    this%adjoint_u => simulation%perturb_case%fluid_pert%u_pert
+    this%adjoint_v => simulation%perturb_case%fluid_pert%v_pert
+    this%adjoint_w => simulation%perturb_case%fluid_pert%w_pert
 
     this%dealias = dealias
     ! GLL
@@ -177,13 +177,13 @@ contains
     this%Xh_GLL => this%c_Xh_GLL%Xh
 
     ! GL
-    this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%c_Xh_GL => simulation%perturb_case%fluid_pert%c_Xh_GL
     this%Xh_GL => this%c_Xh_GL%Xh
 
     ! GLL to GL
-    this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
+    this%GLL_to_GL => simulation%perturb_case%fluid_pert%GLL_to_GL
 
-    this%scratch_GL => simulation%adjoint_case%fluid_adj%scratch_GL
+    this%scratch_GL => simulation%perturb_case%fluid_pert%scratch_GL
 
   end subroutine augmented_lagrangian_init_attributes
 

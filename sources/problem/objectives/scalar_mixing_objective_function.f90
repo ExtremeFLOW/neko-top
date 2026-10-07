@@ -54,7 +54,7 @@ module scalar_mixing_objective
   use adjoint_mixing_scalar_source_term, only: &
        adjoint_mixing_scalar_source_term_t
   use neko_ext, only: get_scalar_indicies
-  ! delete after the simulation computes u u_adj
+  ! delete after the simulation computes u u_pert
   use field_math, only: field_addcol3, field_col3
   use continuation_scheduler, only: nekotop_continuation
   implicit none
@@ -80,8 +80,8 @@ module scalar_mixing_objective
      ! -----------------------------------------------------------------
      ! THESE SHOULD BE DELETED WHEN THE DESIGN UPDATE COMES IN.
      ! These sensitivity should return zero, and the simulation
-     ! should compute the u u_adj component
-     type(field_t), pointer :: u, v, w, u_adj, v_adj, w_adj
+     ! should compute the u u_pert component
+     type(field_t), pointer :: u, v, w, u_pert, v_pert, w_pert
 
    contains
 
@@ -163,7 +163,7 @@ contains
     integer :: i_scalar, i_adjoint_scalar
 
     ! Start by checking if the adjoint scalar has been initialized
-    if (.not.allocated(simulation%adjoint_case%adjoint_scalars)) then
+    if (.not.allocated(simulation%perturb_case%perturb_scalars)) then
        call neko_error("adjoint passive scalar not initialized")
     end if
 
@@ -185,12 +185,12 @@ contains
 
     ! figure out the index associated with the scalar and adjoint scalar.
     call get_scalar_indicies(i_scalar, i_adjoint_scalar, simulation%scalars, &
-         simulation%adjoint_scalars, this%scalar_name)
+         simulation%perturb_scalars, this%scalar_name)
 
     !> Associate the RHS of the passive scalar equation
     !! \f$ f_{\phi^\dagger} \f$
-    associate(f_phi_adj => simulation%adjoint_scalars% &
-         adjoint_scalar_fields(i_adjoint_scalar)%f_Xh)
+    associate(f_phi_adj => simulation%perturb_scalars% &
+         perturb_scalar_fields(i_adjoint_scalar)%f_Xh)
 
       ! Associate json parameters
       this%phi_ref = phi_ref
@@ -206,7 +206,7 @@ contains
     end associate
 
     ! append adjoint source term to the adjoint passive scalar equation
-    call simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar) &
+    call simulation%perturb_scalars%perturb_scalar_fields(i_adjoint_scalar) &
          %source_term%add_source_term(adjoint_forcing)
 
     !--------------------------------------------------------------------------
@@ -214,9 +214,9 @@ contains
     this%u => simulation%fluid%u
     this%v => simulation%fluid%v
     this%w => simulation%fluid%w
-    this%u_adj => simulation%adjoint_fluid%u_adj
-    this%v_adj => simulation%adjoint_fluid%v_adj
-    this%w_adj => simulation%adjoint_fluid%w_adj
+    this%u_pert => simulation%perturb_fluid%u_pert
+    this%v_pert => simulation%perturb_fluid%v_pert
+    this%w_pert => simulation%perturb_fluid%w_pert
   end subroutine scalar_mixing_init_attributes
 
   !> Destructor.
@@ -228,9 +228,9 @@ contains
     this%v => null()
     this%w => null()
     this%phi => null()
-    this%u_adj => null()
-    this%v_adj => null()
-    this%w_adj => null()
+    this%u_pert => null()
+    this%v_pert => null()
+    this%w_pert => null()
 
   end subroutine scalar_mixing_free
 

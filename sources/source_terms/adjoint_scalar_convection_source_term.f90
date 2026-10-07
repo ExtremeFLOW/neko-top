@@ -64,11 +64,11 @@ module adjoint_scalar_convection_source_term
 
   ! In any case,
   ! it's a source term acting on the adjoint velocity equations, of the form:
-  ! \f$\nabla s s_adj\f$
+  ! \f$\nabla s s_pert\f$
   type, public, extends(source_term_t) :: &
        adjoint_scalar_convection_source_term_t
      !> adjoint passive scalar
-     type(field_t), pointer :: s_adj => null()
+     type(field_t), pointer :: s_pert => null()
      !> forward passive scalar
      type(field_t), pointer :: s => null()
      ! --- for over-integration
@@ -135,17 +135,17 @@ contains
   !! @param this The source term.
   !! @param f_x, f_y, f_z the RHS of the equation (either primal or adjoint).
   !! @param s the primal scalar
-  !! @param s_adj the primal scalar
+  !! @param s_pert the primal scalar
   !! @param coef The SEM coeffs.
   !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
   !! @param GLL_to_GL Interpolator between GLL and GL.
   !! @param dealias if dealiasing should be applied.
   !! @param scratch_GL A scratch registry on the GL space.
   subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
-       f_x, f_y, f_z, s, s_adj, coef, c_Xh_GL, GLL_to_GL, dealias, scratch_GL)
+       f_x, f_y, f_z, s, s_pert, coef, c_Xh_GL, GLL_to_GL, dealias, scratch_GL)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
-    type(field_t), intent(in), target :: s, s_adj
+    type(field_t), intent(in), target :: s, s_pert
     type(coef_t), intent(in), target :: coef
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
@@ -174,7 +174,7 @@ contains
     call fields%free()
 
     ! point everything in the correct places
-    this%s_adj => s_adj
+    this%s_pert => s_pert
     this%s => s
 
     ! for over integration
@@ -192,7 +192,7 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
 
     call this%free_base()
-    nullify(this%s_adj)
+    nullify(this%s_pert)
     nullify(this%s)
     nullify(this%c_Xh_GL)
     nullify(this%Xh_GL)
@@ -211,7 +211,7 @@ contains
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(4)
     type(field_t), pointer :: dsdx, dsdy, dsdz, work
-    type(field_t), pointer :: accumulate, fld_GL, s_GL, s_adj_GL
+    type(field_t), pointer :: accumulate, fld_GL, s_GL, s_pert_GL
     integer :: temp_indices_GL(4)
     integer :: n_GL, nel
 
@@ -225,22 +225,22 @@ contains
     fv => this%fields%get(2)
     fw => this%fields%get(3)
 
-    ! we need the term \f$\nabla s s_adj\f$
+    ! we need the term \f$\nabla s s_pert\f$
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
        call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), .false.)
        call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), .false.)
        call this%scratch_GL%request_field(s_GL, temp_indices_GL(3), .false.)
-       call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4), .false.)
+       call this%scratch_GL%request_field(s_pert_GL, temp_indices_GL(4), .false.)
 
        call this%GLL_to_GL%map(s_GL%x, this%s%x, nel, this%Xh_GL)
-       call this%GLL_to_GL%map(s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(s_pert_GL%x, this%s_pert%x, nel, this%Xh_GL)
 
        ! u
        call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdx, &
             this%c_Xh_GL%dsdx, this%c_Xh_GL%dtdx, this%c_Xh_GL)
-       call field_col3(accumulate, s_adj_GL, fld_GL)
+       call field_col3(accumulate, s_pert_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
@@ -261,7 +261,7 @@ contains
        ! v
        call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdy, &
             this%c_Xh_GL%dsdy, this%c_Xh_GL%dtdy, this%c_Xh_GL)
-       call field_col3(accumulate, s_adj_GL, fld_GL)
+       call field_col3(accumulate, s_pert_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
@@ -282,7 +282,7 @@ contains
        ! w
        call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdz, &
             this%c_Xh_GL%dsdz, this%c_Xh_GL%dtdz, this%c_Xh_GL)
-       call field_col3(accumulate, s_adj_GL, fld_GL)
+       call field_col3(accumulate, s_pert_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
@@ -304,9 +304,9 @@ contains
 
     else
        call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
-       call field_subcol3(fu, this%s_adj, dsdx)
-       call field_subcol3(fv, this%s_adj, dsdy)
-       call field_subcol3(fw, this%s_adj, dsdz)
+       call field_subcol3(fu, this%s_pert, dsdx)
+       call field_subcol3(fv, this%s_pert, dsdy)
+       call field_subcol3(fw, this%s_pert, dsdz)
     end if
 
     ! free the scratch

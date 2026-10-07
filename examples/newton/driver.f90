@@ -8,10 +8,11 @@ program usrneko
   use LightKrylov_Constants
   use neko, only: neko_init, neko_finalize
   use neko_vector, only: state_vector_t
-  use neko_system, only: non_linear_propagator_t
-  use neko_jacobian, only: jacobian_t
-  use neko_linop, only: linear_propagator_t
-  use simulation_m, only: simulation_t
+  use fixed_point_system, only: fixed_point_jacobian_t, fixed_point_system_t
+  use linop_fixed_baseflow, only: linop_fixed_baseflow_t
+  use case, only: case_t
+  use perturb_case, only: perturb_case_t
+  use stability_case_utils, only: stability_case_free, stability_case_init
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use utils, only: neko_error
@@ -27,11 +28,10 @@ program usrneko
   !------------------------------------------------
 
   !> simulation
-  type(simulation_t), target :: simulation
+  type(case_t), target :: base_case
+  type(perturb_case_t), target :: lns_case
   !> nonlinear propagator.
-  type(non_linear_propagator_t) :: non_linear
-  !> a jacobian.
-  type(jacobian_t) :: jacobian
+  type(fixed_point_system_t) :: non_linear
   !> State vectors
   type(state_vector_t), allocatable :: bf
 
@@ -39,7 +39,7 @@ program usrneko
   !-----     KRYLOV-BASED EIGENDECOMPOSITION     -----
   !---------------------------------------------------
   !> Exponential propagator.
-  type(linear_propagator_t), allocatable :: A
+  type(linop_fixed_baseflow_t), allocatable :: A
   !> Sampling time.
   real(kind=wp) :: tau
   !> Number of eigenvalues we wish to converge.
@@ -60,6 +60,7 @@ program usrneko
   type(state_vector_t) :: vector_mold
   !> Miscellaneous.
   integer :: i
+  logical :: compute_eigs
   ! JSON related arguments
   integer :: argc
   character(len=256) :: parameter_file
@@ -90,7 +91,9 @@ program usrneko
   call json_get_or_default(parameters, &
        'case.lightkrylov.newton.relative_tolerance', newton_tol, 1.0e-3_wp)
   call json_get_or_default(parameters, &
-       'case.lightkrylov.eigensolver.number_of_eigenvalues', nev, 15)
+       'case.lightkrylov.eigensolver.enabled', compute_eigs, .false.)
+  call json_get_or_default(parameters, &
+       'case.lightkrylov.eigensolver.number_of_eigenvalues', nev, 2)
   call json_get_or_default(parameters, &
        'case.lightkrylov.eigensolver.tolerance', eigs_tol, rtol_dp)
 
@@ -107,60 +110,52 @@ program usrneko
   !> Initialize propagators.
   ! -------------------------------------------------------------------------- !
   ! do a linear simulation
-  simulation%adjoint_case%if_adjoint = .false.
-  call simulation%init(parameters)
-  tau = real(simulation%neko_case%time%end_time, kind=wp)
-  call non_linear%init(simulation)
-  vector_mold%coef => simulation%neko_case%fluid%c_Xh
-  vector_mold%if_2d = (simulation%neko_case%fluid%c_Xh%msh%gdim .eq. 2)
-  non_linear%jacobian = jacobian
+  call stability_case_init(base_case, parameters)
+  lns_case%if_adjoint = .false.
+  call lns_case%init(base_case)
+  tau = real(base_case%time%end_time, kind=wp)
+  call non_linear%init(base_case)
+  vector_mold%coef => base_case%fluid%c_Xh
+  vector_mold%if_2d = (base_case%fluid%c_Xh%msh%gdim .eq. 2)
+  allocate(fixed_point_jacobian_t :: non_linear%jacobian)
   select type (f => non_linear%jacobian)
-  type is (jacobian_t)
-     call f%init(simulation)
+  type is (fixed_point_jacobian_t)
+     call f%init(base_case, lns_case)
   end select
 
   !> initial guess is baseflow loaded
   allocate(bf)
   call bf%init_like(vector_mold)
-  call field_copy(bf%u, non_linear%simulation%neko_case%fluid%u)
-  call field_copy(bf%v, non_linear%simulation%neko_case%fluid%v)
-  call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
+  call field_copy(bf%u, base_case%fluid%u)
+  call field_copy(bf%v, base_case%fluid%v)
+  call field_copy(bf%w, base_case%fluid%w)
 
   call newton(non_linear, bf, gmres_rdp, info, &
        scheduler=dynamic_tol_dp, rtol=newton_tol)
+  if (info < 0) call check_info(info, 'newton', module=this_module, &
+       procedure='main')
 
-  ! Now we have a steady baseflow, let's take a browse
-  call non_linear%simulation%write_forward(1)
-  
-  ! let's compute the spectra
-  allocate(A)
-  call A%init(simulation)
+  if (compute_eigs) then
+     allocate(A)
+     call A%init(base_case, lns_case)
+     call A%set_baseflow(bf)
 
-  !> Initialize Krylov subspace.
-  allocate(X(nev))
-  call init_like_basis(X, bf)
-  call initialize_krylov_subspace(X)
+     allocate(X(nev))
+     call init_like_basis(X, bf)
+     call initialize_krylov_subspace(X)
 
-  !> initialize writer
-  allocate(X_writer)
-  call X_writer%init_like(bf)
+     allocate(X_writer)
+     call X_writer%init_like(bf)
 
-  !> Call to LightKrylov.
-  call eigs(A, X, lambda, residuals, info, tolerance=eigs_tol)
+     call eigs(A, X, lambda, residuals, info, tolerance=eigs_tol)
+     call check_info(info, 'eigs', module=this_module, procedure='main')
+     lambda = log(lambda) / tau
 
-  call check_info(info, 'eigs', module=this_module, procedure='main')
-  !> Transform eigenspectrum from unit-disk to standard complex plane.
-  lambda = log(lambda) / tau
-
-  !--------------------------------
-  !-----     SAVE TO DISK     -----
-  !--------------------------------
-
-  !> Save eigenvectors to disk.
-  do i = 1, nev
-      call X_writer%axpby(1.0_wp, X(i), 0.0_wp)
-      call X_writer%write(i - 1)
-  enddo
+     do i = 1, nev
+        call X_writer%axpby(1.0_wp, X(i), 0.0_wp)
+        call X_writer%write(i - 1)
+     end do
+  end if
 
   !> Clean up
   if (allocated(A)) then
@@ -168,7 +163,6 @@ program usrneko
     deallocate(A)
   end if
   call non_linear%free()
-  call jacobian%free()
   if (allocated(X_writer)) then
     call X_writer%free()
     deallocate(X_writer)
@@ -185,7 +179,8 @@ program usrneko
   end if
   if (allocated(lambda)) deallocate(lambda)
   if (allocated(residuals)) deallocate(residuals)
-  call simulation%free()
+  call lns_case%free()
+  call stability_case_free(base_case)
   call neko_finalize()
 
 end program usrneko

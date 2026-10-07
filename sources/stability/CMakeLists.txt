@@ -52,11 +52,7 @@ target_link_libraries(
         lightkrylov
 )
 
-target_sources(
-    neko-top
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/neko_vector.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/neko_system.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/neko_jacobian.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/neko_linop.f90
-)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/vectors)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/utils)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/systems)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/linops)
