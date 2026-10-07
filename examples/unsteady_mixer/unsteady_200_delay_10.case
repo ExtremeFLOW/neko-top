@@ -200,7 +200,8 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "weight": 111.792352991
+                "weight": 111.792352991,
+                "start_time": 10.0
             },
             {
                 "type": "viscous_dissipation",
