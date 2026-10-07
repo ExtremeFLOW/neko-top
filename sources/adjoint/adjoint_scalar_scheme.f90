@@ -37,6 +37,7 @@
 module adjoint_scalar_scheme
   use gather_scatter, only : gs_t
   use checkpoint, only : chkp_t
+  use checkpoint_payload, only : checkpoint_payload_t
   use num_types, only: rp
   use field, only : field_t
   use field_list, only: field_list_t
@@ -165,6 +166,9 @@ module adjoint_scalar_scheme
      !> Update variable material properties
      procedure, pass(this) :: update_material_properties => &
           adjoint_scalar_scheme_update_material_properties
+     !> Register this scalar scheme with the checkpoint.
+     procedure, pass(this) :: register_checkpoint => &
+          adjoint_scalar_scheme_register_checkpoint
      !> Constructor.
      procedure(adjoint_scalar_scheme_init_intrf), pass(this), deferred :: init
      !> Destructor.
@@ -395,6 +399,19 @@ contains
 
   end subroutine adjoint_scalar_scheme_init
 
+  !> Register this scalar scheme with the checkpoint.
+  !! @param this The object.
+  !! @param chkp Checkpoint object to register with.
+  subroutine adjoint_scalar_scheme_register_checkpoint(this, chkp)
+    class(adjoint_scalar_scheme_t), target, intent(inout) :: this
+    type(chkp_t), intent(inout) :: chkp
+    type(checkpoint_payload_t), pointer :: payload
+
+    payload => chkp%add_payload("adjoint_scalars/" // trim(this%name))
+    call payload%add_field(this%s_adj)
+    call payload%add_series(this%s_adj_lag)
+
+  end subroutine adjoint_scalar_scheme_register_checkpoint
 
   !> Deallocate a scalar formulation
   subroutine adjoint_scalar_scheme_free(this)

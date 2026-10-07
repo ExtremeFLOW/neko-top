@@ -37,11 +37,12 @@
 module adjoint_scalar_pnpn
   use comm, only: NEKO_COMM
   use utils, only: neko_error
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use, intrinsic :: iso_fortran_env, only: error_unit
   use rhs_maker, only : rhs_maker_bdf_t, rhs_maker_ext_t, rhs_maker_oifs_t, &
        rhs_maker_ext_fctry, rhs_maker_bdf_fctry, rhs_maker_oifs_fctry
   use adjoint_scalar_scheme, only : adjoint_scalar_scheme_t
+  use checkpoint_payload, only : checkpoint_payload_t
   use checkpoint, only : chkp_t
   use field, only : field_t
   use scalar_bc_projector, only : scalar_bc_projector_t
@@ -116,6 +117,9 @@ module adjoint_scalar_pnpn
    contains
      !> Constructor.
      procedure, pass(this) :: init => adjoint_scalar_pnpn_init
+     !> Register this scalar scheme with the checkpoint.
+     procedure, pass(this) :: register_checkpoint => &
+          adjoint_scalar_pnpn_register_checkpoint
      !> To restart
      procedure, pass(this) :: restart => adjoint_scalar_pnpn_restart
      !> Destructor.
@@ -179,6 +183,7 @@ contains
     class(bc_t), pointer :: bc_i
     character(len=15), parameter :: scheme = 'Modular (Pn/Pn)'
     logical :: advection
+    real(kind=dp), pointer :: tlag(:), dtlag(:)
 
     call this%free()
 
@@ -242,35 +247,53 @@ contains
     ! Initialize advection factory
     call json_get_or_default(params_adjoint, 'advection', advection, .true.)
 
+    call chkp%get_time_history(tlag, dtlag)
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
-         ulag, vlag, wlag, this%chkp%dtlag, &
-         this%chkp%tlag, time_scheme, .not. advection, &
+         ulag, vlag, wlag, dtlag, &
+         tlag, time_scheme, .not. advection, &
          this%s_adj_lag)
-    ! Add lagged term to checkpoint
-    ! @todo Init chkp object, note, adding 3 slags
-
-    ! Add scalar info to checkpoint
-    ! call this%chkp%add_scalar(this%s)
-    ! this%chkp%abs1 => this%abx1
-    ! this%chkp%abs2 => this%abx2
-    ! this%chkp%slag => this%slag
-
   end subroutine adjoint_scalar_pnpn_init
+
+  !> Register this scalar scheme with the checkpoint.
+  subroutine adjoint_scalar_pnpn_register_checkpoint(this, chkp)
+    class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
+    type(chkp_t), intent(inout) :: chkp
+    type(checkpoint_payload_t), pointer :: payload
+
+    payload => chkp%add_payload("adjoint_scalars/" // trim(this%name))
+    call payload%add_field(this%s_adj)
+    call payload%add_series(this%s_adj_lag)
+    call payload%add_field(this%abx1)
+    call payload%add_field(this%abx2)
+
+  end subroutine adjoint_scalar_pnpn_register_checkpoint
 
   !> I envision the arguments to this func might need to be expanded
   subroutine adjoint_scalar_pnpn_restart(this, chkp)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
     type(chkp_t), intent(inout) :: chkp
-    real(kind=rp) :: dtlag(10), tlag(10)
+    logical :: interpolated
     integer :: n
-    dtlag = chkp%dtlag
-    tlag = chkp%tlag
 
     n = this%s_adj%dof%size()
 
-    call col2(this%s_adj%x, this%c_Xh%mult, n)
-    call col2(this%s_adj_lag%lf(1)%x, this%c_Xh%mult, n)
-    call col2(this%s_adj_lag%lf(2)%x, this%c_Xh%mult, n)
+    ! Lag fields are restored through the checkpoint's fsp mechanism
+
+    ! The restored fields are continuous unless the checkpoint was written
+    ! on another mesh or at another polynomial order and was interpolated
+    ! on the way in. Only then do the copies of a node shared between
+    ! elements need averaging: scale by the inverse multiplicity, then sum
+    ! the copies with a gather-scatter. On a plain restart that is the
+    ! identity in exact arithmetic but not in floating point, and would put
+    ! about one ulp of error on every shared node. Same guard as the fluid.
+    interpolated = allocated(chkp%previous_mesh%elements) .or. &
+         chkp%previous_Xh%lx .ne. this%Xh%lx
+
+    if (interpolated) then
+       call col2(this%s_adj%x, this%c_Xh%mult, n)
+       call col2(this%s_adj_lag%lf(1)%x, this%c_Xh%mult, n)
+       call col2(this%s_adj_lag%lf(2)%x, this%c_Xh%mult, n)
+    end if
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(this%s_adj%x, this%s_adj%x_d, &
             n, HOST_TO_DEVICE, sync = .false.)
@@ -286,9 +309,11 @@ contains
             n, HOST_TO_DEVICE, sync = .false.)
     end if
 
-    call this%gs_Xh%op(this%s_adj, GS_OP_ADD)
-    call this%gs_Xh%op(this%s_adj_lag%lf(1), GS_OP_ADD)
-    call this%gs_Xh%op(this%s_adj_lag%lf(2), GS_OP_ADD)
+    if (interpolated) then
+       call this%gs_Xh%op(this%s_adj, GS_OP_ADD)
+       call this%gs_Xh%op(this%s_adj_lag%lf(1), GS_OP_ADD)
+       call this%gs_Xh%op(this%s_adj_lag%lf(2), GS_OP_ADD)
+    end if
 
   end subroutine adjoint_scalar_pnpn_restart
 
