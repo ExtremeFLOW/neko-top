@@ -124,7 +124,9 @@ if [ -n "$CLUSTER" ]; then
     fi
 fi
 
-[ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
+if [[ -z "$NEKO_DIR" || "${NEKO_DIR:0:1}" != "/" ]]; then
+    export NEKO_DIR="$MAIN_DIR/external/neko"
+fi
 export NEKO_DIR=$(realpath $NEKO_DIR)
 
 if [ "$NEKO" == true ]; then
