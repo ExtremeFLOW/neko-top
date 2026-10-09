@@ -124,6 +124,9 @@ function(build_example)
         $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
         $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
         $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
+        "$<$<BOOL:${HAVE_ADIOS2}>:${ADIOS2_CXX_LIBS}>"
+        $<$<BOOL:${HAVE_ADIOS2}>:MPI::MPI_CXX>
+        $<$<BOOL:${HAVE_ADIOS2}>:stdc++>
     )
 
     # Reset the module directory if we set it earlier.
