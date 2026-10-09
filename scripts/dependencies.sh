@@ -402,7 +402,17 @@ function find_neko() {
     # Check if Neko is installed, if not install it.
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
-    if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
+
+    if [[ $# -ge 2 ]]; then
+        if [[ -d "$NEKO_LIB" && ! -f "$NEKO_DIR/configure.ac" ]]; then
+            BUILD_NEKO="false"
+        elif [ "$2" == "build" ]; then
+            BUILD_NEKO="true"
+        fi
+    fi
+
+    # Build neko if requested.
+    if [[ "$BUILD_NEKO" == true ]]; then
 
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
