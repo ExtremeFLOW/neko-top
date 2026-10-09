@@ -315,8 +315,10 @@ contains
     class(simulation_t), intent(inout) :: this
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
+    type(json_file) :: dt_params
 
-    call dt_controller%init(this%neko_case%params)
+    call json_get(this%neko_case%params, 'case.time', dt_params)
+    call dt_controller%init(dt_params)
 
     call this%neko_case%time%reset()
     call simulation_init(this%neko_case, dt_controller)
@@ -343,11 +345,13 @@ contains
   subroutine simulation_run_backward(this)
     class(simulation_t), intent(inout) :: this
     type(time_step_controller_t) :: dt_controller
+    type(json_file) :: dt_params
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
     integer :: i
 
-    call dt_controller%init(this%neko_case%params)
+    call json_get(this%neko_case%params, 'case.time', dt_params)
+    call dt_controller%init(dt_params)
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
