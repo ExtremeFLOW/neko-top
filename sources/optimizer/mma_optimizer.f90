@@ -365,6 +365,13 @@ contains
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
 
+    ! Scale the constraints with the factor used in the update, such that they
+    ! are consistent with the multipliers of the scaled subproblem
+    if (.not. abscmp(this%scaling_factor, 1.0_rp)) then
+       call vector_cmult(constraint_value, this%scaling_factor)
+       call matrix_cmult(constraint_sensitivities, this%scaling_factor)
+    end if
+
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
          constraint_value, constraint_sensitivities)
