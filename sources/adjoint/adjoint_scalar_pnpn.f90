@@ -400,8 +400,8 @@ contains
       call this%update_material_properties(time)
       call field_col3(rho_cp, rho, cp)
 
-      ! Compute the source terms
-      call this%source_term%compute(time)
+      ! Compute the source terms that are extrapolated in time below
+      call this%source_term%compute(time, extrapolate = .true.)
 
       ! if (oifs) then
       !    call neko_error("oifs not implemented for adjoint scalar")
@@ -441,6 +441,12 @@ contains
            rho_cp, dt, ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       ! end if
 
+      ! Source terms that must not be extrapolated in time are added as
+      ! computed, weighted by the mass matrix and rho * cp like the
+      ! extrapolated terms above.
+      call this%source_term%compute(time, extrapolate = .false., &
+           scale = rho_cp)
+           
       call s_adj_lag%update()
 
       !> Apply strong boundary conditions.
