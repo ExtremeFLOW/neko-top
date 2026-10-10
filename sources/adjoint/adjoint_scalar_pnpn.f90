@@ -446,7 +446,7 @@ contains
       ! extrapolated terms above.
       call this%source_term%compute(time, extrapolate = .false., &
            scale = rho_cp)
-           
+
       call s_adj_lag%update()
 
       !> Apply strong boundary conditions.
