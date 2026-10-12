@@ -20,7 +20,7 @@
             "Re": 180.0,
             "initial_condition": {
                 "type": "field",
-                "file_name": "periodic_orbit_Re1800.f00000"
+                "file_name": "baseflow0.f00000"
             },
             "velocity_solver": {
                 "type": "cg",
@@ -77,7 +77,7 @@
         },
         "lightkrylov": {
             "floquet": {
-                "period": 5.2350032253733518,
+                "period": 0.0,
                 "number_of_eigenvalues": 4,
                 "krylov_dimension": 24,
                 "tolerance": 1.0e-8,

@@ -5,17 +5,18 @@ module periodic_orbit_system
    use field, only: field_t
    use field_output, only: field_output_t
    use fld_file, only: fld_file_t
-   use linop_transient_baseflow, only: linop_transient_baseflow_t
    use mpi_f08, only: MPI_WTIME
-   use neko_ext, only: reset
+   use neko_ext, only: reset, reset_adjoint
    use neko_ext_vector, only: ext_state_vector_t
-   use neko_stability_propagator, only: copy_primal_to_state, &
-        copy_state_to_primal, fit_timestep_to_interval
+   use neko_stability_propagator, only: copy_perturb_to_state, &
+        copy_primal_to_state, copy_state_to_perturb, copy_state_to_primal, &
+        fit_timestep_to_interval
    use neko_vector, only: state_vector_t
    use num_types, only: neko_rp => rp, neko_sp => sp, rp
    use perturb_case, only: perturb_case_t
    use stability_solver_tolerances, only: solver_tolerance_guard_t
-   use simulation, only: simulation_finalize, simulation_init, simulation_step
+   use simulation, only: simulation_init, simulation_step
+   use simulation_perturb, only: simulation_lns_step, simulation_perturb_init
    use system_base, only: stability_system_t
    use time_step_controller, only: time_step_controller_t
    use utils, only: neko_error
@@ -53,13 +54,15 @@ module periodic_orbit_system
 
    type, extends(abstract_jacobian_linop_rdp), public :: periodic_orbit_jacobian_t
       type(periodic_orbit_system_t), pointer :: system => null()
-      type(linop_transient_baseflow_t) :: propagator
+      type(perturb_case_t), pointer :: lns_case => null()
+      character(len=:), allocatable :: lns_output_base_fname
    contains
       private
       procedure, pass(self), public :: matvec => periodic_orbit_jacobian_matvec
       procedure, pass(self), public :: rmatvec => periodic_orbit_jacobian_rmatvec
       procedure, pass(self), public :: init => periodic_orbit_jacobian_init
       procedure, pass(self), public :: free => periodic_orbit_jacobian_free
+      procedure, pass(self) :: coupled_direct_map
    end type periodic_orbit_jacobian_t
 
 contains
@@ -67,6 +70,7 @@ contains
    subroutine periodic_orbit_system_init(self, base_case)
       class(periodic_orbit_system_t), intent(inout) :: self
       type(case_t), target, intent(inout) :: base_case
+      type(time_step_controller_t) :: dt_controller
 
       self%base_case => base_case
       self%base_output_base_fname = trim(base_case%f_out%file_%get_base_fname())
@@ -75,6 +79,9 @@ contains
       self%suppress_outer_output = .false.
       self%outer_write_counter = 0
       self%fixed_step_count = 0
+
+      call dt_controller%init(self%base_case%params)
+      call simulation_init(self%base_case, dt_controller)
    end subroutine periodic_orbit_system_init
 
    subroutine set_reference(self, reference)
@@ -120,8 +127,7 @@ contains
                call self%write_outer_state(vec_in%q, vec_in%T)
             end if
 
-            call self%flow_map(vec_in%q, vec_in%T, mapped, &
-                 solver_tolerance=atol)
+            call self%flow_map(vec_in%q, vec_in%T, mapped)
 
             call vec_out%q%axpby(1.0_wp, mapped, 0.0_wp)
             call vec_out%q%axpby(-1.0_wp, vec_in%q, 1.0_wp)
@@ -141,16 +147,22 @@ contains
       type(time_step_controller_t) :: dt_controller
       type(solver_tolerance_guard_t) :: tolerance_guard
       real(kind=rp) :: old_end_time, old_dt
+      real(kind=rp) :: old_dtlag(10)
       real(kind=wp) :: loop_start
+      integer :: nsteps, istep
 
       old_end_time = self%base_case%time%end_time
       old_dt = self%base_case%time%dt
+      old_dtlag = self%base_case%time%dtlag
       self%base_case%time%end_time = real(period, kind=rp)
       if (self%fixed_step_count > 0) then
          call fit_timestep_to_interval(self%base_case%time, period, &
               self%fixed_step_count)
+         nsteps = self%fixed_step_count
       else
          call fit_timestep_to_interval(self%base_case%time, period)
+         nsteps = max(1, nint(period / &
+              real(self%base_case%time%dt, kind=wp)))
       end if
 
       call reset(self%base_case, 0, self%base_output_base_fname)
@@ -160,20 +172,19 @@ contains
       end if
 
       call dt_controller%init(self%base_case%params)
-      call simulation_init(self%base_case, dt_controller)
 
       loop_start = MPI_WTIME()
-      do while (.not. self%base_case%time%is_done())
+      do istep = 1, nsteps
          call simulation_step(self%base_case, dt_controller, loop_start)
       end do
 
       call mapped%init_like(q)
       call copy_primal_to_state(self%base_case, mapped)
 
-      call simulation_finalize(self%base_case)
       call tolerance_guard%restore()
       self%base_case%time%end_time = old_end_time
       self%base_case%time%dt = old_dt
+      self%base_case%time%dtlag = old_dtlag
    end subroutine flow_map
 
    subroutine compute_fdot(self, q, fdot, timestep)
@@ -181,9 +192,10 @@ contains
       type(state_vector_t), intent(in) :: q
       type(state_vector_t), intent(inout) :: fdot
       real(wp), optional, intent(in) :: timestep
-      type(state_vector_t) :: q_next
-      real(wp) :: dt
+      type(state_vector_t) :: q_h, q_2h
+      real(wp) :: dt, h
       integer :: saved_fixed_step_count
+      integer, parameter :: fdot_substeps = 4
 
       if (present(timestep)) then
          dt = timestep
@@ -193,16 +205,28 @@ contains
       if (dt <= 0.0_wp) call neko_error( &
            'Cannot compute fdot with non-positive timestep')
 
+      h = dt / real(fdot_substeps, kind=wp)
+
       call fdot%init_like(q)
-      call q_next%init_like(q)
+      call q_h%init_like(q)
+      call q_2h%init_like(q)
       saved_fixed_step_count = self%fixed_step_count
+
       self%fixed_step_count = 1
-      call self%flow_map(q, dt, q_next)
+      call self%flow_map(q, h, q_h)
+
+      self%fixed_step_count = 2
+      call self%flow_map(q, 2.0_wp * h, q_2h)
+
       self%fixed_step_count = saved_fixed_step_count
-      call fdot%axpby(1.0_wp, q_next, 0.0_wp)
-      call fdot%axpby(-1.0_wp, q, 1.0_wp)
-      call fdot%scal(1.0_wp / dt)
-      call q_next%free()
+
+      call fdot%axpby(4.0_wp, q_h, 0.0_wp)
+      call fdot%axpby(-1.0_wp, q_2h, 1.0_wp)
+      call fdot%axpby(-3.0_wp, q, 1.0_wp)
+      call fdot%scal(1.0_wp / (2.0_wp * h))
+
+      call q_h%free()
+      call q_2h%free()
    end subroutine compute_fdot
 
    subroutine periodic_orbit_set_fixed_step_count(self, period)
@@ -264,19 +288,20 @@ contains
 
       idx = self%outer_write_counter
       call execute_command_line('mkdir -p viz')
-      call output%init(trim(self%outer_write_name), 3, precision=neko_sp, &
+      call output%init(trim(self%outer_write_name), 4, precision=neko_sp, &
            path='viz/', format='nek5000')
       select type (ft => output%file_%file_type)
       type is (fld_file_t)
-         ft%skip_pressure = .true.
+         ft%skip_pressure = .false.
          ft%skip_velocity = .false.
          ft%skip_temperature = .true.
       end select
-      call output%fields%assign_to_field(1, self%base_case%fluid%u)
-      call output%fields%assign_to_field(2, self%base_case%fluid%v)
-      call output%fields%assign_to_field(3, self%base_case%fluid%w)
+      call output%fields%assign_to_field(1, self%base_case%fluid%p)
+      call output%fields%assign_to_field(2, self%base_case%fluid%u)
+      call output%fields%assign_to_field(3, self%base_case%fluid%v)
+      call output%fields%assign_to_field(4, self%base_case%fluid%w)
       call output%set_counter(idx - 1)
-      call output%sample(real(idx, kind=neko_rp))
+      call output%sample(real(period, kind=neko_rp))
       call output%free()
 
       period_file = 'viz/' // trim(self%outer_write_name) // '_period.csv'
@@ -316,14 +341,18 @@ contains
       call self%disable_outer_iteration_output()
    end subroutine periodic_orbit_system_free
 
-   subroutine periodic_orbit_jacobian_init(self, system, lns_case, adjoint_case)
+   subroutine periodic_orbit_jacobian_init(self, system, lns_case)
       class(periodic_orbit_jacobian_t), intent(inout) :: self
       type(periodic_orbit_system_t), target, intent(inout) :: system
       type(perturb_case_t), target, intent(inout) :: lns_case
-      type(perturb_case_t), target, intent(inout) :: adjoint_case
+      type(time_step_controller_t) :: perturb_dt_controller
 
       self%system => system
-      call self%propagator%init(system%base_case, lns_case, adjoint_case)
+      self%lns_case => lns_case
+      self%lns_output_base_fname = trim(lns_case%f_out%file_%get_base_fname())
+
+      call perturb_dt_controller%init(self%system%base_case%params)
+      call simulation_perturb_init(self%lns_case, perturb_dt_controller)
    end subroutine periodic_orbit_jacobian_init
 
    subroutine periodic_orbit_jacobian_matvec(self, vec_in, vec_out)
@@ -345,15 +374,7 @@ contains
                call fdot_endpoint%init_like(x%q)
                call fdot_initial%init_like(x%q)
 
-               call self%system%flow_map(x%q, x%T, mapped)
-               if (self%system%fixed_step_count > 0) then
-                  call self%propagator%set_baseflow(x%q, &
-                       time_interval=x%T, &
-                       fixed_step_count=self%system%fixed_step_count)
-               else
-                  call self%propagator%set_baseflow(x%q, time_interval=x%T)
-               end if
-               call self%propagator%matvec(v%q, tangent)
+               call self%coupled_direct_map(x%q, v%q, x%T, mapped, tangent)
 
                call y%q%axpby(1.0_wp, tangent, 0.0_wp)
                call y%q%axpby(-1.0_wp, v%q, 1.0_wp)
@@ -375,59 +396,100 @@ contains
       end select
    end subroutine periodic_orbit_jacobian_matvec
 
+   subroutine coupled_direct_map(self, baseflow, perturbation, period, &
+        mapped, tangent)
+      class(periodic_orbit_jacobian_t), intent(inout) :: self
+      type(state_vector_t), intent(in) :: baseflow
+      type(state_vector_t), intent(in) :: perturbation
+      real(wp), intent(in) :: period
+      type(state_vector_t), intent(inout) :: mapped
+      type(state_vector_t), intent(inout) :: tangent
+      type(time_step_controller_t) :: primal_dt_controller
+      type(time_step_controller_t) :: perturb_dt_controller
+      real(kind=rp) :: old_base_end, old_lns_end, old_base_dt, old_lns_dt
+      real(kind=rp) :: old_base_dtlag(10), old_lns_dtlag(10)
+      real(kind=rp) :: cfl
+      real(kind=wp) :: loop_start
+      integer :: nsteps, istep
+
+      if (.not. associated(self%system)) then
+         call neko_error('Periodic-orbit Jacobian has not been initialized')
+      end if
+      if (.not. associated(self%lns_case)) then
+         call neko_error('Periodic-orbit Jacobian LNS case is not initialized')
+      end if
+
+      old_base_end = self%system%base_case%time%end_time
+      old_base_dt = self%system%base_case%time%dt
+      old_base_dtlag = self%system%base_case%time%dtlag
+      old_lns_end = self%lns_case%time%end_time
+      old_lns_dt = self%lns_case%time%dt
+      old_lns_dtlag = self%lns_case%time%dtlag
+
+      self%system%base_case%time%end_time = real(period, kind=rp)
+      self%lns_case%time%end_time = real(period, kind=rp)
+      if (self%system%fixed_step_count > 0) then
+         call fit_timestep_to_interval(self%system%base_case%time, period, &
+              self%system%fixed_step_count)
+         nsteps = self%system%fixed_step_count
+      else
+         call fit_timestep_to_interval(self%system%base_case%time, period)
+         nsteps = max(1, nint(period / &
+              real(self%system%base_case%time%dt, kind=wp)))
+      end if
+      self%lns_case%time%dt = self%system%base_case%time%dt
+      self%lns_case%time%dtlag = self%lns_case%time%dt
+
+      call reset(self%system%base_case, 0, &
+           self%system%base_output_base_fname)
+      call reset_adjoint(self%lns_case, self%system%base_case, 0, &
+           self%lns_output_base_fname)
+      call copy_state_to_primal(self%system%base_case, baseflow)
+      call copy_state_to_perturb(self%lns_case, perturbation)
+
+      call primal_dt_controller%init(self%system%base_case%params)
+      call perturb_dt_controller%init(self%system%base_case%params)
+
+      cfl = self%lns_case%fluid_pert%compute_cfl(self%lns_case%time%dt)
+      loop_start = MPI_WTIME()
+      do istep = 1, nsteps
+         call simulation_step(self%system%base_case, primal_dt_controller, &
+              loop_start)
+         call simulation_lns_step(self%lns_case, perturb_dt_controller, &
+              cfl, loop_start)
+      end do
+
+      call mapped%init_like(baseflow)
+      call tangent%init_like(perturbation)
+      call copy_primal_to_state(self%system%base_case, mapped)
+      call copy_perturb_to_state(self%system%base_case, self%lns_case, &
+           tangent)
+
+      self%system%base_case%time%end_time = old_base_end
+      self%system%base_case%time%dt = old_base_dt
+      self%system%base_case%time%dtlag = old_base_dtlag
+      self%lns_case%time%end_time = old_lns_end
+      self%lns_case%time%dt = old_lns_dt
+      self%lns_case%time%dtlag = old_lns_dtlag
+   end subroutine coupled_direct_map
+
    subroutine periodic_orbit_jacobian_rmatvec(self, vec_in, vec_out)
       class(periodic_orbit_jacobian_t), intent(inout) :: self
       class(abstract_vector_rdp), intent(in) :: vec_in
       class(abstract_vector_rdp), intent(inout) :: vec_out
-      type(state_vector_t) :: mapped, adjoint_image, fdot_endpoint, fdot_initial
 
-      select type (x => self%X)
-      type is (ext_state_vector_t)
-         select type (v => vec_in)
-         type is (ext_state_vector_t)
-            select type (y => vec_out)
-            type is (ext_state_vector_t)
-               call y%init_like(x)
-               call mapped%init_like(x%q)
-               call adjoint_image%init_like(x%q)
-               call fdot_endpoint%init_like(x%q)
-               call fdot_initial%init_like(x%q)
-
-               call self%system%flow_map(x%q, x%T, mapped)
-               if (self%system%fixed_step_count > 0) then
-                  call self%propagator%set_baseflow(x%q, &
-                       time_interval=x%T, &
-                       fixed_step_count=self%system%fixed_step_count)
-               else
-                  call self%propagator%set_baseflow(x%q, time_interval=x%T)
-               end if
-               call self%propagator%rmatvec(v%q, adjoint_image)
-
-               call y%q%axpby(1.0_wp, adjoint_image, 0.0_wp)
-               call y%q%axpby(-1.0_wp, v%q, 1.0_wp)
-
-               call self%system%compute_fdot(x%q, fdot_initial, &
-                    self%system%timestep_for_period(x%T))
-               call y%q%axpby(v%T, fdot_initial, 1.0_wp)
-
-               call self%system%compute_fdot(mapped, fdot_endpoint, &
-                    self%system%timestep_for_period(x%T))
-               y%T = v%q%dot(fdot_endpoint)
-
-               call mapped%free()
-               call adjoint_image%free()
-               call fdot_endpoint%free()
-               call fdot_initial%free()
-            end select
-         end select
-      end select
+      call neko_error('Periodic-orbit Newton Jacobian has no adjoint ' // &
+           'matvec; use a Floquet/adjoint linop for transpose operations')
    end subroutine periodic_orbit_jacobian_rmatvec
 
    subroutine periodic_orbit_jacobian_free(self)
       class(periodic_orbit_jacobian_t), intent(inout) :: self
 
       nullify(self%system)
-      call self%propagator%free()
+      nullify(self%lns_case)
+      if (allocated(self%lns_output_base_fname)) then
+         deallocate(self%lns_output_base_fname)
+      end if
    end subroutine periodic_orbit_jacobian_free
 
    subroutine z_plane_fix(fld)

@@ -27,6 +27,7 @@ contains
       call field_copy(neko_case%fluid%u, q%u)
       call field_copy(neko_case%fluid%v, q%v)
       call field_copy(neko_case%fluid%w, q%w)
+      call field_copy(neko_case%fluid%p, q%p)
       call neko_case%fluid%ulag%set(neko_case%fluid%u)
       call neko_case%fluid%vlag%set(neko_case%fluid%v)
       call neko_case%fluid%wlag%set(neko_case%fluid%w)
@@ -46,6 +47,7 @@ contains
       call field_copy(q%u, neko_case%fluid%u)
       call field_copy(q%v, neko_case%fluid%v)
       call field_copy(q%w, neko_case%fluid%w)
+      call field_copy(q%p, neko_case%fluid%p)
       call enforce_dimension(q, neko_case%fluid%c_Xh%msh%gdim)
    end subroutine copy_primal_to_state
 
@@ -56,6 +58,7 @@ contains
       call field_copy(perturb_case%fluid_pert%u_pert, q%u)
       call field_copy(perturb_case%fluid_pert%v_pert, q%v)
       call field_copy(perturb_case%fluid_pert%w_pert, q%w)
+      call field_copy(perturb_case%fluid_pert%p_pert, q%p)
       call perturb_case%fluid_pert%ulag%set(perturb_case%fluid_pert%u_pert)
       call perturb_case%fluid_pert%vlag%set(perturb_case%fluid_pert%v_pert)
       call perturb_case%fluid_pert%wlag%set(perturb_case%fluid_pert%w_pert)
@@ -76,6 +79,7 @@ contains
       call field_copy(q%u, perturb_case%fluid_pert%u_pert)
       call field_copy(q%v, perturb_case%fluid_pert%v_pert)
       call field_copy(q%w, perturb_case%fluid_pert%w_pert)
+      call field_copy(q%p, perturb_case%fluid_pert%p_pert)
       call enforce_dimension(q, neko_case%fluid%c_Xh%msh%gdim)
    end subroutine copy_perturb_to_state
 

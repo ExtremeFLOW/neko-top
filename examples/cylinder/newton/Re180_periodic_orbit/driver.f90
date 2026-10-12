@@ -31,13 +31,13 @@ program usrneko
   character(len=*), parameter :: this_module = 'Cylinder Re180 periodic orbit'
   type(case_t), target :: base_case
   type(perturb_case_t), target :: lns_case
-  type(perturb_case_t), target :: adjoint_case
   type(periodic_orbit_system_t), target :: periodic
   type(periodic_orbit_jacobian_t) :: jacobian
   type(ext_state_vector_t) :: orbit
   type(state_vector_t) :: vector_mold
   type(newton_dp_opts) :: newton_options
   real(wp) :: newton_tol, initial_period, transient_time
+  real(wp) :: target_dt
   character(len=:), allocatable :: base_output_base_fname
   integer :: argc, info, movie_frames
   logical :: write_outer_iterations
@@ -78,11 +78,11 @@ program usrneko
   if (movie_frames < 2) call neko_error('Periodic orbit movie_frames must be >= 2')
 
   call stability_case_init(base_case, parameters)
+  target_dt = real(base_case%time%dt, kind=wp)
+  if (target_dt <= 0.0_wp) call neko_error('Case timestep must be positive')
   base_output_base_fname = trim(base_case%f_out%file_%get_base_fname())
   lns_case%if_adjoint = .false.
   call lns_case%init(base_case)
-  adjoint_case%if_adjoint = .true.
-  call adjoint_case%init(base_case)
 
   if (transient_time > 0.0_wp) then
      call run_forward_transient(transient_time)
@@ -94,6 +94,7 @@ program usrneko
   call field_copy(orbit%q%u, base_case%fluid%u)
   call field_copy(orbit%q%v, base_case%fluid%v)
   call field_copy(orbit%q%w, base_case%fluid%w)
+  call field_copy(orbit%q%p, base_case%fluid%p)
   orbit%T = initial_period
 
   call periodic%init(base_case)
@@ -105,7 +106,7 @@ program usrneko
   periodic%jacobian = jacobian
   select type (f => periodic%jacobian)
   type is (periodic_orbit_jacobian_t)
-     call f%init(periodic, lns_case, adjoint_case)
+     call f%init(periodic, lns_case)
   end select
 
   newton_options = newton_dp_opts(maxiter=40, ifbisect=.false.)
@@ -114,14 +115,16 @@ program usrneko
   if (info < 0) call check_info(info, 'newton', module=this_module, &
        procedure='main')
 
+  call write_baseflow_file(orbit%q, orbit%T)
+
   call field_copy(base_case%fluid%u, orbit%q%u)
   call field_copy(base_case%fluid%v, orbit%q%v)
   call field_copy(base_case%fluid%w, orbit%q%w)
+  call field_copy(base_case%fluid%p, orbit%q%p)
   call write_periodic_movie(orbit%q, orbit%T, movie_frames)
 
   call orbit%free()
   call periodic%free()
-  call adjoint_case%free()
   call lns_case%free()
   call stability_case_free(base_case)
   call neko_finalize()
@@ -134,20 +137,42 @@ contains
     type(field_output_t) :: output
 
     call execute_command_line('mkdir -p viz')
-    call output%init(trim(name), 3, precision=neko_sp, path='viz/', format='nek5000')
+    call output%init(trim(name), 4, precision=neko_sp, path='viz/', format='nek5000')
     select type (ft => output%file_%file_type)
     type is (fld_file_t)
-       ft%skip_pressure = .true.
+       ft%skip_pressure = .false.
        ft%skip_velocity = .false.
        ft%skip_temperature = .true.
     end select
-    call output%fields%assign_to_field(1, vec%u)
-    call output%fields%assign_to_field(2, vec%v)
-    call output%fields%assign_to_field(3, vec%w)
+    call output%fields%assign_to_field(1, vec%p)
+    call output%fields%assign_to_field(2, vec%u)
+    call output%fields%assign_to_field(3, vec%v)
+    call output%fields%assign_to_field(4, vec%w)
     call output%set_counter(idx - 1)
     call output%sample(real(idx, kind=neko_rp))
     call output%free()
   end subroutine write_state_fields
+
+  subroutine write_baseflow_file(vec, period)
+    type(state_vector_t), intent(inout) :: vec
+    real(wp), intent(in) :: period
+    type(field_output_t) :: output
+
+    call output%init('baseflow', 4, precision=neko_sp, format='nek5000')
+    select type (ft => output%file_%file_type)
+    type is (fld_file_t)
+       ft%skip_pressure = .false.
+       ft%skip_velocity = .false.
+       ft%skip_temperature = .true.
+    end select
+    call output%fields%assign_to_field(1, vec%p)
+    call output%fields%assign_to_field(2, vec%u)
+    call output%fields%assign_to_field(3, vec%v)
+    call output%fields%assign_to_field(4, vec%w)
+    call output%set_counter(-1)
+    call output%sample(real(period, kind=neko_rp))
+    call output%free()
+  end subroutine write_baseflow_file
 
   subroutine run_forward_transient(time_interval)
     real(wp), intent(in) :: time_interval
@@ -195,17 +220,18 @@ contains
     call reset(base_case, 0, base_output_base_fname)
     call copy_state_to_primal(base_case, initial_state)
 
-    call output%init('periodic_orbit_Re180_movie', 3, precision=neko_sp, &
+    call output%init('periodic_orbit_Re180_movie', 4, precision=neko_sp, &
          path='viz/', format='nek5000')
     select type (ft => output%file_%file_type)
     type is (fld_file_t)
-       ft%skip_pressure = .true.
+       ft%skip_pressure = .false.
        ft%skip_velocity = .false.
        ft%skip_temperature = .true.
     end select
-    call output%fields%assign_to_field(1, base_case%fluid%u)
-    call output%fields%assign_to_field(2, base_case%fluid%v)
-    call output%fields%assign_to_field(3, base_case%fluid%w)
+    call output%fields%assign_to_field(1, base_case%fluid%p)
+    call output%fields%assign_to_field(2, base_case%fluid%u)
+    call output%fields%assign_to_field(3, base_case%fluid%v)
+    call output%fields%assign_to_field(4, base_case%fluid%w)
 
     call dt_controller%init(base_case%params)
     call simulation_init(base_case, dt_controller)

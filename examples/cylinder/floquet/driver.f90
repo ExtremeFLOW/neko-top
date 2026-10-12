@@ -6,6 +6,8 @@ program usrneko
   use LightKrylov_Logger
   use field_math, only: field_copy
   use field_output, only: field_output_t
+  use file, only: file_t
+  use fld_file_data, only: fld_file_data_t
   use fld_file, only: fld_file_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
@@ -26,7 +28,7 @@ program usrneko
        simulation_perturb_finalize, simulation_perturb_init
   use stability_case_utils, only: stability_case_free, stability_case_init
   use time_step_controller, only: time_step_controller_t
-  use utils, only: neko_error
+  use utils, only: extract_fld_file_index, filename_chsuffix, neko_error
   implicit none
 
   character(len=*), parameter :: this_module = 'Cylinder Re180 Floquet'
@@ -37,10 +39,11 @@ program usrneko
   type(state_vector_t) :: vector_mold
   complex(kind=wp), allocatable :: multiplier(:), exponent(:)
   real(kind=wp), allocatable :: residuals(:)
-  real(kind=wp) :: period, eigs_tol, old_dt
+  real(kind=wp) :: period, eigs_tol, old_dt, field_period
   integer :: argc, nev, kdim, info, i, movie_frames, mode_movies, nsteps
   logical :: write_baseflow_movie, write_mode_movies
   character(len=256) :: parameter_file
+  character(len=:), allocatable :: baseflow_file
   type(json_file) :: parameters
 
   call neko_init()
@@ -54,6 +57,8 @@ program usrneko
   parameters = json_read_file(trim(parameter_file))
   call json_get_or_default(parameters, 'case.lightkrylov.floquet.period', &
        period, 0.0_wp)
+  call json_get_or_default(parameters, &
+       'case.fluid.initial_condition.file_name', baseflow_file, '')
   call json_get_or_default(parameters, &
        'case.lightkrylov.floquet.number_of_eigenvalues', nev, 4)
   call json_get_or_default(parameters, &
@@ -71,7 +76,12 @@ program usrneko
        'case.lightkrylov.floquet.number_of_mode_movies', mode_movies, nev)
 
   call stability_case_init(base_case, parameters)
-  if (period <= 0.0_wp) period = real(base_case%time%end_time, kind=wp)
+  field_period = read_field_time(baseflow_file)
+  if (field_period > 0.0_wp) then
+     period = field_period
+  else if (period <= 0.0_wp) then
+     period = real(base_case%time%end_time, kind=wp)
+  end if
   if (period <= 0.0_wp) call neko_error('Floquet period must be positive')
   if (nev < 1) call neko_error('Number of eigenvalues must be positive')
   if (kdim < nev) call neko_error('Krylov dimension must be at least nev')
@@ -133,6 +143,28 @@ program usrneko
   call neko_finalize()
 
 contains
+
+  real(wp) function read_field_time(field_name) result(field_time)
+    character(len=*), intent(in) :: field_name
+    type(file_t) :: f
+    type(fld_file_data_t) :: fld_data
+    character(len=1024) :: fld_name
+    integer :: sample_idx
+
+    field_time = 0.0_wp
+    if (len_trim(field_name) .eq. 0) return
+
+    sample_idx = extract_fld_file_index(trim(field_name), -1)
+    if (sample_idx .eq. -1) return
+
+    call filename_chsuffix(trim(field_name), fld_name, 'fld')
+    call f%init(trim(fld_name))
+    call f%set_counter(sample_idx)
+    call f%read(fld_data)
+    field_time = real(fld_data%time, kind=wp)
+    call fld_data%free()
+    call f%free()
+  end function read_field_time
 
   subroutine write_floquet_spectrum(mu, lambda, res)
     complex(kind=wp), intent(in) :: mu(:), lambda(:)

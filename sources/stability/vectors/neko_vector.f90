@@ -18,8 +18,8 @@ module neko_vector
    implicit none
 
    type, extends(abstract_vector_rdp), public :: state_vector_t
-      ! velocity fields
-      type(field_t) :: u, v, w
+      ! velocity and pressure fields
+      type(field_t) :: u, v, w, p
       ! we need the mass matrix to integrate fields..
       type(coef_t), pointer :: coef => null()
       logical :: if_2d = .false.
@@ -55,6 +55,7 @@ module neko_vector
       call self%u%init(self%coef%dof, fld_name='state_u')
       call self%v%init(self%coef%dof, fld_name='state_v')
       call self%w%init(self%coef%dof, fld_name='state_w')
+      call self%p%init(self%coef%dof, fld_name='state_p')
       self%is_initialized = .true.
       self%owns_data = .true.
    end subroutine state_vector_init_like
@@ -65,6 +66,7 @@ module neko_vector
       call field_rzero(self%u)
       call field_rzero(self%v)
       call field_rzero(self%w)
+      call field_rzero(self%p)
    end subroutine zero
  
    real(kind=wp) function dot(self, vec) result(alpha)
@@ -107,6 +109,7 @@ module neko_vector
       call field_cmult(self%u, alpha_rp)
       call field_cmult(self%v, alpha_rp)
       call field_cmult(self%w, alpha_rp)
+      call field_cmult(self%p, alpha_rp)
       if (self%if_2d) call field_rzero(self%w)
    end subroutine scal
  
@@ -127,13 +130,14 @@ module neko_vector
          call field_add3s2(self%u, self%u, vec%u, beta_rp, alpha_rp)
          call field_add3s2(self%v, self%v, vec%v, beta_rp, alpha_rp)
          call field_add3s2(self%w, self%w, vec%w, beta_rp, alpha_rp)
+         call field_add3s2(self%p, self%p, vec%p, beta_rp, alpha_rp)
       end select
    end subroutine axpby
  
    integer function get_size(self) result(N)
       class(state_vector_t), intent(in) :: self
 
-      N = self%u%size() + self%v%size() + self%w%size()
+      N = self%u%size() + self%v%size() + self%w%size() + self%p%size()
    end function get_size
  
    subroutine rand(self, ifnorm)
@@ -144,6 +148,7 @@ module neko_vector
 
       normalize = optval(ifnorm, .true.)
       call rand_ic(self%u, self%v, self%w, self%if_2d)
+      call field_rzero(self%p)
 
       call self%coef%gs_h%op(self%u, GS_OP_ADD)
       call self%coef%gs_h%op(self%v, GS_OP_ADD)
@@ -162,6 +167,7 @@ module neko_vector
          call self%u%free()
          call self%v%free()
          call self%w%free()
+         call self%p%free()
       end if
 
       nullify(self%coef)
@@ -248,16 +254,17 @@ module neko_vector
       integer, intent(in) :: idx
       type(fld_file_output_t) :: output
 
-      call output%init(sp, 'state', 3)
+      call output%init(sp, 'state', 4)
       select type (ft => output%file_%file_type)
       type is (fld_file_t)
-         ft%skip_pressure = .true.
+         ft%skip_pressure = .false.
          ft%skip_velocity = .false.
          ft%skip_temperature = .true.
       end select
-      call output%fields%assign_to_field(1, self%u)
-      call output%fields%assign_to_field(2, self%v)
-      call output%fields%assign_to_field(3, self%w)
+      call output%fields%assign_to_field(1, self%p)
+      call output%fields%assign_to_field(2, self%u)
+      call output%fields%assign_to_field(3, self%v)
+      call output%fields%assign_to_field(4, self%w)
       call output%set_counter(idx - 1)
       call output%sample(real(idx, kind=rp))
       call output%free()

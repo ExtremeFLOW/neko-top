@@ -147,17 +147,18 @@ contains
 
       idx = self%outer_write_counter
       call execute_command_line('mkdir -p viz')
-      call output%init(trim(self%outer_write_name), 3, precision=neko_sp, &
+      call output%init(trim(self%outer_write_name), 4, precision=neko_sp, &
            path='viz/', format='nek5000')
       select type (ft => output%file_%file_type)
       type is (fld_file_t)
-         ft%skip_pressure = .true.
+         ft%skip_pressure = .false.
          ft%skip_velocity = .false.
          ft%skip_temperature = .true.
       end select
-      call output%fields%assign_to_field(1, self%base_case%fluid%u)
-      call output%fields%assign_to_field(2, self%base_case%fluid%v)
-      call output%fields%assign_to_field(3, self%base_case%fluid%w)
+      call output%fields%assign_to_field(1, self%base_case%fluid%p)
+      call output%fields%assign_to_field(2, self%base_case%fluid%u)
+      call output%fields%assign_to_field(3, self%base_case%fluid%v)
+      call output%fields%assign_to_field(4, self%base_case%fluid%w)
       call output%set_counter(idx - 1)
       call output%sample(real(idx, kind=neko_rp))
       call output%free()
