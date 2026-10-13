@@ -42,11 +42,15 @@ def main():
 
     if not os.path.isfile(args.state):
         raise FileNotFoundError(args.state)
+    if not os.path.splitext(args.state)[1] == ".pvsm":
+        raise ValueError(f"State file must have a .pvsm extension: {args.state}")
     if not os.path.isdir(args.data_dir):
         raise NotADirectoryError(args.data_dir)
     
+    # Load the VTKm plugin to enable VTKm filters in ParaView
     LoadPlugin("VTKmFilters", remote=True)
 
+    # Load the ParaView state file and extract view and scene information
     LoadState(
         args.state,
         data_directory=args.data_dir,
@@ -58,6 +62,7 @@ def main():
     scene.UpdateAnimationUsingDataTimeSteps()
     scene.PlayMode = "Snap To TimeSteps"
 
+    # Scale the view and PPI to match the specified resolution.
     original_size = list(view.ViewSize)
     original_ppi = view.PPI
 
@@ -71,18 +76,19 @@ def main():
     # Set the frame index range to export.
     frame_count = len(scene.TimeKeeper.TimestepValues)
     if args.frames:
+        if args.frames[0] < scene.TimeKeeper.TimestepValues[0] or args.frames[1] > scene.TimeKeeper.TimestepValues[-1]:
+            raise ValueError(f"Frame range {args.frames} is out of bounds for available frames {scene.TimeKeeper.TimestepValues[0]} to {scene.TimeKeeper.TimestepValues[-1]}")
         start_frame, end_frame = args.frames
     else:
-        start_frame, end_frame = 0, frame_count - 1
+        start_frame, end_frame = scene.TimeKeeper.TimestepValues[0], scene.TimeKeeper.TimestepValues[-1]
 
     # Determine the output location and ensure the directory exists
     state_name = os.path.splitext(os.path.basename(args.state))[0]
     output_dir = os.path.join(args.data_dir, "visualisations", state_name)
     os.makedirs(output_dir, exist_ok=True)
 
-    # Define the output file path for the animation frames
+    # Define the output file path for the animation frames and detect existing frames
     animation_file = os.path.join(output_dir, "frame.png")
-
     if not args.overwrite:
         frame_list = list(range(start_frame, end_frame + 1))
         frame_windows = []
