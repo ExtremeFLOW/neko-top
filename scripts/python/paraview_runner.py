@@ -1,8 +1,16 @@
 #!/usr/bin/env pvpython
 """Load a ParaView state file (.pvsm) and export an animation of all frames.
 
+The output frames are stored in a subdirectory of the data directory, named 
+after the state file.
+
 Usage:
-    pvpython paraview_runner.py state.pvsm data_dir output.png [--resolution H] [--frames START END]
+    pvpython paraview_runner.py state.pvsm data_dir
+
+Additional arguments:
+    --resolution H: Set the height of the output images (default: 360)
+    --frames START END: Export only frames from START to END (inclusive)
+    --overwrite: Overwrite existing files in the output directory
 """
 
 import argparse
@@ -22,10 +30,13 @@ def main():
     parser.add_argument("state", help="Path to the .pvsm state file")
     parser.add_argument("data_dir", help="Path to the data directory")
     parser.add_argument(
-        "--resolution", nargs=1, type=int, default=1080, metavar=("H")
+        "--resolution", type=int, default=360, help="Height of the output images (default: 360)"
     )
     parser.add_argument(
         "--frames", nargs=2, type=int, default=None, metavar=("START", "END")
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Overwrite existing files"
     )
     args = parser.parse_args()
 
@@ -47,23 +58,22 @@ def main():
     scene.UpdateAnimationUsingDataTimeSteps()
     scene.PlayMode = "Snap To TimeSteps"
 
-    # Set the view size based on the resolution argument retaining the aspect ratio of the original view
-    original_size = view.ViewSize
-    aspect_ratio = original_size[0] / original_size[1]
-    new_height = args.resolution[0]
-    new_width = int(new_height * aspect_ratio)
-    view.ViewSize = [new_width, new_height]
-    output_resolution = view.ViewSize
+    original_size = list(view.ViewSize)
+    original_ppi = view.PPI
 
-    # Set the animation bounds
+    scale = args.resolution / original_size[1]
+    output_resolution = [int(original_size[0] * scale), args.resolution]
+
+    view.ViewSize = output_resolution
+    view.PPI = round(original_ppi * scale)
+    view.UpdateVTKObjects()
+
+    # Set the frame index range to export.
+    frame_count = len(scene.TimeKeeper.TimestepValues)
     if args.frames:
         start_frame, end_frame = args.frames
-        scene.StartTime = start_frame
-        scene.EndTime = end_frame
     else:
-        scene.StartTime = scene.TimeKeeper.TimestepValues[0]
-        scene.EndTime = scene.TimeKeeper.TimestepValues[-1]
-
+        start_frame, end_frame = 0, frame_count - 1
 
     # Determine the output location and ensure the directory exists
     state_name = os.path.splitext(os.path.basename(args.state))[0]
@@ -73,13 +83,29 @@ def main():
     # Define the output file path for the animation frames
     animation_file = os.path.join(output_dir, "frame.png")
 
-    # Export all frames, start to end.
-    SaveAnimation(
-        animation_file,
-        view,
-        ImageResolution=output_resolution,
-        SuffixFormat="_{:04d}",
-    )
+    if not args.overwrite:
+        frame_list = list(range(start_frame, end_frame + 1))
+        frame_windows = []
+        window_start = frame_list[0]
+        for frame_index in frame_list:
+            if os.path.isfile(os.path.join(output_dir, f"frame_{frame_index:04d}.png")):
+                if window_start < frame_index:
+                    frame_windows.append((window_start, frame_index - 1))
+                window_start = frame_index + 1
+        if window_start <= frame_list[-1]:
+            frame_windows.append((window_start, frame_list[-1]))
+    else:
+        frame_windows = [(start_frame, end_frame)]
+
+    # Export the animation frames for each frame window
+    for frame_window in frame_windows:
+        SaveAnimation(
+            animation_file,
+            view,
+            FrameWindow=(frame_window[0], frame_window[1]),
+            ImageResolution=output_resolution,
+            SuffixFormat="_{:04d}",
+        )
 
 
 if __name__ == "__main__":
