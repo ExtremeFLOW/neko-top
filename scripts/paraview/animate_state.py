@@ -76,11 +76,11 @@ def main():
     # Set the frame index range to export.
     frame_count = len(scene.TimeKeeper.TimestepValues)
     if args.frames:
-        if args.frames[0] < scene.TimeKeeper.TimestepValues[0] or args.frames[1] > scene.TimeKeeper.TimestepValues[-1]:
-            raise ValueError(f"Frame range {args.frames} is out of bounds for available frames {scene.TimeKeeper.TimestepValues[0]} to {scene.TimeKeeper.TimestepValues[-1]}")
+        if args.frames[0] < 0 or args.frames[1] >= frame_count:
+            raise ValueError(f"Frame range {args.frames} is out of bounds for available frames 0-{frame_count - 1}")
         start_frame, end_frame = args.frames
     else:
-        start_frame, end_frame = scene.TimeKeeper.TimestepValues[0], scene.TimeKeeper.TimestepValues[-1]
+        start_frame, end_frame = 0, frame_count - 1
 
     # Determine the output location and ensure the directory exists
     state_name = os.path.splitext(os.path.basename(args.state))[0]
