@@ -1,0 +1,284 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": false,
+        "time": {
+            "end_time": 0.05,
+            "timestep": 0.005
+        },
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 3,
+            "dealias": false
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 50.0,
+            "output_control": "never",
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-09,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-08,
+                "max_iterations": 800
+            },
+            "boundary_conditions": [
+                {
+                    "type": "user_velocity",
+                    "zone_indices": [
+                        1
+                    ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [
+                        2
+                    ]
+                },
+                {
+                    "type": "no_slip",
+                    "zone_indices": [
+                        3,
+                        4,
+                        5,
+                        6
+                    ]
+                }
+            ]
+        },
+        "scalar": {
+            "enabled": true,
+            "Pe": 100.0,
+            "output_control": "never",
+            "solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-09,
+                "max_iterations": 200
+            },
+            "initial_condition": {
+                "type": "user",
+                "value": 0.0
+            },
+            "boundary_conditions": [
+                {
+                    "type": "user_dirichlet",
+                    "zone_indices": [
+                        1
+                    ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0.0,
+                    "zone_indices": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6
+                    ]
+                }
+            ]
+        },
+        "adjoint_fluid": {
+            "output_control": "never",
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [
+                        1,
+                        3,
+                        4,
+                        5,
+                        6
+                    ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [
+                        2
+                    ]
+                }
+            ]
+        },
+        "adjoint_scalar": {
+            "enabled": true,
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
+            },
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 0.0,
+                    "zone_indices": [
+                        1
+                    ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0.0,
+                    "zone_indices": [
+                        2,
+                        3,
+                        4,
+                        5,
+                        6
+                    ]
+                }
+            ]
+        },
+        "point_zones": [
+            {
+                "name": "optimization_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    0.25,
+                    0.75
+                ],
+                "y_bounds": [
+                    0.0,
+                    1.0
+                ],
+                "z_bounds": [
+                    0.0,
+                    1.0
+                ]
+            },
+            {
+                "name": "initial_blob",
+                "geometry": "box",
+                "x_bounds": [
+                    0.25,
+                    0.5
+                ],
+                "y_bounds": [
+                    0.25,
+                    0.5
+                ],
+                "z_bounds": [
+                    0.25,
+                    0.75
+                ]
+            },
+            {
+                "name": "outlet_region",
+                "geometry": "box",
+                "x_bounds": [
+                    1.5,
+                    2.0
+                ],
+                "y_bounds": [
+                    0.0,
+                    1.0
+                ],
+                "z_bounds": [
+                    0.0,
+                    1.0
+                ]
+            }
+        ]
+    },
+    "unsteady": true,
+    "state_recovery": {
+        "type": "checkpoint",
+        "enabled": true,
+        "format": "chkp",
+        "n_memory": 64
+    },
+    "optimization": {
+        "time_window_test": {
+            "end_times": [
+                0.05,
+                0.1
+            ],
+            "tolerance": 1e-09
+        },
+        "design": {
+            "type": "brinkman",
+            "verbose_design": false,
+            "verbose_sensitivity": false,
+            "output_format": "fld",
+            "mapping": [
+                {
+                    "type": "RAMP",
+                    "f_max": 100.0
+                }
+            ],
+            "initial_distribution": {
+                "type": "point_zone",
+                "base_value": 0.0,
+                "zone_value": 1.0,
+                "zone_name": "initial_blob"
+            },
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
+            }
+        },
+        "solver": {
+            "type": "mma",
+            "max_iterations": 0,
+            "tolerance": 0.001,
+            "mma": {
+                "scale": 1.0,
+                "xmin": 0.0,
+                "xmax": 1.0
+            }
+        },
+        "objectives": [
+            {
+                "type": "viscous_dissipation",
+                "name": "viscous [0.02,0.04]",
+                "weight": 1.0,
+                "start_time": 0.02,
+                "end_time": 0.04
+            },
+            {
+                "type": "brinkman_dissipation",
+                "name": "brinkman [0.02,0.04]",
+                "weight": 1.0,
+                "start_time": 0.02,
+                "end_time": 0.04
+            },
+            {
+                "type": "scalar_mixing",
+                "name": "mixing [0.02,0.04]",
+                "weight": 1.0,
+                "start_time": 0.02,
+                "end_time": 0.04,
+                "mask_name": "outlet_region"
+            }
+        ]
+    }
+}

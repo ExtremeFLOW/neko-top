@@ -58,7 +58,7 @@ jobs:
     name: Deploy
     runs-on: ubuntu-latest
 
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' || github.event.pull_request.base.ref == 'main'
     needs: build-docs
 
     # Define the deployment environment

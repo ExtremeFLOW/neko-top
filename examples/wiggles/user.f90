@@ -107,9 +107,9 @@ contains
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
-          x = u%dof%x(idx, 1, 1, 1)
-          y = u%dof%y(idx, 1, 1, 1)
-          z = u%dof%z(idx, 1, 1, 1)
+          x = u%dof%x%x(idx, 1, 1, 1)
+          y = u%dof%y%x(idx, 1, 1, 1)
+          z = u%dof%z%x(idx, 1, 1, 1)
 
           ! Inflow velocity profile is a paraboloid
           u%x(idx, 1, 1, 1) = -0.5_rp * (y - 1.0_rp)**2 - &
@@ -129,7 +129,7 @@ contains
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
-          z = s%dof%z(idx, 1, 1, 1)
+          z = s%dof%z%x(idx, 1, 1, 1)
           ! Inflow scalar profile is a sigmoid separating the two species
           s%x(idx, 1, 1, 1) = logistic(z)
        end do
@@ -151,7 +151,7 @@ contains
 
        ! Initial scalar profile is a sigmoid separating the two species
        s => fields%get("Scalar")
-       s%x = logistic(s%dof%z)
+       s%x = logistic(s%dof%z%x)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_memcpy(s%x, s%x_d, s%size(), HOST_TO_DEVICE, sync=.true.)
@@ -163,9 +163,9 @@ contains
        w => fields%get("w")
 
        do i = 1, u%size()
-          x = u%dof%x(i, 1, 1, 1)
-          y = u%dof%y(i, 1, 1, 1)
-          z = u%dof%z(i, 1, 1, 1)
+          x = u%dof%x%x(i, 1, 1, 1)
+          y = u%dof%y%x(i, 1, 1, 1)
+          z = u%dof%z%x(i, 1, 1, 1)
 
           ! Inflow velocity profile is a paraboloid
           u%x(i, 1, 1, 1) = -0.5_rp * (y - 1.0_rp)**2 - &

@@ -63,9 +63,9 @@ contains
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
-          x = u%dof%x(idx, 1, 1, 1)
-          y = u%dof%y(idx, 1, 1, 1)
-          z = u%dof%z(idx, 1, 1, 1)
+          x = u%dof%x%x(idx, 1, 1, 1)
+          y = u%dof%y%x(idx, 1, 1, 1)
+          z = u%dof%z%x(idx, 1, 1, 1)
 
           ! Inflow velocity is uniform
           u%x(idx, 1, 1, 1) = 1.0_rp
@@ -84,7 +84,7 @@ contains
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
-          y = s%dof%y(idx, 1, 1, 1)
+          y = s%dof%y%x(idx, 1, 1, 1)
           ! Inflow scalar profile is a bump
           s%x(idx, 1, 1, 1) = 0.5_rp * (1.0_rp - cos(2.0_rp*pi*y))
        end do
@@ -107,7 +107,7 @@ contains
     ! Initial scalar profile is a bump
     s => fields%get("s")
     do i = 1, s%dof%size()
-       y = s%dof%y(i, 1, 1, 1)
+       y = s%dof%y%x(i, 1, 1, 1)
        s%x(i, 1, 1, 1) = 0.5_rp * (1.0_rp - cos(2.0_rp*pi*y))
     end do
 

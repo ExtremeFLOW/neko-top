@@ -122,7 +122,6 @@ contains
 
     this%name = name
     call this%sensitivity%init(design_size)
-    call this%sensitivity_old%init(design_size)
 
     this%weight = weight
 
@@ -155,11 +154,11 @@ contains
     this%weight = 1.0_rp
 
     this%value = 0.0_rp
-    this%value_old = 0.0_rp
+    this%value_weight = 0.0_rp
+    this%sensitivity_weight = 0.0_rp
     this%start_time = 0.0_rp
     this%end_time = huge(0.0_rp)
     call this%sensitivity%free()
-    call this%sensitivity_old%free()
 
     this%has_mask = .false.
     if (associated(this%mask)) nullify(this%mask)

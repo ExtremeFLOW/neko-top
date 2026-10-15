@@ -18,14 +18,23 @@ inputs:
     required: false
     default: "/home/runner/tmp/neko"
 
+  json-fortran-version:
+    description: "The version of the JSON-Fortran library to use."
+    required: true
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
     required: true
 
+  parmetis-version:
+    description: "The version of the ParMETIS library to use."
+    required: true
   parmetis-dir:
     description: "The directory where the ParMETIS library was installed."
     required: true
 
+  hdf5-version:
+    description: "The version of the HDF5 library to use."
+    required: true
   hdf5-dir:
     description: "The directory where the HDF5 library was installed."
     required: true
@@ -106,11 +115,12 @@ runs:
       run: |
         # Get the GIT sha for the current commit
         SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key=neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
-        [ -n "$PARMETIS_DIR" ] && key="$key-with-parmetis"
-        [ -n "$HDF5_DIR" ] && key="$key-with-hdf5"
+        [ -n "$JSON_FORTRAN_DIR" ] && key="$key-json-fortran-$JSON_FORTRAN_VERSION"
+        [ -n "$PARMETIS_DIR" ] && key="$key-parmetis-$PARMETIS_VERSION"
+        [ -n "$HDF5_DIR" ] && key="$key-hdf5-$HDF5_VERSION"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library

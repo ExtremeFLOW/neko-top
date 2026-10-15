@@ -51,10 +51,9 @@ DOCS=OFF
 EXAMPLES=OFF
 NEKO_TEST=OFF
 
-# Load the environment file.
-if [ -f "$MAIN_DIR/prepare.env" ]; then
-    source $MAIN_DIR/prepare.env
-fi
+# Load the environment files.
+source $MAIN_DIR/config/dependency-versions.env
+[ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
 
 # List possible options
 OPTIONS=help,tests,clean,clean-neko,test-neko,quiet,device:,docs,examples
@@ -91,8 +90,8 @@ export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE NEKO_TEST
 
 # Check for valid settings
 
-if [[ "$TEST" == "ON" || "$NEKO_TEST" == "true" ]] && [ -z "$PFUNIT_DIR" ]; then
-    export PFUNIT_DIR="$EXTERNAL_DIR/pfunit"
+if [[ "$TEST" == "ON" || "$NEKO_TEST" == "true" ]]; then
+    export PFUNIT_DIR=${PFUNIT_DIR:-"pfunit"}
 fi
 
 # ============================================================================ #
@@ -126,11 +125,11 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Setting up external dependencies\n"
 
-check_system_dependencies           # Check for system dependencies.
-find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
-find_hdf5 $HDF5_DIR                 # Re-defines the HDF5_DIR variable.
-find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
-find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
+check_system_dependencies          # Check for system dependencies.
+find_json_fortran                  # Re-defines the JSON_FORTRAN_DIR variable.
+find_hdf5                          # Re-defines the HDF5_DIR variable.
+find_neko --build                  # Re-defines the NEKO_DIR variable.
+[ "$TEST" == "ON" ] && find_pfunit # Re-defines the PFUNIT_DIR variable.
 
 # Done setting up external dependencies
 # ============================================================================ #

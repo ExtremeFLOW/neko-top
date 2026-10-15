@@ -56,7 +56,7 @@ with MMA-specific settings under `optimization.solver.mma`.
 | `xmax`       | Global upper bound applied to all design variables.     | Real                  | `1.0`                                              |
 | `a0`         | MMA scalar coefficient \f$a_0\f$.                       | Real                  | `1.0`                                              |
 | `a`          | MMA vector coefficient \f$a_i\f$ (applied uniformly).   | Real                  | `0.0`                                              |
-| `c`          | MMA vector coefficient \f$c_i\f$ (applied uniformly).   | Real                  | `100.0`                                            |
+| `c`          | MMA vector coefficient \f$c_i\f$ (applied uniformly).   | Real                  | `1000.0`                                           |
 | `d`          | MMA vector coefficient \f$d_i\f$ (applied uniformly).   | Real                  | `0.0`                                              |
 | `scale`      | Constraint scaling target value.                        | Real, `> 0`           | `1.0`                                              |
 | `auto_scale` | Enable adaptive scaling of constraints each iteration.  | `.true.` or `.false.` | `.false.`                                          |

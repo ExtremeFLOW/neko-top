@@ -78,8 +78,8 @@ contains
        band_size = max(band_size, element_size)
 
        do i = 1, bc%msk(0)
-          y = bc%dof%y(bc%msk(i), 1, 1, 1)
-          z = bc%dof%z(bc%msk(i), 1, 1, 1)
+          y = bc%dof%y%x(bc%msk(i), 1, 1, 1)
+          z = bc%dof%z%x(bc%msk(i), 1, 1, 1)
 
           val_y0 = smooth_step(y, 0.0_rp, band_size)
           val_z0 = smooth_step(z, 0.0_rp, band_size)
@@ -101,7 +101,7 @@ contains
        s => fields%get("temperature")
 
        do i = 1, bc%msk(0)
-          z = bc%dof%z(bc%msk(i), 1, 1, 1)
+          z = bc%dof%z%x(bc%msk(i), 1, 1, 1)
           s%x(bc%msk(i), 1, 1, 1) = smooth_step(z, 0.45_rp, 0.55_rp)
        end do
 
