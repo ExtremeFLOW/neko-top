@@ -47,7 +47,8 @@ module adv_lin_no_dealias
   use operators, only: opgrad, conv1, cdtp
   use device_math, only: device_vdot3, device_sub2, device_add4, &
        device_col3, device_subcol3, device_rzero
-  use device, only: device_free, device_map, device_get_ptr
+  use device, only: device_map, device_unmap, device_get_ptr
+  use utils, only: neko_error
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, &
        c_associated
   implicit none
@@ -93,6 +94,8 @@ contains
     class(adv_lin_no_dealias_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
 
+    call this%free()
+
     allocate(this%temp(coef%dof%size()))
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -102,14 +105,15 @@ contains
   end subroutine init_no_dealias
 
   !> Destructor
+  !! @param this The object.
   subroutine free_no_dealias(this)
     class(adv_lin_no_dealias_t), intent(inout) :: this
 
     if (allocated(this%temp)) then
+       if (c_associated(this%temp_d)) then
+          call device_unmap(this%temp, this%temp_d)
+       end if
        deallocate(this%temp)
-    end if
-    if (c_associated(this%temp_d)) then
-       call device_free(this%temp_d)
     end if
   end subroutine free_no_dealias
 
@@ -212,6 +216,11 @@ contains
        end associate
 
        call neko_scratch_registry%relinquish_field(temp_indices)
+    else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
+       ! The element loop below relies on opgrad and cdtp honouring an
+       ! element range, which the SX and XSMM backends do not.
+       call neko_error("Adjoint advection without dealiasing is not " // &
+            "implemented for the SX and XSMM backends")
     else
        do e = 1, coef%msh%nelv
           ! u . grad U_b^T
@@ -497,6 +506,11 @@ contains
 
        call neko_scratch_registry%relinquish_field(temp_indices)
 
+    else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
+       ! The element loop below relies on cdtp honouring an element range,
+       ! which the SX and XSMM backends do not.
+       call neko_error("Adjoint scalar advection without dealiasing is " // &
+            "not implemented for the SX and XSMM backends")
     else
        do e = 1, coef%msh%nelv
           ! \int \grad r . U_b  s
