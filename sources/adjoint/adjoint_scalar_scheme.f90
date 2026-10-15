@@ -45,15 +45,9 @@ module adjoint_scalar_scheme
   use dofmap, only : dofmap_t
   use krylov, only : ksp_t, krylov_solver_factory, KSP_MAX_ITER, ksp_monitor_t
   use coefs, only : coef_t
-  use dirichlet, only : dirichlet_t
-  use neumann, only : neumann_t
-  use jacobi, only : jacobi_t
-  use device_jacobi, only : device_jacobi_t
-  use sx_jacobi, only : sx_jacobi_t
-  use hsmg, only : hsmg_t
   use bc, only : bc_t
   use bc_list, only : bc_list_t
-  use precon, only : pc_t, precon_allocator, precon_destroy
+  use precon, only : pc_t, precon_factory
   use field_dirichlet, only: field_dirichlet_t, field_dirichlet_update
   use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
   use facet_zone, only : facet_zone_t
@@ -392,7 +386,7 @@ contains
     call adjoint_scalar_scheme_solver_factory(this%ksp, this%dm_Xh%size(), &
          solver_type, integer_val, solver_abstol, logical_val)
     call scalar_scheme_precon_factory(this%pc, this%ksp, &
-         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs, &
+         this%c_Xh, this%bcs, &
          solver_precon, precon_params)
 
     call neko_log%end_section()
@@ -433,7 +427,7 @@ contains
     end if
 
     if (allocated(this%pc)) then
-       call precon_destroy(this%pc)
+       call this%pc%free()
        deallocate(this%pc)
     end if
 
@@ -523,30 +517,16 @@ contains
   end subroutine adjoint_scalar_scheme_solver_factory
 
   !> Initialize a Krylov preconditioner
-  subroutine adjoint_scalar_scheme_precon_factory(pc, ksp, coef, dof, gs, &
-       bclst, pctype, pcparams)
+  subroutine adjoint_scalar_scheme_precon_factory(pc, ksp, coef, &
+       bclst, pctype, json)
     class(pc_t), allocatable, target, intent(inout) :: pc
     class(ksp_t), target, intent(inout) :: ksp
     type(coef_t), target, intent(in) :: coef
-    type(dofmap_t), target, intent(in) :: dof
-    type(gs_t), target, intent(inout) :: gs
     type(bc_list_t), target, intent(inout) :: bclst
     character(len=*) :: pctype
-    type(json_file), intent(inout) :: pcparams
+    type(json_file), intent(inout) :: json
 
-    call precon_allocator(pc, pctype)
-
-    select type (pcp => pc)
-    type is (jacobi_t)
-       call pcp%init(coef, dof, gs)
-    type is (sx_jacobi_t)
-       call pcp%init(coef, dof, gs)
-    type is (device_jacobi_t)
-       call pcp%init(coef, dof, gs)
-    type is (hsmg_t)
-       call pcp%init(coef, bclst, pcparams)
-    end select
-
+    call precon_factory(pc, pctype, coef, bclst, json)
     call ksp%set_pc(pc)
 
   end subroutine adjoint_scalar_scheme_precon_factory

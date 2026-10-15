@@ -1,7 +1,7 @@
 /**
  * @file mma_kernel.h
  * @copyright
- * Copyright (c) 2025, The Neko-TOP Authors
+ * Copyright (c) 2025-2026, The Neko-TOP Authors
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -37,6 +37,10 @@
 #ifndef MMA_HIP_KERNEL_H
 #define MMA_HIP_KERNEL_H
 
+#include <cfloat>
+
+// z term of the Hessian of the dip subsolver, Hess -= 10 * a * a^T. The
+// factor 10 is the inverse of the weight 2 * 0.05 of z^2 in L_z.
 template <typename T>
 __global__ void mma_update_hessian_z_kernel(
     T* __restrict__ Hess,
@@ -51,7 +55,7 @@ __global__ void mma_update_hessian_z_kernel(
     int i = tid % m;
     int j = tid / m;
 
-    Hess[tid] -= a[i] * a[j];
+    Hess[tid] -= T(10.0) * a[i] * a[j];
 }
 
 template<typename T>
@@ -253,9 +257,12 @@ __global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
   T denom = 2.0 * pj / diff_u3 + 2.0 * qj / diff_l3;
   T val = -1.0 / denom;
 
-  // Mask out active primal constraints
-  bool active = (fabs(xt - alpha[tj]) <= T(1e-16)) ||
-              (fabs(xt - beta[tj])  <= T(1e-16));
+  // Mask out active primal constraints, as mma_subsolve_dip_cpu with
+  // NEKO_EPS = epsilon(1.0_rp)
+  const T eps = (sizeof(T) == sizeof(float)) ?
+    static_cast<T>(FLT_EPSILON) :
+    static_cast<T>(DBL_EPSILON);
+  bool active = (xt - alpha[tj] < eps) || (beta[tj] - xt < eps);
 
   Ljjxinv[tj] = active ? T(0.0) : val;
 }
@@ -432,6 +439,60 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
          T(0.001) * max_neg + eps * inv_xgap);
     qij[idx] = x_minus_low_sq * (T(0.001) * max_pos +
          T(1.001) * max_neg + eps * inv_xgap);
+  }
+}
+
+// As mma_sub3_kernel, but with the p0j, q0j, pij and qij of the dip
+// subsolver (mma_gensub_cpu): following MMA::GenSub in topopt_in_petsc
+// (constraintModification = false), only the objective is regularised,
+// by 0.5e-6/(upp - low).
+template <typename T>
+__global__ void mma_sub3_dip_kernel( const T* __restrict__ x,
+    const T* __restrict__ df0dx, const T* __restrict__ dfdx,
+    T* __restrict__ low, T* __restrict__ upp, const T* __restrict__ xmin,
+    const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
+    T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
+    T* __restrict__ qij, const int n, const int m) {
+  int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj >= n) return;
+
+  // Load into registers once
+  const T xt    = x[tj];
+  const T xmin_j = xmin[tj];
+  const T xmax_j = xmax[tj];
+  const T low_j = low[tj];
+  const T upp_j = upp[tj];
+  const T df0 = df0dx[tj];
+
+  // Clamp helpers
+  const T tenth_low_diff = T(0.1) * (xt - low_j);
+  const T tenth_upp_diff = T(0.1) * (upp_j - xt);
+
+  // Compute alpha and beta with fused max/min and fewer calls
+  T alpha_val = max(xmin_j, low_j + tenth_low_diff);
+  T beta_val = min(xmax_j, upp_j - tenth_upp_diff);
+
+  alpha[tj] = alpha_val;
+  beta[tj] = beta_val;
+
+  const T upp_minus_x = upp_j - xt;
+  const T x_minus_low = xt - low_j;
+  const T upp_minus_x_sq = upp_minus_x * upp_minus_x;
+  const T x_minus_low_sq = x_minus_low * x_minus_low;
+
+  // Regularisation of the objective, a true division as in mma_gensub_cpu
+  const T reg = T(0.5) * T(1.0e-6) / (upp_j - low_j);
+
+  p0j[tj] = upp_minus_x_sq * (max(df0, T(0)) + T(0.001) * abs(df0) + reg);
+  q0j[tj] = x_minus_low_sq * (max(-df0, T(0)) + T(0.001) * abs(df0) + reg);
+
+  // The constraints are not regularised
+  for (int i = 0; i < m; ++i) {
+    const int idx = i + tj * m;
+    const T dfdx_val = dfdx[idx];
+
+    pij[idx] = upp_minus_x_sq * max(dfdx_val, T(0));
+    qij[idx] = x_minus_low_sq * max(-dfdx_val, T(0));
   }
 }
 
@@ -1141,6 +1202,42 @@ __global__ void kkt_rex_kernel(T* __restrict__ rex, const T* __restrict__ df0dx,
     }
     rex[tj] += df0dx[tj] - xsi[tj] + eta[tj];
   }
+}
+
+// KKT residual of the original problem for the dip subsolver, as
+// mma_dip_KKT_cpu (MMA::KKTresidual in topopt_in_petsc), for each local
+// design variable j: the stationarity in res[j] and the complementarity
+// of the lower and upper bounds in res[n + j] and res[2n + j]. The bound
+// multipliers are estimated where x_j is within 1e-5 of the true bounds.
+template <typename T>
+__global__ void mma_dip_kkt_kernel(T* __restrict__ res,
+     const T* __restrict__ x, const T* __restrict__ df0dx,
+     const T* __restrict__ dfdx, const T* __restrict__ xmin,
+     const T* __restrict__ xmax, const T* __restrict__ lambda,
+     const int n, const int m) {
+  const int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj >= n) return;
+
+  const T xt = x[tj];
+  const T xmin_j = xmin[tj];
+  const T xmax_j = xmax[tj];
+
+  // Gradient of the Lagrangian w.r.t. x_j
+  T rex = df0dx[tj];
+  for (int i = 0; i < m; i++) {
+    rex = rex + lambda[i] * dfdx[i + tj * m];
+  }
+
+  // Estimate the bound multipliers where x_j is at a bound
+  T xsi = T(0.0);
+  if (xt < xmin_j + T(1.0e-5) && rex > T(0.0)) xsi = rex;
+  T eta = T(0.0);
+  if (xt > xmax_j - T(1.0e-5) && rex < T(0.0)) eta = -rex;
+  rex = rex + (-xsi + eta);
+
+  res[tj] = rex;
+  res[n + tj] = xsi * (xt - xmin_j);
+  res[2 * n + tj] = eta * (xmax_j - xt);
 }
 
 
