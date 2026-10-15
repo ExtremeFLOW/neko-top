@@ -1,0 +1,465 @@
+!> Discrete-transpose (dot-product) checks for the non-dealiased adjoint
+!! advection terms of adv_lin_no_dealias_t.
+!!
+!! Neko's kernels give, element by element, `opgrad = B d/dx_j`,
+!! `cdtp(x; d.dj) = (B d/dx_j)^T x` and `B conv1(s; c) = B (c . grad) s`,
+!! all with the same discrete derivative. The adjoint terms must therefore
+!! be the exact discrete transposes of the forward ones. On the
+!! element-local (unassembled) vectors, with the plain Euclidean inner
+!! product (both sides already carry the mass matrix B), up to round-off:
+!!
+!!   fluid:  <w, L u> = <L^T w, u>, where L u = compute_linear(u; U_b) and
+!!           L^T w = compute_adjoint(w; U_b);
+!!   scalar: <r, -B (U_b . grad s)> = <compute_adjoint_scalar(r; U_b), s>.
+!!
+!! Each term is accumulated into a zeroed field. Three tests separate the
+!! two terms of the adjoint:
+!!
+!!   - fluid, U_b = (g, 0, 0): the weak term then has only its x part, so
+!!     its sign cannot matter, and the test sees only the pointwise
+!!     u . grad(U_b)^T term (where it writes, and which element's base flow
+!!     and geometry it differentiates);
+!!   - scalar, general U_b: this path never touches the pointwise term, so
+!!     it sees only the weak term (including its sign);
+!!   - fluid, general U_b: both.
+!!
+!! The mesh has two hex elements, so that an element-index error moves
+!! values across the element boundary. Element 2 is a distorted (non-affine)
+!! hex unlike element 1, so that using one element's geometric factors on
+!! the other is also visible. All fields are smooth, non-polynomial and
+!! non-uniform functions of the node coordinates, differ from one component
+!! to the next, and carry an extra per-element offset.
+module adv_adjoint_no_dealias_transpose
+  use mpi
+  use pfunit
+  use num_types, only: rp, dp
+  use mesh, only: mesh_t
+  use point, only: point_t
+  use space, only: space_t, GLL
+  use dofmap, only: dofmap_t
+  use gather_scatter, only: gs_t
+  use field, only: field_t
+  use coefs, only: coef_t
+  use math, only: glsc2, glsc3
+  use field_math, only: field_rzero
+  use operators, only: conv1
+  use adv_lin_no_dealias, only: adv_lin_no_dealias_t
+  use scratch_registry, only: neko_scratch_registry
+  use comm, only: NEKO_COMM, pe_rank, pe_size, comm_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_init, device_finalize, device_memcpy, &
+       HOST_TO_DEVICE, DEVICE_TO_HOST
+  implicit none
+
+  !> Polynomial order of the test space (order 7 => lx = 8).
+  integer, parameter :: LX = 8
+
+  !> Relative tolerance on the transpose identity. Exact up to round-off.
+  real(kind=rp), parameter :: transpose_rtol = 1.0e4_rp * epsilon(1.0_rp)
+
+  !> Smallest accepted magnitude of the two sides, so that two (near) zero
+  !! inner products cannot pass vacuously.
+  real(kind=rp), parameter :: min_magnitude = 1.0e-3_rp
+
+  !> Offset added to field k on element e, scaled by k * (e - 1), so that
+  !! the two elements hold different data.
+  real(kind=rp), parameter :: elem_offset = 0.05_rp
+
+  @TestCase
+  type, extends(MPITestCase) :: test_adv_adjoint_no_dealias
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_adv_adjoint_no_dealias
+
+contains
+
+  !> Initialise the device (on device backends) and the communicator.
+  !! @param this The test case.
+  subroutine setUp(this)
+    class(test_adv_adjoint_no_dealias), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call comm_init
+  end subroutine setUp
+
+  !> Finalise the device (on device backends).
+  !! @param this The test case.
+  subroutine tearDown(this)
+    class(test_adv_adjoint_no_dealias), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+  end subroutine tearDown
+
+  !> Build a two-element hex mesh (adapted from mapping_pde_filter).
+  !! Element 1 is the unit cube on x in [0, 1]; element 2 shares its x = 1
+  !! face, and its far corner is moved from (2, 1, 1) to (2.3, 1.2, 1.15),
+  !! making it a non-affine hex whose geometric factors vary within the
+  !! element and differ from those of element 1.
+  !! @param msh The mesh to build.
+  subroutine gen_msh(msh)
+    type(mesh_t), intent(inout) :: msh
+    type(point_t) :: p(12)
+
+    call p(1)%init(0.0_dp, 0.0_dp, 0.0_dp)
+    call p(1)%set_id(1)
+    call p(2)%init(1.0_dp, 0.0_dp, 0.0_dp)
+    call p(2)%set_id(2)
+    call p(3)%init(0.0_dp, 1.0_dp, 0.0_dp)
+    call p(3)%set_id(3)
+    call p(4)%init(1.0_dp, 1.0_dp, 0.0_dp)
+    call p(4)%set_id(4)
+    call p(5)%init(2.0_dp, 0.0_dp, 0.0_dp)
+    call p(5)%set_id(5)
+    call p(6)%init(2.0_dp, 1.0_dp, 0.0_dp)
+    call p(6)%set_id(6)
+    call p(7)%init(0.0_dp, 0.0_dp, 1.0_dp)
+    call p(7)%set_id(7)
+    call p(8)%init(1.0_dp, 0.0_dp, 1.0_dp)
+    call p(8)%set_id(8)
+    call p(9)%init(1.0_dp, 1.0_dp, 1.0_dp)
+    call p(9)%set_id(9)
+    call p(10)%init(0.0_dp, 1.0_dp, 1.0_dp)
+    call p(10)%set_id(10)
+    call p(11)%init(2.0_dp, 0.0_dp, 1.0_dp)
+    call p(11)%set_id(11)
+    call p(12)%init(2.3_dp, 1.2_dp, 1.15_dp)
+    call p(12)%set_id(12)
+
+    call msh%init(3, 2)
+    call msh%add_element(1, 1, p(1), p(2), p(3), p(4), &
+         p(7), p(8), p(10), p(9))
+    call msh%add_element(2, 2, p(2), p(5), p(4), p(6), &
+         p(8), p(11), p(9), p(12))
+    call msh%generate_conn()
+
+  end subroutine gen_msh
+
+  !> Build the SEM chain mesh -> space -> dofmap -> gs -> coef, and the
+  !! scratch registry the device branch draws its temporaries from.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  subroutine build_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), target, intent(inout) :: msh
+    type(space_t), target, intent(inout) :: Xh
+    type(dofmap_t), target, intent(inout) :: dof
+    type(gs_t), target, intent(inout) :: gs
+    type(coef_t), target, intent(inout) :: coef
+
+    call gen_msh(msh)
+    call Xh%init(GLL, LX, LX, LX)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+    call neko_scratch_registry%init(dof = dof)
+
+  end subroutine build_fixture
+
+  !> Free everything build_fixture created, in reverse order.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  subroutine free_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+
+    call neko_scratch_registry%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine free_fixture
+
+  !> A smooth, non-polynomial, non-uniform function of the coordinates.
+  !! Each value of `k` gives a different function.
+  !! @param x The x coordinate.
+  !! @param y The y coordinate.
+  !! @param z The z coordinate.
+  !! @param k Selects the function.
+  elemental function smooth_fn(x, y, z, k) result(f)
+    real(kind=rp), intent(in) :: x, y, z
+    integer, intent(in) :: k
+    real(kind=rp) :: f
+    real(kind=rp) :: a
+
+    a = real(k, kind=rp)
+    f = sin((0.3_rp + 0.15_rp * a) * x + 1.1_rp * y - 0.2_rp * a * z &
+         + 0.5_rp * a) &
+         + 0.4_rp * cos(1.3_rp * x * y + 0.6_rp * z + 0.3_rp * a) &
+         + 0.2_rp * exp(0.3_rp * cos(a) * x - 0.5_rp * y * z)
+
+  end function smooth_fn
+
+  !> Set a field to `smooth_fn(k)` at its nodes, plus the per-element
+  !! offset `elem_offset * k * (e - 1)`, on host and device.
+  !! @param f The field.
+  !! @param dof The dofmap holding the node coordinates.
+  !! @param k Selects the function.
+  subroutine fill_smooth(f, dof, k)
+    type(field_t), intent(inout) :: f
+    type(dofmap_t), intent(in) :: dof
+    integer, intent(in) :: k
+    integer :: e
+
+    do e = 1, size(f%x, 4)
+       f%x(:,:,:,e) = smooth_fn(dof%x%x(:,:,:,e), dof%y%x(:,:,:,e), &
+            dof%z%x(:,:,:,e), k) + elem_offset * real(k * (e - 1), kind=rp)
+    end do
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(f%x, f%x_d, f%size(), HOST_TO_DEVICE, .true.)
+    end if
+
+  end subroutine fill_smooth
+
+  !> Copy a field from device to host (no-op on the CPU backend).
+  !! @param f The field.
+  subroutine to_host(f)
+    type(field_t), intent(inout) :: f
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(f%x, f%x_d, f%size(), DEVICE_TO_HOST, .true.)
+    end if
+
+  end subroutine to_host
+
+  !> Print both sides of the identity and assert that they agree.
+  !! @param label Name of the check, printed with the numbers.
+  !! @param lhs The forward side.
+  !! @param rhs The adjoint side.
+  subroutine assert_transpose(label, lhs, rhs)
+    character(len=*), intent(in) :: label
+    real(kind=rp), intent(in) :: lhs, rhs
+    real(kind=rp) :: magnitude, rel_diff
+
+    magnitude = max(abs(lhs), abs(rhs))
+    rel_diff = 0.0_rp
+    if (magnitude .gt. 0.0_rp) rel_diff = abs(lhs - rhs) / magnitude
+
+    if (pe_rank .eq. 0) then
+       write(*, '(A, A, 3(A, ES24.16))') label, ':', &
+            ' lhs = ', lhs, ' rhs = ', rhs, ' rel_diff = ', rel_diff
+    end if
+
+    @assertGreaterThan(magnitude, min_magnitude, label // ': vacuous')
+    @assertLessThanOrEqual(rel_diff, transpose_rtol, label)
+
+  end subroutine assert_transpose
+
+  !> Check <w, L u> = <L^T w, u> for the fluid terms.
+  !! @param label Name of the check, printed with the numbers.
+  !! @param general_base If false, the base flow is U_b = (g, 0, 0);
+  !! otherwise all three of its components are non-zero.
+  subroutine check_fluid(label, general_base)
+    character(len=*), intent(in) :: label
+    logical, intent(in) :: general_base
+    type(mesh_t), target :: msh
+    type(space_t), target :: Xh
+    type(dofmap_t), target :: dof
+    type(gs_t), target :: gs
+    type(coef_t), target :: coef
+    type(adv_lin_no_dealias_t) :: adv
+    type(field_t) :: ub, vb, wb, ux, uy, uz, wx, wy, wz
+    type(field_t) :: lux, luy, luz, ltwx, ltwy, ltwz
+    real(kind=rp) :: lhs, rhs
+    integer :: n
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+    call adv%init(coef)
+    n = coef%dof%size()
+
+    call ub%init(dof, 'ub')
+    call vb%init(dof, 'vb')
+    call wb%init(dof, 'wb')
+    call ux%init(dof, 'ux')
+    call uy%init(dof, 'uy')
+    call uz%init(dof, 'uz')
+    call wx%init(dof, 'wx')
+    call wy%init(dof, 'wy')
+    call wz%init(dof, 'wz')
+    call lux%init(dof, 'lux')
+    call luy%init(dof, 'luy')
+    call luz%init(dof, 'luz')
+    call ltwx%init(dof, 'ltwx')
+    call ltwy%init(dof, 'ltwy')
+    call ltwz%init(dof, 'ltwz')
+
+    call fill_smooth(ub, dof, 1)
+    if (general_base) then
+       call fill_smooth(vb, dof, 2)
+       call fill_smooth(wb, dof, 3)
+    else
+       call field_rzero(vb)
+       call field_rzero(wb)
+    end if
+    call fill_smooth(ux, dof, 4)
+    call fill_smooth(uy, dof, 5)
+    call fill_smooth(uz, dof, 6)
+    call fill_smooth(wx, dof, 7)
+    call fill_smooth(wy, dof, 8)
+    call fill_smooth(wz, dof, 9)
+
+    call field_rzero(lux)
+    call field_rzero(luy)
+    call field_rzero(luz)
+    call field_rzero(ltwx)
+    call field_rzero(ltwy)
+    call field_rzero(ltwz)
+
+    call adv%compute_linear(ux, uy, uz, ub, vb, wb, lux, luy, luz, &
+         Xh, coef, n)
+    call adv%compute_adjoint(wx, wy, wz, ub, vb, wb, ltwx, ltwy, ltwz, &
+         Xh, coef, n)
+
+    call to_host(lux)
+    call to_host(luy)
+    call to_host(luz)
+    call to_host(ltwx)
+    call to_host(ltwy)
+    call to_host(ltwz)
+
+    lhs = glsc2(wx%x, lux%x, n) + glsc2(wy%x, luy%x, n) &
+         + glsc2(wz%x, luz%x, n)
+    rhs = glsc2(ltwx%x, ux%x, n) + glsc2(ltwy%x, uy%x, n) &
+         + glsc2(ltwz%x, uz%x, n)
+
+    call assert_transpose(label, lhs, rhs)
+
+    call ub%free()
+    call vb%free()
+    call wb%free()
+    call ux%free()
+    call uy%free()
+    call uz%free()
+    call wx%free()
+    call wy%free()
+    call wz%free()
+    call lux%free()
+    call luy%free()
+    call luz%free()
+    call ltwx%free()
+    call ltwy%free()
+    call ltwz%free()
+    call adv%free()
+    call free_fixture(msh, Xh, dof, gs, coef)
+
+  end subroutine check_fluid
+
+  !> Check <r, -B (U_b . grad s)> = <compute_adjoint_scalar(r; U_b), s>,
+  !! with a general base flow.
+  !! @param label Name of the check, printed with the numbers.
+  subroutine check_scalar(label)
+    character(len=*), intent(in) :: label
+    type(mesh_t), target :: msh
+    type(space_t), target :: Xh
+    type(dofmap_t), target :: dof
+    type(gs_t), target :: gs
+    type(coef_t), target :: coef
+    type(adv_lin_no_dealias_t) :: adv
+    type(field_t) :: ub, vb, wb, s, r, conv_s, ltr
+    real(kind=rp) :: lhs, rhs
+    integer :: n
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+    call adv%init(coef)
+    n = coef%dof%size()
+
+    call ub%init(dof, 'ub')
+    call vb%init(dof, 'vb')
+    call wb%init(dof, 'wb')
+    call s%init(dof, 's')
+    call r%init(dof, 'r')
+    call conv_s%init(dof, 'conv_s')
+    call ltr%init(dof, 'ltr')
+
+    call fill_smooth(ub, dof, 1)
+    call fill_smooth(vb, dof, 2)
+    call fill_smooth(wb, dof, 3)
+    call fill_smooth(s, dof, 10)
+    call fill_smooth(r, dof, 11)
+    call field_rzero(ltr)
+
+    ! Forward: U_b . grad s, strong form; B is applied in the inner product.
+    call conv1(conv_s%x, s%x, ub%x, vb%x, wb%x, Xh, coef)
+    call adv%compute_adjoint_scalar(ub, vb, wb, r, ltr, Xh, coef, n)
+
+    call to_host(conv_s)
+    call to_host(ltr)
+
+    lhs = -glsc3(r%x, coef%B, conv_s%x, n)
+    rhs = glsc2(ltr%x, s%x, n)
+
+    call assert_transpose(label, lhs, rhs)
+
+    call ub%free()
+    call vb%free()
+    call wb%free()
+    call s%free()
+    call r%free()
+    call conv_s%free()
+    call ltr%free()
+    call adv%free()
+    call free_fixture(msh, Xh, dof, gs, coef)
+
+  end subroutine check_scalar
+
+  ! ========================================================================== !
+  ! Test entry points.
+
+  !> Fluid, U_b = (g, 0, 0): only the pointwise term can fail.
+  !! @param this The test case.
+  @test(npes=[1])
+  subroutine test_fluid_base_x_only(this)
+    class(test_adv_adjoint_no_dealias), intent(inout) :: this
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call check_fluid('T_A fluid, U_b = (g,0,0)', .false.)
+
+  end subroutine test_fluid_base_x_only
+
+  !> Scalar, general U_b: only the weak term can fail.
+  !! @param this The test case.
+  @test(npes=[1])
+  subroutine test_scalar_general_base(this)
+    class(test_adv_adjoint_no_dealias), intent(inout) :: this
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call check_scalar('T_B scalar, general U_b')
+
+  end subroutine test_scalar_general_base
+
+  !> Fluid, general U_b: both terms.
+  !! @param this The test case.
+  @test(npes=[1])
+  subroutine test_fluid_general_base(this)
+    class(test_adv_adjoint_no_dealias), intent(inout) :: this
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call check_fluid('T_AB fluid, general U_b', .true.)
+
+  end subroutine test_fluid_general_base
+
+end module adv_adjoint_no_dealias_transpose
