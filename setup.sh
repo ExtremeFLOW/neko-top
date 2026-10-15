@@ -6,7 +6,9 @@ function help() {
     echo -e "Usage: $0 [options]"
     echo -e "Options:"
     echo -e "\t-h, --help        Show this help message and exit"
-    echo -e "\t-t, --tests       Run the tests after the installation"
+    echo -e "\t-t, --tests       Build with tests enabled and default the build"
+    echo -e "\t                  type to Testing; it does not itself run the"
+    echo -e "\t                  suite (see 'ctest --test-dir build')"
     echo -e "\t    --test-neko   Run the Neko tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
@@ -152,6 +154,43 @@ fi
 CMAKE_VARIABLES+=("-DBUILD_DOCS=$DOCS")
 CMAKE_VARIABLES+=("-DBUILD_TESTING=$TEST")
 CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=$EXAMPLES")
+
+# Choose the build type, in priority order: an explicit -DCMAKE_BUILD_TYPE=
+# already present in CMAKE_VARIABLES, then the CMAKE_BUILD_TYPE environment
+# variable, then (only if -t/--tests was given) "Testing". If none of those
+# apply, nothing is passed and CMake's own default (Release; see
+# CMakeLists.txt) applies.
+#
+# Whenever a type *is* chosen here from the environment variable or the -t
+# default, it is passed explicitly with -D: CMAKE_BUILD_TYPE as an
+# environment variable only seeds CMake's cache the first time a build tree
+# is configured, so on any later call against the same build/ directory
+# (e.g. a second "./setup.sh -t" without --clean) it would silently stop
+# having any effect, while an explicit -D always applies.
+HAS_BUILD_TYPE_VAR=false
+for var in "${CMAKE_VARIABLES[@]}"; do
+    if [[ "$var" == -DCMAKE_BUILD_TYPE=* ]]; then
+        HAS_BUILD_TYPE_VAR=true
+        BUILD_TYPE="${var#-DCMAKE_BUILD_TYPE=}"
+    fi
+done
+
+if [ "$HAS_BUILD_TYPE_VAR" == false ]; then
+    if [ -n "$CMAKE_BUILD_TYPE" ]; then
+        BUILD_TYPE="$CMAKE_BUILD_TYPE"
+    elif [ "$TEST" == "ON" ]; then
+        BUILD_TYPE="Testing"
+    else
+        BUILD_TYPE=""
+    fi
+    [ -n "$BUILD_TYPE" ] && CMAKE_VARIABLES+=("-DCMAKE_BUILD_TYPE=$BUILD_TYPE")
+fi
+
+if [ -n "$BUILD_TYPE" ]; then
+    printf "Build type: %s\n" "$BUILD_TYPE"
+else
+    printf "Build type: (not set; CMake default applies)\n"
+fi
 
 # Run the cmake command to configure the build
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
