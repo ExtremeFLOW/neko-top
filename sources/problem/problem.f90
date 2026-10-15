@@ -50,7 +50,7 @@ module problem
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
-  use logger, only: neko_log
+  use logger, only: neko_log, LOG_SIZE
   use math, only: copy
   use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
@@ -107,6 +107,9 @@ module problem
      !! sensitivity.
      procedure, pass(this), public :: run_backward_unsteady => &
           problem_run_backward_unsteady
+     !> Warn about objectives whose time window never overlapped the run.
+     procedure, pass(this) :: check_objective_windows => &
+          problem_check_objective_windows
      ! ----------------------------------------------------------------------- !
      ! Base class methods
 
@@ -541,9 +544,31 @@ contains
     end do
     call profiler_end_region("Forward simulation")
 
+    call this%check_objective_windows()
+
     call simulation_finalize(simulation%neko_case)
 
   end subroutine problem_run_forward_unsteady
+
+  !> Warn about objectives whose time window never overlapped the run.
+  !!
+  !! Such an objective accumulates nothing and reports zero, which is easy to
+  !! mistake for a well-performing design. Say so rather than staying silent.
+  !! @param this The problem.
+  subroutine problem_check_objective_windows(this)
+    class(problem_t), intent(inout) :: this
+    character(len=LOG_SIZE) :: log_buf
+    integer :: i
+
+    do i = 1, this%n_objectives
+       if (this%objective_list(i)%objective%value_weight .gt. 0.0_rp) cycle
+
+       write (log_buf, '(A,A,A)') "Objective '", &
+            trim(this%objective_list(i)%objective%name), &
+            "' was never sampled; its time window misses the run."
+       call neko_log%warning(trim(log_buf))
+    end do
+  end subroutine problem_check_objective_windows
 
   !> Run the adjoint backwards
   subroutine problem_run_backward_unsteady(this, simulation, design)

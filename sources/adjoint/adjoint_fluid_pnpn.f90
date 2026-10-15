@@ -39,7 +39,7 @@ module adjoint_fluid_pnpn
   use symmetry_aligned, only: symmetry_aligned_t
   use registry, only: neko_registry
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use krylov, only: ksp_monitor_t
   use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
        adjoint_pnpn_vel_res_t, adjoint_pnpn_prs_res_factory, &
@@ -68,6 +68,7 @@ module adjoint_fluid_pnpn
   use facet_normal, only: facet_normal_t
   use non_normal_aligned, only: non_normal_aligned_t
   use checkpoint, only: chkp_t
+  use checkpoint_payload, only : checkpoint_payload_t
   use mesh, only: mesh_t
   use user_intf, only: user_t
   use time_step_controller, only: time_step_controller_t
@@ -79,8 +80,7 @@ module adjoint_fluid_pnpn
        segregated_vector_bc_projector_t
   use zero_dirichlet, only: zero_dirichlet_t
   use utils, only: neko_error
-  use field_math, only: field_add2, field_copy, &
-       field_add2s2
+  use field_math, only: field_add2, field_copy
   use bc, only: bc_t, BC_DIRICHLET
   use file, only: file_t
   use operators, only: ortho
@@ -98,8 +98,8 @@ module adjoint_fluid_pnpn
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_INTEGER, &
        MPI_LOGICAL, MPI_LOR
-  use operators, only : opgrad, curl, grad
-  use normal_vec_bcs, only: normal_vec_bcs_t
+  use operators, only : opgrad
+  use adjoint_curl_curl, only: adjoint_curl_curl_load
 
   implicit none
   private
@@ -141,12 +141,13 @@ module adjoint_fluid_pnpn
      !> Surface term in pressure rhs. Masks symmetry bcs.
      type(facet_normal_t) :: bc_sym_surface
 
-     !> Surface term in pressure rhs. Masks symmetry bcs.
-     type(normal_vec_bcs_t) :: bc_curl_curl
+     !
+     ! Boundary conditions and  lists for residuals and solution increments
+     !
 
-     !> Projector for velocity increment constraints.
+     !> Boundary conditions projector for velocity constraints.
      class(vector_bc_projector_t), allocatable :: bcs_vel_projector
-     !> Projector for pressure increment constraints.
+     !> Boundary conditions projector for pressure constraints.
      type(scalar_bc_projector_t) :: bcs_prs_projector
 
 
@@ -284,6 +285,8 @@ contains
     logical :: monitor, found
     logical :: advection
     type(json_file) :: numerics_params, precon_params
+    type(checkpoint_payload_t), pointer :: payload
+    real(kind=dp), pointer :: tlag(:), dtlag(:)
 
     ! Temporary field pointers
     character(len=:), allocatable :: file_name
@@ -330,9 +333,6 @@ contains
 
        ! Setup backend dependent vel residual routines
        call adjoint_pnpn_vel_res_factory(this%vel_res)
-
-       allocate(segregated_vector_bc_projector_t :: this%bcs_vel_projector)
-       call this%bcs_vel_projector%init(this%c_Xh)
     end if
 
     if (params%valid_path('case.fluid.nut_field')) then
@@ -428,7 +428,7 @@ contains
     call this%solver_factory(this%ksp_prs, this%dm_Xh%size(), &
          solver_type, solver_maxiter, abs_tol, monitor)
     call this%precon_factory_(this%pc_prs, this%ksp_prs, &
-         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, &
+         this%c_Xh, this%bcs_prs, &
          precon_type, precon_params)
     call neko_log%end_section()
 
@@ -436,23 +436,28 @@ contains
     call neko_log%section("Advection factory")
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
     call json_get(params, 'case.numerics', numerics_params)
+    call chkp%get_time_history(tlag, dtlag)
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
          this%ulag, this%vlag, this%wlag, &
-         chkp%dtlag, chkp%tlag, this%ext_bdf, &
+         dtlag, tlag, this%ext_bdf, &
          .not. advection)
     ! Should be in init_base maybe?
     this%chkp => chkp
-    ! This is probably scheme specific
-    ! Should not be init really, but more like, add fluid or something...
-    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
-
-    this%chkp%abx1 => this%abx1
-    this%chkp%abx2 => this%abx2
-    this%chkp%aby1 => this%aby1
-    this%chkp%aby2 => this%aby2
-    this%chkp%abz1 => this%abz1
-    this%chkp%abz2 => this%abz2
-    call this%chkp%add_lag(this%ulag, this%vlag, this%wlag)
+    ! Register the scheme state for checkpointing.
+    payload => this%chkp%add_payload("adjoint_fluid")
+    call payload%add_field(this%u_adj)
+    call payload%add_field(this%v_adj)
+    call payload%add_field(this%w_adj)
+    call payload%add_field(this%p_adj)
+    call payload%add_field(this%abx1)
+    call payload%add_field(this%abx2)
+    call payload%add_field(this%aby1)
+    call payload%add_field(this%aby2)
+    call payload%add_field(this%abz1)
+    call payload%add_field(this%abz2)
+    call payload%add_series(this%ulag)
+    call payload%add_series(this%vlag)
+    call payload%add_series(this%wlag)
 
     call neko_log%end_section()
 
@@ -492,11 +497,7 @@ contains
   subroutine adjoint_fluid_pnpn_restart(this, chkp)
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(chkp_t), intent(inout) :: chkp
-    real(kind=rp) :: dtlag(10), tlag(10)
     integer :: i, n
-
-    dtlag = chkp%dtlag
-    tlag = chkp%tlag
 
     n = this%u_adj%dof%size()
     if (allocated(this%chkp%previous_mesh%elements) .or. &
@@ -590,7 +591,6 @@ contains
 
     call this%bc_prs_surface%free()
     call this%bc_sym_surface%free()
-    call this%bc_curl_curl%free()
     if (allocated(this%bcs_vel_projector)) then
        call this%bcs_vel_projector%free()
        deallocate(this%bcs_vel_projector)
@@ -673,11 +673,10 @@ contains
     integer :: n
     ! Solver results monitors (pressure + 3 velocity)
     type(ksp_monitor_t) :: ksp_results(4)
-    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, &
-         work1, work2
+    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj
+    type(field_t), pointer :: cc_x, cc_y, cc_z, work1, work2, work3, work4
     integer :: temp_indices(3)
-    integer :: cc_indices(8)
-    real(kind=rp) :: rho_val, mu_val
+    integer :: cc_indices(7)
 
     if (this%freeze) return
 
@@ -710,12 +709,34 @@ contains
       call sumab%compute_fluid(u_e, v_e, w_e, u, v, w, &
            ulag, vlag, wlag, ext_bdf%advection_coeffs%x, ext_bdf%nadv)
 
-      ! Compute the source terms
-      call this%source_term%compute(time)
+      ! Compute the source terms that are extrapolated in time below
+      call this%source_term%compute(time, extrapolate = .true.)
 
       ! Add Neumann bc contributions to the RHS
       call this%bcs_vel%apply_vector(f_x%x, f_y%x, f_z%x, &
            this%dm_Xh%size(), time, strong = .false.)
+
+      ! Add the adjoint of the primal's curl-curl pressure-residual term, a
+      ! volume load explicit in the adjoint pressure (see adjoint_curl_curl).
+      ! It is added before makeabf, so that the extrapolation weights the
+      ! adjoint pressures of the later primal steps as the primal's sumab
+      ! weights u_e; makeabf scales f by rho, which the load's mu / rho
+      ! factor accounts for.
+      call neko_scratch_registry%request_field(cc_x, cc_indices(1), .false.)
+      call neko_scratch_registry%request_field(cc_y, cc_indices(2), .false.)
+      call neko_scratch_registry%request_field(cc_z, cc_indices(3), .false.)
+      call neko_scratch_registry%request_field(work1, cc_indices(4), .false.)
+      call neko_scratch_registry%request_field(work2, cc_indices(5), .false.)
+      call neko_scratch_registry%request_field(work3, cc_indices(6), .false.)
+      call neko_scratch_registry%request_field(work4, cc_indices(7), .false.)
+
+      call adjoint_curl_curl_load(cc_x, cc_y, cc_z, p, c_Xh, gs_Xh, &
+           mu%x(1,1,1,1), rho%x(1,1,1,1), work1, work2, work3, work4)
+      call field_add2(f_x, cc_x, n)
+      call field_add2(f_y, cc_y, n)
+      call field_add2(f_z, cc_z, n)
+
+      call neko_scratch_registry%relinquish_field(cc_indices)
 
       if (oifs) then
          call neko_error("OIFS not implemented for adjoint")
@@ -741,64 +762,17 @@ contains
               ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
 
+      ! Source terms that must not be extrapolated in time are added as
+      ! computed, weighted by the mass matrix and the density like the
+      ! extrapolated terms above.
+      call this%source_term%compute(time, extrapolate = .false., scale = rho)
+
       call ulag%update()
       call vlag%update()
       call wlag%update()
 
       call this%bc_apply_vel(time, strong = .true.)
       call this%bc_apply_prs(time)
-
-      ! Now we need the surface contribution of the curl curl BC.(explicit in p)
-      call neko_scratch_registry%request_field(dx_p_adj, cc_indices(1), .false.)
-      call neko_scratch_registry%request_field(dy_p_adj, cc_indices(2), .false.)
-      call neko_scratch_registry%request_field(dz_p_adj, cc_indices(3), .false.)
-
-      ! Note: zero interior
-      call neko_scratch_registry%request_field(nx1, cc_indices(4), .true.)
-      call neko_scratch_registry%request_field(nx2, cc_indices(5), .true.)
-      call neko_scratch_registry%request_field(nx3, cc_indices(6), .true.)
-
-      call neko_scratch_registry%request_field(work1, cc_indices(7), .false.)
-      call neko_scratch_registry%request_field(work2, cc_indices(8), .false.)
-
-      ! gradient of adjoint pressure (explicit)
-      call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
-
-      ! Now we compute the n x grad(p) (this include 2D weights)
-      call this%bc_curl_curl%apply_n_cross(nx1%x, nx2%x, nx3%x, dx_p_adj%x, &
-           dy_p_adj%x, dz_p_adj%x, dx_p_adj%size())
-
-      ! Now we need curl on the test function, note that transpose of curl is
-      ! negative curl
-      ! reuse dx_p_adj etc as fx, fy, fz etc
-      call curl(dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, work1, work2, c_Xh)
-
-      ! Forward does gsop on the residual (which has the pressure gradient)
-      call gs_Xh%op(dx_p_adj, GS_OP_ADD, event)
-      call device_event_sync(event)
-      call gs_Xh%op(dy_p_adj, GS_OP_ADD, event)
-      call device_event_sync(event)
-      call gs_Xh%op(dz_p_adj, GS_OP_ADD, event)
-      call device_event_sync(event)
-
-      ! multiplcity
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_col2(dx_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
-         call device_col2(dy_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
-         call device_col2(dz_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
-      else
-         call col2(dx_p_adj%x, c_Xh%mult, dx_p_adj%size())
-         call col2(dy_p_adj%x, c_Xh%mult, dx_p_adj%size())
-         call col2(dz_p_adj%x, c_Xh%mult, dx_p_adj%size())
-      end if
-
-      rho_val = rho%x(1,1,1,1)
-      mu_val = mu%x(1,1,1,1)
-      call field_add2s2(f_x, dx_p_adj, -mu_val / rho_val)
-      call field_add2s2(f_y, dy_p_adj, -mu_val / rho_val)
-      call field_add2s2(f_z, dz_p_adj, -mu_val / rho_val)
-
-      call neko_scratch_registry%relinquish_field(cc_indices)
 
       ! Update material properties if necessary
       call this%update_material_properties(time)
@@ -993,10 +967,14 @@ contains
     integer, allocatable :: zone_indices(:)
     character(len=:), allocatable :: json_key
 
+    ! The adjoint scheme does not support the full stress formulation, so the
+    ! velocity constraints are always resolved component-wise.
+    allocate(segregated_vector_bc_projector_t :: this%bcs_vel_projector)
+    call this%bcs_vel_projector%init(this%c_Xh)
+
     ! Special PnPn boundary conditions for pressure
     call this%bc_prs_surface%init_from_components(this%c_Xh)
     call this%bc_sym_surface%init_from_components(this%c_Xh)
-    call this%bc_curl_curl%init_from_components(this%c_Xh)
 
     json_key = 'case.adjoint_fluid.boundary_conditions'
 
@@ -1057,27 +1035,40 @@ contains
           ! so we check.
           if (associated(bc_i)) then
 
+             ! Mixed bcs need to be treated separately, since their
+             ! constraints are per-component and live on nested bcs.
              select type (bc_i)
              type is (symmetry_aligned_t)
-                call this%bcs_vel_projector%mark(bc_i%bc_x, component = 'x')
-                call this%bcs_vel_projector%mark(bc_i%bc_y, component = 'y')
-                call this%bcs_vel_projector%mark(bc_i%bc_z, component = 'z')
-                call this%bcs_vel%append(bc_i)
-                call this%bc_sym_surface%mark_facets(bc_i%marked_facet)
+                ! On symmetry surfaces the primal's curl-curl term also
+                ! enters the pressure residual through bc_sym_surface, and
+                ! adjoint_curl_curl does not transpose that part.
+                call neko_error("The symmetry boundary condition is not " // &
+                     "supported by the adjoint: the transpose of the " // &
+                     "curl-curl pressure term on symmetry surfaces is " // &
+                     "not implemented.")
              type is (non_normal_aligned_t)
+                ! The masks are marked component-wise, as the primal does
+                ! for symmetry, but the bc itself is deliberately not
+                ! appended to bcs_vel. Upstream Neko does
+                ! append it, because non_normal now prescribes tangential
+                ! *values*; for the adjoint those values must stay
+                ! homogeneous, so we only take the constraint masks and let
+                ! the tangential components remain zero.
                 call this%bcs_vel_projector%mark(bc_i%bc_x, component = 'x')
                 call this%bcs_vel_projector%mark(bc_i%bc_y, component = 'y')
                 call this%bcs_vel_projector%mark(bc_i%bc_z, component = 'z')
-                call this%bcs_vel%append(bc_i)
              type is (shear_stress_t)
                 call neko_error("The shear_stress boundary condition " // &
-                     "requires the full stress formulation to be enabled.")
+                     "requires the full stress formulation, which the " // &
+                     "adjoint scheme does not support.")
              type is (wall_model_bc_t)
                 call neko_error("The wall_model boundary condition " // &
-                     "requires the full stress formulation to be enabled.")
+                     "requires the full stress formulation, which the " // &
+                     "adjoint scheme does not support.")
              class default
 
-                ! Additionally we mark the special PnPn pressure  bc.
+                ! Mark the Dirichlet dofs on every velocity component, and
+                ! additionally mark the special PnPn pressure bc.
                 if (bc_i%bc_type .eq. BC_DIRICHLET) then
                    call this%bc_prs_surface%mark_labeled_zones( &
                         bc_i%zone_indices)
@@ -1085,9 +1076,6 @@ contains
                    call this%bcs_vel_projector%mark(bc_i, component = 'y')
                    call this%bcs_vel_projector%mark(bc_i, component = 'z')
                 end if
-
-                ! add all BCs to curl curl
-                call this%bc_curl_curl%mark_facets(bc_i%marked_facet)
 
                 call this%bcs_vel%append(bc_i)
              end select
@@ -1143,7 +1131,6 @@ contains
 
     call this%bc_prs_surface%finalize()
     call this%bc_sym_surface%finalize()
-    call this%bc_curl_curl%finalize()
     call this%bcs_vel_projector%finalize(rebuild_mask = .true.)
 
     ! If we have no strong pressure bcs, we will demean the pressure

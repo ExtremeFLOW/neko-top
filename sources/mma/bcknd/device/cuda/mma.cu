@@ -1,7 +1,7 @@
 /**
  * @file mma.cu
  * @copyright
- * Copyright (c) 2025, The Neko-TOP Authors
+ * Copyright (c) 2025-2026, The Neko-TOP Authors
  * All rights reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
@@ -163,7 +163,21 @@ extern "C" {
   void cuSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     cusolverDnHandle_t handle;
     cusolverStatus_t status;
-    cusolverDnCreate(&handle);
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+    if (cusolverDnCreate(&handle) != CUSOLVER_STATUS_SUCCESS) {
+        *jj = -1;
+        return;
+    }
+
+    // Solve on Neko's stream, ordered after the kernels assembling A and b.
+    // The stream is non-blocking, so the info values are also copied on it.
+    // A failure is returned through jj, which the caller reports.
+    status = cusolverDnSetStream(handle, stream);
+    if (status != CUSOLVER_STATUS_SUCCESS) {
+        cusolverDnDestroy(handle);
+        *jj = -1;
+        return;
+    }
 
     int lwork;
     double* workspace;
@@ -184,13 +198,17 @@ extern "C" {
     cusolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
 
     // Copy info from device to host to check if factorization succeeded
-    cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
+    CUDA_CHECK(cudaMemcpyAsync(&host_info, info, sizeof(int),
+                               cudaMemcpyDeviceToHost, stream));
+    CUDA_CHECK(cudaStreamSynchronize(stream));
 
     if (host_info == 0) {
         // Only solve if factorization was successful
         cusolverDnDgetrs(handle, CUBLAS_OP_N, n, 1, (double*)A, n, ipiv, (double*)b, n, info);
         // Copy the final info value
-        cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
+        CUDA_CHECK(cudaMemcpyAsync(&host_info, info, sizeof(int),
+                                   cudaMemcpyDeviceToHost, stream));
+        CUDA_CHECK(cudaStreamSynchronize(stream));
     }
 
 
@@ -354,6 +372,22 @@ extern "C" {
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
     mma_sub3_kernel<real><<<nblcks, nthrds, 0,
+         (cudaStream_t)glb_cmd_queue>>>(
+         (real*)x, (real*)df0dx, (real*)dfdx, (real*)low,
+         (real*)upp, (real*)xmin, (real*)xmax, (real*)alpha,
+         (real*)beta, (real*)p0j, (real*)q0j, (real*)pij,
+         (real*)qij, *n, *m);
+
+    CUDA_CHECK(cudaGetLastError());
+  }
+
+  void mma_gensub3_dip_cuda(void* x, void* df0dx, void* dfdx, void* low,
+       void* upp, void* xmin, void* xmax, void* alpha, void* beta,
+       void* p0j, void* q0j, void* pij, void* qij, int* n, int* m) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+
+    mma_sub3_dip_kernel<real><<<nblcks, nthrds, 0,
          (cudaStream_t)glb_cmd_queue>>>(
          (real*)x, (real*)df0dx, (real*)dfdx, (real*)low,
          (real*)upp, (real*)xmin, (real*)xmax, (real*)alpha,
@@ -716,6 +750,19 @@ extern "C" {
     kkt_rex_kernel <real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >>>
          ((real*)rex, (real*)df0dx, (real*)dfdx, (real*)xsi,
          (real*)eta, (real*)lambda, *n, *m);
+    CUDA_CHECK(cudaGetLastError());
+  }
+
+  void mma_dip_kkt_cuda(void* res, void* x, void* df0dx, void* dfdx,
+       void* xmin, void* xmax, void* lambda, int* n, int* m) {
+    if (*n < 1) return;
+
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    mma_dip_kkt_kernel<real><<<nblcks, nthrds, 0,
+         (cudaStream_t)glb_cmd_queue>>>(
+         (real*)res, (real*)x, (real*)df0dx, (real*)dfdx, (real*)xmin,
+         (real*)xmax, (real*)lambda, *n, *m);
     CUDA_CHECK(cudaGetLastError());
   }
 
