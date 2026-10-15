@@ -35,6 +35,17 @@
 # ============================================================================ #
 
 cmake_minimum_required(VERSION 3.21)
+
+# Seed the per-build-type Fortran flags (CMAKE_Fortran_FLAGS_<CONFIG>_INIT)
+# before `project()` caches CMake's own compiler defaults from them. This is
+# CMake's documented override hook: it is included after the compiler info
+# files set their *_INIT defaults, but before those are cached into
+# CMAKE_Fortran_FLAGS_<CONFIG>, so setting the *_INIT variables here replaces
+# the defaults instead of fighting them after the fact. Must be set before
+# `project()`/`enable_language()` establishes the Fortran compiler.
+set(CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/FlagsInit.cmake)
+
 project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 
 # Set language standards
@@ -43,13 +54,54 @@ set(CMAKE_Fortran_STANDARD 2008)
 # ............................................................................ #
 # Define cmake variables
 
-# Define the list of available build types
-set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
+# Define the list of available build types.
 set(CMAKE_BUILD_TYPE_LIST
     Debug
     Release
     Testing
 )
+
+# Default to Release if no build type was given. CMAKE_BUILD_TYPE only means
+# anything for single-config generators (Makefiles, Ninja); multi-config
+# generators (Ninja Multi-Config, Visual Studio) select the configuration at
+# build time via --config and would otherwise pick up an unwanted cached
+# default here. FORCE is required: `project()` above has already created the
+# CMAKE_BUILD_TYPE cache entry (empty, if the user did not set one), and a
+# plain `set(... CACHE ...)` without FORCE does not overwrite an existing
+# cache entry.
+get_property(_is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if (NOT _is_multi_config AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING
+        "Choose the type of build" FORCE)
+endif()
+unset(_is_multi_config)
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_BUILD_TYPE_LIST})
+
+# Validate the build type case-insensitively, matching CMake: per-config flags
+# and $<CONFIG:...> treat the configuration name case-insensitively
+# (cmake-buildsystem(7), "Build Configurations"), so "testing" really does get
+# the Testing flags and must not be rejected. Anything that is not one of
+# CMAKE_BUILD_TYPE_LIST up to case is an error, rather than a build with no
+# type-specific flags at all.
+if (CMAKE_BUILD_TYPE)
+    string(TOLOWER "${CMAKE_BUILD_TYPE}" _build_type_lower)
+    set(_build_type_match FALSE)
+    foreach(_valid_type ${CMAKE_BUILD_TYPE_LIST})
+        string(TOLOWER "${_valid_type}" _valid_type_lower)
+        if (_build_type_lower STREQUAL _valid_type_lower)
+            set(_build_type_match TRUE)
+        endif()
+    endforeach()
+    if (NOT _build_type_match)
+        message(FATAL_ERROR
+            "Unknown CMAKE_BUILD_TYPE: '${CMAKE_BUILD_TYPE}'. Valid options "
+            "are (case-insensitive): ${CMAKE_BUILD_TYPE_LIST}.")
+    endif()
+    unset(_build_type_match)
+    unset(_valid_type_lower)
+    unset(_build_type_lower)
+endif()
+
 set(CMAKE_Fortran_PREPROCESS ON)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -61,6 +113,17 @@ option(BUILD_EXAMPLES "Build the examples" OFF)
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTING "Build the tests" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
+
+# Runtime checks (GNU -fcheck/-ffpe-trap/-finit-*) are an orthogonal cache
+# option rather than tied to a build type: AUTO|ON|OFF, applied in
+# cmake/GNU.cmake. Declared here (rather than only inside cmake/GNU.cmake) so
+# it exists, with its default, regardless of which compiler is in use -- a
+# non-GNU compiler warns and ignores it rather than silently never seeing the
+# option at all.
+set(NEKO_TOP_RUNTIME_CHECKS "OFF" CACHE STRING
+    "GNU runtime checks (-fcheck, -ffpe-trap, -finit-*): AUTO, ON or OFF. \
+AUTO is reserved to mean Debug builds only and currently behaves as OFF.")
+set_property(CACHE NEKO_TOP_RUNTIME_CHECKS PROPERTY STRINGS AUTO ON OFF)
 
 # ============================================================================ #
 # Documentation
@@ -200,6 +263,16 @@ endif()
 include(${CMAKE_Fortran_COMPILER_ID} OPTIONAL RESULT_VARIABLE compiler_flags_found)
 if (NOT compiler_flags_found)
     message(WARNING "No specific compiler flags found for "
+        "${CMAKE_Fortran_COMPILER_ID}.")
+endif()
+
+# NEKO_TOP_RUNTIME_CHECKS is only implemented for GNU (cmake/GNU.cmake). A
+# non-GNU compiler silently ignoring a requested ON/AUTO would be confusing,
+# so say so instead.
+if (NOT CMAKE_Fortran_COMPILER_ID STREQUAL "GNU"
+        AND NOT NEKO_TOP_RUNTIME_CHECKS STREQUAL "OFF")
+    message(WARNING "NEKO_TOP_RUNTIME_CHECKS=${NEKO_TOP_RUNTIME_CHECKS} is "
+        "only implemented for the GNU compiler; ignored for "
         "${CMAKE_Fortran_COMPILER_ID}.")
 endif()
 

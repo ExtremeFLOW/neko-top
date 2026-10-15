@@ -1,64 +1,76 @@
 # ============================================================================ #
-# This file contains the compiler flags for the project.
+# This file contains the compiler flags for the project that are not purely a
+# function of CMAKE_BUILD_TYPE.
 #
-# This allow us to set the flags for different compilers and different build
-# types. The flags are set using the `add_compile_options` command.
+# Per-build-type optimisation/debug-info flags (CMAKE_Fortran_FLAGS_DEBUG,
+# _TESTING and _RELEASE) are set in cmake/FlagsInit.cmake, through CMake's
+# CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran hook, so that they are the same kind
+# of overridable per-config cache variable as any of CMake's own build types.
+# What is left here is flags that cut across build types instead of selecting
+# one: warnings, shared by Debug and Testing, and the NEKO_TOP_RUNTIME_CHECKS
+# option, which is orthogonal to build type entirely.
 
-# ============================================================================ #
-# Set the compiler flags for GNU compilers
-# ============================================================================ #
+# ............................................................................ #
+# Warnings for Debug and Testing.
+#
+# Warnings are not errors by default. CI's Debug lane (check_compile.yml)
+# turns them into errors with -DCMAKE_COMPILE_WARNING_AS_ERROR=ON, and a local
+# build can do the same. Release gets no warning flags.
+#
+# -Warray-temporaries and -Wimplicit-interface are deliberately not in this
+# set: array temporaries are a performance concern rather than a correctness
+# one, and the existing sources trigger the warning at dozens of sites. Add
+# either through CMAKE_Fortran_FLAGS to audit for them.
+set(_neko_top_fortran_debug_testing
+    $<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:Debug,Testing>>)
+add_compile_options(
+    $<${_neko_top_fortran_debug_testing}:-Wall>
+    $<${_neko_top_fortran_debug_testing}:-Wextra>
+    $<${_neko_top_fortran_debug_testing}:-Wno-unused-dummy-argument>
+    $<${_neko_top_fortran_debug_testing}:-Wno-function-elimination>
+    $<${_neko_top_fortran_debug_testing}:-Wno-missing-include-dirs>
+    $<${_neko_top_fortran_debug_testing}:-Wcompare-reals>
+    $<${_neko_top_fortran_debug_testing}:-Wconversion>
+    $<${_neko_top_fortran_debug_testing}:-pedantic-errors>
+)
+unset(_neko_top_fortran_debug_testing)
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+# ............................................................................ #
+# Runtime checks: bounds/do/pointer/recursion checking, FPE traps, and
+# poisoning values for uninitialised variables. Orthogonal to build type --
+# NEKO_TOP_RUNTIME_CHECKS (declared in CMakeLists.txt) is AUTO, ON or OFF, and
+# defaults to OFF.
+#
+# There is deliberately no -finit-local-zero: it sets the integer, real,
+# logical and character initialisers all to zero, so placed after the
+# -finit-* options below it would silently replace their poison values with
+# zero (gfortran's options.cc), defeating the point of poisoning. There is
+# also no -fbacktrace: it is gfortran's default already.
+if (NEKO_TOP_RUNTIME_CHECKS STREQUAL "ON")
+    set(_neko_top_apply_runtime_checks TRUE)
+elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "AUTO")
+    # Reserved to mean "Debug builds only". Until the Nek-style collapsed
+    # indexing in the sources (x(i,1,1,1) with i running over the whole
+    # array) is rewritten, -fcheck=bounds rejects it, so AUTO behaves as OFF
+    # for now and is safe to leave at its default.
+    set(_neko_top_apply_runtime_checks FALSE)
+elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "OFF")
+    set(_neko_top_apply_runtime_checks FALSE)
+else()
+    message(FATAL_ERROR
+        "Unknown NEKO_TOP_RUNTIME_CHECKS: '${NEKO_TOP_RUNTIME_CHECKS}'. "
+        "Valid options are AUTO, ON or OFF.")
+endif()
+
+if (_neko_top_apply_runtime_checks)
     add_compile_options(
-        # Debugging flags
-        $<$<COMPILE_LANGUAGE:Fortran>:-g>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Og>
-
-        # Warnings which for debug builds are errors
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wconversion>
-        $<$<COMPILE_LANGUAGE:Fortran>:-pedantic-errors>
-    )
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-O3>
-        $<$<COMPILE_LANGUAGE:Fortran>:-funroll-loops>
-        $<$<COMPILE_LANGUAGE:Fortran>:-flto>
-        $<$<COMPILE_LANGUAGE:Fortran>:-fwhole-program>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
-    )
-elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
-    add_compile_options(
-        # Debugging flags
-        $<$<COMPILE_LANGUAGE:Fortran>:-g>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Og>
-
-        # Warnings which for debug builds are errors
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wsurprising>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Warray-temporaries>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wimplicit-interface>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
-
-        # Debugging checks
-        $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=all>
-        $<$<COMPILE_LANGUAGE:Fortran>:-fbacktrace>
+        $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=all,no-array-temps>
         $<$<COMPILE_LANGUAGE:Fortran>:-ffpe-trap=invalid,zero,overflow>
         $<$<COMPILE_LANGUAGE:Fortran>:-finit-real=snan>
         $<$<COMPILE_LANGUAGE:Fortran>:-finit-integer=-99999999>
         $<$<COMPILE_LANGUAGE:Fortran>:-finit-character=1>
         $<$<COMPILE_LANGUAGE:Fortran>:-finit-logical=true>
-        $<$<COMPILE_LANGUAGE:Fortran>:-finit-local-zero>
+        $<$<COMPILE_LANGUAGE:Fortran>:-finit-derived>
     )
 endif()
+unset(_neko_top_apply_runtime_checks)

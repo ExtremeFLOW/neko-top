@@ -1,29 +1,19 @@
 # ============================================================================ #
-# This file contains the compiler flags for the project.
+# This file contains the compiler flags for the project that are not purely a
+# function of CMAKE_BUILD_TYPE.
 #
-# This allow us to set the flags for different compilers and different build
-# types. The flags are set using the `add_compile_options` command.
-
-# ============================================================================ #
-# Set the compiler flags for GNU compilers
-# ============================================================================ #
-
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(
-        # Debugging flags
-        $<$<COMPILE_LANGUAGE:Fortran>:-g>  # Enable debugging
-        $<$<COMPILE_LANGUAGE:Fortran>:-m1> # Set message level to verbose
-        $<$<COMPILE_LANGUAGE:Fortran>:-O0> # Disable optimization
-
-        $<$<COMPILE_LANGUAGE:Fortran>:-RABCDS> # Run time checks
-    )
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-e0> # Initialize to 0
-        $<$<COMPILE_LANGUAGE:Fortran>:-O2> # Optimize to level 2
-        $<$<COMPILE_LANGUAGE:Fortran>:-m4> # Set message level to Error only
-        $<$<COMPILE_LANGUAGE:HIP>:-w>      # Suppress all warnings
-        $<$<COMPILE_LANGUAGE:HIP>:-O3>     # Optimize to level 3
-        $<$<COMPILE_LANGUAGE:HIP>:--offload-arch=gfx90a> # Set the target architecture for HIP
-    )
-endif()
+# Per-build-type Fortran flags (CMAKE_Fortran_FLAGS_DEBUG, _TESTING and
+# _RELEASE) are set in cmake/FlagsInit.cmake, through CMake's
+# CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran hook. What is left here is the HIP
+# device-compile options, which apply identically to Release and Testing.
+# Debug carries no HIP flags.
+#
+# NOTE: not verified in this environment -- there is no Cray compiler here.
+set(_neko_top_hip_release_testing
+    $<AND:$<COMPILE_LANGUAGE:HIP>,$<CONFIG:Release,Testing>>)
+add_compile_options(
+    $<${_neko_top_hip_release_testing}:-w>  # Suppress all warnings
+    $<${_neko_top_hip_release_testing}:-O3> # Optimize to level 3
+    $<${_neko_top_hip_release_testing}:--offload-arch=gfx90a> # HIP target arch
+)
+unset(_neko_top_hip_release_testing)
