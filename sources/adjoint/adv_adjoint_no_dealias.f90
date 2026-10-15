@@ -147,14 +147,11 @@ contains
     real(kind=rp), dimension(Xh%lxyz) :: duxb, dvxb, dwxb
     real(kind=rp), dimension(Xh%lxyz) :: duyb, dvyb, dwyb
     real(kind=rp), dimension(Xh%lxyz) :: duzb, dvzb, dwzb
-    ! temporary arrays
-    integer :: e, i, idx, idxx
-
+    integer :: e, i
 
     type(field_t), pointer :: tduxb, tdvxb, tdwxb, tduyb, tdvyb, tdwyb, tduzb, &
          tdvzb, tdwzb
     integer :: temp_indices(9)
-
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_scratch_registry%request_field(tduxb, temp_indices(1), .false.)
@@ -181,7 +178,7 @@ contains
        call opgrad(tdwxb%x, tdwyb%x, tdwzb%x, vzb%x, coef)
 
 
-       ! traspose and multiply
+       ! transpose and multiply
        call device_vdot3(this%temp_d, vx_d, vy_d, vz_d, &
             tduxb%x_d, tdvxb%x_d, tdwxb%x_d, n)
        call device_sub2(fx_d, this%temp_d, n)
@@ -219,25 +216,23 @@ contains
        do e = 1, coef%msh%nelv
           ! u . grad U_b^T
           !-----------------------------
-          call opgrad(duxb, duyb, duzb, vxb%x, coef, e, e)
-          call opgrad(dvxb, dvyb, dvzb, vyb%x, coef, e, e)
-          call opgrad(dwxb, dwyb, dwzb, vzb%x, coef, e, e)
+          call opgrad(duxb, duyb, duzb, vxb%x(1,1,1,e), coef, e, e)
+          call opgrad(dvxb, dvyb, dvzb, vyb%x(1,1,1,e), coef, e, e)
+          call opgrad(dwxb, dwyb, dwzb, vzb%x(1,1,1,e), coef, e, e)
 
-          ! traspose and multiply
-          idx = (e - 1)*Xh%lxyz + 1
+          ! transpose and multiply
           do i = 1, Xh%lxyz
-             idxx = idx + i
-             fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
+             fx%x(i,1,1,e) = fx%x(i,1,1,e) - ( &
                   vx%x(i,1,1,e)*duxb(i) + &
                   vy%x(i,1,1,e)*dvxb(i) + &
                   vz%x(i,1,1,e)*dwxb(i) )
 
-             fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
+             fy%x(i,1,1,e) = fy%x(i,1,1,e) - ( &
                   vx%x(i,1,1,e)*duyb(i) + &
                   vy%x(i,1,1,e)*dvyb(i) + &
                   vz%x(i,1,1,e)*dwyb(i))
 
-             fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
+             fz%x(i,1,1,e) = fz%x(i,1,1,e) - ( &
                   vx%x(i,1,1,e)*duzb(i) + &
                   vy%x(i,1,1,e)*dvzb(i) + &
                   vz%x(i,1,1,e)*dwzb(i))
@@ -281,9 +276,15 @@ contains
   !! @param ub The x component of baseflow.
   !! @param vb The y component of baseflow.
   !! @param wb The z component of baseflow.
-  !! @param Xh The function space.
   !! @param coef The coefficients of the (Xh, mesh) pair.
+  !! @param Xh The function space.
   !! @param n Typically the size of the mesh.
+  !! @param work1 Work field, holds the outer product with ub.
+  !! @param work2 Work field, holds the outer product with vb.
+  !! @param work3 Work field, holds the outer product with wb.
+  !! @param w1 Work field, holds \f$ D_x^T \f$ of work1.
+  !! @param w2 Work field, holds \f$ D_y^T \f$ of work2.
+  !! @param w3 Work field, holds \f$ D_z^T \f$ of work3.
   subroutine adjoint_weak_no_dealias_device(f_d, u_i_d, ub, vb, wb, coef, Xh, &
        n, work1, work2, work3, w1, w2, w3)
     integer, intent(in) :: n
@@ -323,15 +324,22 @@ contains
   !> Compute a single component of
   !! \f$ \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega |_i \f$
   !! , to
-  !! the RHS on CPU.
+  !! the RHS on CPU, for a single element.
   !! @param f The i'th component of this term.
   !! @param u_i The i'th component of adjoint velocity.
   !! @param ub The x component of baseflow.
   !! @param vb The y component of baseflow.
   !! @param wb The z component of baseflow.
-  !! @param Xh The function space.
+  !! @param e The element index.
   !! @param coef The coefficients of the (Xh, mesh) pair.
-  !! @param n Typically the size of the mesh.
+  !! @param Xh The function space.
+  !! @param n The number of points in an element.
+  !! @param work1 Work array, holds the outer product with ub.
+  !! @param work2 Work array, holds the outer product with vb.
+  !! @param work3 Work array, holds the outer product with wb.
+  !! @param w1 Work array, holds \f$ D_x^T \f$ of work1.
+  !! @param w2 Work array, holds \f$ D_y^T \f$ of work2.
+  !! @param w3 Work array, holds \f$ D_z^T \f$ of work3.
   subroutine adjoint_weak_no_dealias_cpu(f, u_i, ub, vb, wb, e, coef, Xh, n, &
        work1, work2, work3, w1, w2, w3)
     implicit none
@@ -359,7 +367,7 @@ contains
 
     ! sum them
     do i = 1, Xh%lxyz
-       f(i) = f(i) - w1(i) + w2(i) + w3(i)
+       f(i) = f(i) - (w1(i) + w2(i) + w3(i))
     end do
   end subroutine adjoint_weak_no_dealias_cpu
 
