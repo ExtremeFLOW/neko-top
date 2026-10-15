@@ -31,6 +31,12 @@ function help() {
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
     echo -e "\tNEKO_CONFIG_FLAGS Additional features to pass to neko configure"
+    echo -e "\tCMAKE_BUILD_TYPE  Neko-TOP build type: Debug, Testing or"
+    echo -e "\t                  Release (default Release, Testing with -t)"
+    echo -e "\tNEKO_FCFLAGS      Fortran flags for Neko's own configure"
+    echo -e "\t                  (default -g -O2; -O2 on Cray)"
+    echo -e "\tNEKO_CFLAGS       C flags for Neko's own configure (default"
+    echo -e "\t                  -g -O2)"
 }
 
 # ============================================================================ #
