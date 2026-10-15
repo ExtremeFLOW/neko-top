@@ -1,0 +1,62 @@
+From faf2a58e9887bca24c8dd2300f75966729229cc5 Mon Sep 17 00:00:00 2001
+From: Neko-Agent <tife@dtu.dk>
+Date: Thu, 15 Oct 2026 12:50:31 +0000
+Subject: [PATCH] CI: keep the warning gate via CMAKE_COMPILE_WARNING_AS_ERROR
+
+-Werror no longer lives in the build types. Valgrind lane disables the
+runtime checks explicitly.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .github/actions/setup_neko-top/action.yml | 1 +
+ .github/workflows/check_compile.yml       | 1 +
+ .github/workflows/check_valgrind.yml      | 7 ++++++-
+ 3 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/.github/actions/setup_neko-top/action.yml b/.github/actions/setup_neko-top/action.yml
+index 16cfb2c..e3275c2 100644
+--- a/.github/actions/setup_neko-top/action.yml
++++ b/.github/actions/setup_neko-top/action.yml
+@@ -152,6 +152,7 @@ runs:
+         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
+           --install-prefix $INSTALL_DIR \
+           -DCMAKE_BUILD_TYPE=Release \
++          -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+           -DCMAKE_Fortran_COMPILER=$FC \
+           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
+           -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
+diff --git a/.github/workflows/check_compile.yml b/.github/workflows/check_compile.yml
+index 13744e5..908ea37 100644
+--- a/.github/workflows/check_compile.yml
++++ b/.github/workflows/check_compile.yml
+@@ -179,6 +179,7 @@ jobs:
+           fi
+           cmake -B build -S . -G Ninja --fresh \
+             -DCMAKE_BUILD_TYPE=Debug \
++            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+             -DBUILD_TESTING=$TEST
+ 
+       - name: Building Library
+diff --git a/.github/workflows/check_valgrind.yml b/.github/workflows/check_valgrind.yml
+index 6f68516..dc7a7cb 100644
+--- a/.github/workflows/check_valgrind.yml
++++ b/.github/workflows/check_valgrind.yml
+@@ -75,9 +75,14 @@ jobs:
+           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+           PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
+         run: |
++          # Runtime checks are off explicitly, so this lane is unaffected if
++          # the option's default changes: Valgrind does not honour the FP
++          # trap unmasking from -ffpe-trap, and the -finit-* poisoning would
++          # initialise locals whose uninitialised reads memcheck should flag.
+           cmake -B build -S . -G Ninja --fresh \
+             -DCMAKE_BUILD_TYPE=Debug \
+-            -DBUILD_TESTING=ON
++            -DBUILD_TESTING=ON \
++            -DNEKO_TOP_RUNTIME_CHECKS=OFF
+ 
+       - name: Run valgrind regression ctests
+         env:
+-- 
+2.53.0
+
