@@ -13,8 +13,7 @@ fix was included in version 4.7.1 of pFUnit.
 ## Build types {#testing-build-types}
 
 `./setup.sh -t` builds tests and, unless a build type is already chosen
-(either `-DCMAKE_BUILD_TYPE=...` in `CMAKE_VARIABLES`, or the
-`CMAKE_BUILD_TYPE` environment variable), defaults `CMAKE_BUILD_TYPE` to
+(the `CMAKE_BUILD_TYPE` environment variable), defaults `CMAKE_BUILD_TYPE` to
 `Testing`. `Testing` is an optimised configuration (`-g -O2` for GNU, debug
 symbols kept) with the same warning set as `Debug`, so the test suite runs at
 a realistic speed while still surfacing compiler warnings. See the
@@ -24,12 +23,14 @@ and `CMAKE_BUILD_TYPE`.
 ## Runtime checks {#testing-runtime-checks}
 
 GNU builds can additionally enable bounds/do/pointer/recursion checking,
-floating-point exception traps and poisoned values for uninitialised
-variables via `-DNEKO_TOP_RUNTIME_CHECKS=ON` (default `OFF`;
-`AUTO` is reserved for future use and currently behaves as `OFF`). This is
-experimental: several tests currently fail with it enabled, due to
-collapsed-index loops in the sources (for example `x(i,1,1,1)` with `i`
-running over the whole array, which `-fcheck=bounds` rejects). Only use it to
-investigate a specific suspected memory or FPE issue, not as part of a normal
-test run.
+floating-point exception traps and poisoned values for uninitialised variables
+via `-DNEKO_TOP_RUNTIME_CHECKS=ON` (default `AUTO`). Setting `AUTO` enables
+runtime known passing checks for `Debug` builds and disables them otherwise.
+Setting `ON` enables all runtime checks regardless of the build type, and
+setting `OFF` disables all runtime checks.
 
+### Known failing tests with runtime checks enabled
+
+- Several tests currently fail with it enabled, due to collapsed-index loops in
+the sources (for example `x(i,1,1,1)` with `i` running over the whole array,
+which `-fcheck=bounds` rejects).
