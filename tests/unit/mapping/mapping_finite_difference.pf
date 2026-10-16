@@ -43,6 +43,7 @@ module mapping_finite_difference
   use device, only: device_init, device_finalize, device_memcpy, &
        HOST_TO_DEVICE, DEVICE_TO_HOST
   use field_math, only: field_cfill
+  use logger, only: neko_log
   implicit none
 
   !> Central-difference step sizes.
@@ -64,6 +65,9 @@ module mapping_finite_difference
   real(kind=rp), dimension(5), parameter :: x_test = &
        [0.02_rp, 0.2_rp, 0.5_rp, 0.8_rp, 0.98_rp]
 
+  !> Whether the log has been initialized.
+  logical :: log_initialized = .false.
+
   @TestCase
   type, extends(MPITestCase) :: test_mapping
    contains
@@ -79,6 +83,13 @@ contains
        call device_init
     end if
     call comm_init
+    ! Initialize the log once for the whole suite, such that it
+    ! logs to the file named by NEKO_LOG_FILE. Initializing it in
+    ! every setUp would replace the file each time.
+    if (.not. log_initialized) then
+       call neko_log%init()
+       log_initialized = .true.
+    end if
   end subroutine setUp
 
   subroutine tearDown(this)
