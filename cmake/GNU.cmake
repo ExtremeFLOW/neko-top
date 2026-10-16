@@ -78,6 +78,9 @@ elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "AUTO"
         $<$<COMPILE_LANGUAGE:Fortran>:-finit-logical=true>
         $<$<COMPILE_LANGUAGE:Fortran>:-finit-derived>
     )
+elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "AUTO"
+        AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # No runtime checks for Release and Testing builds
 elseif (NOT NEKO_TOP_RUNTIME_CHECKS STREQUAL "OFF")
     message(FATAL_ERROR
         "Unknown NEKO_TOP_RUNTIME_CHECKS: '${NEKO_TOP_RUNTIME_CHECKS}'. "
