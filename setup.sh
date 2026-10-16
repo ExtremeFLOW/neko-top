@@ -154,7 +154,11 @@ CMAKE_VARIABLES+=("-DBUILD_TESTING=$TEST")
 CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=$EXAMPLES")
 
 # Enable conditional cmake settings
-[ "$TEST" == "ON" ] && CMAKE_VARIABLES+=("-DCMAKE_BUILD_TYPE=Testing")
+if [ -n "$CMAKE_BUILD_TYPE" ]; then
+    CMAKE_VARIABLES+=("-DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE")
+elif [ "$TEST" == "ON" ]; then
+    CMAKE_VARIABLES+=("-DCMAKE_BUILD_TYPE=Testing")
+fi
 
 # Run the cmake command to configure the build
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
