@@ -67,17 +67,17 @@ dependencies. The script relies in a number of environment variables, which can
 be used to modify the behaviour of the system and allow the user to specify
 custom install locations for the given dependencies.
 
-| Variable           | Description                                                          | Default               |
-| ------------------ | -------------------------------------------------------------------- | --------------------- |
-| `NEKO_DIR`         | Location of the Neko library.                                        | external/neko         |
-| `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                   | external/json-fortran |
-| `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000      |
-| `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                     |
-| `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                     |
-| `CUDA_ARCH`        | CUDA architecture for GPU builds (for example `80` for sm_80).       | Required for CUDA     |
+| Variable           | Description                                                          | Default                 |
+| ------------------ | -------------------------------------------------------------------- | ----------------------- |
+| `NEKO_DIR`         | Location of the Neko library.                                        | external/neko           |
+| `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                   | external/json-fortran   |
+| `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000        |
+| `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                       |
+| `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                       |
+| `CUDA_ARCH`        | CUDA architecture for GPU builds (for example `80` for sm_80).       | Required for CUDA       |
 | `CMAKE_BUILD_TYPE` | Neko-TOP's build type: `Debug`, `Testing` or `Release`.              | Release (`-t`: Testing) |
-| `NEKO_FCFLAGS`     | Fortran flags `configure` builds Neko with.                          | `-g -O2` (Cray: `-O2`) |
-| `NEKO_CFLAGS`      | C flags `configure` builds Neko with.                                | `-g -O2`               |
+| `NEKO_FCFLAGS`     | Override Fortran flags `configure` builds Neko with.                 | -                       |
+| `NEKO_CFLAGS`      | Override C flags `configure` builds Neko with.                       | -                       |
 
 `CMAKE_BUILD_TYPE` only selects the optimisation/debug-symbol flags
 (`-O3 -funroll-loops` for `Release`, `-g -Og` for `Debug`, `-g -O2` for
