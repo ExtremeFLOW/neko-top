@@ -56,7 +56,7 @@ add_pfunit_ctest(optimizer_checkpoint
     TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/optimizer_checkpoint.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
-    MAX_PES 2
+    MAX_PES 1
 )
 
 add_dependencies(Unit optimizer_checkpoint)
@@ -64,8 +64,8 @@ add_dependencies(Unit optimizer_checkpoint)
 # Set test properties
 set_tests_properties(optimizer_checkpoint PROPERTIES
     LABELS "unit;optimizer;hdf5"
-    ENVIRONMENT "NEKO_LOG_FILE=optimizer_checkpoint.log"
-    TIMEOUT 300
+    ENVIRONMENT "NEKO_LOG_FILE=optimizer_checkpoint.log;NEKO_GS_COMM=MPI;OMP_NUM_THREADS=16"
+    TIMEOUT 120
 )
 
 # Add dependencies to ensure preparation is done before the test runs

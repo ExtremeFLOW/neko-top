@@ -6,12 +6,14 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 1e-3,
-            "timestep": 1e-4
+            "end_time": 1.0,
+            "timestep": 1e-3,
+            "target_cfl": 0.4,
+            "variable_timestep": true
         },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 5,
+            "polynomial_order": 3,
             "dealias": false
         },
         "adjoint_fluid": {
@@ -28,7 +30,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2.0,
+            "Re": 20.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -44,7 +46,7 @@
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": {
-                    "type": "hsmg"
+                    "type": "phmg"
                 },
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
@@ -61,9 +63,9 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "tol": 1e-2,
+                "tol": 1e-6,
                 "compute_control": "tsteps",
-                "compute_value": 1
+                "compute_value": 10
             }
         ],
         "point_zones": [
@@ -80,7 +82,7 @@
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
                 "radius": 0.25
-            },
+            }
         ]
     },
     "optimization": {
@@ -115,17 +117,9 @@
             "tolerance": 1.0e-3,
             "mma": {
                 "max_iter": 100,
-                "asyinit": 0.5,
-                "asyincr": 1.2,
-                "asydecr": 0.7,
                 "scale": 1.0,
-                "auto_scale": false,
                 "xmin": 0.0,
-                "xmax": 1.0,
-                "a0": 1.0,
-                "a": 0.0,
-                "c": 1000.0,
-                "d": 10.0
+                "xmax": 1.0
             }
         },
         "objectives": [

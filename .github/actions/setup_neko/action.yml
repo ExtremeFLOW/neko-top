@@ -35,7 +35,7 @@ inputs:
   hdf5-version:
     description: "The version of the HDF5 library to use."
     required: true
-  hdf5-dir:
+  hdf5-root:
     description: "The directory where the HDF5 library was installed."
     required: true
 
@@ -109,7 +109,7 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
-        HDF5_DIR: ${{ inputs.hdf5-dir }}
+        HDF5_ROOT: ${{ inputs.hdf5-root }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
@@ -120,7 +120,7 @@ runs:
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
         [ -n "$JSON_FORTRAN_DIR" ] && key="$key-json-fortran-$JSON_FORTRAN_VERSION"
         [ -n "$PARMETIS_DIR" ] && key="$key-parmetis-$PARMETIS_VERSION"
-        [ -n "$HDF5_DIR" ] && key="$key-hdf5-$HDF5_VERSION"
+        [ -n "$HDF5_ROOT" ] && key="$key-hdf5-$HDF5_VERSION"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
@@ -167,7 +167,7 @@ runs:
         BACKEND_PATH: ${{ inputs.backend-path }}
         RP: ${{ inputs.precision }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
-        HDF5_DIR: ${{ inputs.hdf5-dir }}
+        HDF5_ROOT: ${{ inputs.hdf5-root }}
       run: |
         BACKEND_FLAGS=""
         if [ "$BACKEND" == "CUDA" ]; then
@@ -183,10 +183,9 @@ runs:
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
         [ -n "$PARMETIS_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-parmetis=$PARMETIS_DIR"
-        [ -n "$HDF5_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-hdf5=$HDF5_DIR"
+        [ -n "$HDF5_ROOT" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-hdf5=$HDF5_ROOT"
 
         cd $WORKING_DIR
-        [ -n "$HDF5_DIR" ] && export PKG_CONFIG_PATH="$HDF5_DIR/lib/pkgconfig:${PKG_CONFIG_PATH}"
         ./regen.sh
         ./configure FCFLAGS="-w -O2" $CONFIG_FLAGS
         make ${{ inputs.build-options }}
