@@ -35,11 +35,15 @@ module linop_base
 
 contains
 
-   subroutine linop_base_init(self, base_case, lns_case, adjoint_case)
+   subroutine linop_base_init(self, base_case, lns_case, adjoint_case, &
+        baseflow, time_interval, fixed_step_count)
       class(linop_base_t), intent(inout) :: self
       type(case_t), target, intent(inout) :: base_case
       type(perturb_case_t), optional, target, intent(inout) :: lns_case
       type(perturb_case_t), optional, target, intent(inout) :: adjoint_case
+      type(state_vector_t), optional, intent(in) :: baseflow
+      real(wp), optional, intent(in) :: time_interval
+      integer, optional, intent(in) :: fixed_step_count
 
       self%base_case => base_case
       self%base_output_base_fname = &
@@ -68,7 +72,11 @@ contains
          call neko_warning('Stability linop initialized without an adjoint case')
       end if
 
-      call capture_current_baseflow(self)
+      if (present(baseflow)) then
+         call linop_base_store_baseflow(self, baseflow)
+      else
+         call capture_current_baseflow(self)
+      end if
    end subroutine linop_base_init
 
    subroutine linop_base_set_baseflow(self, baseflow, time_interval, &

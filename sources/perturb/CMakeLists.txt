@@ -7,6 +7,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_scheme.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_scheme_incompressible.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_curl_curl.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_pnpn.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/perturb_fluid_pnpn_bc_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/perturb_source_term.f90

@@ -24,11 +24,11 @@ and response real/imaginary parts.
 Implemented here:
 
 - `dns/Re40` and `dns/Re180`: Neko JSON translations of the upstream DNS runs.
-- `newton/Re40_fixed_point`: fixed-point Newton solve from the upstream
-  `BF.fld` initial guess.
-- `stability/direct` and `stability/adjoint`: fixed-point eigenspectrum runs
-  using the local `sources/stability` LightKrylov/Neko propagator layer.
-- `newton/Re180_periodic_orbit`: extended-state Newton solve with the period as
-  an unknown.
+- `Re40/baseflow`, `Re40/LNS`, `Re40/adjoint`, and `Re40/transient_growth`:
+  steady-baseflow stability examples.
+- `Re60/baseflow`, `Re60/LNS`, and `Re60/adjoint`: artificially stabilized
+  steady-baseflow examples.
+- `Re180/periodic_orbit`, `Re180/LNS_floquete`, and
+  `Re180/adjoint_floquete`: periodic-orbit Floquet examples.
 - `resolvent`: complex shifted resolvent solve using the time-stepper
   approximation to the continuous linearized generator.
