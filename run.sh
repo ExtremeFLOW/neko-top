@@ -124,10 +124,14 @@ if [ -n "$CLUSTER" ]; then
     fi
 fi
 
-[ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
-export NEKO_DIR=$(realpath $NEKO_DIR)
-
 if [ "$NEKO" == true ]; then
+    source $MAIN_DIR/scripts/dependencies.sh
+    find_neko $NEKO_DIR
+    if [ ! -d "$NEKO_DIR/examples" ]; then
+        printf >&2 "\e[1;31mInvalid Neko directory:\e[m $NEKO_DIR\n"
+        exit 1
+    fi
+
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"

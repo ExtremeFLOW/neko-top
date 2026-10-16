@@ -263,9 +263,61 @@ The order above matches the implementation: solve the implicit adjoint step,
 then the adjoint pressure correction, then form the projection to obtain the
 adjoint velocity used in the sensitivity accumulation.
 
-\warning The curl--curl contribution in the pressure equation is implemented
-as the boundary integral
-\f$-\int_{\partial\Omega}\big(\mathbf{n}\times\nabla p_{n+1}^{\dagger}\big)\cdot
-\big(\nabla\times \mathbf{w}\big)\,\mathrm{d}S\f$, where \f$\mathbf{w}\f$
-is the test function of adjoint velocity equation, however
-it has not yet been tested extensively.
+### The curl--curl term {#adjoint-curl-curl}
+The forward pressure equation above contains the curl--curl term
+\f$-\int_\Omega \nabla q_n \cdot \nabla \times (\nabla \times
+\mathbf{u}_{n-1})\,\mathrm{d}\Omega\f$, which `Neko` evaluates on the
+extrapolated velocity \f$\mathbf{u}_e\f$ (the same extrapolation as for the
+explicit terms). Its adjoint therefore enters the adjoint velocity equation as
+an explicit load in the adjoint pressure. In the continuous setting,
+\f$\nabla \times \nabla p^\dagger = 0\f$ reduces this load to a boundary
+integral. The discrete operators do not satisfy that identity, so a
+boundary-only form is not the transpose of what the forward solver computes
+and biases the gradient. The implementation
+([`adjoint_curl_curl`](@ref adjoint_curl_curl)) instead uses the exact
+transpose of the discrete term, which acts on the whole volume.
+
+Before gather-scatter, the forward solver adds to the pressure residual
+\f[
+  r_{cc}(\mathbf{u}_e) = -\frac{\mu}{\rho}\, G^T M \mathbf{W}, \qquad
+  \mathbf{W} = M D_c M D_c\, \mathbf{u}_e,
+\f]
+where \f$D_c\f$ is the element-local, pointwise curl,
+\f$M\mathbf{y} = \bar{B}^{-1}\,\mathrm{gs}(B\mathbf{y})\f$ is the
+mass-weighted average applied by `Neko`'s `curl` (with \f$B\f$ the
+element-local diagonal mass matrix, \f$\mathrm{gs}\f$ the gather-scatter sum
+and \f$\bar{B} = \mathrm{gs}(B)\f$ the assembled mass matrix), and \f$G\f$ is
+the weak gradient, \f$G_i p = B D_i p\f$. Because \f$\mathrm{gs}\f$ replaces
+every degree of freedom in a shared group by the sum over that group,
+\f$M\mathbf{y}\f$ already carries the same value on every copy of a shared
+degree of freedom; a second application of \f$M\f$ multiplies that
+group-uniform value by the local \f$B\f$, sums it back to \f$\bar{B}\f$ times
+the value, then divides by \f$\bar{B}\f$ again, so it returns the input
+unchanged. \f$M\f$ is therefore a projection, \f$M^2 = M\f$, and the
+\f$M^2\f$ that would otherwise appear where the leading \f$M\f$ of
+\f$r_{cc}\f$ meets the leading \f$M\f$ of \f$\mathbf{W}\f$ collapses to a
+single \f$M\f$. Since \f$r_{cc}\f$ is linear in \f$\mathbf{u}_e\f$, the
+adjoint load is
+\f[
+  \mathbf{L} = -\Big(\frac{\partial r_{cc}}{\partial \mathbf{u}_e}\Big)^T
+  p^\dagger
+  = \frac{\mu}{\rho}\, D_c^T M^T D_c^T M^T G\, p^\dagger, \qquad
+  M^T\mathbf{y} = B\,\mathrm{gs}(\bar{B}^{-1}\mathbf{y}),
+\f]
+carrying two \f$M^T\f$ factors rather than the three a term-by-term
+transpose of \f$\mathbf{W}\f$ would suggest. It is added to the adjoint
+forcing before the explicit extrapolation. That step scales the forcing by
+\f$\rho\f$ and weights the lagged values, so the adjoint velocity right-hand
+side receives \f$\mu\, D_c^T M^T D_c^T M^T G\, p^\dagger\f$, weighted over
+the adjoint pressures of the later forward steps exactly as the forward
+extrapolation weights \f$\mathbf{u}_e\f$.
+
+\warning A mesh that is not three-dimensional is rejected before the
+adjoint fluid is initialised: the curl--curl transpose is exact in three
+dimensions only. The forward solver also applies the curl--curl term
+through the symmetry-surface term of the pressure residual and through the
+rotations at cyclic boundaries; neither transpose is implemented, so a
+`symmetry` velocity boundary condition in either
+`case.fluid.boundary_conditions` or `case.adjoint_fluid.boundary_conditions`,
+and `case.fluid.cyclic` set to `true`, are rejected when the adjoint is set
+up.
