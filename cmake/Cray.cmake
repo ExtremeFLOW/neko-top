@@ -52,20 +52,23 @@ endif()
 # - b:    Enables checking of array bounds.
 # - c:    Enables conformance checking of array operands in array expressions.
 # - p:    Generates run time code to check the association or allocation status
-#         of referenced  POINTER  variables, ALLOCATABLE arrays, or
+#         of referenced POINTER variables, ALLOCATABLE arrays, or
 #         assumed-shape arrays.
 # - s:    Enables checking of character substring bounds.
 
 if (NEKO_TOP_RUNTIME_CHECKS STREQUAL "ON")
     add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-ei>     # Set uninitialised values to NaN
-        $<$<COMPILE_LANGUAGE:Fortran>:-RABCDpS> # Run time checks
+        $<$<COMPILE_LANGUAGE:Fortran>:-ei>      # Initialised values to NaN
+        $<$<COMPILE_LANGUAGE:Fortran>:-RABCDPS> # Run time checks
     )
-elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "AUTO")
+elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "AUTO"
+        AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
-        $<$<COMPILE_LANGUAGE:Fortran>:-ei>     # Set uninitialised values to NaN
+        $<$<COMPILE_LANGUAGE:Fortran>:-ei>      # Initialised values to NaN
         $<$<COMPILE_LANGUAGE:Fortran>:-RAbCDpS> # Run time checks (Bounds warning)
     )
-elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "OFF")
-    # No runtime checks
+elseif (NOT NEKO_TOP_RUNTIME_CHECKS STREQUAL "OFF")
+    message(FATAL_ERROR
+        "Unknown NEKO_TOP_RUNTIME_CHECKS: '${NEKO_TOP_RUNTIME_CHECKS}'. "
+        "Valid options are AUTO, ON or OFF.")
 endif()
