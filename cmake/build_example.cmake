@@ -62,14 +62,8 @@ function(build_example)
 
     # ........................................................................ #
     # Print a message if we are compiling in DEBUG mode.
-    #
-    # This is a configure-time message(), not a compiled flag, so a generator
-    # expression (evaluated at build-system generation/build time) cannot be
-    # used here; compare case-insensitively instead, consistent with how
-    # CMAKE_BUILD_TYPE is validated in the top-level CMakeLists.txt.
 
-    string(TOLOWER "${CMAKE_BUILD_TYPE}" _neko_top_build_type_lower)
-    if (_neko_top_build_type_lower STREQUAL "debug")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         message(STATUS "Building example: ${EXAMPLE_NAME}")
         message(STATUS "  Driver type:    ${DRIVER_TYPE}")
         message(STATUS "  Driver:         ${DRIVER}")
@@ -86,7 +80,6 @@ function(build_example)
         endif()
         message(STATUS "")
     endif()
-    unset(_neko_top_build_type_lower)
 
     # If the example contains extra sources, set the module directory.
     if (DEFINED EXTRA_SOURCES)
