@@ -1,6 +1,6 @@
 !> @file adjoint_case.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -39,6 +39,8 @@ module adjoint_case
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use adjoint_curl_curl, only: adjoint_curl_curl_check
+  use fluid_pnpn, only: fluid_pnpn_t
   use adjoint_output, only: adjoint_output_t
   use scalar_ic, only: set_scalar_ic
   use checkpoint, only: chkp_t
@@ -135,13 +137,32 @@ contains
     lx = lx + 1 ! add 1 to get number of gll points
 
     call this%chkp%init()
-    this%chkp%tlag => this%time%tlag
-    this%chkp%dtlag => this%time%dtlag
+    call this%chkp%add_time_state(this%time)
+
+    ! Checked before the adjoint fluid is initialised, which assumes a
+    ! three-dimensional mesh.
+    if (neko_case%msh%gdim .ne. 3) then
+       call neko_error("The adjoint requires a three-dimensional mesh: " // &
+            "the transpose of the curl-curl pressure term is exact in " // &
+            "three dimensions only.")
+    end if
 
     select type (f => this%fluid_adj)
     type is (adjoint_fluid_pnpn_t)
        call f%init(neko_case%msh, lx, neko_case%params, &
             neko_case%user, this%chkp)
+
+       ! Reject the cases for which the adjoint curl-curl load is not the
+       ! transpose of the primal's term. Both boundary condition lists are
+       ! complete only here.
+       select type (pf => neko_case%fluid)
+       type is (fluid_pnpn_t)
+          call adjoint_curl_curl_check(pf%bc_sym_surface, f%bc_sym_surface, &
+               pf%c_Xh%cyclic)
+       class default
+          call neko_error("The adjoint requires the Pn/Pn primal fluid " // &
+               "scheme (case.fluid.scheme = pnpn).")
+       end select
     end select
     !
     ! Setup adjoint scalar
@@ -185,7 +206,7 @@ contains
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
                neko_case%fluid%gs_Xh, scalar_params_adjoint, &
                scalar_params_primal, numerics_params, neko_case%user, &
-               neko_case%chkp, neko_case%fluid%ulag, neko_case%fluid%vlag, &
+               this%chkp, neko_case%fluid%ulag, neko_case%fluid%vlag, &
                neko_case%fluid%wlag, neko_case%fluid%ext_bdf, &
                neko_case%fluid%rho)
           ! allocate the coupling term
@@ -217,7 +238,7 @@ contains
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
                scalar_params_adjoint, scalar_params_primal, numerics_params, &
-               neko_case%user, neko_case%chkp, neko_case%fluid%ulag, &
+               neko_case%user, this%chkp, neko_case%fluid%ulag, &
                neko_case%fluid%vlag, neko_case%fluid%wlag, &
                neko_case%fluid%ext_bdf, neko_case%fluid%rho)
           call neko_error('The adjoint scaling coupling term have not yet' // &
