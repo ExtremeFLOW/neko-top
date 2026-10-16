@@ -53,9 +53,9 @@ endif()
 # ============================================================================ #
 #
 # Runtime checks:
-# - bounds/do/pointer/recursion checking
-# - FPE traps, and
-# - poisoning values for uninitialised variables.
+# - bounds/do/pointer/recursion checks
+# - FPE traps
+# - poisoning values for uninitialised variables
 
 if (NEKO_TOP_RUNTIME_CHECKS STREQUAL "ON")
     add_compile_options(
