@@ -197,6 +197,9 @@ module problem
      procedure, pass(this) :: get_n_objectives => problem_get_num_objectives
      !> Return the number of constraints.
      procedure, pass(this) :: get_n_constraints => problem_get_num_constraints
+     !> Return the name of a constraint.
+     procedure, pass(this), public :: get_constraint_name => &
+          problem_get_constraint_name
 
      !> Return the logfile header
      procedure, pass(this) :: get_log_header => problem_get_log_header
@@ -899,13 +902,33 @@ contains
   !!
   !! This function constructs the sensitivity of the constraint values from the
   !! individual constraints.
+  !!
+  !! **Layout**: row \f$i\f$ of `sensitivity` holds the sensitivity of
+  !! constraint \f$i\f$, so the matrix is `(n_constraints, n_design)` and
+  !! *not* the other way round. That is asserted on below rather than assumed,
+  !! because a transposed allocation is silent at `n_constraints == 1` -- the
+  !! two shapes hold the same number of entries and the single row spans the
+  !! whole allocation -- and becomes memory corruption the moment a second
+  !! constraint is added. A caller got this wrong for exactly that reason.
+  !!
   !! @param[in] this The problem to update the objectives with.
-  !! @param[inout] sensitivity The matrix of all constraint sensitivities.
+  !! @param[inout] sensitivity The matrix of all constraint sensitivities,
+  !!        shaped `(n_constraints, n_design)`.
   subroutine problem_get_constraint_sensitivities(this, sensitivity)
     class(problem_t), intent(inout) :: this
-    type(matrix_t), target, intent(inout) :: sensitivity
-    real(kind=rp), pointer :: row(:)
-    integer :: i
+    type(matrix_t), intent(inout) :: sensitivity
+    character(len=128) :: shape_str
+    integer :: i, j
+
+    if (sensitivity%get_nrows() .ne. this%n_constraints .or. &
+         sensitivity%get_ncols() .ne. this%n_design) then
+       write(shape_str, '(A,I0,A,I0,A,I0,A,I0,A)') &
+            ' expected (', this%n_constraints, ', ', this%n_design, &
+            '), got (', sensitivity%get_nrows(), ', ', &
+            sensitivity%get_ncols(), ')'
+       call neko_error('get_constraint_sensitivities: the destination ' // &
+            'matrix must be (n_constraints, n_design);' // trim(shape_str))
+    end if
 
     ! Copy all constraint sensitivities to host, sync on last one
     do i = 1, this%n_constraints
@@ -913,11 +936,14 @@ contains
             DEVICE_TO_HOST, sync = i .eq. this%n_constraints)
     end do
 
+    ! Written element-wise rather than through a contiguous row pointer: a
+    ! row of a column-major matrix is strided, so remapping it onto a
+    ! contiguous array is non-conforming and aliases the neighbouring rows.
     do i = 1, this%n_constraints
-       row(1:this%n_design) => sensitivity%x(i, :)
-
-       call copy(row, this%constraint_list(i)%constraint%sensitivity%x, &
-            this%n_design)
+       do j = 1, this%n_design
+          sensitivity%x(i, j) = &
+               this%constraint_list(i)%constraint%sensitivity%x(j)
+       end do
     end do
 
     call sensitivity%copy_from(HOST_TO_DEVICE, sync = .true.)
@@ -942,6 +968,27 @@ contains
 
     n = this%n_constraints
   end function problem_get_num_constraints
+
+  !> Return the name of a constraint.
+  !!
+  !! The constraint list is private, so a caller selecting a constraint by
+  !! the name it was given in the case file has no other way to resolve it.
+  !!
+  !! @param[in] this The problem object.
+  !! @param[in] i 1-based index of the constraint, in case-file order.
+  !! @return The constraint's name.
+  function problem_get_constraint_name(this, i) result(name)
+    class(problem_t), intent(in) :: this
+    integer, intent(in) :: i
+    character(len=25) :: name
+
+    if (i .lt. 1 .or. i .gt. this%n_constraints) then
+       call neko_error('get_constraint_name: constraint index out of range')
+    end if
+
+    name = this%constraint_list(i)%constraint%name
+
+  end function problem_get_constraint_name
 
   !> Return the header for the problem.
   !! @param[in] this The problem object.

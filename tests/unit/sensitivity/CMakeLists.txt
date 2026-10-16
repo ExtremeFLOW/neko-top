@@ -51,6 +51,9 @@ add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
 # ============================================================================ #
 # Build the single driver executable
 add_executable(problem_tester_sensitivity_bin EXCLUDE_FROM_ALL
+    # fd_criterion is listed first: sensitivity uses it, and the Fortran
+    # module it defines has to exist by then.
+    ${SHARED_TEST_SOURCES}/fd_criterion.f90
     ${SHARED_TEST_SOURCES}/sensitivity.f90
     ${SENSITIVITY_DRIVER}
 )
@@ -89,12 +92,21 @@ foreach(case_file ${test_list})
         COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_file}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
+    # 78 is the driver's "the assertion was skipped, not made" exit code
+    # (FD_SKIP_EXIT_CODE in tests/shared/sensitivity.f90), returned by a
+    # single-precision build, where the functional is not reproducible
+    # enough for any finite-difference verdict to mean anything. Without
+    # this the driver exits 0 and CTest reports a green gradient check that
+    # checked nothing. 77 is deliberately avoided: the regression lane uses
+    # it for its opt-in gate, and the two reasons must stay distinguishable.
+    set(sensitivity_case_timeout 300)
     set_tests_properties(${case_name}_sensitivity
         PROPERTIES
             DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
-            TIMEOUT 300
+            SKIP_RETURN_CODE 78
+            TIMEOUT ${sensitivity_case_timeout}
     )
 endforeach()
 
