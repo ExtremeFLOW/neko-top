@@ -3,7 +3,7 @@
 #
 # This allow us to set the flags for different compilers and different build
 # types. The flags are set using the `add_compile_options` command.
-
+#
 # ============================================================================ #
 # Set the compiler flags for Cray compilers
 # ============================================================================ #
@@ -41,4 +41,31 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
         $<$<COMPILE_LANGUAGE:HIP>:-O3>     # Optimize to level 3
         $<$<COMPILE_LANGUAGE:HIP>:--offload-arch=gfx90a> # Set the target architecture for HIP
     )
+endif()
+
+# ============================================================================ #
+# Define the runtime checks for Cray compilers
+# ============================================================================ #
+#
+# Runtime checks (Capitalized throw error on first occurrence):
+# - a:    Enables argument present check on entry.
+# - b:    Enables checking of array bounds.
+# - c:    Enables conformance checking of array operands in array expressions.
+# - p:    Generates run time code to check the association or allocation status
+#         of referenced  POINTER  variables, ALLOCATABLE arrays, or
+#         assumed-shape arrays.
+# - s:    Enables checking of character substring bounds.
+
+if (NEKO_TOP_RUNTIME_CHECKS STREQUAL "ON")
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:Fortran>:-ei>     # Set uninitialised values to NaN
+        $<$<COMPILE_LANGUAGE:Fortran>:-RABCDpS> # Run time checks
+    )
+elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "AUTO")
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:Fortran>:-ei>     # Set uninitialised values to NaN
+        $<$<COMPILE_LANGUAGE:Fortran>:-RAbCDpS> # Run time checks (Bounds warning)
+    )
+elseif (NEKO_TOP_RUNTIME_CHECKS STREQUAL "OFF")
+    # No runtime checks
 endif()
