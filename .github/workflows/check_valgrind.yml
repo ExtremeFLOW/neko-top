@@ -75,9 +75,14 @@ jobs:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
         run: |
+          # Runtime checks are off explicitly, so this lane is unaffected if
+          # the option's default changes: Valgrind does not honour the FP
+          # trap unmasking from -ffpe-trap, and the -finit-* poisoning would
+          # initialise locals whose uninitialised reads memcheck should flag.
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTING=ON
+            -DBUILD_TESTING=ON \
+            -DNEKO_TOP_RUNTIME_CHECKS=OFF
 
       - name: Run valgrind regression ctests
         env:
