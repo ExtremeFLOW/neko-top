@@ -46,6 +46,7 @@ module augmented_lagrangian_objective
   use design, only: design_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use adjoint_dealias_default, only: dealias_default
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
@@ -132,12 +133,14 @@ contains
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
-    logical :: dealias
+    logical :: dealias, dealias_fallback
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Augmented Lagrangian")
-    call json_get_or_default(json, "dealias", dealias, .true.)
+    dealias_fallback = dealias_default(simulation%neko_case%params)
+    call json_get_or_default(json, "dealias_sensitivity", dealias, &
+         dealias_fallback)
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, dealias)
@@ -176,6 +179,11 @@ contains
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
     this%Xh_GLL => this%c_Xh_GLL%Xh
 
+    ! The over-integration stack is only needed if this objective dealiases
+    if (dealias) then
+       call simulation%adjoint_case%fluid_adj%require_gauss_stack()
+    end if
+
     ! GL
     this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
     this%Xh_GL => this%c_Xh_GL%Xh
@@ -200,8 +208,12 @@ contains
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
     if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
+    nullify(this%c_Xh_GLL)
+    nullify(this%Xh_GLL)
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%GLL_to_GL)
     nullify(this%scratch_GL)
-
 
   end subroutine augmented_lagrangian_free
 
