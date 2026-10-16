@@ -27,7 +27,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1.0e-8,
+                "absolute_tolerance": 1.0e-4,
                 "max_iterations": 20
             },
             "pressure_solver": {
@@ -39,7 +39,7 @@
                         "solver": "tamg"
                     }
                 },
-                "absolute_tolerance": 1.0e-8,
+                "absolute_tolerance": 1.0e-4,
                 "max_iterations": 20
             },
             "output_control": "never",
