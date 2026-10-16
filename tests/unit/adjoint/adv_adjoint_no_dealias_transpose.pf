@@ -217,22 +217,9 @@ contains
        f%x(:,:,:,e) = smooth_fn(dof%x%x(:,:,:,e), dof%y%x(:,:,:,e), &
             dof%z%x(:,:,:,e), k) + elem_offset * real(k * (e - 1), kind=rp)
     end do
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(f%x, f%x_d, f%size(), HOST_TO_DEVICE, .true.)
-    end if
+    call f%copy_from(HOST_TO_DEVICE, .true.)
 
   end subroutine fill_smooth
-
-  !> Copy a field from device to host (no-op on the CPU backend).
-  !! @param f The field.
-  subroutine to_host(f)
-    type(field_t), intent(inout) :: f
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(f%x, f%x_d, f%size(), DEVICE_TO_HOST, .true.)
-    end if
-
-  end subroutine to_host
 
   !> Print both sides of the identity and assert that they agree.
   !! @param label Name of the check, printed with the numbers.
@@ -322,12 +309,12 @@ contains
     call adv%compute_adjoint(wx, wy, wz, ub, vb, wb, ltwx, ltwy, ltwz, &
          Xh, coef, n)
 
-    call to_host(lux)
-    call to_host(luy)
-    call to_host(luz)
-    call to_host(ltwx)
-    call to_host(ltwy)
-    call to_host(ltwz)
+    call lux%copy_from(DEVICE_TO_HOST, .false.)
+    call luy%copy_from(DEVICE_TO_HOST, .false.)
+    call luz%copy_from(DEVICE_TO_HOST, .false.)
+    call ltwx%copy_from(DEVICE_TO_HOST, .false.)
+    call ltwy%copy_from(DEVICE_TO_HOST, .false.)
+    call ltwz%copy_from(DEVICE_TO_HOST, .true.)
 
     lhs = glsc2(wx%x, lux%x, n) + glsc2(wy%x, luy%x, n) &
          + glsc2(wz%x, luz%x, n)
@@ -394,8 +381,8 @@ contains
     call conv1(conv_s%x, s%x, ub%x, vb%x, wb%x, Xh, coef)
     call adv%compute_adjoint_scalar(ub, vb, wb, r, ltr, Xh, coef, n)
 
-    call to_host(conv_s)
-    call to_host(ltr)
+    call conv_s%copy_from(DEVICE_TO_HOST, .false.)
+    call ltr%copy_from(DEVICE_TO_HOST, .true.)
 
     lhs = -glsc3(r%x, coef%B, conv_s%x, n)
     rhs = glsc2(ltr%x, s%x, n)
