@@ -1,39 +1,52 @@
 # ============================================================================ #
-# This file contains the compiler flags for the project that are not purely a
-# function of CMAKE_BUILD_TYPE.
+# This file contains the compiler flags for the project.
 #
-# Per-build-type optimisation/debug-info flags (CMAKE_Fortran_FLAGS_DEBUG,
-# _TESTING and _RELEASE) are set in cmake/FlagsInit.cmake, through CMake's
-# CMAKE_USER_MAKE_RULES_OVERRIDE_Fortran hook, so that they are the same kind
-# of overridable per-config cache variable as any of CMake's own build types.
-# What is left here is flags that cut across build types instead of selecting
-# one: warnings, shared by Debug and Testing, and the NEKO_TOP_RUNTIME_CHECKS
-# option, which is orthogonal to build type entirely.
+# This allow us to set the flags for different compilers and different build
+# types. The flags are set using the `add_compile_options` command.
 
-# ............................................................................ #
-# Warnings for Debug and Testing.
-#
-# Warnings are not errors by default. CI's Debug lane (check_compile.yml)
-# turns them into errors with -DCMAKE_COMPILE_WARNING_AS_ERROR=ON, and a local
-# build can do the same. Release gets no warning flags.
-#
-# -Warray-temporaries and -Wimplicit-interface are deliberately not in this
-# set: array temporaries are a performance concern rather than a correctness
-# one, and the existing sources trigger the warning at dozens of sites. Add
-# either through CMAKE_Fortran_FLAGS to audit for them.
-set(_neko_top_fortran_debug_testing
-    $<AND:$<COMPILE_LANGUAGE:Fortran>,$<CONFIG:Debug,Testing>>)
+# ============================================================================ #
+# Set the compiler flags for GNU compilers
+# ============================================================================ #
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(
+        # Debugging flags
+        $<$<COMPILE_LANGUAGE:Fortran>:-g>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Og>
+
+        # Extra warnings for debug builds, but not errors
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wconversion>
+        $<$<COMPILE_LANGUAGE:Fortran>:-pedantic-errors>
+    )
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:Fortran>:-w>
+        $<$<COMPILE_LANGUAGE:Fortran>:-O3>
+        $<$<COMPILE_LANGUAGE:Fortran>:-funroll-loops>
+    )
+elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
 add_compile_options(
-    $<${_neko_top_fortran_debug_testing}:-Wall>
-    $<${_neko_top_fortran_debug_testing}:-Wextra>
-    $<${_neko_top_fortran_debug_testing}:-Wno-unused-dummy-argument>
-    $<${_neko_top_fortran_debug_testing}:-Wno-function-elimination>
-    $<${_neko_top_fortran_debug_testing}:-Wno-missing-include-dirs>
-    $<${_neko_top_fortran_debug_testing}:-Wcompare-reals>
-    $<${_neko_top_fortran_debug_testing}:-Wconversion>
-    $<${_neko_top_fortran_debug_testing}:-pedantic-errors>
+        # Debugging flags
+        $<$<COMPILE_LANGUAGE:Fortran>:-g>
+        $<$<COMPILE_LANGUAGE:Fortran>:-O2>
+
+        # Extra warnings for testing builds, but not errors
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wconversion>
+        $<$<COMPILE_LANGUAGE:Fortran>:-pedantic-errors>
 )
-unset(_neko_top_fortran_debug_testing)
+endif()
 
 # ............................................................................ #
 # Runtime checks: bounds/do/pointer/recursion checking, FPE traps, and
