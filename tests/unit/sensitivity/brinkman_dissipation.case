@@ -6,7 +6,12 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 0.1,
+            // end_time is 5.0, not 0.1: the steady simcomp only freezes
+            // around t = 2.25 on this mesh, and at 0.1 (20 steps) the
+            // velocity start residual is still about 6e-2 against the
+            // 1e-8 steady tolerance, so the run is still mid-transient
+            // and the finite-difference check would be ill-posed.
+            "end_time": 5.0,
             "timestep": 5.0e-3
         },
         "numerics": {
@@ -84,7 +89,16 @@
         ]
     },
     "optimization": {
-        "fd_test_tolerance": 1.0e-2,
+        // fd_test_tolerance: at m_min = 1e-4 the FD estimate differs from the
+        // adjoint sensitivity by -4.051e-4, relative to |adjoint| (the FD
+        // check's error column). Set to 2(|C| + |A| m_min^p), p the median
+        // order over the run (about 1), from Richardson extrapolation, which
+        // equals 2|e(m_min)| exactly, both 8.10e-4 (rounded up to 1 s.f.).
+        // Guards against a gross error, e.g. a sign error or a dropped term,
+        // not a bias of order 1e-4. Rule and symbols: readme.md. Derived on a
+        // 16x8x1-element mesh (prepare.sh -N8), 1 rank, Neko 7eeba5e64;
+        // re-derive under the conditions listed in readme.md.
+        "fd_test_tolerance": 9.0e-4,
         "domain": {
             "type": "point_zone",
             "zone_name": "optimization_domain"
