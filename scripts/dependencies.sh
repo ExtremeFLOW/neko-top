@@ -451,36 +451,14 @@ function find_neko() {
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
 
-            # Default Neko's own optimisation flags, unless the caller set
-            # them -- even to an explicit empty string, which must still be
-            # respected: it is how a caller deliberately suppresses these
-            # defaults. ${VAR+set} expands to "set" exactly when VAR is set,
-            # whatever its value, so unlike ${VAR:-...} or [ -z "$VAR" ] it
-            # tells "unset" from "set but empty". Passing an empty FCFLAGS=
-            # to configure suppresses autoconf's own "-g -O2" default, which
-            # is how an unset NEKO_FCFLAGS used to produce an -O0 Neko.
-            if [ -z "${NEKO_FCFLAGS+set}" ]; then
-                if [ "${PE_ENV:-}" == "CRAY" ]; then
-                    NEKO_FCFLAGS="-O2"
-                else
-                    NEKO_FCFLAGS="-g -O2"
-                fi
-            fi
-            [ -z "${NEKO_CFLAGS+set}" ] && NEKO_CFLAGS="-g -O2"
-            printf "Configuring Neko with FCFLAGS='%s' CFLAGS='%s'\n" \
-                "$NEKO_FCFLAGS" "$NEKO_CFLAGS"
+            # Only apply the user-defined flags if they are set, otherwise use
+            # the default internally.
+            [ "${NEKO_FCFLAGS+set}" ] && export FCFLAGS="$NEKO_FCFLAGS"
+            [ "${NEKO_CFLAGS+set}" ] && export CFLAGS="$NEKO_CFLAGS"
+            [ "${NEKO_HIPCC_FLAGS+set}" ] && export HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS"
+            [ "${NEKO_CUDA_CFLAGS+set}" ] && export CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
 
-            ./configure --prefix="$(realpath ./)" $FEATURES \
-                FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
-                CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
-                HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
-                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
-        else
-            # An existing configuration is kept as-is, including its flags:
-            # NEKO_FCFLAGS/NEKO_CFLAGS (and their defaults) only take effect
-            # when configure runs.
-            printf "Neko is already configured; keeping its flags. "
-            printf "Use --clean-neko to reconfigure.\n"
+            ./configure --prefix="$(realpath ./)" $FEATURES
         fi
 
         # Update compile dependencies if makedepf90 is installed
