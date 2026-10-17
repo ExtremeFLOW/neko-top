@@ -532,8 +532,7 @@ contains
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
     simulation%n_timesteps = 0
-    do while (simulation%neko_case%time%t .lt. &
-         simulation%neko_case%time%end_time)
+    do while (.not. simulation%neko_case%time%is_done())
        simulation%n_timesteps = simulation%n_timesteps + 1
        ! step forward
        call simulation_step(simulation%neko_case, dt_controller, loop_start)

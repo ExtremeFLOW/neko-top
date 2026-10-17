@@ -20,6 +20,8 @@ has to run a flow to a genuine steady state.
 - `time_window_tester.f90`: the driver. It runs the case once per entry in
   `optimization.time_window_test.end_times` and compares the objective values
   across those runs and, optionally, against each other within a run.
+- `step_count_tester.f90`: the driver for `end_time_step_count` alone, which
+  checks where a run stops rather than what its objectives report.
 
 With `compare_steady` set it also runs the case with `simulation_t%unsteady`
 cleared — the flag `problem_t%compute` branches on — and requires that result
@@ -274,17 +276,44 @@ and no other. Both ends of the accepted interval sit half a timestep from a
 sample, so no amount of round-off in the accumulated time can change which
 steps are counted.
 
-An `end_time` sitting *on* a step boundary is what to avoid, and not for a
-subtle reason: with `end_time = 0.05` and `dt = 0.005` the accumulated time
-after ten steps lands just below `0.05`, the loop takes an eleventh step, and
-the run ends at `t = 0.055`. The window then holds two samples while the
-steady path still evaluates one, and the objectives disagree by 0.3%, 10% and
-0.2% — a real failure with a thoroughly misleading cause. The underlying
-overshoot is Neko's, not this test's.
+The half-step offset is no longer required, though it is kept since it still
+does what it says. When this test was written, an `end_time` sitting *on* a
+step boundary made the run overshoot: with `end_time = 0.05` and `dt = 0.005`
+the accumulated time after ten steps lands just below `0.05`, the loop took an
+eleventh step, and the run ended at `t = 0.055`. The window then held two
+samples while the steady path still evaluated one, and the objectives
+disagreed by 0.3%, 10% and 0.2% — a real failure with a thoroughly misleading
+cause. Both paths now stop within a small tolerance of `end_time`, using
+`time_state_t%is_done`, so that `end_time` takes ten steps on either path;
+`end_time_step_count` below guards it.
 
 Measured agreement between the two paths, with the window right, is `4e-13`,
 `4e-12` and `6e-14` relative, the same floor two identical unsteady runs of
 this case reach.
+
+## `end_time_step_count`
+
+The run-length guard. It runs `time_window_run_length.case`, whose
+`end_time = 0.05` lies on a step boundary for its `dt = 0.005`, once through
+each branch of `problem_t%compute`, and requires each run to take exactly ten
+steps and stop at `t = 0.05`. It has its own driver, `step_count_tester.f90`,
+which checks nothing but the step count and the final time, and refuses a case
+whose `end_time` is not on a step boundary, since only there does the check
+bite. It costs 3 s.
+
+This is the property that was broken before. The time accumulated after ten
+steps is `0.049999999999999996`, and the unsteady path's loop compared it
+against `end_time` with no tolerance, so it took an eleventh step. The steady
+path already stopped through `time_state_t%is_done`, which allows for that
+round-off, so the two paths disagreed by a step. Against that code the test
+fails with
+
+```
+The unsteady run took 11 steps to t =  0.550000000000000E-01 instead of 10 to t =  0.500000000000000E-01
+```
+
+while the steady run passes. Both paths are reported before the test fails,
+so a regression in either is named.
 
 ## Choosing window boundaries in new cases
 
@@ -297,8 +326,9 @@ on the final step can silently lose that step's forcing.
 Keep every window boundary away from a step time, by roughly half a timestep.
 The accumulation gate has a `1e-6 * dt` tolerance, so a boundary sitting on a
 step is decided by round-off in the accumulated time rather than by the case
-file. The same applies to the simulation's own `end_time`, which decides how
-many steps the run takes — see `steady_unsteady_equivalence` above.
+file. The simulation's own `end_time` no longer needs that care: a run stops
+on a step-boundary `end_time` rather than one step past it, on both paths —
+see `end_time_step_count` above.
 
 To select the final step alone, set `start_time` to the simulation's
 `end_time` and leave the objective's `end_time` unset. The run always overshoots
