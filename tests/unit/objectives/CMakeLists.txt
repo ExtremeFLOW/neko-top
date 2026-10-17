@@ -8,6 +8,7 @@ set(test_list
     "steady_unsteady_converged.case"
     "steady_unsteady_final_step.case"
     "steady_scalar_unconverged.case"
+    "steady_scalar_unconverged_simtime.case"
 )
 
 # Path to the common driver source, plus the user module carrying the
@@ -115,13 +116,17 @@ function(add_steady_log_check case_name frozen at_end converged end_time)
     )
 endfunction()
 
-# Both cases run twice, through the steady path and the unsteady one. The
-# first stops with the scalar unconverged, so each run warns at the freeze and
-# at its end. The second runs on until the scalar has converged, so each run
-# warns at the freeze and then reports that the scalar converged. The last
-# argument is the time the runs end at, which the end-of-run report must carry.
+# Each case runs twice, through the steady path and the unsteady one. The
+# unconverged ones stop with the scalar unconverged, so each run warns at the
+# freeze and at its end. The converged one runs on until the scalar has
+# converged, so each run warns at the freeze and then reports that the scalar
+# converged. The last argument is the time of the component's last check in
+# each run, which the end-of-run report must carry. It is the final step under
+# `tsteps` control, and under `simulationtime` the last scheduled time before
+# the end: 2.4, as 2.5 lies past `end_time = 2.495`.
 add_steady_log_check(steady_scalar_unconverged 2 2 0 1.50000E+00)
 add_steady_log_check(steady_unsteady_converged 2 0 2 2.00000E+01)
+add_steady_log_check(steady_scalar_unconverged_simtime 2 2 0 2.40000E+00)
 
 # ============================================================================ #
 # Final dependencies

@@ -48,6 +48,7 @@ module steady_simcomp
   use csv_file, only : csv_file_t
   use vector, only: vector_t
   use time_state, only: time_state_t
+  use time_based_controller, only: time_based_controller_t
   use utils, only: neko_error
   use logger, only: neko_log
   implicit none
@@ -340,15 +341,17 @@ contains
     if (.not. steady_simcomp_is_last_compute(this, time)) return
     this%check_scalar_at_end = .false.
 
+    ! The last check need not be on the final step, so the time given is
+    ! that of the check.
     if (residual .le. this%tol) then
-       call neko_log%message('steady: the scalar has converged since the ' &
-            // 'fluid was frozen (residual ' // real_str(real(residual, dp)) &
-            // ' <= tol ' // real_str(this%tol) // ' at t = ' // &
-            real_str(time%t) // ').')
+       call neko_log%message('steady: run ending, scalar converged since ' &
+            // 'the fluid was frozen (t = ' // real_str(time%t) // &
+            ', residual ' // real_str(real(residual, dp)) // ' <= tol ' // &
+            real_str(this%tol) // ').')
     else
-       call neko_log%warning('steady: run ending at t = ' // &
-            real_str(time%t) // ' with the scalar still not converged ' // &
-            '(residual ' // real_str(real(residual, dp)) // ' > tol ' // &
+       call neko_log%warning('steady: run ending, scalar still not ' // &
+            'converged at the last check (t = ' // real_str(time%t) // &
+            ', residual ' // real_str(real(residual, dp)) // ' > tol ' // &
             real_str(this%tol) // '). Any scalar objective is evaluated ' // &
             'on a scalar that is not steady. Set "scalar_coupled": true, ' // &
             'with an end_time long enough for the scalar to converge.')
@@ -358,25 +361,31 @@ contains
   !> Whether the run ends before this component is computed again.
   !! @param time The current time state.
   !! @return True if this is the last computation of the run.
-  !! @details The next computation is one compute interval away. The run gets
-  !! there only if it is not done one time step before, which is decided by
-  !! the time loop's own end criterion, `time_state_t%is_done`.
+  !! @details The component's own compute controller decides, so that the
+  !! answer follows its schedule whatever the control mode. It is asked on
+  !! copies of itself and of the time state, which leaves the originals
+  !! untouched: the copied controller registers the current computation, as
+  !! the real one does after it, and the copied time is advanced as the time
+  !! loop advances it, up to the step at which the run is done.
   function steady_simcomp_is_last_compute(this, time) result(is_last)
     class(steady_simcomp_t), intent(in) :: this
     type(time_state_t), intent(in) :: time
     logical :: is_last
+    type(time_based_controller_t) :: controller
     type(time_state_t) :: ahead
-    real(kind=dp) :: interval
 
-    if (this%compute_controller%nsteps .gt. 0) then
-       interval = this%compute_controller%nsteps * time%dt
-    else
-       interval = this%compute_controller%time_interval
-    end if
+    controller = this%compute_controller
+    call controller%register_execution(time)
 
     ahead = time
-    ahead%t = time%t + max(interval - time%dt, 0.0_dp)
-    is_last = ahead%is_done()
+    is_last = .true.
+    do while (is_last .and. .not. ahead%is_done())
+       ahead%tstep = ahead%tstep + 1
+       ahead%t = ahead%t + ahead%dt
+       is_last = .not. controller%check(ahead)
+    end do
+
+    call controller%free()
 
   end function steady_simcomp_is_last_compute
 

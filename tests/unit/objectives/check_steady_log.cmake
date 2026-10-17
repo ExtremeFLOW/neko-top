@@ -10,10 +10,14 @@
 #
 # FROZEN     Warnings that the fluid was frozen with the scalar not converged.
 # AT_END     Warnings that a run is ending with the scalar still not converged.
-# CONVERGED  Messages that the scalar converged after the fluid was frozen.
-# END_TIME   The time the runs end at, as the log prints it (e.g.
-#            1.50000E+00). If given, the last two only count when issued at
-#            that time, so that one issued before the end is caught.
+# CONVERGED  Messages that a run is ending with the scalar converged since the
+#            fluid was frozen.
+# END_TIME   The time of the component's last check in each run, as the log
+#            prints it (e.g. 1.50000E+00). If given, the last two only count
+#            when issued at that time, so that one issued early is caught.
+#            With `tsteps` control at every step it is the final step's time.
+#            Under time-based control it is the last scheduled time before
+#            the end, which need not be on the final step.
 
 foreach(var LOG_FILE FROZEN AT_END CONVERGED)
     if (NOT DEFINED ${var})
@@ -31,14 +35,14 @@ file(READ "${LOG_FILE}" log)
 if (DEFINED END_TIME)
     string(REGEX REPLACE "([.+])" "\\\\\\1" t "${END_TIME}")
 else()
-    set(t "[^ )]+")
+    set(t "[^ ,]+")
 endif()
 
 set(FROZEN_PATTERN "WARNING: steady: fluid frozen at t = ")
-set(AT_END_PATTERN "WARNING: steady: run ending at t = ${t} ")
-set(CONVERGED_PATTERN
-    "steady: the scalar has converged since the fluid was frozen")
-string(APPEND CONVERGED_PATTERN " [^\n]* at t = ${t}\\)")
+set(AT_END_PATTERN "WARNING: steady: run ending, scalar still not converged")
+string(APPEND AT_END_PATTERN " at the last check \\(t = ${t},")
+set(CONVERGED_PATTERN "steady: run ending, scalar converged since the fluid")
+string(APPEND CONVERGED_PATTERN " was frozen \\(t = ${t},")
 
 set(failed FALSE)
 foreach(kind FROZEN AT_END CONVERGED)
