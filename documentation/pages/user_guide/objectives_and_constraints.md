@@ -72,10 +72,11 @@ objective then reports zero and a warning is written to the log.
 \warning Setting `end_time` to exactly the simulation's own `end_time` is not
 the same as leaving it at its `+\infty` default. The adjoint forcing terms that
 objectives register are gated by `source_term_t`'s time window, which compares
-against the simulation time without a tolerance, so the final step -- where the
-accumulated time lands a few ULP above the prescribed `end_time` -- silently
-loses its forcing and the sensitivity is wrong. Leave `end_time` unset unless a
-genuinely shorter window is wanted.
+against the simulation time without a tolerance. The accumulated time of the
+final step lands within a few ULP of the prescribed `end_time`, on either side
+of it, so whether that step keeps its forcing is decided by round-off rather
+than by the case file, and when it loses it the sensitivity is wrong. Leave
+`end_time` unset unless a genuinely shorter window is wanted.
 
 The window only applies to unsteady problems. A steady problem evaluates its
 objectives once, on the converged field, so `start_time` and `end_time` have no
