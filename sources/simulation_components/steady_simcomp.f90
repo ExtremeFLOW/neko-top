@@ -49,6 +49,7 @@ module steady_simcomp
   use vector, only: vector_t
   use time_state, only: time_state_t
   use utils, only: neko_error
+  use logger, only: neko_log
   implicit none
   private
   public :: steady_simcomp_allocate
@@ -57,6 +58,11 @@ module steady_simcomp
   !! simulation when the normed difference between the old and new fields is
   !! below a certain tolerance. This allow us to compute steady-state solutions
   !! without modifying the simulation loop.
+  !!
+  !! Only the fluid is frozen. The scalar keeps evolving, so its residual is
+  !! still followed, and a warning is issued when the fluid is frozen while
+  !! the scalar has not converged, as well as at the end of such a run if it
+  !! still has not.
   type, public, extends(simulation_component_t) :: steady_simcomp_t
      private
 
@@ -70,6 +76,13 @@ module steady_simcomp
      !! the simulation will only be considered converged if both the fluid and
      !! scalar fields have converged.
      logical :: scalar_coupled = .false.
+
+     !> Whether this component froze the fluid. Only read while the fluid is
+     !! frozen, so a reset that unfreezes the fluid needs no reset here.
+     logical :: froze_fluid = .false.
+     !> Whether the scalar was not converged when the fluid was frozen, so
+     !! that it is to be checked again at the end of the run.
+     logical :: check_scalar_at_end = .false.
 
      !> A file writer to document the convergence of the steady state
      type(csv_file_t) :: logger
@@ -191,8 +204,15 @@ contains
     real(kind=rp), dimension(1) :: normed_diff_scalar
     logical :: converged_fluid, converged_scalar, converged
 
-    ! A frozen field is not interesting to compute differences for.
-    if (this%case%fluid%freeze) return
+    ! A frozen field is not interesting to compute differences for. The
+    ! scalar is not frozen with the fluid, though, so if it was this component
+    ! that froze the fluid, the scalar is still followed.
+    if (this%case%fluid%freeze) then
+       if (this%froze_fluid .and. associated(this%s)) then
+          call steady_simcomp_follow_scalar(this, time)
+       end if
+       return
+    end if
 
     ! Get the current time and time step
     t = time%t
@@ -254,26 +274,144 @@ contains
        ! this could be a csv, but I think it's nicer in the logfile, it can
        ! always be greped out later if you want to plot.
        if (mod(tstep, this%log_frequency) .eq. 0) then
-          this%log_data%x(1) = real(tstep, kind=rp)
-          this%log_data%x(2) = t
-          this%log_data%x(3) = normed_diff_fluid(1)
-          this%log_data%x(4) = normed_diff_fluid(2)
-          this%log_data%x(5) = normed_diff_fluid(3)
-          this%log_data%x(6) = normed_diff_fluid(4)
-          this%log_data%x(7) = normed_diff_scalar(1)
-          call this%logger%write(this%log_data)
+          call steady_simcomp_write_row(this, tstep, t, normed_diff_fluid, &
+               normed_diff_scalar(1))
        end if
     end if
 
     if (converged_fluid) then
        this%case%fluid%freeze = .true.
+       this%froze_fluid = .true.
+       this%check_scalar_at_end = .false.
        ! @todo
        ! we should implement a freeze for the scalar too.
 
        ! The scalar freeze should only happen after the fluid has converged.
        ! if (converged_scalar) this%case%scalar%freeze = .true.
+
+       if (associated(this%s)) then
+          ! Nothing was copied above if everything converged, which leaves the
+          ! difference in the old scalar. Following the scalar from here on
+          ! needs the scalar itself.
+          if (converged) call field_copy(this%s_old, this%s)
+
+          ! Without coupling the scalar took no part in the decision.
+          if (.not. this%scalar_coupled .and. .not. converged_scalar) then
+             call neko_log%warning('steady: fluid frozen at t = ' // &
+                  real_str(time%t) // ' with the scalar not converged ' // &
+                  '(residual ' // real_str(real(normed_diff_scalar(1), dp)) &
+                  // ' > tol ' // real_str(this%tol) // '). The scalar ' // &
+                  'is not frozen and keeps evolving, so any scalar ' // &
+                  'objective is evaluated on a scalar that is not steady. ' &
+                  // 'Set "scalar_coupled": true to freeze the fluid only ' &
+                  // 'once the scalar has converged too.')
+             this%check_scalar_at_end = .true.
+          end if
+       end if
     end if
   end subroutine steady_simcomp_compute
+
+  !> Follow the scalar once this component has frozen the fluid.
+  !! @param time The current time state.
+  !! @details The scalar is not frozen with the fluid and keeps evolving, so
+  !! its residual is still computed and logged. The fluid columns of the log
+  !! hold zero, the exact increment of a frozen field. If the scalar was not
+  !! converged when the fluid was frozen, it is checked again on the last
+  !! computation of the run.
+  subroutine steady_simcomp_follow_scalar(this, time)
+    class(steady_simcomp_t), intent(inout) :: this
+    type(time_state_t), intent(in) :: time
+    real(kind=rp), dimension(4), parameter :: frozen_fluid = 0.0_rp
+    real(kind=rp) :: t, dt, residual
+
+    t = time%t
+    dt = this%case%time%dt
+
+    call field_sub2(this%s_old, this%s)
+    residual = energy_norm(this%s_old, this%case%fluid%C_Xh, dt)
+    call field_copy(this%s_old, this%s)
+
+    if (mod(time%tstep, this%log_frequency) .eq. 0) then
+       call steady_simcomp_write_row(this, time%tstep, t, frozen_fluid, &
+            residual)
+    end if
+
+    if (.not. this%check_scalar_at_end) return
+    if (.not. steady_simcomp_is_last_compute(this, time)) return
+    this%check_scalar_at_end = .false.
+
+    if (residual .le. this%tol) then
+       call neko_log%message('steady: the scalar has converged since the ' &
+            // 'fluid was frozen (residual ' // real_str(real(residual, dp)) &
+            // ' <= tol ' // real_str(this%tol) // ' at t = ' // &
+            real_str(time%t) // ').')
+    else
+       call neko_log%warning('steady: run ending at t = ' // &
+            real_str(time%t) // ' with the scalar still not converged ' // &
+            '(residual ' // real_str(real(residual, dp)) // ' > tol ' // &
+            real_str(this%tol) // '). Any scalar objective is evaluated ' // &
+            'on a scalar that is not steady. Set "scalar_coupled": true, ' // &
+            'with an end_time long enough for the scalar to converge.')
+    end if
+  end subroutine steady_simcomp_follow_scalar
+
+  !> Whether the run ends before this component is computed again.
+  !! @param time The current time state.
+  !! @return True if this is the last computation of the run.
+  !! @details The next computation is one compute interval away. The run gets
+  !! there only if it is not done one time step before, which is decided by
+  !! the time loop's own end criterion, `time_state_t%is_done`.
+  function steady_simcomp_is_last_compute(this, time) result(is_last)
+    class(steady_simcomp_t), intent(in) :: this
+    type(time_state_t), intent(in) :: time
+    logical :: is_last
+    type(time_state_t) :: ahead
+    real(kind=dp) :: interval
+
+    if (this%compute_controller%nsteps .gt. 0) then
+       interval = this%compute_controller%nsteps * time%dt
+    else
+       interval = this%compute_controller%time_interval
+    end if
+
+    ahead = time
+    ahead%t = time%t + max(interval - time%dt, 0.0_dp)
+    is_last = ahead%is_done()
+
+  end function steady_simcomp_is_last_compute
+
+  !> Write one row of `steady_state_data.csv`.
+  !! @param tstep The time step.
+  !! @param t The time.
+  !! @param fluid The normed increments of `u`, `v`, `w` and `p`.
+  !! @param scalar The normed increment of the scalar.
+  subroutine steady_simcomp_write_row(this, tstep, t, fluid, scalar)
+    class(steady_simcomp_t), intent(inout) :: this
+    integer, intent(in) :: tstep
+    real(kind=rp), intent(in) :: t
+    real(kind=rp), dimension(4), intent(in) :: fluid
+    real(kind=rp), intent(in) :: scalar
+
+    this%log_data%x(1) = real(tstep, kind=rp)
+    this%log_data%x(2) = t
+    this%log_data%x(3:6) = fluid
+    this%log_data%x(7) = scalar
+    call this%logger%write(this%log_data)
+
+  end subroutine steady_simcomp_write_row
+
+  !> Format a real number for a log message.
+  !! @param x The number.
+  !! @return The number in scientific notation, without padding.
+  function real_str(x) result(str)
+    real(kind=dp), intent(in) :: x
+    character(len=:), allocatable :: str
+    character(len=16) :: buf
+
+    write(buf, '(ES12.5)') x
+    str = trim(adjustl(buf))
+
+  end function real_str
 
   !> A norm for a scalar field based on the energy.
   !! Assuming the time derivative $\frac{\partial u}{\partial t}

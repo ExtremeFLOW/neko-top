@@ -7,8 +7,8 @@ They replace the former `examples/time_test`, which covered the same matrix but
 could only be inspected by hand.
 
 The tests are tagged as `unit`, so they are mandatory for CI to pass. Together
-they take about 44 s, almost all of it in `steady_unsteady_converged`, which
-has to run a flow to a genuine steady state.
+they take about 63 s, most of it in `steady_unsteady_converged`, which has to
+run a flow to a genuine steady state.
 
 ## Common files
 
@@ -201,6 +201,11 @@ workspace bug backlog, and deliberately: it does not use the freeze to
 certify that the scalar has settled. The comparison itself does that, far more
 strictly than a residual threshold would.
 
+`steady` says as much in the log. Each run warns when the fluid is frozen with
+the scalar still unconverged, and at the end reports that the scalar has
+converged since. `steady_unsteady_converged_steady_log` checks that it does
+exactly that; see `steady_scalar_unconverged` below.
+
 ### The scalar solver tolerance was a floor, not the physics
 
 Worth its own note, because it looked like a convergence problem and was not.
@@ -285,6 +290,36 @@ overshoot is Neko's, not this test's.
 Measured agreement between the two paths, with the window right, is `4e-13`,
 `4e-12` and `6e-14` relative, the same floor two identical unsteady runs of
 this case reach.
+
+## `steady_scalar_unconverged`
+
+The trap item 24 of the workspace bug backlog describes, run on purpose.
+`steady` freezes only the fluid, and with `scalar_coupled` off it freezes it on
+the fluid's residuals alone, so a scalar objective can be evaluated on a scalar
+that is still evolving. Nothing used to say so.
+
+The case is `steady_unsteady_converged` stopped at `end_time = 1.495`, with
+every objective windowed to the final step, as in
+`steady_unsteady_final_step`. The fluid is frozen at `t = 1.29`, when the
+scalar residual is still `1.5e-2` against a `tol` of `1e-6`, and the run ends
+at `t = 1.5` with the scalar still far from converged. Both paths must still
+agree on the final step, which they do to every digit the driver prints,
+since the velocity is frozen and the scalar is the same field in both.
+
+`steady_scalar_unconverged_steady_log` then reads the log and requires, in
+each of the two runs, exactly one warning at the freeze and exactly one at the
+end of the run, carrying the run's final time. An exact count catches a
+warning repeated every step, and the time catches an end-of-run warning
+issued early.
+
+Both checks were seen to fail. Against the code before the warnings were
+added, both cases report none of them. With the end-of-run check moved to the
+first step after the freeze, the end-of-run warning carries `t = 1.3` and
+this check fails, while `steady_scalar_unconverged` itself still passes.
+
+The check is a separate test, `check_steady_log.cmake` run as a fixture of
+the case's own test, because the warnings only exist in the log. The driver
+has no handle on the simulation component that issues them.
 
 ## Choosing window boundaries in new cases
 
