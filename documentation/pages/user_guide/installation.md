@@ -60,21 +60,37 @@ cd neko-top
 ./setup.sh
 ```
 
-### Setup script
+### Setup script {#installation-setup}
 
 The `setup.sh` script is an automated setup of Neko-TOP along with Neko and other
 dependencies. The script relies in a number of environment variables, which can
 be used to modify the behaviour of the system and allow the user to specify
 custom install locations for the given dependencies.
 
-| Variable           | Description                                                          | Default               |
-| ------------------ | -------------------------------------------------------------------- | --------------------- |
-| `NEKO_DIR`         | Location of the Neko library.                                        | external/neko         |
-| `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                   | external/json-fortran |
-| `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000      |
-| `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                     |
-| `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                     |
-| `CUDA_ARCH`        | CUDA architecture for GPU builds (for example `80` for sm_80).       | Required for CUDA     |
+| Variable           | Description                                                          | Default                 |
+| ------------------ | -------------------------------------------------------------------- | ----------------------- |
+| `NEKO_DIR`         | Location of the Neko library.                                        | external/neko           |
+| `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                   | external/json-fortran   |
+| `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                   | external/Nek5000        |
+| `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                       |
+| `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                       |
+| `CUDA_ARCH`        | CUDA architecture for GPU builds (for example `80` for sm_80).       | Required for CUDA       |
+| `CMAKE_BUILD_TYPE` | Neko-TOP's build type: `Debug`, `Testing` or `Release`.              | Release (`-t`: Testing) |
+| `NEKO_FCFLAGS`     | Override Fortran flags `configure` builds Neko with.                 | -                       |
+| `NEKO_CFLAGS`      | Override C flags `configure` builds Neko with.                       | -                       |
+
+`CMAKE_BUILD_TYPE` only selects the optimisation/debug-symbol flags
+(`-O3 -funroll-loops` for `Release`, `-g -Og` for `Debug`, `-g -O2` for
+`Testing`, on GNU); it does not turn compiler warnings into errors. Warnings
+are compiled in for `Debug` and `Testing` but are not fatal unless
+`-DCMAKE_COMPILE_WARNING_AS_ERROR=ON` (CMake 3.24 or newer) is also passed,
+e.g. via `CMAKE_VARIABLES` — see the [contributing guide](@ref contributing).
+
+`NEKO_FCFLAGS`/`NEKO_CFLAGS` only take effect while Neko is actually being
+configured. An already-configured Neko tree (an existing `$NEKO_DIR/Makefile`)
+is reused as-is with its existing flags; pass `--clean-neko` to reconfigure it
+with new ones. Note that `--clean-neko` also wipes Neko-TOP's own `build/`
+directory.
 
 These can be defined either on the command line by the user or in a
 `prepare.env` file which is loaded by the setup script if it exists in the root

@@ -450,11 +450,15 @@ function find_neko() {
             ./regen.sh
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
-            ./configure --prefix="$(realpath ./)" $FEATURES \
-                FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
-                CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
-                HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
-                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
+
+            # Only apply the user-defined flags if they are set, otherwise use
+            # the default internally.
+            [ "${NEKO_FCFLAGS+set}" ] && export FCFLAGS="$NEKO_FCFLAGS"
+            [ "${NEKO_CFLAGS+set}" ] && export CFLAGS="$NEKO_CFLAGS"
+            [ "${NEKO_HIPCC_FLAGS+set}" ] && export HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS"
+            [ "${NEKO_CUDA_CFLAGS+set}" ] && export CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
+
+            ./configure --prefix="$(realpath ./)" $FEATURES
         fi
 
         # Update compile dependencies if makedepf90 is installed
