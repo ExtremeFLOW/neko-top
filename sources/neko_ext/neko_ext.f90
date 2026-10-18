@@ -64,6 +64,7 @@ module neko_ext
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scalar_pnpn, only: scalar_pnpn_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
+  use time_step_controller, only: time_step_controller_t
 
   implicit none
 
@@ -72,7 +73,7 @@ module neko_ext
   ! ========================================================================= !
   private
   public :: reset, reset_adjoint, field_to_vector, vector_to_field, &
-       get_scalar_indicies
+       get_scalar_indicies, init_dt_controller
 
 contains
 
@@ -546,6 +547,27 @@ contains
     end if
 
   end subroutine get_scalar_indicies
+
+  !> @brief Initialise a time-step controller from a full case file
+  !!
+  !! @details The controller reads `variable_timestep`, `target_cfl`,
+  !! `max_timestep` and its other settings relative to the object it is
+  !! given, so it must be given the `case.time` subtree, as Neko's own
+  !! `neko_solve` does. Given the whole case file it finds none of them and
+  !! silently stays in fixed-timestep mode.
+  !!
+  !! @param[inout] dt_controller The time-step controller to initialise.
+  !! @param[inout] params The full case file parameters.
+  subroutine init_dt_controller(dt_controller, params)
+    type(time_step_controller_t), intent(inout) :: dt_controller
+    type(json_file), intent(inout) :: params
+    type(json_file) :: dt_params
+
+    call json_get(params, 'case.time', dt_params)
+    call dt_controller%init(dt_params)
+    call dt_params%destroy()
+
+  end subroutine init_dt_controller
 
   ! ========================================================================= !
   ! Private routines

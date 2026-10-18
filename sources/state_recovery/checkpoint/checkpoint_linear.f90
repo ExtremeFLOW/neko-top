@@ -46,6 +46,7 @@ submodule (state_recover_checkpoint) checkpoint_linear
   use num_types, only: dp
   use simulation, only: simulation_step, simulation_restart
   use time_step_controller, only: time_step_controller_t
+  use neko_ext, only: init_dt_controller
   use profiler, only: profiler_start_region, profiler_end_region
 
 contains
@@ -131,7 +132,7 @@ contains
        call simulation_restart(this%neko_case, this%neko_case%chkp)
 
        ! Initialize the time step controller and set the time step
-       call dt_controller%init(this%neko_case%params)
+       call init_dt_controller(dt_controller, this%neko_case%params)
        this%neko_case%time%tstep = previous_save
        this%loaded_checkpoint = this%neko_case%time%tstep
 

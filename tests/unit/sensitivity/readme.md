@@ -38,6 +38,9 @@ Currently, we have added tests for the following components:
   this objective's own `update_sensitivity` is empty.
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
+- The guard against a variable timestep in an unsteady problem
+  (`unsteady_variable_timestep.case`). It is not in `test_list`: it passes
+  only if the run stops with that error.
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core

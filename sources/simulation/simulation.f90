@@ -47,7 +47,7 @@ module simulation_m
   use time_step_controller, only: time_step_controller_t
   use field_output, only: field_output_t
   use simcomp_executor, only: neko_simcomps
-  use neko_ext, only: reset, reset_adjoint
+  use neko_ext, only: reset, reset_adjoint, init_dt_controller
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
@@ -60,6 +60,7 @@ module simulation_m
        simulation_restart
   use state_recover, only: state_recover_t, state_recover_factory
   use runtime_stats, only: neko_rt_stats
+  use utils, only: neko_error
   implicit none
   private
 
@@ -140,6 +141,7 @@ contains
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     type(json_file) :: state_recovery_params
+    type(time_step_controller_t) :: dt_controller
     integer :: i, n_scalars
     character(len=:), allocatable :: output_directory, precision_s, file_format
     integer :: precision
@@ -261,6 +263,14 @@ contains
 
     ! State recovery is only needed for unsteady runs.
     if (this%unsteady) then
+       ! The unsteady adjoint restores the forward states one step at a
+       ! time and assumes every step had the same dt.
+       call init_dt_controller(dt_controller, parameters)
+       if (dt_controller%is_variable_dt) then
+          call neko_error("case.time.variable_timestep is not supported " // &
+               "for unsteady problems")
+       end if
+
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_factory(this%state_recover, this%neko_case, &
             state_recovery_params)
@@ -316,7 +326,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
 
-    call dt_controller%init(this%neko_case%params)
+    call init_dt_controller(dt_controller, this%neko_case%params)
 
     call this%neko_case%time%reset()
     call simulation_init(this%neko_case, dt_controller)
@@ -347,7 +357,7 @@ contains
     real(kind=rp) :: cfl
     integer :: i
 
-    call dt_controller%init(this%neko_case%params)
+    call init_dt_controller(dt_controller, this%neko_case%params)
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
