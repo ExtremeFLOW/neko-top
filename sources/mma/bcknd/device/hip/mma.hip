@@ -125,7 +125,7 @@ void hipSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     HIP_CHECK(hipFree(workspace));
     HIP_CHECK(hipFree(ipiv));
     HIP_CHECK(hipFree(info));
-    HIP_CHECK(hipsolverDnDestroy(handle));
+    hipsolverDnDestroy(handle);
 }
 
 void mma_prepare_aa_matrix_hip(void* AA, void* s, void* lambda,
