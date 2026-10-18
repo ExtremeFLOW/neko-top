@@ -24,10 +24,13 @@ function check_system_dependencies() {
         exit 1
     fi
 
-    # Check for correct version of cmake executable (>= 3.21)
-    CMAKE_VERSION=$(cmake --version | grep -oP '(?<=version )\d+\.\d+')
-    if [ $(echo "$CMAKE_VERSION < 3.21" | bc) -eq 1 ]; then
-        printf "CMake version >= 3.21 is required.\n"
+    # Check for correct version of cmake executable (>= 3.21).
+    CMAKE_VERSION=$(cmake --version | head -n 1)
+    if [[ ! "$CMAKE_VERSION" =~ version\ ([0-9]+)\.([0-9]+) ]] ||
+        ((BASH_REMATCH[1] < 3 ||
+            (BASH_REMATCH[1] == 3 && BASH_REMATCH[2] < 21))); then
+        printf "CMake version >= 3.21 is required, found: %s\n" \
+            "$CMAKE_VERSION"
         printf "Please update your CMake installation.\n"
         exit 1
     fi
