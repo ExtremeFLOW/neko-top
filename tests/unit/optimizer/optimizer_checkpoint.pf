@@ -61,7 +61,7 @@ contains
   ! ========================================================================== !
   ! Test writing the MMA object to HDF5 file.
 
-  @test(npes=[1])
+  @test(npes=[2])
   subroutine manual_checkpoint(this)
     class(test_optimizer_checkpoint), intent(inout) :: this
     type(json_file) :: parameters, design_parameters
