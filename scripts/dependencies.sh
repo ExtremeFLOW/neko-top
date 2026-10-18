@@ -24,8 +24,7 @@ function check_system_dependencies() {
         exit 1
     fi
 
-    # Check for correct version of cmake executable (>= 3.21). Major and minor
-    # are compared as integers, since as decimals 3.9 > 3.21.
+    # Check for correct version of cmake executable (>= 3.21).
     CMAKE_VERSION=$(cmake --version | head -n 1)
     if [[ ! "$CMAKE_VERSION" =~ version\ ([0-9]+)\.([0-9]+) ]] ||
         ((BASH_REMATCH[1] < 3 ||
