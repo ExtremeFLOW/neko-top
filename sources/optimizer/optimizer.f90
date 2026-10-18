@@ -607,7 +607,7 @@ contains
     logical, intent(in), optional :: include_constraints
     character(len=*), intent(in), optional :: filename
 
-    character(len=4096) :: header
+    character(len=:), allocatable :: header
     integer :: total_size, base_size, i, n_cont
     character(len=256) :: log_name
 
@@ -631,25 +631,31 @@ contains
 
     call this%log_file%init(trim(log_name))
 
-    header = 'iter, ' // &
-         trim(problem%get_log_header(this%log_include_constraints))
+    header = 'iter, ' // problem%get_log_header(this%log_include_constraints)
     if (present(extra_headers)) then
        do i = 1, size(extra_headers)
           if (trim(extra_headers(i)) .eq. '') then
              call neko_error('some headers are empty')
           end if
-          header = trim(header) // ', ' // trim(extra_headers(i))
+          header = header // ', ' // trim(extra_headers(i))
        end do
     end if
 
-    header = trim(header) // ', max_design_change, norm2_design_change'
+    header = header // ', max_design_change, norm2_design_change'
 
     ! continuation parameters
     do i = 1, n_cont
-       header = trim(header) // ', ' // &
+       header = header // ', ' // &
             trim(nekotop_continuation%get_param_name(i))
     end do
-    call this%log_file%set_header(trim(header))
+
+    ! csv_file_t keeps its header in a fixed-length field.
+    if (len(header) .gt. len(this%log_file%header)) then
+       call neko_log%warning("Optimization log header exceeds the " // &
+            "csv_file_t header length; " // trim(log_name) // &
+            " will carry truncated column names.")
+    end if
+    call this%log_file%set_header(header)
 
     this%log_initialized = .true.
   end subroutine optimizer_init_log
