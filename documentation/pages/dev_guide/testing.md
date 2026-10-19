@@ -10,3 +10,27 @@ fix was included in version 4.7.1 of pFUnit.
 
 ## Unit Testing
 
+## Build types {#testing-build-types}
+
+`./setup.sh -t` builds tests and, unless a build type is already chosen
+(the `CMAKE_BUILD_TYPE` environment variable), defaults `CMAKE_BUILD_TYPE` to
+`Testing`. `Testing` is an optimised configuration (`-g -O2` for GNU, debug
+symbols kept) with the same warning set as `Debug`, so the test suite runs at
+a realistic speed while still surfacing compiler warnings. See the
+[setup script variables](@ref installation-setup) for the other build types
+and `CMAKE_BUILD_TYPE`.
+
+## Runtime checks {#testing-runtime-checks}
+
+GNU builds can additionally enable bounds/do/pointer/recursion checking,
+floating-point exception traps and poisoned values for uninitialised variables
+via `-DNEKO_TOP_RUNTIME_CHECKS=ON` (default `AUTO`). Setting `AUTO` enables
+runtime known passing checks for `Debug` builds and disables them otherwise.
+Setting `ON` enables all runtime checks regardless of the build type, and
+setting `OFF` disables all runtime checks.
+
+### Known failing tests with runtime checks enabled
+
+- Several tests currently fail with it enabled, due to collapsed-index loops in
+the sources (for example `x(i,1,1,1)` with `i` running over the whole array,
+which `-fcheck=bounds` rejects).
