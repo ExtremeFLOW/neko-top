@@ -151,7 +151,7 @@ contains
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_t), intent(in), target :: u, v, w
     real(kind=rp), intent(in) :: obj_scale
-    class(point_zone_t), intent(in), target :: mask
+    class(point_zone_t), intent(in), pointer :: mask
     logical, intent(in) :: if_mask
     type(coef_t), intent(in) :: coef
     real(kind=rp), intent(in) :: volume
