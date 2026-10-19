@@ -6,7 +6,9 @@ function help() {
     echo -e "Usage: $0 [options]"
     echo -e "Options:"
     echo -e "\t-h, --help        Show this help message and exit"
-    echo -e "\t-t, --tests       Run the tests after the installation"
+    echo -e "\t-t, --tests       Build with tests enabled and default the build"
+    echo -e "\t                  type to Testing; it does not itself run the"
+    echo -e "\t                  suite (see 'ctest --test-dir build')"
     echo -e "\t    --test-neko   Run the Neko tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
@@ -29,6 +31,10 @@ function help() {
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
     echo -e "\tNEKO_CONFIG_FLAGS Additional features to pass to neko configure"
+    echo -e "\tCMAKE_BUILD_TYPE  Neko-TOP build type: Debug, Testing or"
+    echo -e "\t                  Release (default Release, Testing with -t)"
+    echo -e "\tNEKO_FCFLAGS      Override Fortran flags for Neko's own configure"
+    echo -e "\tNEKO_CFLAGS       Override C flags for Neko's own configure"
 }
 
 # ============================================================================ #
@@ -141,17 +147,18 @@ printf "Compiling the example codes and Neko-TOP\n"
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
 
-# If CMAKE_VARIABLES is a string, convert it to an array
-if [ -n "$CMAKE_VARIABLES" ]; then
-    CMAKE_VARIABLES=($CMAKE_VARIABLES)
-else
-    CMAKE_VARIABLES=()
-fi
-
 # Enable desired features
+CMAKE_VARIABLES=()
 CMAKE_VARIABLES+=("-DBUILD_DOCS=$DOCS")
 CMAKE_VARIABLES+=("-DBUILD_TESTING=$TEST")
 CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=$EXAMPLES")
+
+# Enable conditional cmake settings
+if [ -n "$CMAKE_BUILD_TYPE" ]; then
+    CMAKE_VARIABLES+=("-DCMAKE_BUILD_TYPE=$CMAKE_BUILD_TYPE")
+elif [ "$TEST" == "ON" ]; then
+    CMAKE_VARIABLES+=("-DCMAKE_BUILD_TYPE=Testing")
+fi
 
 # Run the cmake command to configure the build
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"

@@ -50,6 +50,7 @@ module mapping_pde_filter
   use device, only: device_init, device_finalize, device_memcpy, &
        HOST_TO_DEVICE, DEVICE_TO_HOST
   use field_math, only: field_cfill
+  use logger, only: neko_log
   implicit none
 
   !> Polynomial order of the test space (order 7 => lx = 8).
@@ -73,6 +74,9 @@ module mapping_pde_filter
   real(kind=rp), parameter :: adjoint_rtol = 1.0e-6_rp
   real(kind=rp), parameter :: regression_rtol = 1.0e-10_rp
 
+  !> Whether the log has been initialized.
+  logical :: log_initialized = .false.
+
   @TestCase
   type, extends(MPITestCase) :: test_pde_filter
    contains
@@ -88,6 +92,13 @@ contains
        call device_init
     end if
     call comm_init
+    ! Initialize the log once for the whole suite, such that it
+    ! logs to the file named by NEKO_LOG_FILE. Initializing it in
+    ! every setUp would replace the file each time.
+    if (.not. log_initialized) then
+       call neko_log%init()
+       log_initialized = .true.
+    end if
   end subroutine setUp
 
   subroutine tearDown(this)
