@@ -978,14 +978,18 @@ contains
   !> Append the log headers of a functional to a comma-separated header.
   !!
   !! The headers are the functional's name plus a suffix of its own choosing,
-  !! such as `.weight`. Their buffer is sized from the name, so a name of any
-  !! length arrives in full. Only a suffix longer than `suffix_len` can still
-  !! be cut, and that is reported rather than done silently.
+  !! such as `.weight`. Their buffer holds at least `min_width` characters,
+  !! the room every header has always had, and grows with the name to leave
+  !! `suffix_len` characters after it. A name of any length therefore
+  !! arrives in full, and a short name still leaves room for a long suffix.
+  !! Only a header longer than both can be cut, and that is reported rather
+  !! than done silently.
   !! @param[inout] buff The header to append to.
   !! @param[in] functional The functional whose headers are appended.
   subroutine problem_append_log_headers(buff, functional)
     character(len=:), allocatable, intent(inout) :: buff
     class(base_functional_t), intent(in) :: functional
+    integer, parameter :: min_width = 128
     integer, parameter :: suffix_len = 64
     character(len=:), allocatable :: headers(:)
     integer :: j, n, width
@@ -993,7 +997,7 @@ contains
     n = functional%get_log_size()
     if (n .lt. 1) return
 
-    width = len(functional%get_name()) + suffix_len
+    width = max(min_width, len(functional%get_name()) + suffix_len)
     allocate(character(len=width) :: headers(n))
     call functional%get_log_headers(headers)
 

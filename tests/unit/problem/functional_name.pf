@@ -33,9 +33,25 @@ module functional_name
           stub_objective_update_sensitivity
   end type stub_objective_t
 
+  !> A stub objective that, like a user-defined one may, labels its second
+  !! log entry with a suffix of its own choosing instead of `.weight`.
+  type, extends(stub_objective_t) :: long_suffix_objective_t
+   contains
+     procedure, pass(this) :: get_log_headers => &
+          long_suffix_objective_get_log_headers
+  end type long_suffix_objective_t
+
   !> A name well past any fixed field width the logs have used so far.
   character(len=*), parameter :: LONG_NAME = &
        "an_objective_name_at_least_thirty_characters_long_on_purpose"
+
+  !> A name short enough to fit any field width the logs have used.
+  character(len=*), parameter :: SHORT_NAME = "drag"
+
+  !> A log header suffix far longer than the name it follows.
+  character(len=*), parameter :: LONG_SUFFIX = &
+       ".time_averaged_streamwise_velocity_component_over_the_downstream_" // &
+       "window_from_t_19_to_t_20"
 
   logical :: initialized = .false.
 
@@ -74,11 +90,21 @@ contains
     class(design_t), intent(in) :: design
   end subroutine stub_objective_update_sensitivity
 
+  subroutine long_suffix_objective_get_log_headers(this, headers)
+    class(long_suffix_objective_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+
+    if (size(headers) .lt. 1) return
+    headers(1) = this%get_name()
+    if (size(headers) .lt. 2) return
+    headers(2) = this%get_name() // LONG_SUFFIX
+  end subroutine long_suffix_objective_get_log_headers
+
   ! ========================================================================== !
   ! Tests
 
   !> An objective keeps its full name, and so do both of its log headers.
-  @test(npes=[2])
+  @test(npes=[1])
   subroutine objective_keeps_full_name(this)
     class(test_functional_name_case), intent(inout) :: this
     type(stub_objective_t) :: obj
@@ -96,7 +122,7 @@ contains
 
   !> A blank-padded name, as user code passing a fixed-length variable does,
   !! must not leave blanks inside the derived headers.
-  @test(npes=[2])
+  @test(npes=[1])
   subroutine padded_name_is_trimmed(this)
     class(test_functional_name_case), intent(inout) :: this
     type(stub_objective_t) :: obj
@@ -114,7 +140,7 @@ contains
   end subroutine padded_name_is_trimmed
 
   !> A constraint keeps its full name, and so do both of its log headers.
-  @test(npes=[2])
+  @test(npes=[1])
   subroutine constraint_keeps_full_name(this)
     class(test_functional_name_case), intent(inout) :: this
     type(volume_constraint_t) :: con
@@ -132,7 +158,7 @@ contains
 
   !> The optimisation log header assembled by the problem carries the full
   !! names of its objectives and constraints.
-  @test(npes=[2])
+  @test(npes=[1])
   subroutine problem_header_keeps_full_name(this)
     class(test_functional_name_case), intent(inout) :: this
     character(len=:), allocatable :: header, expected
@@ -144,7 +170,7 @@ contains
 
   !> A name longer than every fixed-width buffer the header path has used,
   !! 64 characters per name and 128 per header, still arrives in full.
-  @test(npes=[2])
+  @test(npes=[1])
   subroutine header_outgrows_old_buffers(this)
     class(test_functional_name_case), intent(inout) :: this
     character(len=*), parameter :: name = LONG_NAME // LONG_NAME // LONG_NAME
@@ -154,6 +180,27 @@ contains
     header = problem_header(name)
     @assertEqual(expected, header)
   end subroutine header_outgrows_old_buffers
+
+  !> A short name leaves at least the room every header had before names
+  !! were unbounded, 128 characters, so a long suffix chosen by a
+  !! user-defined objective still arrives in full.
+  @test(npes=[1])
+  subroutine short_name_keeps_long_suffix(this)
+    class(test_functional_name_case), intent(inout) :: this
+    type(problem_t) :: prob
+    class(objective_t), allocatable :: obj
+    character(len=:), allocatable :: header, expected
+
+    allocate(long_suffix_objective_t :: obj)
+    call obj%init_base(SHORT_NAME, 1, 1.0_rp)
+    call prob%add_objective(obj)
+
+    expected = "Total objective function" // &
+         ", " // SHORT_NAME // ", " // SHORT_NAME // LONG_SUFFIX
+    header = prob%get_log_header()
+    call prob%free()
+    @assertEqual(expected, header)
+  end subroutine short_name_keeps_long_suffix
 
   ! ========================================================================== !
   ! Helpers

@@ -52,7 +52,6 @@ add_subdirectory(mapping)
 set(PFUNIT_TEST_SOURCES "" CACHE INTERNAL "List of pFUnit test source files.")
 
 list(APPEND PFUNIT_TEST_SOURCES problem/time_window.pf)
-list(APPEND PFUNIT_TEST_SOURCES problem/functional_name.pf)
 
 if (HAVE_HDF5)
     list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
@@ -105,3 +104,30 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     )
     add_dependencies(Unit ${test_name})
 endforeach()
+
+# ============================================================================ #
+# Tests that need a single rank only. These run with one rank on every backend,
+# rather than with two on CPU and one on a device like the tests above.
+
+add_pfunit_ctest(problem-functional_name
+    TEST_SOURCES problem/functional_name.pf
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 1
+)
+
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(problem-functional_name PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+set_target_properties(problem-functional_name PROPERTIES
+    FOLDER "Tests/Unit"
+)
+set_tests_properties(problem-functional_name PROPERTIES
+    LABELS "unit"
+    ENVIRONMENT
+    "NEKO_LOG_FILE=${CMAKE_BINARY_DIR}/tests/unit/problem-functional_name.log"
+    TIMEOUT 120
+)
+add_dependencies(Unit problem-functional_name)
