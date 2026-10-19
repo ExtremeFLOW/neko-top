@@ -17,9 +17,17 @@ passes the test suite.
   directory of the repository.
 - The pull request should not introduce any new warnings or errors from the
   compilers.  
-  This can be checked by compiling the code in `Debug` mode. This can be
-  done by executing `CMAKE_BUILD_TYPE=Debug ./setup.sh` in the root
-  directory of the repository.
+  Warnings are enabled in the `Debug` and `Testing` build types, but are not
+  promoted to errors by default. CI's compile check builds `Debug` with
+  `-DCMAKE_COMPILE_WARNING_AS_ERROR=ON` (a CMake option, needing CMake
+  3.24 or newer) to turn them into failures. Reproduce this locally with:
+  ```sh
+  CMAKE_BUILD_TYPE=Debug \
+  CMAKE_VARIABLES="-DCMAKE_COMPILE_WARNING_AS_ERROR=ON" \
+  ./setup.sh
+  ```
+  On an older CMake, the flag is silently ignored and warnings will not fail
+  the build locally; rely on CI in that case.
 - The pull request should adhere to the code style guidelines.  
   The flint tool can be used to check the code style. This can be done
   by executing `flint -R flinter_rc.yml [sources/ | examples/ | tests/]` in the root directory of the
