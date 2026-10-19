@@ -44,6 +44,7 @@ add_subdirectory(objectives)
 add_subdirectory(checkpointing)
 add_subdirectory(optimizer)
 add_subdirectory(mapping)
+add_subdirectory(adjoint)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
