@@ -127,7 +127,7 @@
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 1.0,
+                "weight": 1.0
             }
         ],
         "constraints": [
