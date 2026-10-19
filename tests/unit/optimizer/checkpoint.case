@@ -7,9 +7,7 @@
         "output_boundary": true,
         "time": {
             "end_time": 2.0,
-            "timestep": 1e-3,
-            "target_cfl": 0.4,
-            "variable_timestep": true
+            "timestep": 1e-4
         },
         "numerics": {
             "time_order": 3,
