@@ -38,6 +38,10 @@ Currently, we have added tests for the following components:
   this objective's own `update_sensitivity` is empty.
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
+- `viscous_dissipation_variable_dt.case` — the same objective with
+  `case.time.variable_timestep`. It fails if the driver ignores the
+  `case.time` settings (the run then marches at a placeholder `dt = 1.0`), or
+  if one run's last `dt` leaks into the next run's time-step history.
 - The guard against a variable timestep in an unsteady problem
   (`unsteady_variable_timestep.case`). It is not in `test_list`: it passes
   only if the run stops with that error.

@@ -101,6 +101,13 @@ module simulation_m
 
      logical :: have_scalar = .false.
      integer :: n_timesteps = 0
+     !> The forward time step as initialised from the case file. A variable
+     !! timestep changes `neko_case%time%dt` during a run, and `reset` starts
+     !! the next run's time-step history from it, so it is restored first.
+     real(kind=dp) :: forward_init_dt = 0.0_dp
+     !> The adjoint time step as initialised from the case file, restored on
+     !! `reset` for the same reason as `forward_init_dt`.
+     real(kind=dp) :: adjoint_init_dt = 0.0_dp
 
      ! ----------------------------------------------------------------------- !
      ! State recovery system
@@ -163,6 +170,10 @@ contains
          trim(this%neko_case%f_out%file_%get_base_fname())
     this%adjoint_field_base_fname = &
          trim(this%adjoint_case%f_out%file_%get_base_fname())
+
+    ! Record the initial time steps, which `reset` restores.
+    this%forward_init_dt = this%neko_case%time%dt
+    this%adjoint_init_dt = this%adjoint_case%time%dt
 
     ! Start the profiler
     call profiler_start
@@ -307,6 +318,8 @@ contains
     this%unsteady = .false.
     this%have_scalar = .false.
     this%n_timesteps = 0
+    this%forward_init_dt = 0.0_dp
+    this%adjoint_init_dt = 0.0_dp
     this%current_design_iteration = 0
     if (allocated(this%forward_field_base_fname)) then
        deallocate(this%forward_field_base_fname)
@@ -382,6 +395,10 @@ contains
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
 
+    ! Start every run from the same time-step history. Otherwise a variable
+    ! timestep carries the previous run's last dt into this run's first steps.
+    this%neko_case%time%dt = this%forward_init_dt
+    this%adjoint_case%time%dt = this%adjoint_init_dt
     call reset(this%neko_case, this%current_design_iteration, &
          this%forward_field_base_fname)
     call reset_adjoint(this%adjoint_case, this%neko_case, &
