@@ -85,7 +85,7 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     add_pfunit_ctest(${test_name}
         TEST_SOURCES ${pf_file}
         LINK_LIBRARIES Neko-TOP::neko-top
-        MAX_PES $<IF:$<STREQUAL:${DEVICE_TYPE},CPU>,2,1>
+        MAX_PES $<IF:$<NOT:$<STREQUAL:${DEVICE_TYPE},CPU>>,1,2>
     )
 
     # Disable treating unused-variable as error for pfunit tests
