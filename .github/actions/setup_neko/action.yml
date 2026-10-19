@@ -187,7 +187,7 @@ runs:
 
         cd $WORKING_DIR
         ./regen.sh
-        ./configure FCFLAGS="-w -O2" $CONFIG_FLAGS
+        ./configure FCFLAGS="-w  -g-O2" $CONFIG_FLAGS
         make ${{ inputs.build-options }}
         make install
 
