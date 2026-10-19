@@ -189,6 +189,7 @@ jobs:
           fi
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
             -DBUILD_TESTING=$TEST
 
       - name: Building Library

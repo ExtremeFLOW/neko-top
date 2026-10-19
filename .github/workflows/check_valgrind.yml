@@ -87,7 +87,8 @@ jobs:
         run: |
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTING=ON
+            -DBUILD_TESTING=ON \
+            -DNEKO_TOP_RUNTIME_CHECKS=OFF
 
       - name: Run valgrind regression ctests
         env:

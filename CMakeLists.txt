@@ -1,4 +1,4 @@
-# Copyright (c) 2023-2024, The Neko-TOP Authors
+# Copyright (c) 2023-2026, The Neko-TOP Authors
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -33,23 +33,24 @@
 # ============================================================================ #
 # Neko-TOP: Neko Topology Optimization Package
 # ============================================================================ #
-
+# CMakeLists.txt for Neko-TOP
 cmake_minimum_required(VERSION 3.21)
-project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 
-# Set language standards
-set(CMAKE_Fortran_STANDARD 2008)
-
-# ............................................................................ #
-# Define cmake variables
-
-# Define the list of available build types
+# Define the list of available build types and default to Release
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
 set(CMAKE_BUILD_TYPE_LIST
     Debug
     Release
     Testing
 )
+# ============================================================================ #
+# Setup the project
+# ============================================================================ #
+
+project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
+
+# Set language standards
+set(CMAKE_Fortran_STANDARD 2008)
 set(CMAKE_Fortran_PREPROCESS ON)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -61,6 +62,12 @@ option(BUILD_EXAMPLES "Build the examples" OFF)
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTING "Build the tests" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
+
+# Enable runtime checks: AUTO (default), ON, or OFF. AUTO enables runtime checks
+# during Debug builds.
+set(NEKO_TOP_RUNTIME_CHECKS "AUTO" CACHE STRING
+    "Enable runtime checks: AUTO (default), ON, or OFF")
+set_property(CACHE NEKO_TOP_RUNTIME_CHECKS PROPERTY STRINGS AUTO ON OFF)
 
 # ============================================================================ #
 # Documentation

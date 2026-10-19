@@ -171,7 +171,7 @@ contains
     class(design_t), intent(in), target :: design
     real(kind=rp), intent(in) :: K
     type(field_t), intent(in), target :: u, v, w
-    class(point_zone_t), intent(in), target :: mask
+    class(point_zone_t), intent(in), pointer :: mask
     logical, intent(in) :: if_mask
     type(coef_t), intent(in) :: coef
     type(coef_t), intent(in), target :: c_Xh_GL
