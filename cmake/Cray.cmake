@@ -1,4 +1,4 @@
-s# ============================================================================ #
+# ============================================================================ #
 # This file contains the Cray compiler flags for the project.
 #
 # This allow us to set the flags for different compilers and different build
