@@ -24,10 +24,13 @@ function check_system_dependencies() {
         exit 1
     fi
 
-    # Check for correct version of cmake executable (>= 3.21)
-    CMAKE_VERSION=$(cmake --version | grep -oP '(?<=version )\d+\.\d+')
-    if [ $(echo "$CMAKE_VERSION < 3.21" | bc) -eq 1 ]; then
-        printf "CMake version >= 3.21 is required.\n"
+    # Check for correct version of cmake executable (>= 3.21).
+    CMAKE_VERSION=$(cmake --version | head -n 1)
+    if [[ ! "$CMAKE_VERSION" =~ version\ ([0-9]+)\.([0-9]+) ]] ||
+        ((BASH_REMATCH[1] < 3 ||
+            (BASH_REMATCH[1] == 3 && BASH_REMATCH[2] < 21))); then
+        printf "CMake version >= 3.21 is required, found: %s\n" \
+            "$CMAKE_VERSION"
         printf "Please update your CMake installation.\n"
         exit 1
     fi
@@ -450,11 +453,15 @@ function find_neko() {
             ./regen.sh
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
-            ./configure --prefix="$(realpath ./)" $FEATURES \
-                FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
-                CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
-                HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
-                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
+
+            # Only apply the user-defined flags if they are set, otherwise use
+            # the default internally.
+            [ "${NEKO_FCFLAGS+set}" ] && export FCFLAGS="$NEKO_FCFLAGS"
+            [ "${NEKO_CFLAGS+set}" ] && export CFLAGS="$NEKO_CFLAGS"
+            [ "${NEKO_HIPCC_FLAGS+set}" ] && export HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS"
+            [ "${NEKO_CUDA_CFLAGS+set}" ] && export CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
+
+            ./configure --prefix="$(realpath ./)" $FEATURES
         fi
 
         # Update compile dependencies if makedepf90 is installed

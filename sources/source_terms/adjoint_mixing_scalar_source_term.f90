@@ -130,7 +130,7 @@ contains
     type(field_t), intent(in), target :: s
     real(kind=rp), intent(in) :: obj_scale
     real(kind=rp), intent(in) :: phi_ref
-    class(point_zone_t), intent(in), target :: mask
+    class(point_zone_t), intent(in), pointer :: mask
     logical, intent(in) :: if_mask
     type(coef_t), intent(in) :: coef
     real(kind=rp), intent(in) :: start_time
