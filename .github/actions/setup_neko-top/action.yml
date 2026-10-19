@@ -152,6 +152,7 @@ runs:
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
           --install-prefix $INSTALL_DIR \
           -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
           -DCMAKE_Fortran_COMPILER=$FC \
           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
           -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \

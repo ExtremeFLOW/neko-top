@@ -97,9 +97,9 @@ void hipSOLVER_wrapper(void* A, void* b, int n, int* jj) {
 
     // Workspace query
     status = hipsolverDnDgetrf_bufferSize(handle, n, n, (double*)A, n, &lwork);
-    hipMalloc(&workspace, lwork * sizeof(double));
-    hipMalloc(&ipiv, n * sizeof(int));
-    hipMalloc(&info, sizeof(int));
+    HIP_CHECK(hipMalloc(&workspace, lwork * sizeof(double)));
+    HIP_CHECK(hipMalloc(&ipiv, n * sizeof(int)));
+    HIP_CHECK(hipMalloc(&info, sizeof(int)));
 
     // LU factorization and solve
     hipsolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
@@ -122,9 +122,9 @@ void hipSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     *jj = host_info;
 
     // Cleanup
-    hipFree(workspace);
-    hipFree(ipiv);
-    hipFree(info);
+    HIP_CHECK(hipFree(workspace));
+    HIP_CHECK(hipFree(ipiv));
+    HIP_CHECK(hipFree(info));
     hipsolverDnDestroy(handle);
 }
 
@@ -238,7 +238,7 @@ void hip_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const int nb = ((*n) + 1024 - 1) / 1024;
     const hipStream_t stream = (hipStream_t) glb_cmd_queue;
-    hipStreamSynchronize(stream);
+    HIP_CHECK(hipStreamSynchronize(stream));
 
     if (nb > mma_red_s) {
         mma_red_s = nb;
@@ -264,7 +264,7 @@ void hip_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
                 (real*)Hess, mma_bufred_d, 1, i + j * (*m));
             HIP_CHECK(hipGetLastError());
 
-            hipStreamSynchronize(stream);
+            HIP_CHECK(hipStreamSynchronize(stream));
         }
     }
 }
@@ -443,7 +443,7 @@ void hip_relambda(void* relambda, void* x, void* xupp, void* xlow,
     }
 
     real* temp;
-    hipMalloc(&temp, (*n) * (*m) * sizeof(real));
+    HIP_CHECK(hipMalloc(&temp, (*n) * (*m) * sizeof(real)));
 
     hipLaunchKernelGGL(relambda_kernel<real>, nblcks, nthrds, 0, stream,
         temp, (real*)x, (real*)xupp, (real*)xlow,
@@ -462,10 +462,10 @@ void hip_relambda(void* relambda, void* x, void* xupp, void* xlow,
             (real*)relambda, mma_bufred_d, 1, i);
         HIP_CHECK(hipGetLastError());
 
-        hipStreamSynchronize(stream);
+        HIP_CHECK(hipStreamSynchronize(stream));
     }
 
-    hipFree(temp);
+    HIP_CHECK(hipFree(temp));
 }
 
 void hip_sub2cons2(void* a, void* b, void* c, void* d, real* e, int* n) {
@@ -505,7 +505,7 @@ real hip_maxval(void* a, int* n) {
 
     HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
                              hipMemcpyDeviceToHost, stream));
-    hipStreamSynchronize(stream);
+    HIP_CHECK(hipStreamSynchronize(stream));
 
     return mma_bufred[0];
 }
@@ -557,7 +557,7 @@ void hip_bb(void* bb, void* GG, void* delx, void* diagx, int *n, int *m) {
     const int nb = ((*n) + 1024 - 1)/ 1024;
     const hipStream_t stream = (hipStream_t)glb_cmd_queue;
 
-    hipStreamSynchronize(stream);
+    HIP_CHECK(hipStreamSynchronize(stream));
 
     if (nb > mma_red_s) {
         mma_red_s = nb;
@@ -582,7 +582,7 @@ void hip_bb(void* bb, void* GG, void* delx, void* diagx, int *n, int *m) {
             mma_bufred_d, 1, i);
         HIP_CHECK(hipGetLastError());
 
-        hipStreamSynchronize(stream);
+        HIP_CHECK(hipStreamSynchronize(stream));
     }
 }
 
@@ -592,7 +592,7 @@ void hip_AA(void* AA, void* GG, void* diagx, int *n, int *m) {
     const int nb = ((*n) + 1024 - 1)/ 1024;
     const hipStream_t stream = (hipStream_t)glb_cmd_queue;
 
-    hipStreamSynchronize(stream);
+    HIP_CHECK(hipStreamSynchronize(stream));
 
     if (nb > mma_red_s) {
         mma_red_s = nb;
@@ -618,7 +618,7 @@ void hip_AA(void* AA, void* GG, void* diagx, int *n, int *m) {
                 (real*)AA, mma_bufred_d, 1, i + j * (*m + 1));
             HIP_CHECK(hipGetLastError());
 
-            hipStreamSynchronize(stream);
+            HIP_CHECK(hipStreamSynchronize(stream));
         }
     }
 }
@@ -719,7 +719,7 @@ real hip_norm(void* a, int* n) {
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
        hipMemcpyDeviceToHost, stream));
 
-  hipStreamSynchronize(stream);
+  HIP_CHECK(hipStreamSynchronize(stream));
 
   return mma_bufred[0];
 }
@@ -763,7 +763,7 @@ real hip_maxval2(void* a, void* b, real* cons, int* n) {
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
        hipMemcpyDeviceToHost, stream));
 
-  hipStreamSynchronize(stream);
+  HIP_CHECK(hipStreamSynchronize(stream));
 
   return mma_bufred[0];
 }
@@ -794,7 +794,7 @@ real hip_maxval3(void* a, void* b, void* c, real* cons, int* n) {
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
        hipMemcpyDeviceToHost, stream));
 
-  hipStreamSynchronize(stream);
+  HIP_CHECK(hipStreamSynchronize(stream));
 
   return mma_bufred[0];
 }
@@ -863,7 +863,7 @@ real hip_lcsc2(void *a, void*b, int *n) {
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
        hipMemcpyDeviceToHost, stream));
 
-  hipStreamSynchronize(stream);
+  HIP_CHECK(hipStreamSynchronize(stream));
 
   return mma_bufred[0];
 }
@@ -872,7 +872,7 @@ real hip_lcsc2(void *a, void*b, int *n) {
 void hip_mpisum(void *a, int *n) {
 #ifdef HAVE_DEVICE_MPI
   real* temp = (real*)a;
-  hipStreamSynchronize(stream);
+  HIP_CHECK(hipStreamSynchronize(stream));
   device_mpi_allreduce_inplace(temp, *n, sizeof(real), DEVICE_MPI_SUM);
 #endif
 }
