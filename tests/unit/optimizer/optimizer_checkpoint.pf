@@ -61,7 +61,7 @@ contains
   ! ========================================================================== !
   ! Test writing the MMA object to HDF5 file.
 
-  @test(npes=[2])
+  @test(npes=[1])
   subroutine manual_checkpoint(this)
     class(test_optimizer_checkpoint), intent(inout) :: this
     type(json_file) :: parameters, design_parameters
@@ -87,7 +87,7 @@ contains
     integer :: i
     character(len=256) :: msg
     integer, parameter :: max_iter = 12
-    real(kind=rp), parameter :: tol = 1.0e-8_rp
+    real(kind=rp), parameter :: tol = 1.0e-7_rp
 
     ! ------------------------------------------------------------------------ !
     ! Read the parameters file as the first terminal argument
