@@ -603,15 +603,15 @@ contains
     call MPI_Allreduce(step_time, step, 1, MPI_REAL_PRECISION, MPI_MAX, &
          NEKO_COMM)
 
-    elapsed = MPI_Wtime() - this%start_time
-    old_avg_weight = (this%step_count - 1.0_rp) / this%step_count
     this%step_count = this%step_count + 1.0_rp
+    old_avg_weight = (this%step_count - 1.0_rp) / this%step_count
 
     ! Estimate Cumulative Average iteration step
     this%average_time = step / this%step_count + &
          this%average_time * old_avg_weight
 
     ! Determine if next iteration would exceed max runtime
+    elapsed = MPI_Wtime() - this%start_time
     out_of_time = (elapsed + this%average_time) .gt. 0.99_rp * this%max_runtime
 
   end function optimizer_out_of_time

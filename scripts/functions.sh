@@ -22,15 +22,16 @@ function run {
     if [ -s error.log ]; then
         RECOVERABLE=$(grep "Optimizer stopped after reaching the maximum runtime" \
             error.log && echo "true" || echo "")
-        if [ -z "$RECOVERABLE" ]; then
+        if [ "$RECOVERABLE" != true ]; then
             printf >&2 "ERROR: Previous run failed with unrecoverable errors.\n"
             return 1
         fi
     fi
 
-    if [[ -f "$logfile" || -s output.log || -s error.log ]]; then
-        # Move old log files to folder with counter padded to 2 digits
+    if [[ -f "$logfile" || -s error.log ]] || \
+        [[ -f output.log && "$(head -n 1 output.log)" != "Ready" ]]; then
 
+        # Move old log files to folder with counter padded to 2 digits
         old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)
         old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
         mkdir -p ./$old_run
