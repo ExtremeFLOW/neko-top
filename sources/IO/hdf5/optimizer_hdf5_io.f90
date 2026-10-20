@@ -47,10 +47,9 @@ contains
   ! -------------------------------------------------------------------------- !
   ! Checkpointing methods for the optimizer optimizer
 
-  subroutine optimizer_save_checkpoint_hdf5(object, filename, iter, overwrite)
+  subroutine optimizer_save_checkpoint_hdf5(object, filename, overwrite)
     class(optimizer_t), intent(inout) :: object
     character(len=*), intent(in) :: filename
-    integer, intent(in) :: iter
     logical, intent(in), optional :: overwrite
     logical :: overwrite_flag, file_exists
 
@@ -133,7 +132,8 @@ contains
     ddim = 1
     call h5acreate_f(grp_id, 'iter', H5T_NATIVE_INTEGER, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, object%current_iteration, &
+         ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ! ------------------------------------------------------------------------ !
@@ -146,10 +146,9 @@ contains
 
   end subroutine optimizer_save_checkpoint_hdf5
 
-  subroutine optimizer_load_checkpoint_hdf5(object, filename, iter)
+  subroutine optimizer_load_checkpoint_hdf5(object, filename)
     class(optimizer_t), intent(inout) :: object
     character(len=*), intent(in) :: filename
-    integer, intent(out) :: iter
 
     ! HDF5 variables
     character(len=64) :: type_name
@@ -160,7 +159,6 @@ contains
 
     ! Initialize reader variables
     type_name = ''
-    iter = -1
 
     ! ------------------------------------------------------------------------ !
     ! Open the HDF5 context and read identification parameters
@@ -199,10 +197,11 @@ contains
     ! Read the current optimizer iteration
     ddim(1) = 1
     call h5aopen_f(grp_id, 'iter', attr_id, ierr)
-    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, object%current_iteration, &
+         ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    if (iter .lt. 0) then
+    if (object%current_iteration .lt. 0) then
        call neko_error("Incompatible optimizer iteration in checkpoint file")
     end if
 
