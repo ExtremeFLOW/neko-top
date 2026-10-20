@@ -18,6 +18,7 @@ module io_hdf5
   use vector_math, only: vector_glsc2
   use math, only: NEKO_EPS
   use utils, only: neko_error
+  use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
 
   implicit none
 
@@ -37,6 +38,7 @@ contains
     if (initialized) return
     initialized = .true.
     call neko_init()
+    call hdf5_session_init()
 
   end subroutine setUp
 
@@ -46,6 +48,8 @@ contains
     ! if ((NEKO_BCKND_DEVICE .eq. 1)) then
     !    call device_finalize
     ! end if
+
+    call hdf5_session_finalize()
 
   end subroutine tearDown
 
