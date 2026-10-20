@@ -82,6 +82,7 @@ module mma
   use logger, only: neko_log
   use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
   use scratch_registry, only: scratch_registry_t
+  use profiler, only: profiler_start_region, profiler_end_region
 
   implicit none
   private
@@ -556,8 +557,10 @@ contains
     type(vector_t), intent(inout) :: df0dx, fval
     type(matrix_t), intent(inout) :: dfdx
 
+    call profiler_start_region('FullMMAupdate')
     ! Select backend type
     select case (this%bcknd)
+
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call x%copy_from(DEVICE_TO_HOST, sync = .false.)
@@ -578,7 +581,7 @@ contains
        call neko_error('mma_update_vector: Unknown backend: ' // &
             trim(this%bcknd))
     end select
-
+    call profiler_end_region('FullMMAupdate')
   end subroutine mma_update_vector
 
   !> Call the KKT ckeck function based on the backend
