@@ -26,12 +26,9 @@ function run {
             printf >&2 "ERROR: Previous run failed with unrecoverable errors.\n"
             return 1
         fi
-
-        # If the error is recoverable, clear the error log and continue
-        echo "" > error.log
     fi
 
-    if [ -f "$logfile" ]; then
+    if [[ -f "$logfile" || -s output.log || -s error.log ]]; then
         # Move old log files to folder with counter padded to 2 digits
 
         old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)
