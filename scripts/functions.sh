@@ -7,7 +7,7 @@ function run {
     set +e # Do not exit on error
 
     # Find the case file and define the log file
-    casefile=($(find . -name "*.case" -or -name "*.json"))
+    casefile=($(find . -maxdepth 1 -name "*.case" -or -name "*.json"))
     if [[ ${#casefile[@]} -eq 0 ]]; then
         printf >&2 "ERROR: No case file found.\n"
         return 1
@@ -20,8 +20,12 @@ function run {
 
     # Check for recoverable errors in the error log
     if [ -s error.log ]; then
-        grep "ERROR: Optimizer stopped after reaching the maximum runtime" \
-            error.log >/dev/null || return 1
+        RECOVERABLE=$(grep "Optimizer stopped after reaching the maximum runtime" \
+            error.log && echo "true" || echo "")
+        if [ -z "$RECOVERABLE" ]; then
+            printf >&2 "ERROR: Previous run failed with unrecoverable errors.\n"
+            return 1
+        fi
 
         # If the error is recoverable, clear the error log and continue
         echo "" > error.log
