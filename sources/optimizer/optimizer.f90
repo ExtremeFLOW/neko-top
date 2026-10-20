@@ -547,7 +547,7 @@ contains
   !! 1: Did not converge in max iterations           (WARNING)
   !! 2: Stopped due to design change below threshold (SUCCESS)
   !! 3: Stopped after reaching max runtime           (ERROR)
-  !!  : Unknown reason                               (FATAL_ERROR)
+  !! *: Unknown reason                               (FATAL_ERROR)
   !!
   !! @param this The optimizer object.
   !! @param stop_flag The stopping flag.
@@ -573,7 +573,8 @@ contains
        call neko_log%warning(msg)
     case (3)
        if (pe_rank .eq. 0) then
-          write(error_unit, '(A)') 'Optimizer stopped due to runtime limit.'
+          write(error_unit, '(A)') &
+               '*** Error: Optimizer stopped due to runtime limit. ***'
        end if
 
     case default
