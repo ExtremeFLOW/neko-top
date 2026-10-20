@@ -593,27 +593,26 @@ contains
     class(optimizer_t), intent(inout) :: this
     real(kind=rp), intent(in) :: step_time
     logical :: out_of_time
-    real(kind=rp) :: elapsed_time, time, old_avg_weight
+    real(kind=rp) :: elapsed, step, old_avg_weight
 
     out_of_time = .false.
-
     if (this%max_runtime .lt. 0.0_rp) then
        return
     end if
 
-    call MPI_Allreduce(step_time, time, 1, MPI_REAL_PRECISION, MPI_MAX, &
+    call MPI_Allreduce(step_time, step, 1, MPI_REAL_PRECISION, MPI_MAX, &
          NEKO_COMM)
 
-    elapsed_time = MPI_Wtime() - this%start_time
+    elapsed = MPI_Wtime() - this%start_time
+    old_avg_weight = (this%step_count - 1.0_rp) / this%step_count
     this%step_count = this%step_count + 1.0_rp
-    old_avg_weight = (this%step_count - 1) / this%step_count
 
-    ! Estimate Cumulative Average iteration time
-    this%average_time = time / this%step_count + &
+    ! Estimate Cumulative Average iteration step
+    this%average_time = step / this%step_count + &
          this%average_time * old_avg_weight
 
     ! Determine if next iteration would exceed max runtime
-    out_of_time = (elapsed_time + this%average_time) .gt. this%max_runtime
+    out_of_time = (elapsed + this%average_time) .gt. 0.99_rp * this%max_runtime
 
   end function optimizer_out_of_time
 
