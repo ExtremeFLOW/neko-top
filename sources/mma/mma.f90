@@ -82,6 +82,7 @@ module mma
   use logger, only: neko_log
   use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
   use scratch_registry, only: scratch_registry_t
+  use profiler, only: profiler_start_region, profiler_end_region
 
   implicit none
   private
@@ -146,7 +147,7 @@ module mma
 
   real(kind=rp), parameter :: a0_default = 1.0_rp
   real(kind=rp), parameter :: a_default = 0.0_rp
-  real(kind=rp), parameter :: c_default = 100.0_rp
+  real(kind=rp), parameter :: c_default = 1000.0_rp
   real(kind=rp), parameter :: d_default = 0.0_rp
   real(kind=rp), parameter :: xmin_default = 0.0_rp
   real(kind=rp), parameter :: xmax_default = 1.0_rp
@@ -233,9 +234,9 @@ contains
     ! m: number of constraints                              !
     !                                                       !
     ! Note that residumax & residunorm of the KKT conditions!
-    ! are initialized with 10^5. This is done to avoid      !
-    ! unnecessary extera computation of KKT norms for the   !
-    ! initial design.                                       !
+    ! are initialized with huge(0.0_rp). This is done to    !
+    ! avoid unnecessary extra computation of KKT norms for  !
+    ! the initial design.                                   !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
@@ -361,9 +362,9 @@ contains
     ! m: number of constraints                              !
     !                                                       !
     ! Note that residumax & residunorm of the KKT conditions!
-    ! are initialized with 10^5. This is done to avoid      !
-    ! unnecessary extera computation of KKT norms for the   !
-    ! initial design.                                       !
+    ! are initialized with huge(0.0_rp). This is done to    !
+    ! avoid unnecessary extra computation of KKT norms for  !
+    ! the initial design.                                   !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
@@ -421,6 +422,8 @@ contains
     call this%mu%init(m)
     call this%xsi%init(n)
     call this%eta%init(n)
+    this%z = 0.0_rp
+    this%zeta = 0.0_rp
 
     this%a0 = a0
     this%a%x = a
@@ -481,6 +484,17 @@ contains
     if (present(move_limit)) this%move_limit = move_limit
     if (present(bcknd)) this%bcknd = bcknd
     if (present(subsolver)) this%subsolver = subsolver
+
+    ! The backend selects the implementation of the update and the KKT check
+    if (this%bcknd .ne. "cpu" .and. this%bcknd .ne. "device") then
+       call neko_error("MMA: unknown backend '" // trim(this%bcknd) // &
+            "', expected 'cpu' or 'device'.")
+    end if
+
+    ! The subsolvers reduce epsilon towards epsimin by factors of 10
+    if (.not. (this%epsimin .gt. 0.0_rp)) then
+       call neko_error("MMA: epsimin must be positive.")
+    end if
 
     call neko_log%section('MMA Parameters')
 
@@ -543,8 +557,10 @@ contains
     type(vector_t), intent(inout) :: df0dx, fval
     type(matrix_t), intent(inout) :: dfdx
 
+    call profiler_start_region('FullMMAupdate')
     ! Select backend type
     select case (this%bcknd)
+
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call x%copy_from(DEVICE_TO_HOST, sync = .false.)
@@ -561,8 +577,11 @@ contains
 
     case ("device")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
+    case default
+       call neko_error('mma_update_vector: Unknown backend: ' // &
+            trim(this%bcknd))
     end select
-
+    call profiler_end_region('FullMMAupdate')
   end subroutine mma_update_vector
 
   !> Call the KKT ckeck function based on the backend
@@ -588,6 +607,9 @@ contains
        call mma_KKT_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
     case ("device")
        call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
+    case default
+       call neko_error('mma_KKT_vector: Unknown backend: ' // &
+            trim(this%bcknd))
     end select
   end subroutine mma_KKT_vector
 

@@ -73,10 +73,6 @@ program usrneko
   !> For getting objectives and constraints values though getters in problem_t
   type(vector_t) :: all_objectives, constraint_value
   real(rp) :: objective_value
-  ! -------------------------------------------------------------------------- !
-  ! Initialize the MPI environment
-
-  call MPI_Init(ierr)
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
@@ -215,7 +211,6 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
-  call neko_finalize(neko_case)
   call opt%free()
   call prob%free()
   call des%free()
@@ -226,6 +221,8 @@ program usrneko
   call all_objectives%free()
   call constraint_value%free()
   call initdesign%free()
+  call neko_finalize(neko_case)
+
 end program usrneko
 
 

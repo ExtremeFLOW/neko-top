@@ -1,6 +1,6 @@
 !> @file hip_mma_math.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -140,6 +140,16 @@ module hip_mma_math
        integer(c_int) :: n, m
      end subroutine mma_gensub3_hip
 
+     !> Binding of mma_gensub3_dip_hip, see device_mma_gensub3_dip.
+     subroutine mma_gensub3_dip_hip(x_d, df0dx_d, dfdx_d, low_d, upp_d, &
+          min_d, max_d, alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m) &
+          bind(c, name = 'mma_gensub3_dip_hip')
+       import c_int, c_ptr
+       type(c_ptr), value :: x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, max_d, &
+            alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d
+       integer(c_int) :: n, m
+     end subroutine mma_gensub3_dip_hip
+
      subroutine mma_gensub4_hip(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d) &
           bind(c, name = 'mma_gensub4_hip')
        import c_int, c_ptr
@@ -275,6 +285,15 @@ module hip_mma_math
        type(c_ptr), value :: rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d
        integer(c_int) :: n, m
      end subroutine hip_kkt_rex
+
+     !> Binding of mma_dip_kkt_hip, see device_mma_dip_kkt.
+     subroutine mma_dip_kkt_hip(res_d, x_d, df0dx_d, dfdx_d, xmin_d, xmax_d, &
+          lambda_d, n, m) bind(c, name = 'mma_dip_kkt_hip')
+       import c_int, c_ptr
+       type(c_ptr), value :: res_d, x_d, df0dx_d, dfdx_d, xmin_d, xmax_d, &
+            lambda_d
+       integer(c_int) :: n, m
+     end subroutine mma_dip_kkt_hip
 
 
      subroutine hip_maxcons(a_d, b, c, d_d, n) bind(c, name = 'hip_maxcons')
