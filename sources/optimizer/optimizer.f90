@@ -54,6 +54,7 @@ module optimizer
   use comm, only: pe_rank, MPI_REAL_PRECISION, NEKO_COMM
   use continuation_scheduler, only: nekotop_continuation
   use math, only: Neko_EPS
+  use, intrinsic :: iso_fortran_env, only : error_unit, output_unit
 
   implicit none
   private
@@ -542,9 +543,11 @@ contains
 
   !> Print status message
   !! Supported flags:
-  !! 0: Converged successfully             (SUCCESS)
-  !! 1: Did not converge in max iterations (WARNING)
-  !! 2: Stopped after reaching max runtime (ERROR)
+  !! 0: Converged successfully                       (SUCCESS)
+  !! 1: Did not converge in max iterations           (WARNING)
+  !! 2: Stopped due to design change below threshold (SUCCESS)
+  !! 3: Stopped after reaching max runtime           (ERROR)
+  !!  : Unknown reason                               (FATAL_ERROR)
   !!
   !! @param this The optimizer object.
   !! @param stop_flag The stopping flag.
@@ -569,8 +572,9 @@ contains
             'below threshold of: ', this%stop_design_change, '.'
        call neko_log%warning(msg)
     case (3)
-       write(msg, '(A)') 'Optimizer stopped due to runtime limit.'
-       call neko_error(msg)
+       if (pe_rank .eq. 0) then
+          write(error_unit, '(A)') 'Optimizer stopped due to runtime limit.'
+       end if
 
     case default
        write(msg, '(A)') 'Optimizer stopped for an unknown reason.'
@@ -813,7 +817,6 @@ contains
     character(len=*), intent(in), optional :: format
     character(len=256) :: file_full, file_path
     character(len=12) :: suffix
-    character(len=LOG_SIZE) :: msg
     logical :: exist
 
     call neko_log%section('Optimizer save checkpoint')
