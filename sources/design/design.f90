@@ -92,15 +92,6 @@ module design
 
      !> Retrieve the design variables.
      procedure(design_get_values), public, pass(this), deferred :: get_values
-     !> Retrieve the x location of the design variables.
-     generic :: get_x => design_get_x
-     generic :: x => design_get_x_i
-     !> Retrieve the y location of the design variables.
-     generic :: get_y => design_get_y
-     generic :: y => design_get_y_i
-     !> Retrieve the z location of the design variables.
-     generic :: get_z => design_get_z
-     generic :: z => design_get_z_i
 
      !> Update the design variables.
      procedure(design_update_design), public, pass(this), deferred :: &
@@ -149,6 +140,14 @@ module design
      procedure, pass(this) :: design_get_z
      !> Getter of i'th element of z
      procedure, pass(this) :: design_get_z_i
+
+     ! Generic interfaces for the getter methods, this allow override
+     generic, public :: get_x => design_get_x
+     generic, public :: get_y => design_get_y
+     generic, public :: get_z => design_get_z
+     generic, public :: x => design_get_x_i
+     generic, public :: y => design_get_y_i
+     generic, public :: z => design_get_z_i
 
   end type design_t
 
