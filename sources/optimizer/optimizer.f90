@@ -701,10 +701,11 @@ contains
     this%log_data%x(offset:offset + 1 - 1) = this%max_design_change
     this%log_data%x(offset + 1:offset + 2 - 1) = this%norm2_design_change
 
-    ! Continuation parameter values
+    ! Continuation parameter values, starting at the first slot after the
+    ! design change entries
     offset = offset + 2
     do i = 1, n_cont
-       this%log_data%x(offset + i) = &
+       this%log_data%x(offset + i - 1) = &
             nekotop_continuation%params(i)%target
     end do
 
