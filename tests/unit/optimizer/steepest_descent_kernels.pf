@@ -1,0 +1,284 @@
+! Hand-computed checks of the three steepest-descent kernels (Appendix D,
+! Eqs. D22-D24 of da Silva, Aage, Beck & Sigmund, 2021), exercised both
+! through `steepest_descent_math` (the backend dispatch; on this CPU-only
+! box it forwards straight to the CPU path) and through
+! `steepest_descent_cpu` directly, so both entry points are covered.
+!
+! Every expected value below is a literal, computed by hand from the
+! formulas, not by re-running the code under test. The comparison tolerance
+! is a small multiple of `epsilon(1.0_rp)`: every quantity here has
+! magnitude at most O(1), so a handful of ULPs comfortably bounds the
+! difference between a decimal literal and the same value built from one or
+! two floating-point operations.
+module steepest_descent_kernels
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use vector, only: vector_t
+  use comm, only: comm_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_init, device_finalize, DEVICE_TO_HOST
+  use logger, only: neko_log
+  use steepest_descent_math, only: sd_direction, sd_update_move_limits, &
+       sd_update_design
+  use steepest_descent_cpu, only: sd_direction_cpu, &
+       sd_update_move_limits_cpu, sd_update_design_cpu
+
+  implicit none
+
+  !> A handful of ULPs: every value compared here is O(1) in magnitude, so
+  !! this absolute tolerance is still far tighter than any physically
+  !! meaningful difference.
+  real(kind=rp), parameter :: tol = 20.0_rp * epsilon(1.0_rp)
+
+  logical :: log_initialized = .false.
+
+  @TestCase
+  type, extends(MPITestCase) :: test_sd_kernels
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_sd_kernels
+
+contains
+
+  subroutine setUp(this)
+    class(test_sd_kernels), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 1) call device_init
+    call comm_init
+
+    if (.not. log_initialized) then
+       call neko_log%init()
+       log_initialized = .true.
+    end if
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_sd_kernels), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 1) call device_finalize
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! D22: bound-projected direction. Checks that the projected direction is
+  ! zero exactly at an active bound pointing outward, and unaffected
+  ! otherwise -- including at a bound when the direction actually points
+  ! back into the box.
+
+  @test(npes=[1])
+  subroutine d22_projects_at_bounds(this)
+    class(test_sd_kernels), intent(inout) :: this
+    integer, parameter :: n = 6
+    real(kind=rp) :: xmin, xmax
+    real(kind=rp) :: g(n), x(n), expected(n)
+    real(kind=rp) :: s_c(n), x_c(n)
+    type(vector_t) :: s_v, x_v
+
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+
+    !        x_e      g_e    comment
+    x        = [ 0.0_rp,  0.0_rp,  1.0_rp,  1.0_rp,  0.5_rp,  0.5_rp]
+    g        = [ 2.0_rp, -2.0_rp, -3.0_rp,  3.0_rp,  4.0_rp, -1.5_rp]
+    ! 1: at xmin, S < 0 -> zeroed.   2: at xmin, S > 0 -> kept (into box).
+    ! 3: at xmax, S > 0 -> zeroed.   4: at xmax, S < 0 -> kept (into box).
+    ! 5, 6: interior, unaffected.
+    expected = [ 0.0_rp,  2.0_rp,  0.0_rp, -3.0_rp, -4.0_rp,  1.5_rp]
+
+    ! Dispatch path (steepest_descent_math), through a vector_t.
+    s_v = g
+    x_v = x
+    call sd_direction(s_v, x_v, xmin, xmax)
+    call s_v%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expected, s_v%x(1:n), tol, 'dispatch D22 mismatch')
+
+    ! Direct CPU kernel, on plain arrays.
+    s_c = g
+    x_c = x
+    call sd_direction_cpu(s_c, x_c, xmin, xmax, n)
+    @assertEqual(expected, s_c, tol, 'cpu D22 mismatch')
+
+    call s_v%free()
+    call x_v%free()
+  end subroutine d22_projects_at_bounds
+
+  ! ========================================================================== !
+  ! D23: move-limit adaptation. Covers d_e < 0 (shrink), d_e = 0 (hold),
+  ! d_e > 0 (grow), and both the dmin and dmax clamps.
+
+  @test(npes=[1])
+  subroutine d23_branches_and_clamps(this)
+    class(test_sd_kernels), intent(inout) :: this
+    integer, parameter :: n = 5
+    real(kind=rp) :: dec, inc, dmin, dmax
+    real(kind=rp) :: x(n), x1(n), x2(n), delta0(n), expected(n)
+    real(kind=rp) :: delta_c(n)
+    type(vector_t) :: delta_v, x_v, x1_v, x2_v
+
+    dec = 0.7_rp
+    inc = 1.1_rp
+    dmin = 0.01_rp
+    dmax = 0.2_rp
+
+    !          x         x1        x2     delta0   comment
+    x      = [0.3_rp,  0.1_rp,  0.2_rp,  0.5_rp,  0.1_rp]
+    x1     = [0.2_rp,  0.3_rp,  0.2_rp,  0.4_rp,  0.3_rp]
+    x2     = [0.1_rp,  0.2_rp,  0.1_rp,  0.3_rp,  0.2_rp]
+    delta0 = [0.05_rp, 0.05_rp, 0.05_rp, 0.19_rp, 0.012_rp]
+    ! 1: d = 0.01  > 0 -> grow,   0.05*1.1  = 0.055.
+    ! 2: d = -0.02 < 0 -> shrink, 0.05*0.7  = 0.035.
+    ! 3: d = 0.0        -> hold,  unchanged = 0.05.
+    ! 4: d = 0.01  > 0 -> grow,   0.19*1.1  = 0.209, clamped to dmax = 0.2.
+    ! 5: d = -0.02 < 0 -> shrink, 0.012*0.7 = 0.0084, clamped to dmin = 0.01.
+    expected = [0.055_rp, 0.035_rp, 0.05_rp, 0.2_rp, 0.01_rp]
+
+    ! Dispatch path.
+    delta_v = delta0
+    x_v = x
+    x1_v = x1
+    x2_v = x2
+    call sd_update_move_limits(delta_v, x_v, x1_v, x2_v, dec, inc, dmin, dmax)
+    call delta_v%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expected, delta_v%x(1:n), tol, 'dispatch D23 mismatch')
+
+    ! Direct CPU kernel.
+    delta_c = delta0
+    call sd_update_move_limits_cpu(delta_c, x, x1, x2, dec, inc, dmin, dmax, n)
+    @assertEqual(expected, delta_c, tol, 'cpu D23 mismatch')
+
+    call delta_v%free()
+    call x_v%free()
+    call x1_v%free()
+    call x2_v%free()
+  end subroutine d23_branches_and_clamps
+
+  ! ========================================================================== !
+  ! D24: move-limited, box-constrained update. Covers the move limit
+  ! active, the box active (after the move limit), both free (raw step),
+  ! an infeasible x below xmin, and a non-default [xmin, xmax] box.
+
+  @test(npes=[1])
+  subroutine d24_move_limit_and_box_cases(this)
+    class(test_sd_kernels), intent(inout) :: this
+    integer, parameter :: n = 4
+    real(kind=rp) :: psi, smax, xmin, xmax
+    real(kind=rp) :: x(n), s(n), delta(n), expected(n)
+    real(kind=rp) :: x_new_c(n)
+    type(vector_t) :: x_v, s_v, delta_v, x_new_v
+
+    ! Case e: a single point with a non-default box, its own call below.
+    real(kind=rp) :: xe, se, deltae, xmine, xmaxe, expectede
+    real(kind=rp) :: x_new_e_c(1)
+    type(vector_t) :: xe_v, se_v, deltae_v, x_new_e_v
+
+    psi = 1.0_rp
+    smax = 10.0_rp
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+
+    !      x       s      delta   comment
+    x     = [ 0.5_rp,  0.97_rp,  0.5_rp, -0.1_rp]
+    s     = [10.0_rp, 10.0_rp,   0.2_rp, 10.0_rp]
+    delta = [ 0.05_rp, 0.05_rp,  0.05_rp, 0.05_rp]
+    ! 1: raw step = 0.5 + 1.0 = 1.5; move limit active: 0.5 + 0.05 = 0.55.
+    ! 2: raw step = 0.97 + 1.0 = 1.97; move-limited to 1.02; box active at
+    !    xmax = 1.0.
+    ! 3: raw step = 0.5 + 0.02 = 0.52; inside both the move limit
+    !    ([0.45, 0.55]) and the box -- both free, equals the raw step.
+    ! 4: infeasible x < xmin; raw step = -0.1 + 1.0 = 0.9; move-limited to
+    !    -0.05; box clamps up to xmin = 0.0.
+    expected = [0.55_rp, 1.0_rp, 0.52_rp, 0.0_rp]
+
+    ! Dispatch path.
+    x_v = x
+    s_v = s
+    delta_v = delta
+    call x_new_v%init(n)
+    call sd_update_design(x_new_v, x_v, s_v, delta_v, psi, smax, xmin, xmax)
+    call x_new_v%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expected, x_new_v%x(1:n), tol, 'dispatch D24 mismatch')
+
+    ! Direct CPU kernel.
+    call sd_update_design_cpu(x_new_c, x, s, delta, psi, smax, xmin, xmax, n)
+    @assertEqual(expected, x_new_c, tol, 'cpu D24 mismatch')
+
+    call x_v%free()
+    call s_v%free()
+    call delta_v%free()
+    call x_new_v%free()
+
+    ! Case e: non-default box, xmin = 0.2, xmax = 0.8. Raw step = 0.75 +
+    ! 1.0 = 1.75; move-limited to 0.85; box clamps down to xmax = 0.8.
+    xmine = 0.2_rp
+    xmaxe = 0.8_rp
+    xe = 0.75_rp
+    se = 10.0_rp
+    deltae = 0.1_rp
+    expectede = 0.8_rp
+
+    xe_v = [xe]
+    se_v = [se]
+    deltae_v = [deltae]
+    call x_new_e_v%init(1)
+    call sd_update_design(x_new_e_v, xe_v, se_v, deltae_v, psi, smax, &
+         xmine, xmaxe)
+    call x_new_e_v%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expectede, x_new_e_v%x(1), tol, 'dispatch D24 case e')
+
+    call sd_update_design_cpu(x_new_e_c, [xe], [se], [deltae], psi, smax, &
+         xmine, xmaxe, 1)
+    @assertEqual(expectede, x_new_e_c(1), tol, 'cpu D24 case e')
+
+    call xe_v%free()
+    call se_v%free()
+    call deltae_v%free()
+    call x_new_e_v%free()
+  end subroutine d24_move_limit_and_box_cases
+
+  ! ========================================================================== !
+  ! n = 0: the dispatch wrappers must do nothing (and not touch a
+  ! possibly-unallocated host array) rather than crash.
+
+  @test(npes=[1])
+  subroutine dispatch_handles_n_zero(this)
+    class(test_sd_kernels), intent(inout) :: this
+    integer, parameter :: n = 3
+    real(kind=rp), parameter :: sentinel = -999.0_rp
+    type(vector_t) :: s_v, x_v, x1_v, x2_v, delta_v, x_new_v
+    real(kind=rp) :: g(n)
+
+    g = [1.0_rp, 2.0_rp, 3.0_rp]
+    s_v = g
+    x_v = [0.0_rp, 0.5_rp, 1.0_rp]
+    x1_v = x_v
+    x2_v = x_v
+    delta_v = [0.1_rp, 0.1_rp, 0.1_rp]
+    call x_new_v%init(n)
+    x_new_v = [sentinel, sentinel, sentinel]
+
+    call sd_direction(s_v, x_v, 0.0_rp, 1.0_rp, n = 0)
+    call s_v%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(g, s_v%x(1:n), 0.0_rp, 'n=0 sd_direction touched s')
+
+    call sd_update_move_limits(delta_v, x_v, x1_v, x2_v, 0.7_rp, 1.1_rp, &
+         0.01_rp, 0.2_rp, n = 0)
+    call delta_v%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual([0.1_rp, 0.1_rp, 0.1_rp], delta_v%x(1:n), 0.0_rp, &
+         'n=0 sd_update_move_limits touched delta')
+
+    call sd_update_design(x_new_v, x_v, s_v, delta_v, 1.0_rp, 10.0_rp, &
+         0.0_rp, 1.0_rp, n = 0)
+    call x_new_v%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual([sentinel, sentinel, sentinel], x_new_v%x(1:n), 0.0_rp, &
+         'n=0 sd_update_design touched x_new')
+
+    call s_v%free()
+    call x_v%free()
+    call x1_v%free()
+    call x2_v%free()
+    call delta_v%free()
+    call x_new_v%free()
+  end subroutine dispatch_handles_n_zero
+
+end module steepest_descent_kernels

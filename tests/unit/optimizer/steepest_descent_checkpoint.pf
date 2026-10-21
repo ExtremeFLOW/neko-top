@@ -1,0 +1,427 @@
+! HDF5 checkpoint/restart test for the steepest-descent optimizer.
+!
+! Run A executes 12 iterations with a checkpoint saved every 6, on a
+! separable analytic problem (as in steepest_descent_convergence.pf) chosen
+! so that the per-variable move limit `delta` has already shrunk below its
+! initial value by iteration 6 (one variable starts far enough from its
+! target that it overshoots and oscillates). A continuation parameter the
+! objective actually uses (an additive shift of the target) changes between
+! iterations 1 and 6, so a restart that fails to restore the continuation
+! state before re-evaluating the problem (the bug fixed by
+! "Restore continuation parameters before re-evaluating on restart")
+! produces an observably different trajectory from there on.
+!
+! Run B is a factory-fresh optimizer restarted from the iteration-6
+! checkpoint and run on to iteration 12. Its final design must be bitwise
+! identical to Run A's, which is also the end-to-end check for the private
+! xold1/xold2/delta state: dropping the load of any one of them replaces it
+! with the factory-time fill (the initial design, not iteration 5/4/6), so
+! the move-limit update at the first post-restart step (iteration 7 >= 3)
+! diverges and the final designs no longer match.
+module steepest_descent_checkpoint
+  use mpi
+  use pfunit
+  use hdf5
+  use num_types, only: rp, dp, sp
+  use json_module, only: json_file
+  use vector, only: vector_t
+  use vector_math, only: vector_glsc3, vector_glsubnorm
+  use design, only: design_t
+  use objective, only: objective_t
+  use problem, only: problem_t
+  use optimizer, only: optimizer_t, optimizer_factory
+  use continuation_scheduler, only: nekotop_continuation
+  use neko, only: neko_init
+  use comm, only: pe_rank, pe_size, NEKO_COMM, MPI_REAL_PRECISION
+  use device, only: DEVICE_TO_HOST
+  use registry, only: neko_registry
+  use scratch_registry, only: neko_scratch_registry
+  use utils, only: neko_error
+
+  implicit none
+
+  logical :: initialized_lock = .false.
+
+  !> Checkpoint directory/base used by both runs, unique to this test.
+  character(len=*), parameter :: CKPT_PATH = './sd_checkpoints/'
+  character(len=*), parameter :: CKPT_BASE = 'sd_ckpt'
+  character(len=*), parameter :: CKPT_ITER6 = CKPT_PATH // CKPT_BASE // &
+       '_00006.h5'
+  integer, parameter :: N_GLOBAL = 3
+
+  ! ========================================================================== !
+  ! Inline helpers (kept per-file, not shared, per backlog #88).
+
+  !> Stub design that just stores its values; `update_design` has no mask
+  !! here (the checkpoint test does not need one).
+  type, extends(design_t) :: stub_design_t
+     type(vector_t) :: values
+   contains
+     procedure, pass(this) :: init => stub_design_init
+     procedure, pass(this) :: free => stub_design_free
+     procedure, pass(this) :: get_values => stub_design_get_values
+     procedure, pass(this) :: update_design => stub_design_update_design
+     procedure, pass(this) :: map_forward => stub_design_map_forward
+     procedure, pass(this) :: map_backward => stub_design_map_backward
+     procedure, pass(this) :: write => stub_design_write
+  end type stub_design_t
+
+  !> f = sum w (x - d - shift)^2, globally reduced, with its exact gradient.
+  !! `shift` is a continuation-controlled additive target shift: when
+  !! associated, every evaluation adds its *current* value, so the
+  !! objective genuinely depends on the continuation state at the time it
+  !! is evaluated -- not just at construction.
+  type, extends(objective_t) :: quad_obj_t
+     type(vector_t) :: w, d
+     real(kind=rp), pointer :: shift => null()
+   contains
+     procedure, pass(this) :: free => quad_obj_free
+     procedure, pass(this) :: update_value => quad_obj_update_value
+     procedure, pass(this) :: update_sensitivity => quad_obj_update_sensitivity
+  end type quad_obj_t
+
+  @TestCase
+  type, extends(MPITestCase) :: test_sd_checkpoint
+     type(stub_design_t) :: des
+     type(problem_t) :: prob
+     class(optimizer_t), allocatable :: opt
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_sd_checkpoint
+
+contains
+
+  !> Delete any checkpoint files left behind by a previous run of this test
+  !! on rank 0, then barrier, so a repeat `ctest -R` does not see stale
+  !! state (pattern: tests/unit/mma/io_hdf5.pf:132-139).
+  subroutine setUp(this)
+    class(test_sd_checkpoint), intent(inout) :: this
+    integer :: ierr
+
+    if (.not. initialized_lock) then
+       initialized_lock = .true.
+       call neko_init()
+    end if
+
+    if (pe_rank .eq. 0) then
+       call execute_command_line('rm -rf ' // CKPT_PATH)
+    end if
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_sd_checkpoint), intent(inout) :: this
+
+    if (allocated(this%opt)) then
+       call this%opt%free()
+       deallocate(this%opt)
+    end if
+    call this%prob%free()
+    call this%des%free()
+    call nekotop_continuation%free()
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! stub_design_t
+
+  subroutine stub_design_init(this, x0)
+    class(stub_design_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: x0(:)
+
+    call this%init_base('sd_checkpoint_stub', size(x0))
+    call this%values%init(size(x0))
+    this%values%x = x0
+  end subroutine stub_design_init
+
+  subroutine stub_design_free(this)
+    class(stub_design_t), intent(inout) :: this
+
+    call this%values%free()
+    call this%free_base()
+  end subroutine stub_design_free
+
+  subroutine stub_design_get_values(this, values)
+    class(stub_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
+
+    if (this%size() .gt. 0) values%x(1:this%size()) = this%values%x(:)
+  end subroutine stub_design_get_values
+
+  subroutine stub_design_update_design(this, values)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: values
+
+    if (this%size() .eq. 0) return
+    this%values%x(:) = values%x(1:this%size())
+  end subroutine stub_design_update_design
+
+  subroutine stub_design_map_forward(this)
+    class(stub_design_t), intent(inout) :: this
+  end subroutine stub_design_map_forward
+
+  subroutine stub_design_map_backward(this, sensitivity)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: sensitivity
+  end subroutine stub_design_map_backward
+
+  subroutine stub_design_write(this, idx)
+    class(stub_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
+  end subroutine stub_design_write
+
+  ! ========================================================================== !
+  ! quad_obj_t
+
+  subroutine quad_obj_free(this)
+    class(quad_obj_t), intent(inout) :: this
+
+    call this%w%free()
+    call this%d%free()
+    nullify(this%shift)
+    call this%free_base()
+  end subroutine quad_obj_free
+
+  subroutine quad_obj_update_value(this, design)
+    class(quad_obj_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(vector_t) :: r
+    real(kind=rp) :: s
+
+    s = 0.0_rp
+    if (associated(this%shift)) s = this%shift
+
+    call r%init(design%size())
+    call design%get_values(r)
+    if (design%size() .gt. 0) r%x = r%x - this%d%x - s
+    this%value = vector_glsc3(this%w, r, r)
+    call r%free()
+  end subroutine quad_obj_update_value
+
+  subroutine quad_obj_update_sensitivity(this, design)
+    class(quad_obj_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(vector_t) :: r
+    real(kind=rp) :: s
+
+    s = 0.0_rp
+    if (associated(this%shift)) s = this%shift
+
+    call r%init(design%size())
+    call design%get_values(r)
+    if (design%size() .gt. 0) then
+       this%sensitivity%x = 2.0_rp * this%w%x * (r%x - this%d%x - s)
+    end if
+    call r%free()
+  end subroutine quad_obj_update_sensitivity
+
+  ! ========================================================================== !
+  ! HDF5 sanity check: read back `delta` from the iteration-6 checkpoint,
+  ! serially on rank 0 (a parallel-written HDF5 file is an ordinary file
+  ! that any reader can open). This is the guard against a vacuous pass:
+  ! if `delta` never moved away from its initial value, none of the
+  ! "skip loading delta/xold1/xold2" mutations would be observable.
+
+  subroutine read_checkpoint_delta_min(filename, n, delta_min)
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: n
+    real(kind=rp), intent(out) :: delta_min
+    integer(hid_t) :: file_id, grp_id, dset_id, h5t_real
+    integer(hsize_t) :: ddim(1)
+    real(kind=rp) :: buf(n)
+    integer :: ierr
+
+    ddim(1) = int(n, hsize_t)
+    call h5open_f(ierr)
+
+    ! HDF5's native-type constants are only valid once the library has been
+    ! opened, so this must come after h5open_f (steepest_descent_hdf5_io.f90
+    ! follows the same order).
+    select case (rp)
+    case (dp)
+       h5t_real = H5T_NATIVE_DOUBLE
+    case (sp)
+       h5t_real = H5T_NATIVE_REAL
+    case default
+       call neko_error('steepest_descent_checkpoint: unsupported real kind')
+    end select
+
+    call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr)
+    call h5gopen_f(file_id, '/SteepestDescent/checkpoint', grp_id, ierr)
+    call h5dopen_f(grp_id, 'delta', dset_id, ierr)
+    call h5dread_f(dset_id, h5t_real, buf, ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+    call h5gclose_f(grp_id, ierr)
+    call h5fclose_f(file_id, ierr)
+    call h5close_f(ierr)
+
+    delta_min = minval(buf)
+  end subroutine read_checkpoint_delta_min
+
+  ! ========================================================================== !
+  ! The test: run, checkpoint, restart, compare.
+
+  @test(npes=[2])
+  subroutine restart_matches_original_run(this)
+    class(test_sd_checkpoint), intent(inout) :: this
+    real(kind=rp), parameter :: move_limit_initial = 0.1_rp
+    type(json_file) :: parameters
+    class(objective_t), allocatable :: obj
+    real(kind=rp), allocatable :: w(:), d(:), x0(:)
+    real(kind=rp), target :: shift_var
+    real(kind=rp) :: cont_initial
+    integer :: n, iter, ierr
+    logical :: conv
+    type(vector_t) :: x_a, x_b
+    real(kind=rp) :: delta_min, local_diff, global_diff
+    integer :: i
+    character(len=*), parameter :: json_str = &
+         '{"optimization": {"cont_param": [0.0, 0.02, 0.04, 0.06, 0.08, ' // &
+         '0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.22], "solver": ' // &
+         '{"type": "steepest_descent", "enable_output": false, ' // &
+         '"max_iterations": 12, "checkpoint": {"path": "' // CKPT_PATH // &
+         '", "base": "' // CKPT_BASE // '", "interval": 6}}}}'
+    character(len=*), parameter :: json_str_restart = &
+         '{"optimization": {"cont_param": [0.0, 0.02, 0.04, 0.06, 0.08, ' // &
+         '0.10, 0.12, 0.14, 0.16, 0.18, 0.20, 0.22], "solver": ' // &
+         '{"type": "steepest_descent", "enable_output": false, ' // &
+         '"max_iterations": 12, "restart_file": "' // CKPT_ITER6 // '"}}}'
+
+    ! Global layout (3 variables): 2 on rank 0, 1 on rank 1. Entry 1 starts
+    ! far from its target with a large weight, so it overshoots and
+    ! oscillates, shrinking its move limit below 0.1 well before iteration 6.
+    if (pe_rank .eq. 0) then
+       n = 2
+       w = [5.0_rp, 1.0_rp]
+       d = [0.437_rp, 0.3_rp]
+       x0 = [0.9_rp, 0.5_rp]
+    else
+       n = 1
+       w = [0.8_rp]
+       d = [0.65_rp]
+       x0 = [0.1_rp]
+    end if
+
+    ! ------------------------------------------------------------------- !
+    ! Run A: 12 iterations, checkpointing every 6.
+
+    call this%des%init(x0)
+
+    call parameters%initialize()
+    call parameters%load_from_string(json_str)
+
+    call nekotop_continuation%init(parameters)
+    call nekotop_continuation%json_get_or_register(parameters, &
+         'optimization.cont_param', shift_var, cont_initial)
+    shift_var = cont_initial
+
+    call this%prob%init(parameters, this%des)
+    allocate(quad_obj_t :: obj)
+    select type (q => obj)
+    type is (quad_obj_t)
+       call q%init_base('quadratic', n, 1.0_rp)
+       call q%w%init(n)
+       call q%d%init(n)
+       if (n .gt. 0) then
+          q%w%x = w
+          q%d%x = d
+       end if
+       q%shift => shift_var
+    end select
+    call this%prob%add_objective(obj)
+
+    call optimizer_factory(this%opt, parameters, this%prob, this%des)
+    call parameters%destroy()
+
+    call this%opt%run(this%prob, this%des)
+
+    call x_a%init(n)
+    call this%des%get_values(x_a)
+    call x_a%copy_from(DEVICE_TO_HOST, .true.)
+
+    ! Guard against a vacuous pass: delta must really have shrunk below its
+    ! initial value by iteration 6, or the "skip loading delta" mutation
+    ! would be invisible to the final comparison below. Read serially on
+    ! rank 0, broadcast the result.
+    delta_min = move_limit_initial
+    if (pe_rank .eq. 0) then
+       call read_checkpoint_delta_min(CKPT_ITER6, N_GLOBAL, delta_min)
+    end if
+    call MPI_Bcast(delta_min, 1, MPI_REAL_PRECISION%mpi_val, 0, &
+         NEKO_COMM%mpi_val, ierr)
+    @assertTrue(delta_min .lt. move_limit_initial, &
+         'the move limit should have shrunk below its initial value by &
+         &iteration 6, or the delta checkpoint is not being exercised')
+
+    ! ------------------------------------------------------------------- !
+    ! Tear down Run A and reset the shared registries, exactly as
+    ! optimizer_checkpoint.pf does between its two phases.
+
+    call this%opt%free()
+    deallocate(this%opt)
+    call this%prob%free()
+    call this%des%free()
+    call nekotop_continuation%free()
+
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+    call neko_registry%init()
+    call neko_scratch_registry%init()
+
+    ! ------------------------------------------------------------------- !
+    ! Run B: a factory-fresh optimizer restarted from the iteration-6
+    ! checkpoint, run on to iteration 12.
+
+    call this%des%init(x0)
+
+    call parameters%initialize()
+    call parameters%load_from_string(json_str_restart)
+
+    call nekotop_continuation%init(parameters)
+    call nekotop_continuation%json_get_or_register(parameters, &
+         'optimization.cont_param', shift_var, cont_initial)
+    shift_var = cont_initial
+
+    call this%prob%init(parameters, this%des)
+    allocate(quad_obj_t :: obj)
+    select type (q => obj)
+    type is (quad_obj_t)
+       call q%init_base('quadratic', n, 1.0_rp)
+       call q%w%init(n)
+       call q%d%init(n)
+       if (n .gt. 0) then
+          q%w%x = w
+          q%d%x = d
+       end if
+       q%shift => shift_var
+    end select
+    call this%prob%add_objective(obj)
+
+    call optimizer_factory(this%opt, parameters, this%prob, this%des)
+    call parameters%destroy()
+
+    call this%opt%run(this%prob, this%des)
+
+    call x_b%init(n)
+    call this%des%get_values(x_b)
+    call x_b%copy_from(DEVICE_TO_HOST, .true.)
+
+    ! --------------------------------------------------------------------- !
+    ! Compare: on CPU the two final designs must be bitwise identical.
+
+    local_diff = 0.0_rp
+    do i = 1, n
+       local_diff = max(local_diff, abs(x_b%x(i) - x_a%x(i)))
+    end do
+    call MPI_Allreduce(local_diff, global_diff, 1, &
+         MPI_REAL_PRECISION%mpi_val, MPI_MAX, NEKO_COMM%mpi_val, ierr)
+
+    @assertEqual(0.0_rp, global_diff, 0.0_rp, &
+         'the restarted run should reproduce the original run bitwise on &
+         &CPU')
+
+    call x_a%free()
+    call x_b%free()
+  end subroutine restart_matches_original_run
+
+end module steepest_descent_checkpoint

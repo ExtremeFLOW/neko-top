@@ -1,0 +1,489 @@
+! Convergence, pinning, zero-gradient and CSV-continuation-column checks for
+! the steepest-descent optimizer, exercised through the real
+! `optimizer_factory` on a separable analytic problem
+!   f(x) = sum_e w_e (x_e - d_e)^2,  grad_e = 2 w_e (x_e - d_e),
+! with a no-mesh stub design that just stores its values (the shape of
+! `tests/unit/problem/time_window.pf`'s stub design). Some d_e lie outside
+! [xmin, xmax], so the final design is pinned at a bound for those entries.
+!
+! The analytic trajectory of SDM on this problem was independently verified
+! bit-exact against a numpy reference of Appendix D (D22-D24), at 1 and 2
+! ranks, over 40-iteration trajectories -- so the numbers used below (the
+! iteration count, the error bound in units of move_limit.min) are drawn
+! from that study, not from this test passing.
+!
+! All tests run with 2 ranks and an uneven split of the design variables,
+! since `neko_init()` in `setUp` performs a collective `MPI_Comm_dup` that a
+! 1-rank subtest would hang against under a 2-rank launch.
+module steepest_descent_convergence
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use json_module, only: json_file
+  use vector, only: vector_t
+  use vector_math, only: vector_glsc3
+  use design, only: design_t
+  use objective, only: objective_t
+  use problem, only: problem_t
+  use optimizer, only: optimizer_t, optimizer_factory
+  use continuation_scheduler, only: nekotop_continuation
+  use neko, only: neko_init
+  use comm, only: pe_rank, pe_size, NEKO_COMM, MPI_REAL_PRECISION
+  use device, only: DEVICE_TO_HOST
+
+  implicit none
+
+  logical :: initialized_lock = .false.
+
+  ! ========================================================================== !
+  ! Inline helpers (kept per-file, not shared, per backlog #88).
+
+  !> Stub design that just stores its values; `update_design` applies an
+  !! optional mask in place, the way `brinkman_design_t` applies the
+  !! Brinkman mask.
+  type, extends(design_t) :: stub_design_t
+     type(vector_t) :: values
+     logical, allocatable :: masked(:)
+   contains
+     procedure, pass(this) :: init => stub_design_init
+     procedure, pass(this) :: free => stub_design_free
+     procedure, pass(this) :: get_values => stub_design_get_values
+     procedure, pass(this) :: update_design => stub_design_update_design
+     procedure, pass(this) :: map_forward => stub_design_map_forward
+     procedure, pass(this) :: map_backward => stub_design_map_backward
+     procedure, pass(this) :: write => stub_design_write
+  end type stub_design_t
+
+  !> f = sum w (x - d)^2, globally reduced, with its exact gradient.
+  type, extends(objective_t) :: quad_obj_t
+     type(vector_t) :: w, d
+   contains
+     procedure, pass(this) :: free => quad_obj_free
+     procedure, pass(this) :: update_value => quad_obj_update_value
+     procedure, pass(this) :: update_sensitivity => quad_obj_update_sensitivity
+  end type quad_obj_t
+
+  @TestCase
+  type, extends(MPITestCase) :: test_sd_convergence
+     type(stub_design_t) :: des
+     type(problem_t) :: prob
+     class(optimizer_t), allocatable :: opt
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_sd_convergence
+
+contains
+
+  subroutine setUp(this)
+    class(test_sd_convergence), intent(inout) :: this
+
+    if (initialized_lock) return
+    initialized_lock = .true.
+    call neko_init()
+  end subroutine setUp
+
+  !> Free whatever the test built, even if an assertion returned early --
+  !! `opt`/`prob`/`des` are type components precisely so this always runs,
+  !! and the continuation scheduler, since a registered target may otherwise
+  !! point at the (now gone) stack frame of a failed test.
+  subroutine tearDown(this)
+    class(test_sd_convergence), intent(inout) :: this
+
+    if (allocated(this%opt)) then
+       call this%opt%free()
+       deallocate(this%opt)
+    end if
+    call this%prob%free()
+    call this%des%free()
+    call nekotop_continuation%free()
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! stub_design_t
+
+  subroutine stub_design_init(this, x0, masked)
+    class(stub_design_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: x0(:)
+    logical, intent(in) :: masked(:)
+
+    call this%init_base('stub_design', size(x0))
+    call this%values%init(size(x0))
+    allocate(this%masked(size(x0)))
+    this%masked = masked
+    this%values%x = x0
+    where (this%masked) this%values%x = 0.0_rp
+  end subroutine stub_design_init
+
+  subroutine stub_design_free(this)
+    class(stub_design_t), intent(inout) :: this
+
+    call this%values%free()
+    if (allocated(this%masked)) deallocate(this%masked)
+    call this%free_base()
+  end subroutine stub_design_free
+
+  subroutine stub_design_get_values(this, values)
+    class(stub_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
+
+    if (this%size() .gt. 0) values%x(1:this%size()) = this%values%x(:)
+  end subroutine stub_design_get_values
+
+  !> Masks in place, exactly as `brinkman_design_t%update_design` does.
+  subroutine stub_design_update_design(this, values)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: values
+
+    if (this%size() .eq. 0) return
+    where (this%masked) values%x(1:this%size()) = 0.0_rp
+    this%values%x(:) = values%x(1:this%size())
+  end subroutine stub_design_update_design
+
+  subroutine stub_design_map_forward(this)
+    class(stub_design_t), intent(inout) :: this
+  end subroutine stub_design_map_forward
+
+  subroutine stub_design_map_backward(this, sensitivity)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: sensitivity
+  end subroutine stub_design_map_backward
+
+  subroutine stub_design_write(this, idx)
+    class(stub_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
+  end subroutine stub_design_write
+
+  ! ========================================================================== !
+  ! quad_obj_t
+
+  subroutine quad_obj_free(this)
+    class(quad_obj_t), intent(inout) :: this
+
+    call this%w%free()
+    call this%d%free()
+    call this%free_base()
+  end subroutine quad_obj_free
+
+  subroutine quad_obj_update_value(this, design)
+    class(quad_obj_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(vector_t) :: r
+
+    call r%init(design%size())
+    call design%get_values(r)
+    if (design%size() .gt. 0) r%x = r%x - this%d%x
+    this%value = vector_glsc3(this%w, r, r)
+    call r%free()
+  end subroutine quad_obj_update_value
+
+  subroutine quad_obj_update_sensitivity(this, design)
+    class(quad_obj_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(vector_t) :: r
+
+    call r%init(design%size())
+    call design%get_values(r)
+    if (design%size() .gt. 0) then
+       this%sensitivity%x = 2.0_rp * this%w%x * (r%x - this%d%x)
+    end if
+    call r%free()
+  end subroutine quad_obj_update_sensitivity
+
+  ! ========================================================================== !
+  ! (a) Trajectory: convergence to within 2*move_limit.min of clamp(d),
+  ! masked entries held at 0, bound-pinned entries stay pinned, and the
+  ! design keeps moving while far from the solution.
+
+  @test(npes=[2])
+  subroutine converges_near_clamped_target(this)
+    class(test_sd_convergence), intent(inout) :: this
+    integer, parameter :: n_iter = 45
+    real(kind=rp), parameter :: move_limit_min = 0.001_rp
+    type(json_file) :: parameters
+    class(objective_t), allocatable :: obj
+    real(kind=rp), allocatable :: w(:), d(:), x0(:)
+    logical, allocatable :: mask(:)
+    type(vector_t) :: x
+    integer :: n, iter
+    logical :: conv
+    real(kind=rp) :: iter1_change, local_err, global_err
+    real(kind=rp) :: local_pin_fail, global_pin_fail
+    real(kind=rp) :: local_mask_fail, global_mask_fail
+    real(kind=rp) :: target_e
+    real(kind=rp), parameter :: bound_tol = 10.0_rp * epsilon(1.0_rp)
+    integer :: i, ierr
+
+    ! Global layout (8 variables): 1-5 on rank 0, 6-8 on rank 1 -- an
+    ! uneven split.
+    !   1: interior, oscillates.            5: d < xmin, pins at xmin.
+    !   2: interior, oscillates.            6: starts exactly at d (no move).
+    !   3: interior.                        7: interior, oscillates.
+    !   4: d > xmax, pins at xmax.          8: masked (w = d = 0 too).
+    if (pe_rank .eq. 0) then
+       n = 5
+       w = [5.0_rp, 3.0_rp, 1.0_rp, 2.0_rp, 1.5_rp]
+       d = [0.437_rp, 0.61_rp, 0.3_rp, 1.4_rp, -0.5_rp]
+       x0 = [0.9_rp, 0.2_rp, 0.5_rp, 0.75_rp, 0.3_rp]
+       mask = [.false., .false., .false., .false., .false.]
+    else
+       n = 3
+       w = [1.0_rp, 0.8_rp, 0.0_rp]
+       d = [0.2_rp, 0.65_rp, 0.0_rp]
+       x0 = [0.2_rp, 0.1_rp, 0.0_rp]
+       mask = [.false., .false., .true.]
+    end if
+
+    call this%des%init(x0, mask)
+
+    call parameters%initialize()
+    call parameters%load_from_string('{"optimization": {"solver": ' // &
+         '{"type": "steepest_descent", "enable_output": false}}}')
+
+    call this%prob%init(parameters, this%des)
+    allocate(quad_obj_t :: obj)
+    select type (q => obj)
+    type is (quad_obj_t)
+       call q%init_base('quadratic', n, 1.0_rp)
+       call q%w%init(n)
+       call q%d%init(n)
+       if (n .gt. 0) then
+          q%w%x = w
+          q%d%x = d
+       end if
+    end select
+    call this%prob%add_objective(obj)
+
+    call optimizer_factory(this%opt, parameters, this%prob, this%des)
+    call parameters%destroy()
+
+    call x%init(n)
+
+    call this%opt%initialize(this%prob, this%des)
+    iter1_change = -1.0_rp
+    do iter = 1, n_iter
+       conv = this%opt%step(iter, this%prob, this%des)
+       if (iter .eq. 1) iter1_change = this%opt%max_design_change
+    end do
+
+    ! --------------------------------------------------------------------- !
+    ! Collective work first: reduce every local check to one global scalar.
+
+    call this%des%get_values(x)
+    call x%copy_from(DEVICE_TO_HOST, .true.)
+
+    local_err = 0.0_rp
+    local_pin_fail = 0.0_rp
+    local_mask_fail = 0.0_rp
+    do i = 1, n
+       if (mask(i)) then
+          if (abs(x%x(i)) .gt. bound_tol) local_mask_fail = 1.0_rp
+          cycle
+       end if
+       target_e = min(1.0_rp, max(0.0_rp, d(i)))
+       local_err = max(local_err, abs(x%x(i) - target_e))
+    end do
+    ! Rank 0's entries 4 and 5 (indices 4, 5) must sit exactly on a bound.
+    if (pe_rank .eq. 0) then
+       if (abs(x%x(4) - 1.0_rp) .gt. bound_tol) local_pin_fail = 1.0_rp
+       if (abs(x%x(5) - 0.0_rp) .gt. bound_tol) local_pin_fail = 1.0_rp
+    end if
+
+    call MPI_Allreduce(local_err, global_err, 1, MPI_REAL_PRECISION%mpi_val, &
+         MPI_MAX, NEKO_COMM%mpi_val, ierr)
+    call MPI_Allreduce(local_pin_fail, global_pin_fail, 1, &
+         MPI_REAL_PRECISION%mpi_val, MPI_MAX, NEKO_COMM%mpi_val, ierr)
+    call MPI_Allreduce(local_mask_fail, global_mask_fail, 1, &
+         MPI_REAL_PRECISION%mpi_val, MPI_MAX, NEKO_COMM%mpi_val, ierr)
+
+    ! --------------------------------------------------------------------- !
+    ! Assert only now, identically on every rank.
+
+    @assertTrue(iter1_change .gt. 1.0e-6_rp, &
+         'design should still be moving after the first step')
+    @assertLessThanOrEqual(global_err, 2.0_rp * move_limit_min, &
+         'after 45 iterations x should be within 2*move_limit.min of &
+         &clamp(d)')
+    @assertEqual(0.0_rp, global_pin_fail, 0.0_rp, &
+         'a variable with d outside the box should pin exactly on its bound')
+    @assertEqual(0.0_rp, global_mask_fail, 0.0_rp, &
+         'a masked variable must stay exactly 0')
+
+    call x%free()
+  end subroutine converges_near_clamped_target
+
+  ! ========================================================================== !
+  ! (b) Zero projected gradient: every d_e lies beyond the bound that x
+  ! already sits on, so D22 zeroes the direction everywhere. Rank 1 holds no
+  ! variables at all, exercising the n = 0 paths.
+
+  @test(npes=[2])
+  subroutine zero_gradient_is_a_kkt_point(this)
+    class(test_sd_convergence), intent(inout) :: this
+    type(json_file) :: parameters
+    class(objective_t), allocatable :: obj
+    real(kind=rp), allocatable :: w(:), d(:), x0(:)
+    logical, allocatable :: mask(:)
+    type(vector_t) :: x_before, x_after
+    integer :: n, i, ierr
+    logical :: conv
+    real(kind=rp) :: local_diff, global_diff
+
+    if (pe_rank .eq. 0) then
+       n = 3
+       w = [2.0_rp, 1.0_rp, 3.0_rp]
+       d = [1.5_rp, -0.5_rp, 2.0_rp]
+       x0 = [1.0_rp, 0.0_rp, 1.0_rp]
+       mask = [.false., .false., .false.]
+    else
+       n = 0
+       allocate(w(0), d(0), x0(0), mask(0))
+    end if
+
+    call this%des%init(x0, mask)
+
+    call parameters%initialize()
+    call parameters%load_from_string('{"optimization": {"solver": ' // &
+         '{"type": "steepest_descent", "enable_output": false}}}')
+
+    call this%prob%init(parameters, this%des)
+    allocate(quad_obj_t :: obj)
+    select type (q => obj)
+    type is (quad_obj_t)
+       call q%init_base('quadratic', n, 1.0_rp)
+       call q%w%init(n)
+       call q%d%init(n)
+       if (n .gt. 0) then
+          q%w%x = w
+          q%d%x = d
+       end if
+    end select
+    call this%prob%add_objective(obj)
+
+    call optimizer_factory(this%opt, parameters, this%prob, this%des)
+    call parameters%destroy()
+
+    call x_before%init(n)
+    call x_after%init(n)
+    call this%des%get_values(x_before)
+    call x_before%copy_from(DEVICE_TO_HOST, .true.)
+
+    call this%opt%initialize(this%prob, this%des)
+    conv = this%opt%step(1, this%prob, this%des)
+
+    call this%des%get_values(x_after)
+    call x_after%copy_from(DEVICE_TO_HOST, .true.)
+
+    local_diff = 0.0_rp
+    do i = 1, n
+       local_diff = max(local_diff, abs(x_after%x(i) - x_before%x(i)))
+    end do
+    call MPI_Allreduce(local_diff, global_diff, 1, MPI_REAL_PRECISION%mpi_val, &
+         MPI_MAX, NEKO_COMM%mpi_val, ierr)
+
+    @assertTrue(conv, &
+         'a zero bound-projected gradient is a KKT point: step() must &
+         &report convergence')
+    @assertEqual(0.0_rp, global_diff, 0.0_rp, &
+         'the design must be bitwise unchanged at a KKT point')
+    @assertEqual(0.0_rp, this%opt%max_design_change, 0.0_rp, &
+         'max design change must be exactly 0 at a KKT point')
+    @assertEqual(0.0_rp, this%opt%norm2_design_change, 0.0_rp, &
+         'the L2 design change must be exactly 0 at a KKT point')
+
+    call x_before%free()
+    call x_after%free()
+  end subroutine zero_gradient_is_a_kkt_point
+
+  ! ========================================================================== !
+  ! (c) CSV fix (e5cf65b): a continuation parameter registered from the
+  ! test, read back from the last row of optimization_data.csv. Before the
+  ! fix the first continuation column was always 0 and the write went one
+  ! element past the log row.
+
+  @test(npes=[2])
+  subroutine csv_log_continuation_column(this)
+    class(test_sd_convergence), intent(inout) :: this
+    real(kind=rp), target :: cont_target
+    real(kind=rp) :: cont_initial
+    real(kind=rp), allocatable :: w(:), d(:), x0(:)
+    logical, allocatable :: mask(:)
+    type(json_file) :: parameters
+    class(objective_t), allocatable :: obj
+    integer :: n, csv_unit, ios, pos, ierr
+    character(len=4096) :: line, last_line
+    real(kind=rp) :: read_val
+
+    cont_target = 0.0_rp
+
+    if (pe_rank .eq. 0) then
+       n = 2
+       w = [1.0_rp, 1.0_rp]
+       d = [0.5_rp, 0.6_rp]
+       x0 = [0.0_rp, 0.0_rp]
+       mask = [.false., .false.]
+    else
+       n = 1
+       w = [1.0_rp]
+       d = [0.7_rp]
+       x0 = [0.0_rp]
+       mask = [.false.]
+    end if
+
+    call this%des%init(x0, mask)
+
+    call parameters%initialize()
+    call parameters%load_from_string('{"optimization": {"cont_param": ' // &
+         '[10.0, 20.0, 30.0, 40.0], "solver": {"type": ' // &
+         '"steepest_descent", "enable_output": true, "max_iterations": 4}}}')
+
+    call nekotop_continuation%init(parameters)
+    call nekotop_continuation%json_get_or_register(parameters, &
+         'optimization.cont_param', cont_target, cont_initial)
+    cont_target = cont_initial
+
+    call this%prob%init(parameters, this%des)
+    allocate(quad_obj_t :: obj)
+    select type (q => obj)
+    type is (quad_obj_t)
+       call q%init_base('quadratic', n, 1.0_rp)
+       call q%w%init(n)
+       call q%d%init(n)
+       if (n .gt. 0) then
+          q%w%x = w
+          q%d%x = d
+       end if
+    end select
+    call this%prob%add_objective(obj)
+
+    call optimizer_factory(this%opt, parameters, this%prob, this%des)
+    call parameters%destroy()
+
+    call this%opt%run(this%prob, this%des)
+
+    ! Read the last row of the CSV on rank 0 and broadcast the result, so
+    ! every rank asserts the same, already-collective value.
+    read_val = 0.0_rp
+    if (pe_rank .eq. 0) then
+       last_line = ''
+       open(newunit = csv_unit, file = 'optimization_data.csv', &
+            status = 'old', action = 'read')
+       do
+          read(csv_unit, '(A)', iostat = ios) line
+          if (ios .ne. 0) exit
+          if (len_trim(line) .gt. 0) last_line = line
+       end do
+       close(csv_unit)
+
+       pos = index(trim(last_line), ',', back = .true.)
+       read(last_line(pos + 1:), *) read_val
+    end if
+    call MPI_Bcast(read_val, 1, MPI_REAL_PRECISION%mpi_val, 0, &
+         NEKO_COMM%mpi_val, ierr)
+
+    @assertEqual(40.0_rp, read_val, 1.0e-6_rp, &
+         'the last CSV row should carry the continuation target of the &
+         &final iteration (iteration 4 -> 40.0)')
+  end subroutine csv_log_continuation_column
+
+end module steepest_descent_convergence
