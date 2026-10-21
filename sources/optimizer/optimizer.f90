@@ -452,7 +452,7 @@ contains
     converged = .false.
 
     if (len_trim(this%restart_file) .gt. 0) then
-       call this%load_checkpoint(this%restart_file, design)
+       call this%load_checkpoint(design, this%restart_file)
     end if
 
     ! compute potential internals for for a potential restart
@@ -507,7 +507,7 @@ contains
        ! Save checkpoint if enabled
        if (this%checkpoint_interval .gt. 0 .and. &
             mod(this%current_iteration, this%checkpoint_interval) == 0) then
-          call this%save_checkpoint(design, .false., this%current_iteration)
+          call this%save_checkpoint(design, .false.)
        end if
 
        ! --------------------------------------------------------------------- !
@@ -802,19 +802,21 @@ contains
   !! @param this The optimizer object.
   !! @param design The design object.
   !! @param overwrite Whether to overwrite the file if it exists.
-  !! @param iter The iteration used to construct the checkpoint filename.
+  !! @param filename The name of the file to save the checkpoint to.
   !! @param path The path where the checkpoint file will be saved.
   !! @param basename The base name of the file to save the checkpoint.
   !! @param format The file format to use for the checkpoint file.
-  subroutine optimizer_save_checkpoint(this, design, overwrite, iter, &
-       path, basename, format)
+  !! @param iter The iteration used to construct the checkpoint filename.
+  subroutine optimizer_save_checkpoint(this, design, overwrite, filename, &
+       path, basename, format, iter)
     class(optimizer_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
     logical, intent(in) :: overwrite
-    integer, intent(in), optional :: iter
+    character(len=*), intent(in), optional :: filename
     character(len=*), intent(in), optional :: path
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
+    integer, intent(in), optional :: iter
     character(len=256) :: file_full, file_path
     character(len=12) :: suffix
     logical :: exist
@@ -823,7 +825,11 @@ contains
     call profiler_start_region('Optimizer save checkpoint')
 
     ! Create the fill filename and extract relevant components
-    file_full = checkpoint_filename(this, path, basename, format, iter)
+    if (present(filename)) then
+       file_full = trim(filename)
+    else
+       file_full = checkpoint_filename(this, path, basename, format, iter)
+    end if
     call filename_path(trim(file_full), file_path)
     call filename_suffix(trim(file_full), suffix)
 
@@ -867,20 +873,27 @@ contains
   !! @param path The path where the checkpoint file is located.
   !! @param basename The base name of the file to load the checkpoint from.
   !! @param format The file format to use for the checkpoint file.
-  subroutine optimizer_load_checkpoint(this, filename, design, &
+  subroutine optimizer_load_checkpoint(this, design, filename, &
        path, basename, format, iter)
-    class(optimizer_t), intent(inout) :: this
+       class(optimizer_t), intent(inout) :: this
+       class(design_t), intent(inout) :: design
     character(len=*), intent(in), optional :: filename
-    class(design_t), intent(inout) :: design
-    integer, intent(in), optional :: iter
     character(len=*), intent(in), optional :: path
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
+    integer, intent(in), optional :: iter
     character(len=256) :: file_full
     character(len=12) :: suffix
 
     call neko_log%section('Optimizer loading checkpoint')
     call profiler_start_region('Optimizer load checkpoint')
+
+    ! Check that the provided inputs are a valid combination.
+    if (present(filename) .and. (present(path) .or. present(basename) .or. &
+         present(format) .or. present(iter) )) then
+       call neko_error('optimizer: Cannot specify both filename and ' // &
+            'path/basename/format/iter for checkpoint loading.')
+    end if
 
     if (present(filename)) then
        file_full = trim(filename)

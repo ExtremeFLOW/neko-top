@@ -118,7 +118,7 @@ contains
        converged = opt%step(iter, prob, des, sim)
 
        if (iter .eq. max_iter / 2 ) then
-          call opt%save_checkpoint(iter, des, .true.)
+          call opt%save_checkpoint(des, .true.)
           call prob%get_objective_value(f_half)
           call des%get_values(x_half)
        end if
@@ -148,7 +148,7 @@ contains
     call prob%init(parameters, des, sim)
     call optimizer_factory(opt, parameters, prob, des, sim)
 
-    call opt%load_checkpoint(iter = iter0, design = des)
+    call opt%load_checkpoint(des, iter = iter0)
     call opt%initialize(prob, des, sim)
 
     ! ------------------------------------------------------------------------ !
