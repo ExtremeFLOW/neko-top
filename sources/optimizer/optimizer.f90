@@ -904,7 +904,7 @@ contains
     if (present(filename) .and. (present(path) .or. present(basename) .or. &
          present(format))) then
        call neko_error('optimizer: Cannot specify both filename and ' // &
-            'path/basename/format/iter for checkpoint loading.')
+            'path/basename/format for checkpoint loading.')
     else if (present(filename) .and. .not. present(iter)) then
        file_full = trim(filename)
     else if (present(iter) .and. .not. present(filename)) then
