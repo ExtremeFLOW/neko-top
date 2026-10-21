@@ -25,7 +25,8 @@ module steepest_descent_checkpoint
   use num_types, only: rp, dp, sp
   use json_module, only: json_file
   use vector, only: vector_t
-  use vector_math, only: vector_glsc3, vector_glsubnorm
+  use vector_math, only: vector_glsc3, vector_sub2, vector_cadd, &
+       vector_col3, vector_cmult
   use design, only: design_t
   use objective, only: objective_t
   use problem, only: problem_t
@@ -33,7 +34,7 @@ module steepest_descent_checkpoint
   use continuation_scheduler, only: nekotop_continuation
   use neko, only: neko_init
   use comm, only: pe_rank, pe_size, NEKO_COMM, MPI_REAL_PRECISION
-  use device, only: DEVICE_TO_HOST
+  use device, only: DEVICE_TO_HOST, HOST_TO_DEVICE
   use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
   use utils, only: neko_error
@@ -85,6 +86,11 @@ module steepest_descent_checkpoint
      type(stub_design_t) :: des
      type(problem_t) :: prob
      class(optimizer_t), allocatable :: opt
+     !> Final designs of runs A and B. Type components, not test-body
+     !! locals, so tearDown frees them even on a failing assertion's early
+     !! return (see steepest_descent_convergence.pf for why a leaked
+     !! vector_t's device mapping corrupts a later, unrelated vector_t).
+     type(vector_t) :: x_a, x_b
    contains
      procedure :: setUp
      procedure :: tearDown
@@ -119,6 +125,8 @@ contains
     end if
     call this%prob%free()
     call this%des%free()
+    call this%x_a%free()
+    call this%x_b%free()
     call nekotop_continuation%free()
   end subroutine tearDown
 
@@ -130,8 +138,7 @@ contains
     real(kind=rp), intent(in) :: x0(:)
 
     call this%init_base('sd_checkpoint_stub', size(x0))
-    call this%values%init(size(x0))
-    this%values%x = x0
+    this%values = x0
   end subroutine stub_design_init
 
   subroutine stub_design_free(this)
@@ -141,19 +148,28 @@ contains
     call this%free_base()
   end subroutine stub_design_free
 
+  !> Publishes `this%values` into the caller's vector: a host-side copy,
+  !! so the caller's device side must be refreshed afterward.
   subroutine stub_design_get_values(this, values)
     class(stub_design_t), intent(in) :: this
     type(vector_t), intent(inout) :: values
 
     if (this%size() .gt. 0) values%x(1:this%size()) = this%values%x(:)
+    call values%copy_from(HOST_TO_DEVICE, .true.)
   end subroutine stub_design_get_values
 
+  !> `values` arrives with device-side data current from the optimizer's
+  !! own device-dispatching update kernel, so it must be synced to host
+  !! before this reads it, and back to device afterward since the
+  !! optimizer immediately uses it again in a device-dispatching op.
   subroutine stub_design_update_design(this, values)
     class(stub_design_t), intent(inout) :: this
     type(vector_t), intent(inout) :: values
 
     if (this%size() .eq. 0) return
+    call values%copy_from(DEVICE_TO_HOST, .true.)
     this%values%x(:) = values%x(1:this%size())
+    call this%values%copy_from(HOST_TO_DEVICE, .true.)
   end subroutine stub_design_update_design
 
   subroutine stub_design_map_forward(this)
@@ -182,6 +198,11 @@ contains
     call this%free_base()
   end subroutine quad_obj_free
 
+  !> All device-dispatching vector_math ops (vector_glsc3 included), so
+  !! this is correct on both CPU and device builds without any manual
+  !! host/device copy: `r` is local scratch, freed within this same call so
+  !! there is no cross-test leak hazard the way there is for a `@test`
+  !! body's locals.
   subroutine quad_obj_update_value(this, design)
     class(quad_obj_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -193,7 +214,8 @@ contains
 
     call r%init(design%size())
     call design%get_values(r)
-    if (design%size() .gt. 0) r%x = r%x - this%d%x - s
+    call vector_sub2(r, this%d)
+    call vector_cadd(r, -s)
     this%value = vector_glsc3(this%w, r, r)
     call r%free()
   end subroutine quad_obj_update_value
@@ -209,9 +231,10 @@ contains
 
     call r%init(design%size())
     call design%get_values(r)
-    if (design%size() .gt. 0) then
-       this%sensitivity%x = 2.0_rp * this%w%x * (r%x - this%d%x - s)
-    end if
+    call vector_sub2(r, this%d)
+    call vector_cadd(r, -s)
+    call vector_col3(this%sensitivity, this%w, r)
+    call vector_cmult(this%sensitivity, 2.0_rp)
     call r%free()
   end subroutine quad_obj_update_sensitivity
 
@@ -222,14 +245,28 @@ contains
   ! if `delta` never moved away from its initial value, none of the
   ! "skip loading delta/xold1/xold2" mutations would be observable.
 
-  subroutine read_checkpoint_delta_min(filename, n, delta_min)
+  !> @param[out] ok .false. if the file, group or dataset could not be
+  !! opened, or the read failed -- in which case `delta_min` is left at a
+  !! visibly-invalid sentinel rather than whatever `buf` happens to hold
+  !! (under `-finit-real=snan`, reading an untouched `buf` is itself an
+  !! FPE trap, not just a wrong answer).
+  subroutine read_checkpoint_delta_min(filename, n, delta_min, ok)
     character(len=*), intent(in) :: filename
     integer, intent(in) :: n
     real(kind=rp), intent(out) :: delta_min
+    logical, intent(out) :: ok
     integer(hid_t) :: file_id, grp_id, dset_id, h5t_real
     integer(hsize_t) :: ddim(1)
     real(kind=rp) :: buf(n)
-    integer :: ierr
+    integer :: ierr, read_ierr
+    logical :: file_exists
+
+    ok = .false.
+    delta_min = huge(1.0_rp)
+    buf = huge(1.0_rp)
+
+    inquire(file = trim(filename), exist = file_exists)
+    if (.not. file_exists) return
 
     ddim(1) = int(n, hsize_t)
     call h5open_f(ierr)
@@ -247,15 +284,35 @@ contains
     end select
 
     call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr)
+    if (ierr .ne. 0) then
+       call h5close_f(ierr)
+       return
+    end if
+
     call h5gopen_f(file_id, '/SteepestDescent/checkpoint', grp_id, ierr)
+    if (ierr .ne. 0) then
+       call h5fclose_f(file_id, ierr)
+       call h5close_f(ierr)
+       return
+    end if
+
     call h5dopen_f(grp_id, 'delta', dset_id, ierr)
-    call h5dread_f(dset_id, h5t_real, buf, ddim, ierr)
+    if (ierr .ne. 0) then
+       call h5gclose_f(grp_id, ierr)
+       call h5fclose_f(file_id, ierr)
+       call h5close_f(ierr)
+       return
+    end if
+
+    call h5dread_f(dset_id, h5t_real, buf, ddim, read_ierr)
     call h5dclose_f(dset_id, ierr)
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5close_f(ierr)
+    if (read_ierr .ne. 0) return
 
     delta_min = minval(buf)
+    ok = .true.
   end subroutine read_checkpoint_delta_min
 
   ! ========================================================================== !
@@ -270,9 +327,8 @@ contains
     real(kind=rp), allocatable :: w(:), d(:), x0(:)
     real(kind=rp), target :: shift_var
     real(kind=rp) :: cont_initial
-    integer :: n, iter, ierr
-    logical :: conv
-    type(vector_t) :: x_a, x_b
+    integer :: n, iter, ierr, ok_flag
+    logical :: conv, delta_read_ok
     real(kind=rp) :: delta_min, local_diff, global_diff
     integer :: i
     character(len=*), parameter :: json_str = &
@@ -320,12 +376,11 @@ contains
     select type (q => obj)
     type is (quad_obj_t)
        call q%init_base('quadratic', n, 1.0_rp)
-       call q%w%init(n)
-       call q%d%init(n)
-       if (n .gt. 0) then
-          q%w%x = w
-          q%d%x = d
-       end if
+       ! The overloaded vector_t assignment allocates and syncs the
+       ! device side in one step (vector_assign_array), unlike a raw
+       ! `%x = w` write, which would leave the device side stale.
+       q%w = w
+       q%d = d
        q%shift => shift_var
     end select
     call this%prob%add_objective(obj)
@@ -335,20 +390,31 @@ contains
 
     call this%opt%run(this%prob, this%des)
 
-    call x_a%init(n)
-    call this%des%get_values(x_a)
-    call x_a%copy_from(DEVICE_TO_HOST, .true.)
+    call this%x_a%init(n)
+    call this%des%get_values(this%x_a)
+    call this%x_a%copy_from(DEVICE_TO_HOST, .true.)
 
     ! Guard against a vacuous pass: delta must really have shrunk below its
     ! initial value by iteration 6, or the "skip loading delta" mutation
     ! would be invisible to the final comparison below. Read serially on
-    ! rank 0, broadcast the result.
-    delta_min = move_limit_initial
+    ! rank 0, broadcast the result. A failed read reports a clear
+    ! assertion rather than comparing whatever `delta_min` happened to
+    ! hold (which, under `-finit-real=snan`, is itself an FPE trap).
+    delta_min = huge(1.0_rp)
+    delta_read_ok = .false.
     if (pe_rank .eq. 0) then
-       call read_checkpoint_delta_min(CKPT_ITER6, N_GLOBAL, delta_min)
+       call read_checkpoint_delta_min(CKPT_ITER6, N_GLOBAL, delta_min, &
+            delta_read_ok)
     end if
     call MPI_Bcast(delta_min, 1, MPI_REAL_PRECISION%mpi_val, 0, &
          NEKO_COMM%mpi_val, ierr)
+    ok_flag = 0
+    if (delta_read_ok) ok_flag = 1
+    call MPI_Bcast(ok_flag, 1, MPI_INTEGER, 0, NEKO_COMM%mpi_val, ierr)
+
+    @assertEqual(1, ok_flag, &
+         'could not read delta back from the iteration-6 checkpoint &
+         &(the file, group or dataset is missing, or the read failed)')
     @assertTrue(delta_min .lt. move_limit_initial, &
          'the move limit should have shrunk below its initial value by &
          &iteration 6, or the delta checkpoint is not being exercised')
@@ -387,12 +453,11 @@ contains
     select type (q => obj)
     type is (quad_obj_t)
        call q%init_base('quadratic', n, 1.0_rp)
-       call q%w%init(n)
-       call q%d%init(n)
-       if (n .gt. 0) then
-          q%w%x = w
-          q%d%x = d
-       end if
+       ! The overloaded vector_t assignment allocates and syncs the
+       ! device side in one step (vector_assign_array), unlike a raw
+       ! `%x = w` write, which would leave the device side stale.
+       q%w = w
+       q%d = d
        q%shift => shift_var
     end select
     call this%prob%add_objective(obj)
@@ -402,16 +467,16 @@ contains
 
     call this%opt%run(this%prob, this%des)
 
-    call x_b%init(n)
-    call this%des%get_values(x_b)
-    call x_b%copy_from(DEVICE_TO_HOST, .true.)
+    call this%x_b%init(n)
+    call this%des%get_values(this%x_b)
+    call this%x_b%copy_from(DEVICE_TO_HOST, .true.)
 
     ! --------------------------------------------------------------------- !
     ! Compare: on CPU the two final designs must be bitwise identical.
 
     local_diff = 0.0_rp
     do i = 1, n
-       local_diff = max(local_diff, abs(x_b%x(i) - x_a%x(i)))
+       local_diff = max(local_diff, abs(this%x_b%x(i) - this%x_a%x(i)))
     end do
     call MPI_Allreduce(local_diff, global_diff, 1, &
          MPI_REAL_PRECISION%mpi_val, MPI_MAX, NEKO_COMM%mpi_val, ierr)
@@ -419,9 +484,6 @@ contains
     @assertEqual(0.0_rp, global_diff, 0.0_rp, &
          'the restarted run should reproduce the original run bitwise on &
          &CPU')
-
-    call x_a%free()
-    call x_b%free()
   end subroutine restart_matches_original_run
 
 end module steepest_descent_checkpoint

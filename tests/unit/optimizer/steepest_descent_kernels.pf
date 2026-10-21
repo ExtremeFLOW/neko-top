@@ -35,6 +35,16 @@ module steepest_descent_kernels
 
   @TestCase
   type, extends(MPITestCase) :: test_sd_kernels
+     !> Generic scratch vector_t slots, reused (with different meanings)
+     !! across the four tests below. Type components, not test-body
+     !! locals, so tearDown frees them even when a failing assertion
+     !! returns the test early: a local vector_t's allocatable `%x` is
+     !! deallocated by Fortran on scope exit without ever calling
+     !! `device_unmap`, which leaves a stale entry in the device address
+     !! table keyed by that (now-reusable) host address -- and a *later*
+     !! vector_t handed that same address then fails its own, correct
+     !! device_unmap with "Inconsistent host/device mapping state".
+     type(vector_t) :: v1, v2, v3, v4, v5, v6, v7, v8
    contains
      procedure :: setUp
      procedure :: tearDown
@@ -57,6 +67,14 @@ contains
   subroutine tearDown(this)
     class(test_sd_kernels), intent(inout) :: this
 
+    call this%v1%free()
+    call this%v2%free()
+    call this%v3%free()
+    call this%v4%free()
+    call this%v5%free()
+    call this%v6%free()
+    call this%v7%free()
+    call this%v8%free()
     if (NEKO_BCKND_DEVICE .eq. 1) call device_finalize
   end subroutine tearDown
 
@@ -73,7 +91,6 @@ contains
     real(kind=rp) :: xmin, xmax
     real(kind=rp) :: g(n), x(n), expected(n)
     real(kind=rp) :: s_c(n), x_c(n)
-    type(vector_t) :: s_v, x_v
 
     xmin = 0.0_rp
     xmax = 1.0_rp
@@ -87,20 +104,17 @@ contains
     expected = [ 0.0_rp,  2.0_rp,  0.0_rp, -3.0_rp, -4.0_rp,  1.5_rp]
 
     ! Dispatch path (steepest_descent_math), through a vector_t.
-    s_v = g
-    x_v = x
-    call sd_direction(s_v, x_v, xmin, xmax)
-    call s_v%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual(expected, s_v%x(1:n), tol, 'dispatch D22 mismatch')
+    this%v1 = g
+    this%v2 = x
+    call sd_direction(this%v1, this%v2, xmin, xmax)
+    call this%v1%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expected, this%v1%x(1:n), tol, 'dispatch D22 mismatch')
 
     ! Direct CPU kernel, on plain arrays.
     s_c = g
     x_c = x
     call sd_direction_cpu(s_c, x_c, xmin, xmax, n)
     @assertEqual(expected, s_c, tol, 'cpu D22 mismatch')
-
-    call s_v%free()
-    call x_v%free()
   end subroutine d22_projects_at_bounds
 
   ! ========================================================================== !
@@ -114,7 +128,6 @@ contains
     real(kind=rp) :: dec, inc, dmin, dmax
     real(kind=rp) :: x(n), x1(n), x2(n), delta0(n), expected(n)
     real(kind=rp) :: delta_c(n)
-    type(vector_t) :: delta_v, x_v, x1_v, x2_v
 
     dec = 0.7_rp
     inc = 1.1_rp
@@ -134,23 +147,19 @@ contains
     expected = [0.055_rp, 0.035_rp, 0.05_rp, 0.2_rp, 0.01_rp]
 
     ! Dispatch path.
-    delta_v = delta0
-    x_v = x
-    x1_v = x1
-    x2_v = x2
-    call sd_update_move_limits(delta_v, x_v, x1_v, x2_v, dec, inc, dmin, dmax)
-    call delta_v%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual(expected, delta_v%x(1:n), tol, 'dispatch D23 mismatch')
+    this%v1 = delta0
+    this%v2 = x
+    this%v3 = x1
+    this%v4 = x2
+    call sd_update_move_limits(this%v1, this%v2, this%v3, this%v4, dec, &
+         inc, dmin, dmax)
+    call this%v1%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expected, this%v1%x(1:n), tol, 'dispatch D23 mismatch')
 
     ! Direct CPU kernel.
     delta_c = delta0
     call sd_update_move_limits_cpu(delta_c, x, x1, x2, dec, inc, dmin, dmax, n)
     @assertEqual(expected, delta_c, tol, 'cpu D23 mismatch')
-
-    call delta_v%free()
-    call x_v%free()
-    call x1_v%free()
-    call x2_v%free()
   end subroutine d23_branches_and_clamps
 
   ! ========================================================================== !
@@ -165,12 +174,10 @@ contains
     real(kind=rp) :: psi, smax, xmin, xmax
     real(kind=rp) :: x(n), s(n), delta(n), expected(n)
     real(kind=rp) :: x_new_c(n)
-    type(vector_t) :: x_v, s_v, delta_v, x_new_v
 
     ! Case e: a single point with a non-default box, its own call below.
     real(kind=rp) :: xe, se, deltae, xmine, xmaxe, expectede
     real(kind=rp) :: x_new_e_c(1)
-    type(vector_t) :: xe_v, se_v, deltae_v, x_new_e_v
 
     psi = 1.0_rp
     smax = 10.0_rp
@@ -191,22 +198,18 @@ contains
     expected = [0.55_rp, 1.0_rp, 0.52_rp, 0.0_rp]
 
     ! Dispatch path.
-    x_v = x
-    s_v = s
-    delta_v = delta
-    call x_new_v%init(n)
-    call sd_update_design(x_new_v, x_v, s_v, delta_v, psi, smax, xmin, xmax)
-    call x_new_v%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual(expected, x_new_v%x(1:n), tol, 'dispatch D24 mismatch')
+    this%v1 = x
+    this%v2 = s
+    this%v3 = delta
+    call this%v4%init(n)
+    call sd_update_design(this%v4, this%v1, this%v2, this%v3, psi, smax, &
+         xmin, xmax)
+    call this%v4%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expected, this%v4%x(1:n), tol, 'dispatch D24 mismatch')
 
     ! Direct CPU kernel.
     call sd_update_design_cpu(x_new_c, x, s, delta, psi, smax, xmin, xmax, n)
     @assertEqual(expected, x_new_c, tol, 'cpu D24 mismatch')
-
-    call x_v%free()
-    call s_v%free()
-    call delta_v%free()
-    call x_new_v%free()
 
     ! Case e: non-default box, xmin = 0.2, xmax = 0.8. Raw step = 0.75 +
     ! 1.0 = 1.75; move-limited to 0.85; box clamps down to xmax = 0.8.
@@ -217,23 +220,18 @@ contains
     deltae = 0.1_rp
     expectede = 0.8_rp
 
-    xe_v = [xe]
-    se_v = [se]
-    deltae_v = [deltae]
-    call x_new_e_v%init(1)
-    call sd_update_design(x_new_e_v, xe_v, se_v, deltae_v, psi, smax, &
+    this%v5 = [xe]
+    this%v6 = [se]
+    this%v7 = [deltae]
+    call this%v8%init(1)
+    call sd_update_design(this%v8, this%v5, this%v6, this%v7, psi, smax, &
          xmine, xmaxe)
-    call x_new_e_v%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual(expectede, x_new_e_v%x(1), tol, 'dispatch D24 case e')
+    call this%v8%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(expectede, this%v8%x(1), tol, 'dispatch D24 case e')
 
     call sd_update_design_cpu(x_new_e_c, [xe], [se], [deltae], psi, smax, &
          xmine, xmaxe, 1)
     @assertEqual(expectede, x_new_e_c(1), tol, 'cpu D24 case e')
-
-    call xe_v%free()
-    call se_v%free()
-    call deltae_v%free()
-    call x_new_e_v%free()
   end subroutine d24_move_limit_and_box_cases
 
   ! ========================================================================== !
@@ -245,40 +243,32 @@ contains
     class(test_sd_kernels), intent(inout) :: this
     integer, parameter :: n = 3
     real(kind=rp), parameter :: sentinel = -999.0_rp
-    type(vector_t) :: s_v, x_v, x1_v, x2_v, delta_v, x_new_v
     real(kind=rp) :: g(n)
 
     g = [1.0_rp, 2.0_rp, 3.0_rp]
-    s_v = g
-    x_v = [0.0_rp, 0.5_rp, 1.0_rp]
-    x1_v = x_v
-    x2_v = x_v
-    delta_v = [0.1_rp, 0.1_rp, 0.1_rp]
-    call x_new_v%init(n)
-    x_new_v = [sentinel, sentinel, sentinel]
+    this%v1 = g
+    this%v2 = [0.0_rp, 0.5_rp, 1.0_rp]
+    this%v3 = this%v2
+    this%v4 = this%v2
+    this%v5 = [0.1_rp, 0.1_rp, 0.1_rp]
+    call this%v6%init(n)
+    this%v6 = [sentinel, sentinel, sentinel]
 
-    call sd_direction(s_v, x_v, 0.0_rp, 1.0_rp, n = 0)
-    call s_v%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual(g, s_v%x(1:n), 0.0_rp, 'n=0 sd_direction touched s')
+    call sd_direction(this%v1, this%v2, 0.0_rp, 1.0_rp, n = 0)
+    call this%v1%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual(g, this%v1%x(1:n), 0.0_rp, 'n=0 sd_direction touched s')
 
-    call sd_update_move_limits(delta_v, x_v, x1_v, x2_v, 0.7_rp, 1.1_rp, &
-         0.01_rp, 0.2_rp, n = 0)
-    call delta_v%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual([0.1_rp, 0.1_rp, 0.1_rp], delta_v%x(1:n), 0.0_rp, &
+    call sd_update_move_limits(this%v5, this%v2, this%v3, this%v4, 0.7_rp, &
+         1.1_rp, 0.01_rp, 0.2_rp, n = 0)
+    call this%v5%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual([0.1_rp, 0.1_rp, 0.1_rp], this%v5%x(1:n), 0.0_rp, &
          'n=0 sd_update_move_limits touched delta')
 
-    call sd_update_design(x_new_v, x_v, s_v, delta_v, 1.0_rp, 10.0_rp, &
-         0.0_rp, 1.0_rp, n = 0)
-    call x_new_v%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual([sentinel, sentinel, sentinel], x_new_v%x(1:n), 0.0_rp, &
+    call sd_update_design(this%v6, this%v2, this%v1, this%v5, 1.0_rp, &
+         10.0_rp, 0.0_rp, 1.0_rp, n = 0)
+    call this%v6%copy_from(DEVICE_TO_HOST, .true.)
+    @assertEqual([sentinel, sentinel, sentinel], this%v6%x(1:n), 0.0_rp, &
          'n=0 sd_update_design touched x_new')
-
-    call s_v%free()
-    call x_v%free()
-    call x1_v%free()
-    call x2_v%free()
-    call delta_v%free()
-    call x_new_v%free()
   end subroutine dispatch_handles_n_zero
 
 end module steepest_descent_kernels

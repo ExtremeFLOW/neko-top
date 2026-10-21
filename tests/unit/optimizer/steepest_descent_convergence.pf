@@ -21,7 +21,7 @@ module steepest_descent_convergence
   use num_types, only: rp
   use json_module, only: json_file
   use vector, only: vector_t
-  use vector_math, only: vector_glsc3
+  use vector_math, only: vector_glsc3, vector_sub2, vector_col3, vector_cmult
   use design, only: design_t
   use objective, only: objective_t
   use problem, only: problem_t
@@ -29,7 +29,7 @@ module steepest_descent_convergence
   use continuation_scheduler, only: nekotop_continuation
   use neko, only: neko_init
   use comm, only: pe_rank, pe_size, NEKO_COMM, MPI_REAL_PRECISION
-  use device, only: DEVICE_TO_HOST
+  use device, only: DEVICE_TO_HOST, HOST_TO_DEVICE
 
   implicit none
 
@@ -68,6 +68,16 @@ module steepest_descent_convergence
      type(stub_design_t) :: des
      type(problem_t) :: prob
      class(optimizer_t), allocatable :: opt
+     !> Scratch vectors used by individual tests. Kept as type components,
+     !! not test-body locals, so tearDown frees them even when a failing
+     !! assertion returns the test early: a local vector_t's allocatable
+     !! `%x` is deallocated by Fortran on scope exit without ever calling
+     !! `device_unmap`, which leaves a stale entry in the device address
+     !! table keyed by that (now-reusable) host address -- and the *next*
+     !! test's unrelated vector_t can then be handed that same address and
+     !! fail its own, correct device_unmap with "Inconsistent host/device
+     !! mapping state" (seen on the CUDA build).
+     type(vector_t) :: x1, x2
    contains
      procedure :: setUp
      procedure :: tearDown
@@ -96,6 +106,8 @@ contains
     end if
     call this%prob%free()
     call this%des%free()
+    call this%x1%free()
+    call this%x2%free()
     call nekotop_continuation%free()
   end subroutine tearDown
 
@@ -108,11 +120,11 @@ contains
     logical, intent(in) :: masked(:)
 
     call this%init_base('stub_design', size(x0))
-    call this%values%init(size(x0))
+    this%values = x0
     allocate(this%masked(size(x0)))
     this%masked = masked
-    this%values%x = x0
     where (this%masked) this%values%x = 0.0_rp
+    call this%values%copy_from(HOST_TO_DEVICE, .true.)
   end subroutine stub_design_init
 
   subroutine stub_design_free(this)
@@ -123,21 +135,35 @@ contains
     call this%free_base()
   end subroutine stub_design_free
 
+  !> Publishes `this%values` (kept host+device coherent) into the caller's
+  !! vector: a host-side copy, so the caller's device side must be
+  !! explicitly refreshed afterward -- it is read on a device build by
+  !! whichever device-dispatching op the caller applies next (e.g.
+  !! `sd_direction`).
   subroutine stub_design_get_values(this, values)
     class(stub_design_t), intent(in) :: this
     type(vector_t), intent(inout) :: values
 
     if (this%size() .gt. 0) values%x(1:this%size()) = this%values%x(:)
+    call values%copy_from(HOST_TO_DEVICE, .true.)
   end subroutine stub_design_get_values
 
   !> Masks in place, exactly as `brinkman_design_t%update_design` does.
+  !! `values` arrives with device-side data current from the optimizer's
+  !! own device-dispatching update kernel, so it must be synced to host
+  !! before this reads it, and back to device afterward since the
+  !! optimizer immediately uses it again in a device-dispatching op
+  !! (`vector_sub3`, to compute the design-change metrics).
   subroutine stub_design_update_design(this, values)
     class(stub_design_t), intent(inout) :: this
     type(vector_t), intent(inout) :: values
 
     if (this%size() .eq. 0) return
+    call values%copy_from(DEVICE_TO_HOST, .true.)
     where (this%masked) values%x(1:this%size()) = 0.0_rp
     this%values%x(:) = values%x(1:this%size())
+    call values%copy_from(HOST_TO_DEVICE, .true.)
+    call this%values%copy_from(HOST_TO_DEVICE, .true.)
   end subroutine stub_design_update_design
 
   subroutine stub_design_map_forward(this)
@@ -165,6 +191,11 @@ contains
     call this%free_base()
   end subroutine quad_obj_free
 
+  !> All device-dispatching vector_math ops (vector_glsc3 included), so
+  !! this is correct on both CPU and device builds without any manual
+  !! host/device copy: `r` is local scratch, freed within this same call so
+  !! there is no cross-test leak hazard the way there is for a `@test`
+  !! body's locals.
   subroutine quad_obj_update_value(this, design)
     class(quad_obj_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -172,7 +203,7 @@ contains
 
     call r%init(design%size())
     call design%get_values(r)
-    if (design%size() .gt. 0) r%x = r%x - this%d%x
+    call vector_sub2(r, this%d)
     this%value = vector_glsc3(this%w, r, r)
     call r%free()
   end subroutine quad_obj_update_value
@@ -184,9 +215,9 @@ contains
 
     call r%init(design%size())
     call design%get_values(r)
-    if (design%size() .gt. 0) then
-       this%sensitivity%x = 2.0_rp * this%w%x * (r%x - this%d%x)
-    end if
+    call vector_sub2(r, this%d)
+    call vector_col3(this%sensitivity, this%w, r)
+    call vector_cmult(this%sensitivity, 2.0_rp)
     call r%free()
   end subroutine quad_obj_update_sensitivity
 
@@ -204,7 +235,6 @@ contains
     class(objective_t), allocatable :: obj
     real(kind=rp), allocatable :: w(:), d(:), x0(:)
     logical, allocatable :: mask(:)
-    type(vector_t) :: x
     integer :: n, iter
     logical :: conv
     real(kind=rp) :: iter1_change, local_err, global_err
@@ -245,19 +275,18 @@ contains
     select type (q => obj)
     type is (quad_obj_t)
        call q%init_base('quadratic', n, 1.0_rp)
-       call q%w%init(n)
-       call q%d%init(n)
-       if (n .gt. 0) then
-          q%w%x = w
-          q%d%x = d
-       end if
+       ! The overloaded vector_t assignment allocates and syncs the
+       ! device side in one step (vector_assign_array), unlike a raw
+       ! `%x = w` write, which would leave the device side stale.
+       q%w = w
+       q%d = d
     end select
     call this%prob%add_objective(obj)
 
     call optimizer_factory(this%opt, parameters, this%prob, this%des)
     call parameters%destroy()
 
-    call x%init(n)
+    call this%x1%init(n)
 
     call this%opt%initialize(this%prob, this%des)
     iter1_change = -1.0_rp
@@ -269,24 +298,24 @@ contains
     ! --------------------------------------------------------------------- !
     ! Collective work first: reduce every local check to one global scalar.
 
-    call this%des%get_values(x)
-    call x%copy_from(DEVICE_TO_HOST, .true.)
+    call this%des%get_values(this%x1)
+    call this%x1%copy_from(DEVICE_TO_HOST, .true.)
 
     local_err = 0.0_rp
     local_pin_fail = 0.0_rp
     local_mask_fail = 0.0_rp
     do i = 1, n
        if (mask(i)) then
-          if (abs(x%x(i)) .gt. bound_tol) local_mask_fail = 1.0_rp
+          if (abs(this%x1%x(i)) .gt. bound_tol) local_mask_fail = 1.0_rp
           cycle
        end if
        target_e = min(1.0_rp, max(0.0_rp, d(i)))
-       local_err = max(local_err, abs(x%x(i) - target_e))
+       local_err = max(local_err, abs(this%x1%x(i) - target_e))
     end do
     ! Rank 0's entries 4 and 5 (indices 4, 5) must sit exactly on a bound.
     if (pe_rank .eq. 0) then
-       if (abs(x%x(4) - 1.0_rp) .gt. bound_tol) local_pin_fail = 1.0_rp
-       if (abs(x%x(5) - 0.0_rp) .gt. bound_tol) local_pin_fail = 1.0_rp
+       if (abs(this%x1%x(4) - 1.0_rp) .gt. bound_tol) local_pin_fail = 1.0_rp
+       if (abs(this%x1%x(5) - 0.0_rp) .gt. bound_tol) local_pin_fail = 1.0_rp
     end if
 
     call MPI_Allreduce(local_err, global_err, 1, MPI_REAL_PRECISION%mpi_val, &
@@ -308,8 +337,6 @@ contains
          'a variable with d outside the box should pin exactly on its bound')
     @assertEqual(0.0_rp, global_mask_fail, 0.0_rp, &
          'a masked variable must stay exactly 0')
-
-    call x%free()
   end subroutine converges_near_clamped_target
 
   ! ========================================================================== !
@@ -324,7 +351,6 @@ contains
     class(objective_t), allocatable :: obj
     real(kind=rp), allocatable :: w(:), d(:), x0(:)
     logical, allocatable :: mask(:)
-    type(vector_t) :: x_before, x_after
     integer :: n, i, ierr
     logical :: conv
     real(kind=rp) :: local_diff, global_diff
@@ -351,32 +377,31 @@ contains
     select type (q => obj)
     type is (quad_obj_t)
        call q%init_base('quadratic', n, 1.0_rp)
-       call q%w%init(n)
-       call q%d%init(n)
-       if (n .gt. 0) then
-          q%w%x = w
-          q%d%x = d
-       end if
+       ! The overloaded vector_t assignment allocates and syncs the
+       ! device side in one step (vector_assign_array), unlike a raw
+       ! `%x = w` write, which would leave the device side stale.
+       q%w = w
+       q%d = d
     end select
     call this%prob%add_objective(obj)
 
     call optimizer_factory(this%opt, parameters, this%prob, this%des)
     call parameters%destroy()
 
-    call x_before%init(n)
-    call x_after%init(n)
-    call this%des%get_values(x_before)
-    call x_before%copy_from(DEVICE_TO_HOST, .true.)
+    call this%x1%init(n)
+    call this%x2%init(n)
+    call this%des%get_values(this%x1)
+    call this%x1%copy_from(DEVICE_TO_HOST, .true.)
 
     call this%opt%initialize(this%prob, this%des)
     conv = this%opt%step(1, this%prob, this%des)
 
-    call this%des%get_values(x_after)
-    call x_after%copy_from(DEVICE_TO_HOST, .true.)
+    call this%des%get_values(this%x2)
+    call this%x2%copy_from(DEVICE_TO_HOST, .true.)
 
     local_diff = 0.0_rp
     do i = 1, n
-       local_diff = max(local_diff, abs(x_after%x(i) - x_before%x(i)))
+       local_diff = max(local_diff, abs(this%x2%x(i) - this%x1%x(i)))
     end do
     call MPI_Allreduce(local_diff, global_diff, 1, MPI_REAL_PRECISION%mpi_val, &
          MPI_MAX, NEKO_COMM%mpi_val, ierr)
@@ -390,9 +415,6 @@ contains
          'max design change must be exactly 0 at a KKT point')
     @assertEqual(0.0_rp, this%opt%norm2_design_change, 0.0_rp, &
          'the L2 design change must be exactly 0 at a KKT point')
-
-    call x_before%free()
-    call x_after%free()
   end subroutine zero_gradient_is_a_kkt_point
 
   ! ========================================================================== !
@@ -447,12 +469,11 @@ contains
     select type (q => obj)
     type is (quad_obj_t)
        call q%init_base('quadratic', n, 1.0_rp)
-       call q%w%init(n)
-       call q%d%init(n)
-       if (n .gt. 0) then
-          q%w%x = w
-          q%d%x = d
-       end if
+       ! The overloaded vector_t assignment allocates and syncs the
+       ! device side in one step (vector_assign_array), unlike a raw
+       ! `%x = w` write, which would leave the device side stale.
+       q%w = w
+       q%d = d
     end select
     call this%prob%add_objective(obj)
 
