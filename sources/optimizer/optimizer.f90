@@ -147,6 +147,8 @@ module optimizer
      procedure, pass(this) :: free_base => optimizer_free_base
      !> Read settings from JSON parameters file
      procedure, pass(this) :: read_base_settings => optimizer_read_base_settings
+     !> Return the current iteration number.
+     procedure, pass(this) :: get_iteration => optimizer_get_iteration
      !> Print status message
      procedure, pass(this) :: print_status => optimizer_print_status
      !> Estimate if we are out of time
@@ -541,6 +543,16 @@ contains
   ! ========================================================================== !
   ! Helper routines
 
+  !> Get the current iteration number.
+  !! @param this The optimizer object.
+  !! @return The current iteration number.
+  pure function optimizer_get_iteration(this) result(iter)
+    class(optimizer_t), intent(in) :: this
+    integer :: iter
+
+    iter = this%current_iteration
+  end function optimizer_get_iteration
+
   !> Print status message
   !! Supported flags:
   !! 0: Converged successfully                       (SUCCESS)
@@ -875,8 +887,8 @@ contains
   !! @param format The file format to use for the checkpoint file.
   subroutine optimizer_load_checkpoint(this, design, filename, &
        path, basename, format, iter)
-       class(optimizer_t), intent(inout) :: this
-       class(design_t), intent(inout) :: design
+    class(optimizer_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
     character(len=*), intent(in), optional :: filename
     character(len=*), intent(in), optional :: path
     character(len=*), intent(in), optional :: basename
@@ -890,15 +902,16 @@ contains
 
     ! Check that the provided inputs are a valid combination.
     if (present(filename) .and. (present(path) .or. present(basename) .or. &
-         present(format) .or. present(iter) )) then
+         present(format))) then
        call neko_error('optimizer: Cannot specify both filename and ' // &
             'path/basename/format/iter for checkpoint loading.')
-    end if
-
-    if (present(filename)) then
+    else if (present(filename) .and. .not. present(iter)) then
        file_full = trim(filename)
-    else
+    else if (present(iter) .and. .not. present(filename)) then
        file_full = checkpoint_filename(this, path, basename, format, iter)
+    else
+       call neko_error('optimizer: Must specify either filename ' // &
+            'or iteration number for checkpoint loading.')
     end if
 
     ! Get the file extension
