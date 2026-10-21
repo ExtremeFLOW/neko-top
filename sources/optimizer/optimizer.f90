@@ -836,8 +836,15 @@ contains
     call neko_log%section('Optimizer save checkpoint')
     call profiler_start_region('Optimizer save checkpoint')
 
+    ! If an iteration is provided, update the current iteration to that value
+    if (present(iter)) this%current_iteration = iter
+
     ! Create the fill filename and extract relevant components
-    if (present(filename)) then
+    if (present(filename) .and. (present(path) .or. present(basename) .or. &
+         present(format) .or. present(iter))) then
+       call neko_error('optimizer: Cannot specify both filename and ' // &
+            'path/basename/format for checkpoint loading.')
+    else if (present(filename)) then
        file_full = trim(filename)
     else
        file_full = checkpoint_filename(this, path, basename, format, iter)
@@ -902,16 +909,13 @@ contains
 
     ! Check that the provided inputs are a valid combination.
     if (present(filename) .and. (present(path) .or. present(basename) .or. &
-         present(format))) then
+         present(format) .or. present(iter))) then
        call neko_error('optimizer: Cannot specify both filename and ' // &
             'path/basename/format for checkpoint loading.')
-    else if (present(filename) .and. .not. present(iter)) then
+    else if (present(filename)) then
        file_full = trim(filename)
-    else if (present(iter) .and. .not. present(filename)) then
-       file_full = checkpoint_filename(this, path, basename, format, iter)
     else
-       call neko_error('optimizer: Must specify either filename ' // &
-            'or iteration number for checkpoint loading.')
+       file_full = checkpoint_filename(this, path, basename, format, iter)
     end if
 
     ! Get the file extension
