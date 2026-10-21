@@ -149,14 +149,14 @@ contains
     call optimizer_factory(opt, parameters, prob, des, sim)
 
     ! Load the checkpoint
-    call opt%load_checkpoint(des)
-    call opt%initialize(prob, des, sim)
+    call opt%load_checkpoint(des, iter = max_iter / 2)
+    iter0 = opt%get_iteration()
 
     ! ------------------------------------------------------------------------ !
     ! Verify that the restored state matches the saved checkpoint
     ! up to numerical precision
 
-    iter0 = opt%get_iteration()
+    call opt%initialize(prob, des, sim)
     call prob%get_objective_value(f)
     call des%get_values(x)
     call x%copy_from(DEVICE_TO_HOST, sync = .false.)
