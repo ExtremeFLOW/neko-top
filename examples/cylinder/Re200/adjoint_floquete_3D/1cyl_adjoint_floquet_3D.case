@@ -1,34 +1,35 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "../../_shared/1cyl.nmsh",
+        "mesh_file": "newton.nmsh",
         "output_directory": "viz",
         "output_checkpoints": false,
-        "output_at_end": true,
+        "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 500.0,
-            "timestep": 0.008
+            "end_time": 5.2350032253733518,
+            "timestep": 0.0075
         },
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": true
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 180.0,
+            "Re": 200.0,
             "initial_condition": {
-                "type": "uniform",
-                "value": [ 1.0, 0.0, 0.0 ]
+                "type": "field",
+                "file_name": "baseflow3d0.f00000",
+                "interpolate": true
             },
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1.0e-8,
-                "max_iterations": 800
+                "absolute_tolerance": 1.0e-7,
+                "max_iterations": 20
             },
             "pressure_solver": {
                 "type": "gmres",
@@ -39,8 +40,8 @@
                         "solver": "tamg"
                     }
                 },
-                "absolute_tolerance": 1.0e-8,
-                "max_iterations": 800
+                "absolute_tolerance": 1.0e-7,
+                "max_iterations": 20
             },
             "output_control": "never",
             "boundary_conditions": [
@@ -74,6 +75,25 @@
                     "zone_indices": [ 3 ]
                 }
             ]
+        },
+        "lightkrylov": {
+            "floquet": {
+                "period": 0.0,
+                "number_of_eigenvalues": 4,
+                "krylov_dimension": 24,
+                "tolerance": 1.0e-8,
+                "movie_frames": 32,
+                "write_baseflow_movie": true,
+                "write_mode_movies": true,
+                "number_of_mode_movies": 4
+            }
         }
+    },
+    "checkpoints": {
+        "enabled": true,
+        "algorithm": "linear",
+        "n_memory": 2048,
+        "path": "checkpoints/",
+        "filename": "floquet_adjoint_3D"
     }
 }

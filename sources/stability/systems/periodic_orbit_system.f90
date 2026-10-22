@@ -15,8 +15,9 @@ module periodic_orbit_system
    use num_types, only: neko_rp => rp, neko_sp => sp, rp
    use perturb_case, only: perturb_case_t
    use stability_solver_tolerances, only: solver_tolerance_guard_t
-   use simulation, only: simulation_init, simulation_step
-   use simulation_perturb, only: simulation_lns_step, simulation_perturb_init
+   use simulation, only: simulation_finalize, simulation_init, simulation_step
+   use simulation_perturb, only: simulation_lns_step, &
+        simulation_perturb_finalize, simulation_perturb_init
    use system_base, only: stability_system_t
    use time_step_controller, only: time_step_controller_t
    use utils, only: neko_error
@@ -330,6 +331,9 @@ contains
          end select
          deallocate(self%jacobian)
       end if
+      if (associated(self%base_case)) then
+         call simulation_finalize(self%base_case)
+      end if
       nullify(self%base_case)
       self%has_reference = .false.
       self%has_phase_direction = .false.
@@ -453,10 +457,11 @@ contains
       cfl = self%lns_case%fluid_pert%compute_cfl(self%lns_case%time%dt)
       loop_start = MPI_WTIME()
       do istep = 1, nsteps
-         call simulation_step(self%system%base_case, primal_dt_controller, &
-              loop_start)
+         ! Match the tangent map to the NS coefficient state U_n.
          call simulation_lns_step(self%lns_case, perturb_dt_controller, &
               cfl, loop_start)
+         call simulation_step(self%system%base_case, primal_dt_controller, &
+              loop_start)
       end do
 
       call mapped%init_like(baseflow)
@@ -485,6 +490,9 @@ contains
    subroutine periodic_orbit_jacobian_free(self)
       class(periodic_orbit_jacobian_t), intent(inout) :: self
 
+      if (associated(self%lns_case)) then
+         call simulation_perturb_finalize(self%lns_case)
+      end if
       nullify(self%system)
       nullify(self%lns_case)
       if (allocated(self%lns_output_base_fname)) then

@@ -1,14 +1,14 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "../_shared/1cyl.nmsh",
+        "mesh_file": "newton.nmsh",
         "output_directory": "viz",
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 1.0,
-            "timestep": 0.01
+            "end_time": 5.158,
+            "timestep": 0.0075
         },
         "numerics": {
             "time_order": 1,
@@ -17,18 +17,18 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 50.0,
+            "Re": 200.0,
             "initial_condition": {
-                "type": "field",
-                "file_name": "BF_1cyl0.f00001"
+                "type": "uniform",
+                "value": [ 1.0, 0.1, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1.0e-10,
-                "max_iterations": 800
+                "absolute_tolerance": 1.0e-8,
+                "max_iterations": 20
             },
             "pressure_solver": {
                 "type": "gmres",
@@ -40,7 +40,7 @@
                     }
                 },
                 "absolute_tolerance": 1.0e-8,
-                "max_iterations": 800
+                "max_iterations": 20
             },
             "output_control": "never",
             "boundary_conditions": [
@@ -76,19 +76,22 @@
             ]
         },
         "lightkrylov": {
-            "resolvent": {
-                "omega": 1.0,
-                "tolerance": 1.0e-8,
-                "actuator": {
-                    "sigma": 0.1,
-                    "radius": 0.6,
-                    "theta_degrees": 70.0
-                },
-                "sensor": {
-                    "sigma": 0.25,
-                    "x": 5.0
-                }
+            "periodic_orbit": {
+                "initial_period": 5.158,
+                "absolute_tolerance": 1.0e-6,
+                "transient_time": 120.0,
+                "movie_frames": 32,
+                "write_outer_iterations": true,
+                "outer_iteration_output_prefix": "outer_periodic_orbit_Re200",
+                "movie_output_prefix": "periodic_orbit_Re200_movie"
             }
         }
+    },
+    "checkpoints": {
+        "enabled": false,
+        "algorithm": "linear",
+        "n_memory": 2048,
+        "path": "checkpoints/",
+        "filename": "periodic_orbit_forward"
     }
 }

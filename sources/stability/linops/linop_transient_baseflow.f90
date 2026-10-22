@@ -14,10 +14,11 @@ module linop_transient_baseflow
    use neko_vector, only: state_vector_t
    use num_types, only: rp
    use perturb_case, only: perturb_case_t
-   use simulation, only: simulation_init, simulation_step
+   use simulation, only: simulation_finalize, simulation_init, simulation_step
    use simulation_checkpoint, only: simulation_checkpoint_t
    use simulation_perturb, only: simulation_adjoint_step, &
-        simulation_lns_step, simulation_perturb_init
+        simulation_lns_step, simulation_perturb_finalize, &
+        simulation_perturb_init
    use time_step_controller, only: time_step_controller_t
    use utils, only: neko_error, neko_warning
 
@@ -217,9 +218,11 @@ contains
       cfl = self%lns_case%fluid_pert%compute_cfl(self%lns_case%time%dt)
       loop_start = MPI_WTIME()
       do istep = 1, self%n_timesteps
-         call simulation_step(self%base_case, primal_dt_controller, loop_start)
+         ! The LNS coefficient fields alias the current NS state U_n.
+         ! Advance the tangent before moving the base flow to U_(n+1).
          call simulation_lns_step(self%lns_case, perturb_dt_controller, &
               cfl, loop_start)
+         call simulation_step(self%base_case, primal_dt_controller, loop_start)
       end do
 
       call vec_out%init_like(vec_in)
@@ -245,7 +248,15 @@ contains
       total_time = self%n_timesteps * self%adjoint_case%time%dt
       loop_start = MPI_WTIME()
       do i = self%n_timesteps, 1, -1
-         call self%checkpoint%restore(self%base_case, i)
+         ! Checkpoint i contains U_i, while the adjoint of the forward
+         ! interval U_(i-1) -> U_i uses its coefficient state U_(i-1).
+         if (i > 1) then
+            call self%checkpoint%restore(self%base_case, i - 1)
+         else
+            ! The checkpoint API intentionally has no timestep-zero state.
+            call reset(self%base_case, 0, self%base_output_base_fname)
+            call copy_state_to_primal(self%base_case, self%baseflow)
+         end if
          call simulation_adjoint_step(self%adjoint_case, dt_controller, cfl, &
               loop_start, total_time)
       end do
@@ -261,6 +272,16 @@ contains
       self%fixed_step_count = 0
       self%n_timesteps = 0
       self%checkpoint_initialized = .false.
+      ! Close the persistent simulations in reverse initialization order.
+      if (self%adjoint_initialized) then
+         call simulation_perturb_finalize(self%adjoint_case)
+      end if
+      if (self%lns_initialized) then
+         call simulation_perturb_finalize(self%lns_case)
+      end if
+      if (associated(self%base_case)) then
+         call simulation_finalize(self%base_case)
+      end if
       call self%checkpoint%free()
       call linop_base_free(self)
    end subroutine linop_transient_baseflow_free

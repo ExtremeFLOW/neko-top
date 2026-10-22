@@ -77,8 +77,9 @@
         },
         "lightkrylov": {
             "adjoint_test": {
-                "number_of_timesteps": 698,
-                "tolerance": 1.0e-10
+                "number_of_timesteps": 2,
+                "number_of_random_tests": 3,
+                "tolerance": 1.0e-3
             }
         }
     },

@@ -87,11 +87,13 @@ program usrneko
   if (mode_movies < 0) call neko_error('number_of_mode_movies must be nonnegative')
 
   lns_case%if_adjoint = .false.
+  print *, "init"
   call lns_case%init(base_case)
 
   vector_mold%coef => base_case%fluid%c_Xh
   vector_mold%if_2d = (base_case%fluid%c_Xh%msh%gdim .eq. 2)
   allocate(baseflow)
+  print *, "baseflow"
   call baseflow%init_like(vector_mold)
   call field_copy(baseflow%u, base_case%fluid%u)
   call field_copy(baseflow%v, base_case%fluid%v)
@@ -100,7 +102,9 @@ program usrneko
 
   old_dt = real(base_case%time%dt, kind=wp)
   nsteps = max(1, ceiling(period / old_dt))
+  print *, "init again"
   call A%init(base_case, lns_case)
+  print *, "set base"
   call A%set_baseflow(baseflow, period, nsteps)
 
   allocate(X(nev))

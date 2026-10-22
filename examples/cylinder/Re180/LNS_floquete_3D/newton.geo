@@ -27,7 +27,7 @@ wake_nsplit = DefineNumber[ 20 , Min 2, Max 50, Step 1,   Name "Numer of splits;
 // spanwise number of splits
 spnw_nsplit = DefineNumber[ 6 , Min 2, Max 50, Step 1,   Name "Spanwise numer of splits" ];
 span_length = DefineNumber[ 4.0 , Min 0.1, Max 100.0, Step 0.1, Name "Spanwise domain length" ];
-span_layers = DefineNumber[ 8 , Min 1, Max 100, Step 1, Name "Spanwise element layers" ];
+span_layers = DefineNumber[ 4 , Min 1, Max 100, Step 1, Name "Spanwise element layers" ];
 
 // progression normal to the cylinder surface
 wnprog = DefineNumber[ 1.1 , Min 1, Max 2, Step 0.1,   Name "Progression normal to the cylinder surface" ];
@@ -162,25 +162,21 @@ Recombine Surface{surface_list()};
 // Extrusion and physical properties section
 //////////////////////////////////////////////////////////////////////
 // Extrude the 2D cylinder mesh into a spanwise-periodic hexahedral mesh.
-zmin_surface_list() = surface_list();
-zmax_surface_list() = {};
-volume_list() = {};
-For is In {0:#surface_list()-1}
-  etmp[] = Extrude {0, 0, span_length} {
-    Surface{surface_list(is)};
-    Layers{span_layers};
-    Recombine;
-  };
-  zmax_surface_list() += {etmp[0]};
-  volume_list() += {etmp[1]};
-EndFor
-
-Coherence;
+// Extrude all connected blocks in one operation.  Extruding them separately
+// duplicates their shared interfaces, causing Gmsh to remesh the upper plane
+// as a very large unstructured surface instead of preserving the 2D blocks.
+etmp[] = Extrude {0, 0, span_length} {
+  Surface{surface_list()};
+  Layers{span_layers};
+  Recombine;
+};
 
 eps = 1.0e-6;
 
 // Volume
-Physical Volume("Fluid",1) = {volume_list()};
+Physical Volume("Fluid",1) = Volume In BoundingBox{
+  box_min_x-eps, -box_width*0.5-eps, -eps,
+  box_max_x+eps,  box_width*0.5+eps, span_length+eps};
 
 // Wall
 Physical Surface("Wal",1) = Surface In BoundingBox{-cyl_rad-eps, -cyl_rad-eps, -eps,

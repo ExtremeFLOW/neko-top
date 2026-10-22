@@ -42,7 +42,7 @@ program usrneko
   integer :: argc, info, movie_frames
   logical :: write_outer_iterations
   character(len=256) :: parameter_file
-  character(len=:), allocatable :: outer_output_prefix
+  character(len=:), allocatable :: movie_output_prefix, outer_output_prefix
   type(json_file) :: parameters
 
   call neko_init()
@@ -71,6 +71,9 @@ program usrneko
   call json_get_or_default(parameters, &
        'case.lightkrylov.periodic_orbit.outer_iteration_output_prefix', &
        outer_output_prefix, 'outer_periodic_orbit_Re180')
+  call json_get_or_default(parameters, &
+       'case.lightkrylov.periodic_orbit.movie_output_prefix', &
+       movie_output_prefix, 'periodic_orbit_Re180_movie')
 
   if (initial_period <= 0.0_wp) call neko_error('Initial period must be positive')
   if (transient_time < 0.0_wp) call neko_error('Transient time must be non-negative')
@@ -117,14 +120,18 @@ program usrneko
 
   call write_baseflow_file(orbit%q, orbit%T)
 
+  ! Close the Newton flow-map simulations before starting the independent
+  ! integration used to write the movie frames.
+  call periodic%free()
+
   call field_copy(base_case%fluid%u, orbit%q%u)
   call field_copy(base_case%fluid%v, orbit%q%v)
   call field_copy(base_case%fluid%w, orbit%q%w)
   call field_copy(base_case%fluid%p, orbit%q%p)
-  call write_periodic_movie(orbit%q, orbit%T, movie_frames)
+  call write_periodic_movie(orbit%q, orbit%T, movie_frames, &
+       movie_output_prefix)
 
   call orbit%free()
-  call periodic%free()
   call lns_case%free()
   call stability_case_free(base_case)
   call neko_finalize()
@@ -196,10 +203,11 @@ contains
     base_case%time%dt = real(old_dt, kind(base_case%time%dt))
   end subroutine run_forward_transient
 
-  subroutine write_periodic_movie(initial_state, period, nframes)
+  subroutine write_periodic_movie(initial_state, period, nframes, output_prefix)
     type(state_vector_t), intent(in) :: initial_state
     real(wp), intent(in) :: period
     integer, intent(in) :: nframes
+    character(len=*), intent(in) :: output_prefix
     type(time_step_controller_t) :: dt_controller
     type(field_output_t) :: output
     real(wp) :: old_end_time, old_dt, next_sample, sample_interval
@@ -220,7 +228,7 @@ contains
     call reset(base_case, 0, base_output_base_fname)
     call copy_state_to_primal(base_case, initial_state)
 
-    call output%init('periodic_orbit_Re180_movie', 4, precision=neko_sp, &
+    call output%init(trim(output_prefix), 4, precision=neko_sp, &
          path='viz/', format='nek5000')
     select type (ft => output%file_%file_type)
     type is (fld_file_t)
