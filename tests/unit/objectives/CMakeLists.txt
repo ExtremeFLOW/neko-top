@@ -7,6 +7,8 @@ set(test_list
     "time_window_equivalence.case"
     "steady_unsteady_converged.case"
     "steady_unsteady_final_step.case"
+    "steady_scalar_unconverged.case"
+    "steady_scalar_unconverged_simtime.case"
 )
 
 # Path to the common driver source, plus the user module carrying the
@@ -92,6 +94,39 @@ foreach(case_file ${test_list})
             TIMEOUT 300
     )
 endforeach()
+
+# ============================================================================ #
+# Check what the `steady` component reported about the scalar, from the log a
+# case's test wrote. The fixture runs that test first.
+function(add_steady_log_check case_name frozen at_end converged end_time)
+    add_test(NAME ${case_name}_steady_log
+        COMMAND ${CMAKE_COMMAND}
+            -DLOG_FILE=${CMAKE_CURRENT_BINARY_DIR}/${case_name}.log
+            -DFROZEN=${frozen} -DAT_END=${at_end} -DCONVERGED=${converged}
+            -DEND_TIME=${end_time}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/check_steady_log.cmake
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    set_tests_properties(${case_name} PROPERTIES
+        FIXTURES_SETUP ${case_name}_log
+    )
+    set_tests_properties(${case_name}_steady_log PROPERTIES
+        FIXTURES_REQUIRED ${case_name}_log
+        LABELS "objectives;unit"
+    )
+endfunction()
+
+# Each case runs twice, through the steady path and the unsteady one. The
+# unconverged ones stop with the scalar unconverged, so each run warns at the
+# freeze and at its end. The converged one runs on until the scalar has
+# converged, so each run warns at the freeze and then reports that the scalar
+# converged. The last argument is the time of the component's last check in
+# each run, which the end-of-run report must carry. It is the final step under
+# `tsteps` control, and under `simulationtime` the last scheduled time before
+# the end: 2.4, as 2.5 lies past `end_time = 2.495`.
+add_steady_log_check(steady_scalar_unconverged 2 2 0 1.50000E+00)
+add_steady_log_check(steady_unsteady_converged 2 0 2 2.00000E+01)
+add_steady_log_check(steady_scalar_unconverged_simtime 2 2 0 2.40000E+00)
 
 # ============================================================================ #
 # Final dependencies

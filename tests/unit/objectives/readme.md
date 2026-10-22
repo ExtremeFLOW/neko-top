@@ -7,7 +7,7 @@ They replace the former `examples/time_test`, which covered the same matrix but
 could only be inspected by hand.
 
 The tests are tagged as `unit`, so they are mandatory for CI to pass. Together
-they take about 44 s, almost all of it in `steady_unsteady_converged`, which
+they take about 85 s, the largest share in `steady_unsteady_converged`, which
 has to run a flow to a genuine steady state.
 
 ## Common files
@@ -163,12 +163,12 @@ each number measured rather than inherited.
 
 | setting | value | why |
 |---------|-------|-----|
-| `Re` | `5.0` | At the sibling cases' `Re = 50` the fluid residual is still `9e-6` at `t = 3.0`, 39 s of run time short of the `1e-6` it needs. At `Re = 5` it reaches that by `t ≈ 1.27`. |
+| `Re` | `5.0` | At the sibling cases' `Re = 50` the fluid residual is still `9e-6` at `t = 3.0`, 39 s of run time short of the `1e-6` it needs. At `Re = 5` it reaches that by `t = 1.29`. |
 | `timestep` | `0.01` | Not free. At `Pe = 100` there is no diffusion to damp grid-scale advection, and `dt = 0.02` — a perfectly comfortable CFL of 0.58 for the fluid — makes the *scalar* diverge, reaching a residual of `6e36`. It also saves less than it looks, since larger steps need more solver iterations: 600 steps at `0.02` cost 28 s against 33 s for 1000 at `0.01`. |
 | `f_max` | `50.0` | Halved alongside the timestep, so the Brinkman penalty keeps the `chi * dt` of `0.5` the other cases run at. |
 | `end_time` | `19.995` | 2000 steps, ending at `t = 20.0`, half a step off a boundary. See below — this is set by how long the scalar takes to stop drifting, not by the fluid. |
 | scalar `absolute_tolerance` | `1e-12` | The solver's own noise, not the physics, was the floor. See below. |
-| `scalar_coupled` | `false` | So the fluid freezes as soon as *it* has converged, at `t ≈ 1.27`, rather than waiting 18 more time units for the scalar. See below. |
+| `scalar_coupled` | `false` | So the fluid freezes as soon as *it* has converged, at `t = 1.29`, rather than waiting until `t = 10.64` for the scalar. See below. |
 
 `require_steady_state` makes the driver assert that each run really did
 converge, by checking that `steady_simcomp` froze the fluid.
@@ -190,16 +190,22 @@ windowed at three places in one run:
 Clean exponential decay, which is why the window sits at `[19, 20]`.
 
 The length is affordable because `scalar_coupled` is off. The fluid is
-genuinely converged at `t ≈ 1.27`, `steady_simcomp` freezes it there, and the
-remaining 1870 steps skip the fluid solve entirely — around 10 ms a step
+genuinely converged at `t = 1.29`, `steady_simcomp` freezes it there, and the
+remaining 1871 steps skip the fluid solve entirely — around 10 ms a step
 against 33 ms unfrozen. Two runs of 2000 steps cost 35 s. Leaving
 `scalar_coupled` on would keep re-solving an already-converged fluid for
-another 18 time units at four times the cost, for the same answer.
+another 9.35 time units, to `t = 10.64`, at four times the cost, for the same
+answer.
 
 That is the one place this case departs from the advice in item 24 of the
 workspace bug backlog, and deliberately: it does not use the freeze to
 certify that the scalar has settled. The comparison itself does that, far more
 strictly than a residual threshold would.
+
+`steady` says as much in the log. Each run warns when the fluid is frozen with
+the scalar still unconverged, and at the end reports that the scalar has
+converged since. `steady_unsteady_converged_steady_log` checks that it does
+exactly that; see `steady_scalar_unconverged` below.
 
 ### The scalar solver tolerance was a floor, not the physics
 
@@ -214,7 +220,7 @@ closes the gap. Tightening the scalar solver to `1e-12` removed it.
 
 ### What it measures
 
-The fluid converges and freezes at `t ≈ 1.27`; the window is `[19, 20]`, 101
+The fluid converges and freezes at `t = 1.29`; the window is `[19, 20]`, 101
 samples.
 
 | objective | steady | unsteady average | relative difference |
@@ -285,6 +291,50 @@ overshoot is Neko's, not this test's.
 Measured agreement between the two paths, with the window right, is `4e-13`,
 `4e-12` and `6e-14` relative, the same floor two identical unsteady runs of
 this case reach.
+
+## `steady_scalar_unconverged` and `steady_scalar_unconverged_simtime`
+
+The trap item 24 of the workspace bug backlog describes, run on purpose.
+`steady` freezes only the fluid, and with `scalar_coupled` off it freezes it on
+the fluid's residuals alone, so a scalar objective can be evaluated on a scalar
+that is still evolving. Nothing used to say so.
+
+The case is `steady_unsteady_converged` stopped at `end_time = 1.495`, with
+every objective windowed to the final step, as in
+`steady_unsteady_final_step`. The fluid is frozen at `t = 1.29`, when the
+scalar residual is still `1.5e-2` against a `tol` of `1e-6`, and the run ends
+at `t = 1.5` with the scalar still far from converged. Both paths must still
+agree on the final step, which they do to every digit the driver prints,
+since the velocity is frozen and the scalar is the same field in both.
+
+`steady_scalar_unconverged_steady_log` then reads the log and requires, in
+each of the two runs, exactly one warning at the freeze and exactly one at the
+end of the run, carrying the time of the component's last check, here the
+final step at `t = 1.5`. An exact count catches a warning repeated every step,
+and the time catches an end-of-run warning issued early.
+
+`steady_scalar_unconverged_simtime` is the same trap under time-based compute
+control: `compute_control` is `simulationtime` with a `compute_value` of
+`0.1`, and `end_time` is moved off the step grid to `2.495`. The run ends at
+`t = 2.5`, but the last check is at `t = 2.4`, since the scheduled `2.5` lies
+past `end_time` and the controller skips it. The end-of-run report must
+therefore come at `t = 2.4`. The fluid is frozen at `t = 1.6`, later than
+under `tsteps`, because each increment then spans ten steps but is still
+divided by one `dt`.
+
+All three checks were seen to fail. Against the code before the warnings were
+added, the two `tsteps` cases report none of them. With the end-of-run check
+moved to the first step after the freeze, the end-of-run warning carries
+`t = 1.3` and the `steady_scalar_unconverged` check fails, while the case
+itself still passes. The first version of the end-of-run check predicted the
+next computation from the compute interval, which only matches a `tsteps`
+schedule. Under `simulationtime` it saw a computation still to come at
+`t = 2.4`, there was none, and no end-of-run report was issued at all, so the
+`simtime` check failed. The check now asks the compute controller itself.
+
+The check is a separate test, `check_steady_log.cmake` run as a fixture of
+the case's own test, because the warnings only exist in the log. The driver
+has no handle on the simulation component that issues them.
 
 ## Choosing window boundaries in new cases
 
