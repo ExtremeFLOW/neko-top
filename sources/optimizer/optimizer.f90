@@ -78,6 +78,9 @@ module optimizer
      ! ----------------------------------------------------------------------- !
      ! Restart related members
 
+     ! Internal initialization flag to ensure correct ordering.
+     logical, private :: initialized = .false.
+
      !> Checkpoint file to be restarted from.
      character(len=256), private :: restart_file = ''
 
@@ -293,9 +296,11 @@ contains
   !! @param checkpoint_format The file format for checkpoint files.
   !! @param checkpoint_interval The interval for saving checkpoints in
   !!        iterations.
+  !! @param checkpoint_overwrite Whether to overwrite existing checkpoint files.
   subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
        max_runtime, stop_design_change, restart_file, checkpoint_path, &
-       checkpoint_base, checkpoint_format, checkpoint_interval)
+       checkpoint_base, checkpoint_format, checkpoint_interval, &
+       checkpoint_overwrite)
     class(optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
@@ -306,9 +311,14 @@ contains
     character(len=*), intent(in), optional :: checkpoint_base
     character(len=*), intent(in), optional :: checkpoint_format
     integer, intent(in), optional :: checkpoint_interval
+    logical, intent(in), optional :: checkpoint_overwrite
     character(len=LOG_SIZE) :: msg
+    character(len=256) :: file_name
     logical :: exists
-    character (len=256) :: file_name
+
+    ! Initialize internals
+    this%start_time = MPI_Wtime()
+    this%initialized = .true.
 
     ! Mandatory settings
     this%optimizer_type = optimizer_type
@@ -324,22 +334,9 @@ contains
     if (present(checkpoint_interval)) then
        this%checkpoint_interval = checkpoint_interval
     end if
-
-    ! Create checkpoint directory if it does not exist
-    if (len_trim(this%checkpoint_path) .gt. 0) then
-       exists = .false.
-       if (pe_rank .eq. 0) then
-          inquire(file = this%checkpoint_path, exist = exists)
-       end if
-       call MPI_Bcast(exists, 1, MPI_LOGICAL, 0, NEKO_COMM)
-       if (.not. exists) then
-          if (pe_rank .eq. 0) call mkdir(this%checkpoint_path)
-          call MPI_Barrier(NEKO_COMM)
-       end if
+    if (present(checkpoint_overwrite)) then
+       this%checkpoint_overwrite = checkpoint_overwrite
     end if
-
-    ! Initialize internals
-    this%start_time = MPI_Wtime()
 
     if (this%max_runtime .gt. 0.0_rp) then
        write(msg, '(A,F0.0,A)') 'Optimizer will stop after: ', &
@@ -374,6 +371,7 @@ contains
     this%checkpoint_base = 'optimizer_checkpoint'
     this%checkpoint_format = 'hdf5'
     this%checkpoint_interval = -1
+    this%checkpoint_overwrite = .false.
 
     this%start_time = 0.0_rp
     this%current_iteration = 0
@@ -387,6 +385,8 @@ contains
     this%log_file%header_is_written = .false.
     call this%log_file%set_overwrite(.false.)
 
+    this%initialized = .false.
+
   end subroutine optimizer_free_base
 
   !> Read settings from JSON parameters file.
@@ -398,6 +398,10 @@ contains
     integer :: read_int
     logical :: read_logical
     character(len=:), allocatable :: read_str
+
+    if (this%initialized) then
+       call neko_error('optimizer: Base settings already initialized.')
+    end if
 
     call json_get_or_default(solver_params, 'max_runtime', read_str, "")
     call read_duration(read_str, this%max_runtime)
@@ -866,7 +870,7 @@ contains
     ! Throw an error if the file already exists
     if (pe_rank .eq. 0) then
        inquire(file = file_full, exist = exists)
-       if (exists .and. .not. overwrite) then
+       if (exists .and. .not. overwrite_flag) then
           call neko_error('optimizer: Checkpoint file "' // &
                trim(file_full) // '" already exists and overwrite is false.')
        end if
