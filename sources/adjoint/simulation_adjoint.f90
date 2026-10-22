@@ -152,11 +152,14 @@ contains
 
     ! Scalar step
     ! (Note that for the adjoint we should the adjoint_scalars first)
+    ! The scalar shares the adjoint fluid's time scheme, which was just set
+    ! from the adjoint's own time-step history. The primal one is frozen at
+    ! the end of the forward run.
     if (allocated(C%adjoint_scalars)) then
        start_time = MPI_WTIME()
        call neko_log%section('Adjoint scalar')
        call C%adjoint_scalars%step(C%time, &
-            C%case%fluid%ext_bdf, dt_controller)
+            C%fluid_adj%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7)') &
             'Scalar step time:      ', end_time-start_time
