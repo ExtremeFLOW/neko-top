@@ -50,11 +50,12 @@ export EXTERNAL_DIR="$MAIN_DIR/external"
 # Assign default values to the options
 DEVICE_TYPE="CPU"
 CLEAN=false
-CLEAN_NEKO=false
 QUIET=false
 TEST=OFF
 DOCS=OFF
 EXAMPLES=OFF
+
+NEKO_CLEAN=false
 NEKO_TEST=OFF
 
 # Load the environment files.
@@ -81,7 +82,7 @@ while true; do
 
     # Purely long settings
     "--docs") DOCS="ON" && shift ;;             # Build the documentation
-    "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
+    "--clean-neko") NEKO_CLEAN=true && shift ;; # Clean Neko
     "--test-neko") NEKO_TEST="true" && shift ;; # Test Neko
 
     # End of options
@@ -90,9 +91,9 @@ while true; do
 done
 
 # Set Dependent Variables
-[ "$CLEAN_NEKO" == true ] && CLEAN=true
+[ "$NEKO_CLEAN" == true ] && CLEAN=true
 
-export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE NEKO_TEST
+export TEST CLEAN NEKO_CLEAN QUIET DEVICE_TYPE NEKO_TEST
 
 # Check for valid settings
 
