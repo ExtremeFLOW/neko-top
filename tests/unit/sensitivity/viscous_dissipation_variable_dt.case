@@ -34,7 +34,7 @@
             "Re": 0.1,
             "initial_condition": {
                 "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
+                "value": [ 1.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -87,7 +87,7 @@
         ]
     },
     "optimization": {
-        "fd_test_tolerance": 2.0e-2,
+        "fd_test_tolerance": 1.0e-2,
         "domain": {
             "type": "point_zone",
             "zone_name": "optimization_domain"

@@ -556,16 +556,30 @@ contains
   !! `neko_solve` does. Given the whole case file it finds none of them and
   !! silently stays in fixed-timestep mode.
   !!
+  !! A variable timestep also needs `timestep`, unlike in Neko. The first
+  !! step is sized from the CFL of the state the run starts from, capped by
+  !! `timestep`. A run that starts at rest has a zero CFL, and Neko then
+  !! takes `huge(0.0_dp)` as the first time step, or `max_timestep` if set.
+  !!
   !! @param[inout] dt_controller The time-step controller to initialise.
   !! @param[inout] params The full case file parameters.
   subroutine init_dt_controller(dt_controller, params)
     type(time_step_controller_t), intent(inout) :: dt_controller
     type(json_file), intent(inout) :: params
     type(json_file) :: dt_params
+    logical :: has_timestep
 
     call json_get(params, 'case.time', dt_params)
+    ! Look before the controller reads it: Neko adds a missing key, with its
+    ! default value, to the object it reads.
+    has_timestep = dt_params%valid_path('timestep')
     call dt_controller%init(dt_params)
     call dt_params%destroy()
+
+    if (dt_controller%is_variable_dt .and. .not. has_timestep) then
+       call neko_error("case.time.timestep is required with " // &
+            "variable_timestep: it caps the first time step")
+    end if
 
   end subroutine init_dt_controller
 
