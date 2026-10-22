@@ -229,7 +229,6 @@ contains
           call field_rzero(s_scheme%abx1)
           call field_rzero(s_scheme%abx2)
        end select
-
        ! reset the forward scalar
        call json_get(neko_case%params, &
             'case.scalar.initial_condition.type', string_val)

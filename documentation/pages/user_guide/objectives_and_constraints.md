@@ -220,10 +220,18 @@ and has the following input parameters:
 |------|--------------|-------------------|---------------|
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
-| `target_concentration` | \f$\phi_\text{ref}\f$ in the above equation. | Real | `0.5`|
+| `phi_ref` | \f$\phi_\text{ref}\f$ in the above equation. | Real | `0.5`|
+| `target_concentration` | **Deprecated** alias of `phi_ref`. | Real | `0.5`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Scalar Mixing`|
 | `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
 | `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
+
+`target_concentration` is accepted only for backwards compatibility and
+warns when it is used. If both keys are given, `phi_ref` wins and the run
+says so. Note that \f$\phi_\text{ref}\f$ is the only parameter that varies
+the cancellation between the two terms of this objective's sensitivity: at
+the default `0.5` they cancel by roughly 85%, so a case deliberately
+exercising the scalar-mixing gradient should choose an off-centre value.
 
 ## Constraints {#constraints}
 

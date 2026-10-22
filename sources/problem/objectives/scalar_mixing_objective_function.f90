@@ -50,7 +50,7 @@ module scalar_mixing_objective
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
-  use utils, only: neko_error
+  use utils, only: neko_error, neko_warning
   use adjoint_mixing_scalar_source_term, only: &
        adjoint_mixing_scalar_source_term_t
   use neko_ext, only: get_scalar_indicies
@@ -120,11 +120,47 @@ contains
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: scalar_name
+    logical :: has_phi_ref, has_legacy_key
 
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
-    call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
+
+    ! `phi_ref` is the canonical, documented spelling of the target
+    ! concentration; `target_concentration` is the original, undocumented
+    ! one and is retained only as a deprecated alias. Until this was fixed
+    ! the code read *only* the alias, so every case file in the repository
+    ! -- all of which write `phi_ref` -- silently fell back to the default
+    ! 0.5 (known-bugs #40).
+    !
+    ! This is load bearing rather than cosmetic. \f$\phi_{ref}\f$ is the
+    ! only knob that varies the cancellation inside this objective: at 0.5
+    ! the two terms of
+    ! \f$ dF/d\chi = (1/V)[\langle\phi, d\phi/d\chi\rangle -
+    ! \phi_{ref}\langle 1, d\phi/d\chi\rangle] \f$
+    ! cancel by roughly 85%, so while the documented key was ignored the
+    ! whole suite only ever exercised this objective in its most
+    ! self-cancelling configuration -- which is exactly why a gradient
+    ! error in this path (known-bugs #6) went unnoticed for months. Do not
+    ! "simplify" this back to a single key without moving the case files.
+    has_phi_ref = json%valid_path("phi_ref")
+    has_legacy_key = json%valid_path("target_concentration")
+
+    if (has_legacy_key .and. has_phi_ref) then
+       call neko_warning('scalar_mixing: both "phi_ref" and the ' // &
+            'deprecated "target_concentration" are set; "phi_ref" wins')
+    else if (has_legacy_key) then
+       call neko_warning('scalar_mixing: "target_concentration" is ' // &
+            'deprecated and will be removed; use "phi_ref" instead')
+    end if
+
+    if (has_legacy_key .and. .not. has_phi_ref) then
+       call json_get_or_default(json, "target_concentration", phi_ref, &
+            0.5_rp)
+    else
+       call json_get_or_default(json, "phi_ref", phi_ref, 0.5_rp)
+    end if
+
     call json_get_or_default(json, "name", name, "Scalar Mixing")
     call json_get_or_default(json, "scalar_name", scalar_name, "s")
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
