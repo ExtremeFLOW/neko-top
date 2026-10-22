@@ -88,16 +88,27 @@ contains
   end subroutine simulation_adjoint_init
 
   !> Finalize a simulation of a case
-  subroutine simulation_adjoint_finalize(C)
+  !! @param C The adjoint case.
+  !! @param n_steps The number of steps the adjoint was to take. If given,
+  !! the run is complete once it has taken them all; otherwise once its time
+  !! has reached the end time.
+  subroutine simulation_adjoint_finalize(C, n_steps)
     type(adjoint_case_t), intent(inout) :: C
-    logical :: output_at_end
+    integer, intent(in), optional :: n_steps
+    logical :: output_at_end, stopped_short
 
     ! Run a final output if specified in the json
     call json_get_or_default(C%case%params, 'case.output_at_end', &
          output_at_end, .true.)
     call C%output_controller%execute(C%time, output_at_end)
 
-    if (.not. (output_at_end) .and. C%time%t .lt. C%time%end_time) then
+    if (present(n_steps)) then
+       stopped_short = C%time%tstep .lt. n_steps
+    else
+       stopped_short = C%time%t .lt. C%time%end_time
+    end if
+
+    if (.not. (output_at_end) .and. stopped_short) then
        call simulation_adjoint_joblimit_chkp(C, C%time%t)
     end if
 
