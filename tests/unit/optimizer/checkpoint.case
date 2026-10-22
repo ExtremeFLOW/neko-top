@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 2.0,
+            "end_time": 1.0,
             "timestep": 5e-3
         },
         "numerics": {
