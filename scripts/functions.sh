@@ -29,7 +29,7 @@ function run {
     fi
 
     if [[ -f "$logfile" || -s error.log ]] || \
-        [[ -f output.log && "$(head -n 1 output.log)" != "Ready" ]]; then
+        [[ -s output.log && "$(head -n 1 output.log)" != "Ready" ]]; then
 
         # Move old log files to folder with counter padded to 2 digits
         old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)
