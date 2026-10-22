@@ -41,6 +41,7 @@ submodule (optimizer) optimizer_hdf5_io
   use hdf5
   use mpi_f08, only: MPI_INFO_NULL
   use comm, only: NEKO_COMM
+  use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
 
 contains
 
@@ -66,7 +67,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Prepare the HDF5 file, settings for MPIO access and groups
 
-    call h5open_f(ierr)
+    call hdf5_session_init()
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
     call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
@@ -142,7 +143,8 @@ contains
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
+
+    call hdf5_session_finalize()
 
   end subroutine optimizer_save_checkpoint_hdf5
 
@@ -163,7 +165,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Open the HDF5 context and read identification parameters
 
-    call h5open_f(ierr)
+    call hdf5_session_init()
 
     ! Prepare the HDF5 settings for MPIO access
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
@@ -209,7 +211,8 @@ contains
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
+
+    call hdf5_session_finalize()
 
   end subroutine optimizer_load_checkpoint_hdf5
 
