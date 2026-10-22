@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 1.0,
+            "end_time": 2.0,
             "timestep": 5e-3
         },
         "numerics": {
@@ -38,7 +38,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-7,
+                "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
@@ -46,7 +46,7 @@
                 "preconditioner": {
                     "type": "phmg"
                 },
-                "absolute_tolerance": 1e-5,
+                "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
             "boundary_conditions": [

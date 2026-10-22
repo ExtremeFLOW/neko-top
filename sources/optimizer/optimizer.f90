@@ -922,14 +922,14 @@ contains
   !! @param basename The base name of the file to load the checkpoint from.
   !! @param format The file format to use for the checkpoint file.
   subroutine optimizer_load_checkpoint(this, design, filename, &
-       path, basename, format, iter)
+       path, basename, format, iteration)
     class(optimizer_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
     character(len=*), intent(in), optional :: filename
     character(len=*), intent(in), optional :: path
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
-    integer, intent(in), optional :: iter
+    integer, intent(in), optional :: iteration
     character(len=256) :: file_full
     character(len=12) :: suffix
 
@@ -938,13 +938,13 @@ contains
 
     ! Check that the provided inputs are a valid combination.
     if (present(filename) .and. (present(path) .or. present(basename) .or. &
-         present(format) .or. present(iter))) then
+         present(format) .or. present(iteration))) then
        call neko_error('optimizer: Cannot specify both filename and ' // &
             'path/basename/format for checkpoint loading.')
     else if (present(filename)) then
        file_full = trim(filename)
     else
-       file_full = checkpoint_filename(this, path, basename, format, iter)
+       file_full = checkpoint_filename(this, path, basename, format, iteration)
     end if
 
     ! Get the file extension
