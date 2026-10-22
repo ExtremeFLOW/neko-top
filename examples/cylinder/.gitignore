@@ -1,2 +1,12 @@
 gauntlet
 figs_for_preso
+
+# Generated meshes and solver output.  The source geometry and prepare scripts
+# are versioned; these files are reproducible from them.
+*.msh
+*.msh_*
+*.nmsh
+*.re2
+*.geo_unrolled
+*.chkp
+*.log
