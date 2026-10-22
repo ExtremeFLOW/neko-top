@@ -982,8 +982,11 @@ contains
   !! the room every header has always had, and grows with the name to leave
   !! `suffix_len` characters after it. A name of any length therefore
   !! arrives in full, and a short name still leaves room for a long suffix.
-  !! Only a header longer than both can be cut, and that is reported rather
-  !! than done silently.
+  !! Only a header longer than both can be cut, and that cut is made inside
+  !! `get_log_headers`, which fills a buffer of fixed length. A header that
+  !! fills its buffer is reported, since it may have been cut. A cut that
+  !! leaves a blank as the last character kept looks like padding, and
+  !! cannot be detected through this interface.
   !! @param[inout] buff The header to append to.
   !! @param[in] functional The functional whose headers are appended.
   subroutine problem_append_log_headers(buff, functional)

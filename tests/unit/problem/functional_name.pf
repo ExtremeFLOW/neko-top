@@ -48,10 +48,16 @@ module functional_name
   !> A name short enough to fit any field width the logs have used.
   character(len=*), parameter :: SHORT_NAME = "drag"
 
-  !> A log header suffix far longer than the name it follows.
+  !> A log header suffix far longer than the name it follows. After
+  !! `SHORT_NAME` it makes a header of exactly 126 characters: the longest
+  !! that arrived whole when each header was written, after a ", ", into a
+  !! fixed 128-character buffer. With a shorter header this test would pass
+  !! on a smaller buffer, which cuts headers that used to arrive whole.
+  !! Staying below 128 also keeps the header from filling its buffer, which
+  !! would raise the truncation warning.
   character(len=*), parameter :: LONG_SUFFIX = &
        ".time_averaged_streamwise_velocity_component_over_the_downstream_" // &
-       "window_from_t_19_to_t_20"
+       "window_from_t_19_to_t_20_normalised_by_the_inlet_velocity"
 
   logical :: initialized = .false.
 
