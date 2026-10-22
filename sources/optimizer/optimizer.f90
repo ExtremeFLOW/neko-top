@@ -829,7 +829,7 @@ contains
   !! @param path The path where the checkpoint file will be saved.
   !! @param basename The base name of the file to save the checkpoint.
   !! @param format The file format to use for the checkpoint file.
-  !! @param iter The iteration used to construct the checkpoint filename.
+  !! @param iteration The iteration used to construct the checkpoint filename.
   subroutine optimizer_save_checkpoint(this, design, overwrite, filename, &
        path, basename, format, iteration)
     class(optimizer_t), intent(inout) :: this
@@ -921,6 +921,7 @@ contains
   !! @param path The path where the checkpoint file is located.
   !! @param basename The base name of the file to load the checkpoint from.
   !! @param format The file format to use for the checkpoint file.
+  !! @param iteration The iteration to load.
   subroutine optimizer_load_checkpoint(this, design, filename, &
        path, basename, format, iteration)
     class(optimizer_t), intent(inout) :: this
