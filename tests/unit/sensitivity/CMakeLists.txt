@@ -8,6 +8,7 @@ set(test_list
     "viscous_dissipation.case"
     "brinkman_dissipation.case"
     "viscous_dissipation_variable_dt.case"
+    "viscous_dissipation_variable_dt_weighted.case"
 )
 
 # Path to the common driver source

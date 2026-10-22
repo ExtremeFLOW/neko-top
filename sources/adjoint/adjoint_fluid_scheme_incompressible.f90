@@ -618,29 +618,22 @@ contains
 
   end subroutine adjoint_fluid_scheme_precon_factory
 
-  !> Compute CFL
-  ! TODO
-  ! HARRY
-  ! ok this needs to be discussed.
-  ! To me, the CFL is based on the convecting velocity, so I would argue
-  ! that the CFL of the adjoint is based on
-  ! u, v, w
-  ! not
-  ! u_adj, v_adj, w_adj
-  !
-  ! Then again, this function is really only used for varaible timestep,
-  ! which we can't use if we're checkpointing...
-  !
-  ! hmmmmm.... requires more thought. Because people optimal ICs or Arnouldi
-  ! may use variable timesteps... or us in a steady case..
-  !
-  ! for now.... let's ignore it
+  !> Compute the CFL number of an adjoint time step.
+  !!
+  !! @details The adjoint equations are linear in the adjoint velocity, and
+  !! the primal velocity convects it. The explicit convective terms therefore
+  !! limit the time step through the primal velocity, the baseflow, and not
+  !! through the adjoint velocity, whose amplitude scales with the objective.
+  !! The baseflow is the final forward state in a steady problem, and the
+  !! forward state restored for the current step in an unsteady one.
+  !! @param dt The time step.
+  !! @return The CFL number of the baseflow.
   function adjoint_compute_cfl(this, dt) result(c)
     class(adjoint_fluid_scheme_incompressible_t), intent(in) :: this
     real(kind=dp), intent(in) :: dt
     real(kind=dp) :: c
 
-    c = cfl(dt, this%u_adj%x, this%v_adj%x, this%w_adj%x, &
+    c = cfl(dt, this%u_b%x, this%v_b%x, this%w_b%x, &
          this%Xh, this%c_Xh, this%msh%nelv, this%msh%gdim)
 
   end function adjoint_compute_cfl

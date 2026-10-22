@@ -54,6 +54,12 @@ Currently, we have added tests for the following components:
   the forward run has not reached a steady state at `end_time`, while the
   steady adjoint assumes it has. Starting from rest doubles it to 1.3%; the
   fixed-timestep `viscous_dissipation.case` has 0.6% too.
+- `viscous_dissipation_variable_dt_weighted.case` — the same case with the
+  objective weighted by 1e4. The adjoint equations are linear, so its
+  relative finite-difference error must equal that of the unweighted case.
+  It fails if the adjoint sizes its time steps by the adjoint velocity, whose
+  amplitude follows the weight, instead of by the primal velocity that
+  convects it.
 - The guards against a variable timestep in an unsteady problem
   (`unsteady_variable_timestep.case`) and against a variable timestep
   without the `timestep` that caps its first step

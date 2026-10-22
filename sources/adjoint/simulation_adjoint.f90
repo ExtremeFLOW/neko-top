@@ -126,9 +126,8 @@ contains
     start_time = MPI_WTIME()
     tstep_start_time = start_time
 
-    ! Compute the next time step
-    ! NOTE. we should be wary here since CFL is based on the convective velocity
-    ! not the adjoint velocity
+    ! Compute the next time step, from the CFL of the convecting primal
+    ! velocity (see adjoint_compute_cfl)
     cfl = C%fluid_adj%compute_cfl(C%time%dt)
     call dt_controller%set_dt(C%time, cfl)
     if (dt_controller%is_variable_dt) cfl = C%fluid_adj%compute_cfl(C%time%dt)
