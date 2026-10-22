@@ -286,26 +286,28 @@ contains
   !! @param max_iterations The maximum number of iterations.
   !! @param max_runtime The maximum runtime in seconds.
   !! @param stop_design_change The stopping criteria for design change.
-  !! @param checkpoint_file The checkpoint file to restart from.
+  !! @param restart_file The checkpoint file to restart from.
   !! @param checkpoint_path The path for saving checkpoint files.
   !! @param checkpoint_base The base name for checkpoint files.
   !! @param checkpoint_format The file format for checkpoint files.
   !! @param checkpoint_interval The interval for saving checkpoints in
   !!        iterations.
   subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
-       max_runtime, stop_design_change, checkpoint_file, checkpoint_path, &
+       max_runtime, stop_design_change, restart_file, checkpoint_path, &
        checkpoint_base, checkpoint_format, checkpoint_interval)
     class(optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in), optional :: max_runtime
     real(kind=rp), intent(in), optional :: stop_design_change
-    character(len=*), intent(in), optional :: checkpoint_file
+    character(len=*), intent(in), optional :: restart_file
     character(len=*), intent(in), optional :: checkpoint_path
     character(len=*), intent(in), optional :: checkpoint_base
     character(len=*), intent(in), optional :: checkpoint_format
     integer, intent(in), optional :: checkpoint_interval
     character(len=LOG_SIZE) :: msg
+    logical :: exists
+    character (len=256) :: file_name
 
     ! Mandatory settings
     this%optimizer_type = optimizer_type
@@ -314,7 +316,7 @@ contains
     ! Optional settings
     if (present(max_runtime)) this%max_runtime = max_runtime
     if (present(stop_design_change)) this%stop_design_change = stop_design_change
-    if (present(checkpoint_file)) this%restart_file = checkpoint_file
+    if (present(restart_file)) this%restart_file = restart_file
     if (present(checkpoint_path)) this%checkpoint_path = checkpoint_path
     if (present(checkpoint_base)) this%checkpoint_base = checkpoint_base
     if (present(checkpoint_format)) this%checkpoint_format = checkpoint_format
@@ -324,17 +326,15 @@ contains
 
     ! Create checkpoint directory if it does not exist
     if (len_trim(this%checkpoint_path) .gt. 0) then
-       block
-         logical :: dir_exists
-         if (pe_rank .eq. 0) then
-            inquire(file = this%checkpoint_path, exist = dir_exists)
-         end if
-         call MPI_Bcast(dir_exists, 1, MPI_LOGICAL, 0, NEKO_COMM)
-         if (.not. dir_exists) then
-            if (pe_rank .eq. 0) call mkdir(this%checkpoint_path)
-            call MPI_Barrier(NEKO_COMM)
-         end if
-       end block
+       exists = .false.
+       if (pe_rank .eq. 0) then
+          inquire(file = this%checkpoint_path, exist = exists)
+       end if
+       call MPI_Bcast(exists, 1, MPI_LOGICAL, 0, NEKO_COMM)
+       if (.not. exists) then
+          if (pe_rank .eq. 0) call mkdir(this%checkpoint_path)
+          call MPI_Barrier(NEKO_COMM)
+       end if
     end if
 
     ! Initialize internals
@@ -345,18 +345,14 @@ contains
             this%max_runtime, ' seconds.'
        call neko_log%message(msg)
 
-       ! Look up the latest checkpoint file unless explicitly specified
+       ! Look up the runtime checkpoint file if no restart file is specified
        if (len_trim(this%restart_file) .eq. 0) then
-          block
-            logical :: file_exists
-            character (len=256) :: file_name
-
-            file_name = checkpoint_filename(this, &
-                 basename = "optimizer_rt_checkpoint")
-            if (pe_rank .eq. 0) inquire(file = file_name, exist = file_exists)
-            call MPI_Bcast(file_exists, 1, MPI_LOGICAL, 0, NEKO_COMM)
-            if (file_exists) this%restart_file = file_name
-          end block
+          exists = .false.
+          file_name = checkpoint_filename(this, &
+               basename = "optimizer_rt_checkpoint")
+          if (pe_rank .eq. 0) inquire(file = file_name, exist = exists)
+          call MPI_Bcast(exists, 1, MPI_LOGICAL, 0, NEKO_COMM)
+          if (exists) this%restart_file = file_name
        end if
     end if
 
@@ -773,30 +769,32 @@ contains
     character(len=*), intent(in), optional :: format
     integer, intent(in), optional :: iter
     character(len=256) :: file_full
-    character(len=:), allocatable :: checkpoint_format
+    character(len=:), allocatable :: file_format
     character(len=256) :: file_path, file_base, file_ext
 
+    ! Default, read from the optimizer's stored checkpoint settings
     file_path = trim(this%checkpoint_path)
     file_base = trim(this%checkpoint_base)
-    checkpoint_format = trim(this%checkpoint_format)
+    file_format = trim(this%checkpoint_format)
 
+    ! Override with any provided arguments
     if (present(path)) file_path = trim(path)
     if (present(basename)) file_base = trim(basename)
-    if (present(format)) checkpoint_format = trim(format)
+    if (present(format)) file_format = trim(format)
 
+    ! Ensure the path ends with a '/'
     if (len_trim(file_path) .eq. 0) then
        file_path = './'
-    else if (file_path(len_trim(file_path):len_trim(file_path)) &
-         .ne. '/') then
+    else if (file_path(len_trim(file_path):len_trim(file_path)) .ne. '/') then
        file_path = trim(file_path) // '/'
     end if
 
-    select case (trim(checkpoint_format))
+    select case (trim(file_format))
     case ('h5', 'hdf5', 'hf5', 'hdf')
        file_ext = 'h5'
     case default
        call neko_error('optimizer: Unsupported checkpoint format: "' // &
-            trim(checkpoint_format) // '"')
+            trim(file_format) // '"')
     end select
 
     ! Construct the full filename based on overwrite flag
@@ -853,6 +851,7 @@ contains
     call filename_suffix(trim(file_full), suffix)
 
     ! Create the path if it does not exist
+    exist = .false.
     if (pe_rank .eq. 0) inquire(file=file_path, exist=exist)
     call MPI_Bcast(exist, 1, MPI_LOGICAL, 0, NEKO_COMM)
     if (.not. exist) then
