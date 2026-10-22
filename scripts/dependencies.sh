@@ -465,7 +465,7 @@ function find_neko() {
         fi
 
         # Update compile dependencies if makedepf90 is installed
-        if [[ -n "$(which makedepf90)" && "$CLEAN_NEKO" == true ]]; then
+        if command -v makedepf90 2>&1 1>/dev/null; then
             size_pre=$(stat -c %s src/.depends)
             cd src/ && make depend && cd ../
             if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
