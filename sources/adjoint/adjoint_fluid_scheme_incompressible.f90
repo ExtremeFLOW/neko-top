@@ -40,7 +40,7 @@ module adjoint_fluid_scheme_incompressible
   use num_types, only: rp, dp, i8
   use adjoint_source_term, only: adjoint_source_term_t
   use field, only: field_t
-  use space, only: space_t, GLL, GL, operator(.ne.)
+  use space, only: space_t, GLL, operator(.ne.)
   use dofmap, only: dofmap_t
   use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
   use coefs, only: coef_t
@@ -154,7 +154,6 @@ contains
     character(len=:), allocatable :: string_val1, string_val2
     character(len=:), allocatable :: json_key
     type(json_file) :: json_subdict
-    integer :: lxd
 
     !
     ! SEM simulation fundamentals
@@ -162,31 +161,25 @@ contains
 
     this%msh => msh
 
-    ! over intergration order (hard coded now, should be optional)
-    lxd = (3 * (lx + 1)) / 2
     if (msh%gdim .eq. 2) then
        call this%Xh%init(GLL, lx, lx)
     else
        call this%Xh%init(GLL, lx, lx, lx)
     end if
-    call this%Xh_GL%init(GL, lxd, lxd, lxd)
 
     ! NOTE. This shouldn't require remaking all this stuff. What should be
     ! changed on the neko side is a way of initializing a coef FULLY (ie, Bs)
     ! with just a space.
     call this%dm_Xh%init(msh, this%Xh)
-    call this%dm_Xh_GL%init(msh, this%Xh_GL)
 
     call this%gs_Xh%init(this%dm_Xh)
-    call this%gs_Xh_GL%init(this%dm_Xh_GL)
 
     call this%c_Xh%init(this%gs_Xh)
-    call this%c_Xh_GL%init(this%gs_Xh_GL)
 
-    call this%GLL_to_GL%init(this%Xh_GL, this%Xh)
-
-    ! Overintegration scratch registry (5 should be sufficient)
-    call this%scratch_GL%init(5, 2, this%dm_Xh_GL)
+    ! NOTE. The Gauss over-integration stack (Xh_GL, dm_Xh_GL, gs_Xh_GL,
+    ! c_Xh_GL, GLL_to_GL, scratch_GL) is deliberately not built here. It is
+    ! built on demand by require_gauss_stack, called by each consumer that
+    ! actually over-integrates.
 
     ! Assign a name
     call json_get_or_default(params, 'case.fluid.name', this%name, "fluid")
@@ -428,17 +421,18 @@ contains
 
     call this%source_term%free()
 
-    call this%GLL_to_GL%free()
+    if (this%gauss_initialised) call this%GLL_to_GL%free()
 
     call this%gs_Xh%free()
 
-    call this%gs_Xh_GL%free()
+    if (this%gauss_initialised) call this%gs_Xh_GL%free()
 
     call this%c_Xh%free()
 
-    call this%c_Xh_GL%free()
-
-    call this%scratch_GL%free()
+    if (this%gauss_initialised) then
+       call this%c_Xh_GL%free()
+       call this%scratch_GL%free()
+    end if
 
     nullify(this%u_adj)
     nullify(this%v_adj)
@@ -476,9 +470,12 @@ contains
     call this%rho%free()
     call this%mu%free()
     call this%dm_Xh%free()
-    call this%dm_Xh_GL%free()
+    if (this%gauss_initialised) call this%dm_Xh_GL%free()
     call this%Xh%free()
-    call this%Xh_GL%free()
+    if (this%gauss_initialised) then
+       call this%Xh_GL%free()
+       this%gauss_initialised = .false.
+    end if
 
     nullify(this%msh)
     nullify(bc)
