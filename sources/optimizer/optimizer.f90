@@ -45,7 +45,8 @@ module optimizer
   use num_types, only: rp
   use logger, only: neko_log, LOG_SIZE
   use profiler, only: profiler_start_region, profiler_end_region
-  use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX, MPI_Bcast, MPI_LOGICAL
+  use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX, MPI_Bcast, &
+       MPI_LOGICAL, MPI_Barrier
   use utils, only: neko_error, filename_path, filename_suffix, read_duration, &
        mkdir
   use csv_file, only: csv_file_t
