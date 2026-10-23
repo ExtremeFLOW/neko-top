@@ -8,7 +8,7 @@
         "output_boundary": true,
         "time": {
             "end_time": 5.158,
-            "timestep": 0.0075
+            "timestep": 0.005
         },
         "numerics": {
             "time_order": 1,
