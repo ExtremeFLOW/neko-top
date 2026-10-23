@@ -476,7 +476,6 @@ contains
          MPI_REAL_PRECISION%mpi_val, MPI_MAX, NEKO_COMM%mpi_val, ierr)
     write(msg, '(2A)') 'the restarted run should reproduce the original run ', &
          'bitwise on CPU'
-
     @assertEqual(0.0_rp, global_diff, 0.0_rp, msg)
 
     if (allocated(opt)) then
@@ -487,7 +486,7 @@ contains
     call des%free()
     call x_a%free()
     call x_b%free()
-    call nekotop_continuation%free()
+
   end subroutine restart_matches_original_run
 
 end module steepest_descent_checkpoint
