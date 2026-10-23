@@ -22,7 +22,6 @@ module steepest_descent_checkpoint
   use mpi
   use pfunit
   use hdf5
-  use hdf5_session, only: hdf5_session_finalize
   use num_types, only: rp, dp, sp
   use json_module, only: json_file
   use vector, only: vector_t
@@ -129,7 +128,6 @@ contains
     call this%x_a%free()
     call this%x_b%free()
     call nekotop_continuation%free()
-    call hdf5_session_finalize()
   end subroutine tearDown
 
   ! ========================================================================== !
