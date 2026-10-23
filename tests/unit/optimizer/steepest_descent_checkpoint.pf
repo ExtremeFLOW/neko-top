@@ -83,14 +83,6 @@ module steepest_descent_checkpoint
 
   @TestCase
   type, extends(MPITestCase) :: test_sd_checkpoint
-     type(stub_design_t) :: des
-     type(problem_t) :: prob
-     class(optimizer_t), allocatable :: opt
-     !> Final designs of runs A and B. Type components, not test-body
-     !! locals, so tearDown frees them even on a failing assertion's early
-     !! return (see steepest_descent_convergence.pf for why a leaked
-     !! vector_t's device mapping corrupts a later, unrelated vector_t).
-     type(vector_t) :: x_a, x_b
    contains
      procedure :: setUp
      procedure :: tearDown
@@ -119,15 +111,6 @@ contains
   subroutine tearDown(this)
     class(test_sd_checkpoint), intent(inout) :: this
 
-    if (allocated(this%opt)) then
-       call this%opt%free()
-       deallocate(this%opt)
-    end if
-    call this%prob%free()
-    call this%des%free()
-    call this%x_a%free()
-    call this%x_b%free()
-    call nekotop_continuation%free()
   end subroutine tearDown
 
   ! ========================================================================== !
@@ -325,6 +308,10 @@ contains
   @test(npes=[2])
   subroutine restart_matches_original_run(this)
     class(test_sd_checkpoint), intent(inout) :: this
+    type(stub_design_t) :: des
+    type(problem_t) :: prob
+    class(optimizer_t), allocatable :: opt
+    type(vector_t) :: x_a, x_b
     real(kind=rp), parameter :: move_limit_initial = 0.1_rp
     type(json_file) :: parameters
     class(objective_t), allocatable :: obj
@@ -366,7 +353,7 @@ contains
     ! ------------------------------------------------------------------- !
     ! Run A: 12 iterations, checkpointing every 6.
 
-    call this%des%init(x0)
+    call des%init(x0)
 
     call parameters%initialize()
     call parameters%load_from_string(json_str)
@@ -376,7 +363,7 @@ contains
          'optimization.cont_param', shift_var, cont_initial)
     shift_var = cont_initial
 
-    call this%prob%init(parameters, this%des)
+    call prob%init(parameters, des)
     allocate(quad_obj_t :: obj)
     select type (q => obj)
     type is (quad_obj_t)
@@ -388,16 +375,16 @@ contains
        q%d = d
        q%shift => shift_var
     end select
-    call this%prob%add_objective(obj)
+    call prob%add_objective(obj)
 
-    call optimizer_factory(this%opt, parameters, this%prob, this%des)
+    call optimizer_factory(opt, parameters, prob, des)
     call parameters%destroy()
 
-    call this%opt%run(this%prob, this%des)
+    call opt%run(prob, des)
 
-    call this%x_a%init(n)
-    call this%des%get_values(this%x_a)
-    call this%x_a%copy_from(DEVICE_TO_HOST, .true.)
+    call x_a%init(n)
+    call des%get_values(x_a)
+    call x_a%copy_from(DEVICE_TO_HOST, .true.)
 
     ! Guard against a vacuous pass: delta must really have shrunk below its
     ! initial value by iteration 6, or the "skip loading delta" mutation
@@ -430,10 +417,10 @@ contains
     ! Tear down Run A and reset the shared registries, exactly as
     ! optimizer_checkpoint.pf does between its two phases.
 
-    call this%opt%free()
-    deallocate(this%opt)
-    call this%prob%free()
-    call this%des%free()
+    call opt%free()
+    deallocate(opt)
+    call prob%free()
+    call des%free()
     call nekotop_continuation%free()
 
     call neko_registry%free()
@@ -445,7 +432,7 @@ contains
     ! Run B: a factory-fresh optimizer restarted from the iteration-6
     ! checkpoint, run on to iteration 12.
 
-    call this%des%init(x0)
+    call des%init(x0)
 
     call parameters%initialize()
     call parameters%load_from_string(json_str_restart)
@@ -455,7 +442,7 @@ contains
          'optimization.cont_param', shift_var, cont_initial)
     shift_var = cont_initial
 
-    call this%prob%init(parameters, this%des)
+    call prob%init(parameters, des)
     allocate(quad_obj_t :: obj)
     select type (q => obj)
     type is (quad_obj_t)
@@ -467,23 +454,23 @@ contains
        q%d = d
        q%shift => shift_var
     end select
-    call this%prob%add_objective(obj)
+    call prob%add_objective(obj)
 
-    call optimizer_factory(this%opt, parameters, this%prob, this%des)
+    call optimizer_factory(opt, parameters, prob, des)
     call parameters%destroy()
 
-    call this%opt%run(this%prob, this%des)
+    call opt%run(prob, des)
 
-    call this%x_b%init(n)
-    call this%des%get_values(this%x_b)
-    call this%x_b%copy_from(DEVICE_TO_HOST, .true.)
+    call x_b%init(n)
+    call des%get_values(x_b)
+    call x_b%copy_from(DEVICE_TO_HOST, .true.)
 
     ! --------------------------------------------------------------------- !
     ! Compare: on CPU the two final designs must be bitwise identical.
 
     local_diff = 0.0_rp
     do i = 1, n
-       local_diff = max(local_diff, abs(this%x_b%x(i) - this%x_a%x(i)))
+       local_diff = max(local_diff, abs(x_b%x(i) - x_a%x(i)))
     end do
     call MPI_Allreduce(local_diff, global_diff, 1, &
          MPI_REAL_PRECISION%mpi_val, MPI_MAX, NEKO_COMM%mpi_val, ierr)
@@ -491,6 +478,16 @@ contains
          'bitwise on CPU'
 
     @assertEqual(0.0_rp, global_diff, 0.0_rp, msg)
+
+    if (allocated(opt)) then
+       call opt%free()
+       deallocate(opt)
+    end if
+    call prob%free()
+    call des%free()
+    call x_a%free()
+    call x_b%free()
+    call nekotop_continuation%free()
   end subroutine restart_matches_original_run
 
 end module steepest_descent_checkpoint
