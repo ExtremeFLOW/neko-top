@@ -136,6 +136,10 @@ endfunction()
 add_rejected_case(unsteady_variable_timestep
     "variable_timestep is not supported for unsteady problems")
 
+# Also when `timestep` is missing, which is the second error in that case.
+add_rejected_case(unsteady_variable_timestep_without_timestep
+    "variable_timestep is not supported for unsteady problems")
+
 # A variable timestep needs `timestep` to cap the first step: a run that
 # starts at rest has a zero CFL, and the first step would be huge.
 add_rejected_case(variable_timestep_without_timestep

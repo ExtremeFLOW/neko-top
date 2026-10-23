@@ -626,6 +626,7 @@ contains
   !! through the adjoint velocity, whose amplitude scales with the objective.
   !! The baseflow is the final forward state in a steady problem, and the
   !! forward state restored for the current step in an unsteady one.
+  !! @param this The fluid scheme.
   !! @param dt The time step.
   !! @return The CFL number of the baseflow.
   function adjoint_compute_cfl(this, dt) result(c)
