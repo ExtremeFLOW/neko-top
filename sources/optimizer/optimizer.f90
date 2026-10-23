@@ -960,9 +960,22 @@ contains
        file_full = checkpoint_filename(this, path, basename, format, iteration)
     end if
 
+    if (pe_rank .eq. 0) then
+       block
+         logical :: exists
+         character(len=256) :: msg
+         inquire(file = file_full, exist = exists)
+         if (.not. exists) then
+            write(msg, '(3A)') 'optimizer: Checkpoint file "', trim(file_full), &
+                 '" does not exist.'
+            call neko_error(msg)
+         end if
+       end block
+    end if
+    call MPI_Barrier(NEKO_COMM)
+
     ! Get the file extension
     call filename_suffix(trim(file_full), suffix)
-
     select case (trim(suffix))
     case ('h5', 'hdf5', 'hf5')
        call optimizer_load_checkpoint_hdf5(this, trim(file_full))

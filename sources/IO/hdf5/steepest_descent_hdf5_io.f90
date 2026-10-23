@@ -45,6 +45,7 @@
 !! stored; on a restart the case file defines them.
 submodule (steepest_descent_optimizer) steepest_descent_hdf5_io
   use hdf5
+  use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
   use num_types, only: dp, sp
   use mpi_f08, only: MPI_Allreduce, MPI_Scan, MPI_IN_PLACE, MPI_INFO_NULL, &
        MPI_INTEGER, MPI_SUM, MPI_MAX
@@ -94,7 +95,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Open the file and prepare the checkpoint group
 
-    call h5open_f(ierr)
+    call hdf5_session_init()
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
     call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
@@ -159,7 +160,7 @@ contains
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
+    call hdf5_session_finalize()
 
   end subroutine sd_optimizer_save_checkpoint_hdf5
 
@@ -183,7 +184,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Open the file and the checkpoint group
 
-    call h5open_f(ierr)
+    call hdf5_session_init()
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
     call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
@@ -248,7 +249,7 @@ contains
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
+    call hdf5_session_finalize()
 
     ! Ensure device state is updated
     call object%xold1%copy_from(HOST_TO_DEVICE, .true.)

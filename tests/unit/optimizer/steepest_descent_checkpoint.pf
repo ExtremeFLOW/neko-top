@@ -22,6 +22,7 @@ module steepest_descent_checkpoint
   use mpi
   use pfunit
   use hdf5
+  use hdf5_session, only: hdf5_session_finalize
   use num_types, only: rp, dp, sp
   use json_module, only: json_file
   use vector, only: vector_t
@@ -128,6 +129,7 @@ contains
     call this%x_a%free()
     call this%x_b%free()
     call nekotop_continuation%free()
+    call hdf5_session_finalize()
   end subroutine tearDown
 
   ! ========================================================================== !
@@ -269,11 +271,9 @@ contains
     if (.not. file_exists) return
 
     ddim(1) = int(n, hsize_t)
-    call h5open_f(ierr)
 
-    ! HDF5's native-type constants are only valid once the library has been
-    ! opened, so this must come after h5open_f (steepest_descent_hdf5_io.f90
-    ! follows the same order).
+    ! neko_init owns the HDF5 session for this test, so native-type constants
+    ! are already valid without opening or closing the library locally.
     select case (rp)
     case (dp)
        h5t_real = H5T_NATIVE_DOUBLE
@@ -285,14 +285,12 @@ contains
 
     call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr)
     if (ierr .ne. 0) then
-       call h5close_f(ierr)
        return
     end if
 
     call h5gopen_f(file_id, '/SteepestDescent/checkpoint', grp_id, ierr)
     if (ierr .ne. 0) then
        call h5fclose_f(file_id, ierr)
-       call h5close_f(ierr)
        return
     end if
 
@@ -300,7 +298,6 @@ contains
     if (ierr .ne. 0) then
        call h5gclose_f(grp_id, ierr)
        call h5fclose_f(file_id, ierr)
-       call h5close_f(ierr)
        return
     end if
 
@@ -308,7 +305,6 @@ contains
     call h5dclose_f(dset_id, ierr)
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
-    call h5close_f(ierr)
     if (read_ierr .ne. 0) return
 
     delta_min = minval(buf)
