@@ -185,6 +185,7 @@ contains
     end if
 
     ! Read the optimizer type and verify
+    ddim(1) = 1
     call h5aopen_f(grp_id, 'type', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, type_name, ddim, ierr)
