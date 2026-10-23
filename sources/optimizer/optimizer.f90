@@ -555,11 +555,11 @@ contains
   !> Get the current iteration number.
   !! @param this The optimizer object.
   !! @return The current iteration number.
-  pure function optimizer_get_iteration(this) result(iter)
+  pure function optimizer_get_iteration(this) result(iteration)
     class(optimizer_t), intent(in) :: this
-    integer :: iter
+    integer :: iteration
 
-    iter = this%current_iteration
+    iteration = this%current_iteration
   end function optimizer_get_iteration
 
   !> Print status message
@@ -572,17 +572,17 @@ contains
   !!
   !! @param this The optimizer object.
   !! @param stop_flag The stopping flag.
-  !! @param iter The number of iterations performed.
-  subroutine optimizer_print_status(this, stop_flag, iter)
+  !! @param iteration The number of iterations performed.
+  subroutine optimizer_print_status(this, stop_flag, iteration)
     class(optimizer_t), intent(in) :: this
     integer, intent(in) :: stop_flag
-    integer, intent(in) :: iter
+    integer, intent(in) :: iteration
     character(len=LOG_SIZE) :: msg
 
     select case (stop_flag)
     case (0)
        write(msg, '(A,I0,A)') 'Optimizer converged successfully after ', &
-            iter, ' iterations.'
+            iteration, ' iterations.'
        call neko_log%message(msg)
     case (1)
        write(msg, '(A,I0,A)') 'Optimizer did not converge in ', &
@@ -773,14 +773,14 @@ contains
   !! @param path The path where the checkpoint file is located.
   !! @param basename The base name of the checkpoint file.
   !! @param format The file format of the checkpoint file.
-  !! @param iter The iteration number.
-  function checkpoint_filename(this, path, basename, format, iter) &
+  !! @param iteration The iteration number.
+  function checkpoint_filename(this, path, basename, format, iteration) &
        result(file_full)
     class(optimizer_t), intent(in) :: this
     character(len=*), intent(in), optional :: path
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
-    integer, intent(in), optional :: iter
+    integer, intent(in), optional :: iteration
     character(len=256) :: file_full
     character(len=:), allocatable :: file_format
     character(len=256) :: file_path, file_base, file_ext
@@ -811,9 +811,9 @@ contains
     end select
 
     ! Construct the full filename based on overwrite flag
-    if (present(iter)) then
-       write(file_full, '(3A,I5.5,2A)') &
-            trim(file_path), trim(file_base), "_", iter, ".", trim(file_ext)
+    if (present(iteration)) then
+       write(file_full, '(2A,I5.5,2A)') trim(file_path), &
+            trim(file_base), "_", iteration, ".", trim(file_ext)
     else
        write(file_full, '(4A)') &
             trim(file_path), trim(file_base), ".", trim(file_ext)
@@ -916,7 +916,6 @@ contains
   !! saving in overwrite mode.
   !! @param this The optimizer object.
   !! @param filename The name of the file to load the checkpoint from.
-  !! @param iter The iteration number to load from the checkpoint file.
   !! @param design The design object.
   !! @param path The path where the checkpoint file is located.
   !! @param basename The base name of the file to load the checkpoint from.
