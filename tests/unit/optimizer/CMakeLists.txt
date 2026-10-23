@@ -115,7 +115,7 @@ add_pfunit_ctest(optimizer_checkpoint
     TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/optimizer_checkpoint.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
-    MAX_PES 2
+    MAX_PES 1
 )
 
 add_dependencies(Unit optimizer_checkpoint)
