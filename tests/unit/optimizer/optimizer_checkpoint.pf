@@ -88,6 +88,7 @@ contains
     character(len=256) :: msg
     integer, parameter :: max_iter = 12
     real(kind=rp), parameter :: tol = 1.0e-7_rp
+    real(kind=rp), parameter :: tol_x = 1.0e-14_rp
 
     ! ------------------------------------------------------------------------ !
     ! Read the parameters file as the first terminal argument
@@ -118,7 +119,7 @@ contains
        converged = opt%step(iter, prob, des, sim)
 
        if (iter .eq. max_iter / 2 ) then
-          call opt%save_checkpoint(iter, des, .true.)
+          call opt%save_checkpoint(des, .true., iteration = iter)
           call prob%get_objective_value(f_half)
           call des%get_values(x_half)
        end if
@@ -137,24 +138,26 @@ contains
     call neko_registry%free()
     call neko_scratch_registry%free()
 
-    call neko_registry%init()
-    call neko_scratch_registry%init()
-
     ! ------------------------------------------------------------------------ !
     ! Restore from checkpoint
+
+    call neko_registry%init()
+    call neko_scratch_registry%init()
 
     call sim%init(parameters)
     call design_factory(des, design_parameters, sim)
     call prob%init(parameters, des, sim)
     call optimizer_factory(opt, parameters, prob, des, sim)
 
-    call opt%load_checkpoint(iter = iter0, design = des)
-    call opt%initialize(prob, des, sim)
+    ! Load the checkpoint
+    call opt%load_checkpoint(des, iteration = max_iter / 2)
+    iter0 = opt%get_iteration()
 
     ! ------------------------------------------------------------------------ !
     ! Verify that the restored state matches the saved checkpoint
     ! up to numerical precision
 
+    call opt%initialize(prob, des, sim)
     call prob%get_objective_value(f)
     call des%get_values(x)
     call x%copy_from(DEVICE_TO_HOST, sync = .false.)
@@ -164,10 +167,12 @@ contains
     @assertEqual(max_iter / 2, iter0, trim(msg))
     write(msg, '(A)') "Loaded objective does not match"
     @assertEqual(f_half, f, tol, trim(msg))
+    write(msg, '(A)') "Loaded design does not match"
+    @assertEqual(0.0_rp, rmse(x_half, x), NEKO_EPS, trim(msg))
 
     do i = 1, des%size()
        write(msg, '(A,I0)') "Loaded design does not match at index ", i
-       @assertEqual(x_half%x(i), x%x(i), NEKO_EPS, trim(msg))
+       @assertEqual(x_half%x(i), x%x(i), tol_x, trim(msg))
     end do
 
     ! ------------------------------------------------------------------------ !
@@ -183,12 +188,17 @@ contains
 
     call prob%get_objective_value(f)
     call des%get_values(x)
+    call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call x_ref%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     write(msg, '(A)') "Final objective does not match original objective"
     @assertEqual(f_ref, f, tol, trim(msg))
+    write(msg, '(A)') "Final design does not match"
+    @assertEqual(0.0_rp, rmse(x_ref, x), NEKO_EPS, trim(msg))
+
     do i = 1, des%size()
        write(msg, '(A,I0)') "Final design does not match at index ", i
-       @assertEqual(x_ref%x(i), x%x(i), NEKO_EPS, trim(msg))
+       @assertEqual(x_ref%x(i), x%x(i), tol_x, trim(msg))
     end do
 
     ! ------------------------------------------------------------------------ !

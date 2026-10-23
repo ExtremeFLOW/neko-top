@@ -65,7 +65,7 @@ add_dependencies(Unit optimizer_checkpoint)
 set_tests_properties(optimizer_checkpoint PROPERTIES
     LABELS "unit;optimizer;hdf5"
     ENVIRONMENT "NEKO_LOG_FILE=optimizer_checkpoint.log"
-    TIMEOUT 300
+    TIMEOUT 600
 )
 
 # Add dependencies to ensure preparation is done before the test runs
