@@ -812,7 +812,7 @@ contains
 
     ! Construct the full filename based on overwrite flag
     if (present(iteration)) then
-       write(file_full, '(2A,I5.5,2A)') trim(file_path), &
+       write(file_full, '(3A,I5.5,2A)') trim(file_path), &
             trim(file_base), "_", iteration, ".", trim(file_ext)
     else
        write(file_full, '(4A)') &
