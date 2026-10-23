@@ -242,6 +242,7 @@ contains
     real(kind=rp) :: local_mask_fail, global_mask_fail
     real(kind=rp) :: target_e
     real(kind=rp), parameter :: bound_tol = 10.0_rp * epsilon(1.0_rp)
+    character(len=256) :: msg
     integer :: i, ierr
 
     ! Global layout (8 variables): 1-5 on rank 0, 6-8 on rank 1 -- an
@@ -328,15 +329,14 @@ contains
     ! --------------------------------------------------------------------- !
     ! Assert only now, identically on every rank.
 
-    @assertTrue(iter1_change .gt. 1.0e-6_rp, &
-         'design should still be moving after the first step')
-    @assertLessThanOrEqual(global_err, 2.0_rp * move_limit_min, &
-         'after 45 iterations x should be within 2*move_limit.min of &
-         &clamp(d)')
-    @assertEqual(0.0_rp, global_pin_fail, 0.0_rp, &
-         'a variable with d outside the box should pin exactly on its bound')
-    @assertEqual(0.0_rp, global_mask_fail, 0.0_rp, &
-         'a masked variable must stay exactly 0')
+    write(msg, '(A)') 'design should still be moving after the first step'
+    @assertTrue(iter1_change .gt. 1.0e-6_rp, msg)
+    write(msg, '(A)') 'after 45 iterations x should be within 2*move_limit.min of clamp(d)'
+    @assertLessThanOrEqual(global_err, 2.0_rp * move_limit_min, msg)
+    write(msg, '(A)') 'the design should be pinned exactly on its bound for any d outside the box'
+    @assertEqual(0.0_rp, global_pin_fail, 0.0_rp, msg)
+    write(msg, '(A)') 'a masked variable must stay exactly 0'
+    @assertEqual(0.0_rp, global_mask_fail, 0.0_rp, msg)
   end subroutine converges_near_clamped_target
 
   ! ========================================================================== !
@@ -353,6 +353,7 @@ contains
     logical, allocatable :: mask(:)
     integer :: n, i, ierr
     logical :: conv
+    character(len=256) :: msg
     real(kind=rp) :: local_diff, global_diff
 
     if (pe_rank .eq. 0) then
@@ -406,15 +407,15 @@ contains
     call MPI_Allreduce(local_diff, global_diff, 1, MPI_REAL_PRECISION%mpi_val, &
          MPI_MAX, NEKO_COMM%mpi_val, ierr)
 
-    @assertTrue(conv, &
-         'a zero bound-projected gradient is a KKT point: step() must &
-         &report convergence')
-    @assertEqual(0.0_rp, global_diff, 0.0_rp, &
-         'the design must be bitwise unchanged at a KKT point')
-    @assertEqual(0.0_rp, this%opt%max_design_change, 0.0_rp, &
-         'max design change must be exactly 0 at a KKT point')
-    @assertEqual(0.0_rp, this%opt%norm2_design_change, 0.0_rp, &
-         'the L2 design change must be exactly 0 at a KKT point')
+    write(msg, '(2A)') 'a zero bound-projected gradient is a KKT point: ', &
+         'step() must report convergence'
+    @assertTrue(conv, msg)
+    write(msg, '(A)') 'the design must be bitwise unchanged at a KKT point'
+    @assertEqual(0.0_rp, global_diff, 0.0_rp, msg)
+    write(msg, '(A)') 'the max design change must be exactly 0 at a KKT point'
+    @assertEqual(0.0_rp, this%opt%max_design_change, 0.0_rp, msg)
+    write(msg, '(A)') 'the L2 design change must be exactly 0 at a KKT point'
+    @assertEqual(0.0_rp, this%opt%norm2_design_change, 0.0_rp, msg)
   end subroutine zero_gradient_is_a_kkt_point
 
   ! ========================================================================== !
@@ -434,6 +435,7 @@ contains
     class(objective_t), allocatable :: obj
     integer :: n, csv_unit, ios, pos, ierr
     character(len=4096) :: line, last_line
+    character(len=256) :: msg
     real(kind=rp) :: read_val
 
     cont_target = 0.0_rp
@@ -502,9 +504,9 @@ contains
     call MPI_Bcast(read_val, 1, MPI_REAL_PRECISION%mpi_val, 0, &
          NEKO_COMM%mpi_val, ierr)
 
-    @assertEqual(40.0_rp, read_val, 1.0e-6_rp, &
-         'the last CSV row should carry the continuation target of the &
-         &final iteration (iteration 4 -> 40.0)')
+    write(msg, '(2A)') 'the last CSV row should carry the continuation target', &
+         ' of the final iteration (iteration 4 -> 40.0)'
+    @assertEqual(40.0_rp, read_val, 1.0e-6_rp, msg)
   end subroutine csv_log_continuation_column
 
 end module steepest_descent_convergence
