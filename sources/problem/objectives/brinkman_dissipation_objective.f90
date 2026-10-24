@@ -414,6 +414,12 @@ contains
        call field_cmult(work, this%weight * 0.5_rp / this%volume)
     end if
 
+    ! chi enters the value only inside the mask, so the sensitivity is zero
+    ! outside it
+    if (this%has_mask) then
+       call mask_exterior_const(work, this%mask, 0.0_rp)
+    end if
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
     else
