@@ -38,6 +38,27 @@ Currently, we have added tests for the following components:
   this objective's own `update_sensitivity` is empty.
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
+- `brinkman_dissipation_objective_t`, unsteady
+  (`unsteady_brinkman_dissipation.case`) — 20 time steps at polynomial order
+  3, with a PDE filter and the objective's default over-integration. It checks
+  that the reported value is integrated with the quadrature its adjoint
+  forcing and sensitivity differentiate. With the value on the GLL points and
+  its derivatives on the GL points, the error at the smallest perturbation was
+  `+1.775e-2`; with one quadrature it is `+1.05e-5`, which is first-order
+  truncation (`+5.25e-5` at `5e-4`). The tolerance of `1e-4` lies between the
+  two.
+- `brinkman_dissipation_objective_t`, unsteady and masked
+  (`unsteady_brinkman_dissipation_masked.case`) — the same case with the
+  objective masked to the design domain. The PDE filter's transpose carries
+  any sensitivity reported outside the mask onto the design variables next to
+  the domain boundary, and the probed variable lies `0.015` inside it. With
+  the sensitivity unmasked the error was `-6.24e-2`; masked it is `+1.13e-5`.
+- `brinkman_dissipation_dealias_mismatch_rejected`
+  (`brinkman_dissipation_dealias_mismatch.case`) — the same case with
+  `dealias_sensitivity` false and `dealias_forcing` left at its default. A
+  mixed setting has no value its sensitivity is the gradient of, so the
+  objective must reject it; the test passes only if the run stops with that
+  error.
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
@@ -68,6 +89,9 @@ Reuse the existing generic driver — you almost never need new Fortran code:
        "new_case.case"  # Add your new case here
    )
    ```
+   A case the driver must refuse is registered with
+   `add_rejected_case(<name> "<expected error>")` instead, which passes only
+   if the run stops with that error.
 3. Only write new Fortran (in `problem_tester.f90`/`sensitivity.f90`) if the
    generic driver genuinely can't express what you need — it currently
    handles any single objective or single constraint automatically.

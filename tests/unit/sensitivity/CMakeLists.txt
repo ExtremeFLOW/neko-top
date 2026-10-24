@@ -7,6 +7,8 @@ set(test_list
     "volume_filtered.case"
     "viscous_dissipation.case"
     "brinkman_dissipation.case"
+    "unsteady_brinkman_dissipation.case"
+    "unsteady_brinkman_dissipation_masked.case"
 )
 
 # Path to the common driver source
@@ -97,6 +99,43 @@ foreach(case_file ${test_list})
             TIMEOUT 300
     )
 endforeach()
+
+# ============================================================================ #
+# Cases the driver must reject. Each test passes only if the run stops with
+# the given error.
+function(add_rejected_case case_name expected_error)
+    add_custom_target(
+        ${case_name}_case_file
+        COMMENT "Copying case file ${case_name}.case to the test directory"
+        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+        BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+            ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    add_dependencies(sensitivity_test_prepare ${case_name}_case_file)
+
+    add_test(NAME ${case_name}_rejected
+        COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_name}.case
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    set_tests_properties(${case_name}_rejected
+        PROPERTIES
+            DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
+            LABELS "sensitivity;unit"
+            ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
+            PASS_REGULAR_EXPRESSION "${expected_error}"
+            TIMEOUT 300
+    )
+endfunction()
+
+# The brinkman_dissipation objective's two dealias keys select one
+# quadrature for its value, adjoint forcing and sensitivity. Set
+# differently, the sensitivity is not the gradient of the value.
+add_rejected_case(brinkman_dissipation_dealias_mismatch
+    "dealias_sensitivity and dealias_forcing must be equal")
 
 # ============================================================================ #
 # Final dependencies
