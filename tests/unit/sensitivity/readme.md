@@ -64,10 +64,14 @@ Currently, we have added tests for the following components:
   `adjoint_joblimit_tester.f90`. A steady adjoint takes as many steps as the
   forward run did, with time steps of its own, so its clock can stop short
   of `end_time`. It must still count as complete and write no job-limit
-  checkpoint. The forward run starts almost at rest with a large `timestep`,
-  so its first step is much longer than any adjoint step, which follows the
-  CFL of the developed flow. The driver also checks that the adjoint's clock
-  did stop short, so that the check cannot pass vacuously.
+  checkpoint. The forward run starts almost at rest, so its first step is
+  the full `timestep`; its later steps follow the CFL of the developing
+  flow. Every adjoint step follows the CFL of the developed flow, which is
+  higher, so the adjoint steps are shorter. `max_timestep` caps every step
+  at 8e-3, which keeps the explicit Brinkman term stable: BDF3/EXT3 needs
+  `chi * dt` below 20/21, and `chi` reaches 100 here. The driver also
+  checks that the adjoint's clock did stop short, so that the check cannot
+  pass vacuously.
 - The guards against a variable timestep in an unsteady problem
   (`unsteady_variable_timestep.case`) and against a variable timestep
   without the `timestep` that caps its first step

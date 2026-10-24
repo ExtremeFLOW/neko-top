@@ -8,8 +8,9 @@
         "time": {
             "end_time": 0.1,
             "variable_timestep": true,
-            "target_cfl": 0.5,
-            "timestep": 5.0e-2
+            "target_cfl": 0.1,
+            "timestep": 8.0e-3,
+            "max_timestep": 8.0e-3
         },
         "numerics": {
             "time_order": 3,
