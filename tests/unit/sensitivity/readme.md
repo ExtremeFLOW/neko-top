@@ -53,6 +53,12 @@ Currently, we have added tests for the following components:
   any sensitivity reported outside the mask onto the design variables next to
   the domain boundary, and the probed variable lies `0.015` inside it. With
   the sensitivity unmasked the error was `-6.24e-2`; masked it is `+1.13e-5`.
+  The driver probes the variable with the largest |sensitivity|, today number
+  1259 at `y = 0.2155`: `0.0155` inside the mask's `y = 0.2` boundary, so
+  within the filter radius (`0.05`) of the region outside it. The test guards
+  the mask only while its probe stays that close to the boundary. Whenever the
+  case or the driver's probe selection changes, confirm again that the test
+  fails with the mask removed from `update_sensitivity`.
 - `brinkman_dissipation_dealias_mismatch_rejected`
   (`brinkman_dissipation_dealias_mismatch.case`) — the same case with
   `dealias_sensitivity` false and `dealias_forcing` left at its default. A

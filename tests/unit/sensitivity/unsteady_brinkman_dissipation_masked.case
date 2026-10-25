@@ -87,7 +87,8 @@
     "state_recovery": {
         "type": "checkpoint",
         "enabled": true,
-        "n_memory": 20
+        "n_memory": 20,
+        "path": "checkpoints_unsteady_brinkman_dissipation_masked/"
     },
     "optimization": {
         "fd_test_tolerance": 1.0e-4,
