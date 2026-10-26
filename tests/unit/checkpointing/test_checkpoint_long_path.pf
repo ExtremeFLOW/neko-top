@@ -1,5 +1,9 @@
 module test_checkpoint_long_path
   use pfunit
+  use, intrinsic :: iso_c_binding, only: c_char, c_int, c_null_char
+  ! Renamed, since pfunit also exports MPI_Barrier from the mpi module
+  use mpi_f08, only: barrier_f08 => MPI_Barrier
+  use comm, only: pe_rank, NEKO_COMM
   use simulation_m, only: simulation_t
   use state_recover_checkpoint, only: state_recover_checkpoint_t
   use design, only: design_t
@@ -7,6 +11,17 @@ module test_checkpoint_long_path
   use checkpointing_test_utils, only: initialize_runtime_once, &
        initialize_case_from_file, finalize_case_objects
   implicit none
+
+  !> Top-level directory of the checkpoint path used by the test
+  character(len=*), parameter :: top_dir = 'long_path_checkpoints'
+
+  interface
+     !> POSIX rmdir, which removes an empty directory.
+     integer(c_int) function c_rmdir(path) bind(c, name = 'rmdir')
+       import c_char, c_int
+       character(kind=c_char), dimension(*), intent(in) :: path
+     end function c_rmdir
+  end interface
 
   @TestCase
   type, extends(MPITestCase) :: test_checkpoint_long_path_case
@@ -37,8 +52,11 @@ contains
     character(len=:), allocatable :: path, filename
     logical :: path_exists
 
-    path = 'long_path_checkpoints/' // repeat('p', 97) // '/'
+    path = top_dir // '/' // repeat('p', 97) // '/'
     filename = repeat('f', 120)
+
+    ! A tree left by an earlier run would make the existence check pass
+    call remove_path(path)
 
     call initialize_case_from_file('checkpoint.case', sim, des, prob)
 
@@ -47,8 +65,23 @@ contains
 
     inquire(file = path, exist = path_exists)
     call finalize_case_objects(sim, des, prob, chkp)
+    call remove_path(path)
 
     @assertTrue(path_exists, 'Checkpoint directory not created: ' // path)
   end subroutine init_with_long_path_and_filename
+
+  !> Remove the two empty directories of the checkpoint path on rank 0. No
+  !! checkpoint is saved, so both are empty. A missing directory is ignored.
+  !! @param path The checkpoint path, top_dir/<subdirectory>/.
+  subroutine remove_path(path)
+    character(len=*), intent(in) :: path
+    integer(c_int) :: ierr
+
+    if (pe_rank .eq. 0) then
+       ierr = c_rmdir(path // c_null_char)
+       ierr = c_rmdir(top_dir // c_null_char)
+    end if
+    call barrier_f08(NEKO_COMM)
+  end subroutine remove_path
 
 end module test_checkpoint_long_path

@@ -122,6 +122,7 @@ set(CHECKPOINT_LONG_PATH_ENV
 set_tests_properties(checkpoint_restore_consistency PROPERTIES
     LABELS "unit;checkpointing"
     ENVIRONMENT "${CHECKPOINT_RESTORE_ENV}"
+    RESOURCE_LOCK "checkpointing_workspace"
     TIMEOUT 300
 )
 
@@ -129,12 +130,14 @@ set_tests_properties(checkpoint_restore_consistency PROPERTIES
 set_tests_properties(checkpoint_end_of_run_gating PROPERTIES
     LABELS "unit;checkpointing"
     ENVIRONMENT "${CHECKPOINT_GATING_ENV}"
+    RESOURCE_LOCK "checkpointing_workspace"
     TIMEOUT 300
 )
 
 set_tests_properties(checkpoint_long_path PROPERTIES
     LABELS "unit;checkpointing"
     ENVIRONMENT "${CHECKPOINT_LONG_PATH_ENV}"
+    RESOURCE_LOCK "checkpointing_workspace"
     TIMEOUT 300
 )
 
@@ -188,6 +191,7 @@ if (HAVE_HDF5)
     set_tests_properties(checkpoint_restore_consistency_hdf5 PROPERTIES
         LABELS "unit;checkpointing;hdf5"
         ENVIRONMENT "${CHECKPOINT_RESTORE_HDF5_ENV}"
+        RESOURCE_LOCK "checkpointing_workspace"
         TIMEOUT 300
     )
     add_dependencies(Unit checkpoint_restore_consistency_hdf5)
