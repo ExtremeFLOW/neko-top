@@ -78,6 +78,12 @@
     "optimization": {
         "design": {
             "type": "brinkman",
+            "mapping": [
+                {
+                    "type": "RAMP",
+                    "f_max": 1000.0
+                }
+            ],
             "initial_distribution": {
                 "type": "point_zone",
                 "base_value": 0.0,
