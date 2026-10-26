@@ -9,12 +9,13 @@ set(test_list
     "steady_unsteady_final_step.case"
 )
 
-# Path to the common driver source, plus the user module carrying the
-# scalar inflow that `steady_unsteady_converged` needs.
-set(OBJECTIVES_DRIVER
-    ${CMAKE_CURRENT_SOURCE_DIR}/objectives_user.f90
-    ${CMAKE_CURRENT_SOURCE_DIR}/time_window_tester.f90
-)
+# Path to the common driver source
+set(OBJECTIVES_DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/time_window_tester.f90)
+
+# pFUnit source for the run-length check, which reuses
+# `time_window_run_length.case`
+set(STEP_COUNT_TEST ${CMAKE_CURRENT_SOURCE_DIR}/step_count.pf)
+set(STEP_COUNT_CASE "time_window_run_length.case")
 
 # ============================================================================ #
 # Use a private .mod folder to avoid clashes with other test targets
@@ -53,11 +54,39 @@ add_custom_target(
 add_dependencies(objectives_test_prepare objectives_prepare_script)
 
 # ============================================================================ #
-# Build the driver executable
+# The user module carrying the inflow every case here uses. It is built once
+# and linked into both drivers; compiling it into each would have the two
+# targets race on the same .mod file.
+add_library(objectives_user_obj OBJECT EXCLUDE_FROM_ALL
+    ${CMAKE_CURRENT_SOURCE_DIR}/objectives_user.f90
+)
+target_link_libraries(objectives_user_obj PRIVATE Neko-TOP::neko-top)
+
+# ============================================================================ #
+# Build the time-window driver executable
 add_executable(time_window_tester_bin EXCLUDE_FROM_ALL ${OBJECTIVES_DRIVER})
-target_link_libraries(time_window_tester_bin PRIVATE Neko-TOP::neko-top)
+target_link_libraries(time_window_tester_bin
+    PRIVATE objectives_user_obj Neko-TOP::neko-top
+)
 target_include_directories(time_window_tester_bin PRIVATE ${LOCAL_MOD_DIR})
 add_dependencies(Unit time_window_tester_bin)
+
+add_pfunit_ctest(end_time_step_count
+    TEST_SOURCES ${STEP_COUNT_TEST}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES objectives_user_obj Neko-TOP::neko-top
+    MAX_PES 1
+)
+target_include_directories(end_time_step_count PRIVATE ${LOCAL_MOD_DIR})
+add_dependencies(Unit end_time_step_count)
+add_dependencies(end_time_step_count objectives_test_prepare)
+
+# Disable treating pFUnit's generated variables as unused.
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(end_time_step_count PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
 
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules CACHE PATH
     "Fortran module directory" FORCE)
@@ -92,6 +121,17 @@ foreach(case_file ${test_list})
             TIMEOUT 300
     )
 endforeach()
+
+# ============================================================================ #
+# Run-length check: a run whose end_time lies on a step boundary must stop
+# there, on the steady and the unsteady path alike. The case file is copied
+# by the loop above.
+set_tests_properties(end_time_step_count
+    PROPERTIES
+        LABELS "objectives;unit"
+        ENVIRONMENT "NEKO_LOG_FILE=end_time_step_count.log"
+        TIMEOUT 300
+)
 
 # ============================================================================ #
 # Final dependencies

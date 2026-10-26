@@ -1,0 +1,150 @@
+!> Unit tests for NaN handling in the KKT residual of the CPU MMA backend.
+!!
+!! The MMA optimiser stops once the max-norm of the KKT residual, residumax,
+!! drops below its tolerance. MAX, MAXVAL and MPI_MAX can all drop a NaN, so
+!! a NaN in the sensitivities on a single rank must still make residumax NaN
+!! on every rank. Otherwise the optimiser can read a NaN design as converged.
+module mma_kkt_nan
+  use pfunit
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_value, &
+       ieee_quiet_nan
+  use, intrinsic :: ieee_exceptions, only: ieee_invalid, ieee_status_type, &
+       ieee_get_status, ieee_set_status, ieee_support_halting, &
+       ieee_set_halting_mode
+  use num_types, only: rp
+  use neko, only: neko_init
+  use comm, only: pe_rank
+  use mma, only: mma_t
+  use vector, only: vector_t
+  use vector_math, only: vector_glsum
+  use matrix, only: matrix_t
+  use device, only: HOST_TO_DEVICE
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_mma_kkt_nan_case
+   contains
+     procedure :: setUp
+  end type test_mma_kkt_nan_case
+
+  logical :: initialized = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_mma_kkt_nan_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  ! ========================================================================== !
+  ! A NaN sensitivity on one rank must reach residumax on every rank
+
+  @test(npes=[2])
+  subroutine dip_nan_on_one_rank(this)
+    class(test_mma_kkt_nan_case), intent(inout) :: this
+
+    call check_nan_on_one_rank('dip')
+
+  end subroutine dip_nan_on_one_rank
+
+  @test(npes=[2])
+  subroutine pdip_nan_on_one_rank(this)
+    class(test_mma_kkt_nan_case), intent(inout) :: this
+
+    call check_nan_on_one_rank('pdip')
+
+  end subroutine pdip_nan_on_one_rank
+
+  ! ========================================================================== !
+  ! Helpers
+
+  !> Take one MMA step on a small problem, then evaluate the KKT residual of
+  !! the new design twice: once as it is, and once with a NaN in a single
+  !! objective sensitivity on rank 1 only.
+  !! @param subsolver The MMA subsolver, 'dip' or 'pdip'.
+  subroutine check_nan_on_one_rank(subsolver)
+    character(len=*), intent(in) :: subsolver
+    integer, parameter :: n = 3, m = 1
+    type(mma_t) :: mma
+    type(vector_t) :: x, df0dx, fval
+    type(matrix_t) :: dfdx
+    type(ieee_status_type) :: fp_status
+    real(kind=rp), dimension(n) :: xmin, xmax
+    real(kind=rp), dimension(m) :: a, c, d
+
+    call x%init(n)
+    call df0dx%init(n)
+    call fval%init(m)
+    call dfdx%init(m, n)
+
+    x%x = 0.7_rp
+    call x%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+    a = 0.0_rp
+    c = 1000.0_rp
+    d = 1.0_rp
+
+    call mma%init_from_components(x, n, m, 1.0_rp, a, c, d, xmin, xmax, &
+         bcknd = 'cpu', subsolver = subsolver)
+
+    call quadratic_problem(x, df0dx, fval, dfdx)
+    call mma%update(1, x, df0dx, fval, dfdx)
+    call quadratic_problem(x, df0dx, fval, dfdx)
+
+    ! Control: the finite design gives a finite residual
+    call mma%kkt(x, df0dx, fval, dfdx)
+    @assertFalse(ieee_is_nan(mma%get_residumax()), message = "finite design")
+
+    if (pe_rank .eq. 1) df0dx%x(2) = ieee_value(1.0_rp, ieee_quiet_nan)
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    ! Comparisons with the NaN raise IEEE_INVALID, which halts a build with
+    ! -ffpe-trap=invalid, so halting is off for this call only
+    call ieee_get_status(fp_status)
+    if (ieee_support_halting(ieee_invalid)) then
+       call ieee_set_halting_mode(ieee_invalid, .false.)
+    end if
+    call mma%kkt(x, df0dx, fval, dfdx)
+    call ieee_set_status(fp_status)
+
+    @assertTrue(ieee_is_nan(mma%get_residumax()), message = "NaN on rank 1")
+
+    call mma%free()
+    call x%free()
+    call df0dx%free()
+    call fval%free()
+    call dfdx%free()
+
+  end subroutine check_nan_on_one_rank
+
+  !> Evaluate a small problem whose constraint is active at the optimum, so
+  !! that the multiplier is positive after an MMA step:
+  !! minimise \f$ \sum_j (x_j - 0.2)^2 \f$ subject to
+  !! \f$ 3.6 - \sum_j x_j \le 0 \f$.
+  !! @param x The design.
+  !! @param df0dx The objective sensitivities.
+  !! @param fval The constraint value.
+  !! @param dfdx The constraint sensitivities.
+  subroutine quadratic_problem(x, df0dx, fval, dfdx)
+    type(vector_t), intent(in) :: x
+    type(vector_t), intent(inout) :: df0dx, fval
+    type(matrix_t), intent(inout) :: dfdx
+
+    df0dx%x = 2.0_rp * (x%x - 0.2_rp)
+    fval%x(1) = 3.6_rp - vector_glsum(x)
+    dfdx%x = -1.0_rp
+
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+  end subroutine quadratic_problem
+
+end module mma_kkt_nan

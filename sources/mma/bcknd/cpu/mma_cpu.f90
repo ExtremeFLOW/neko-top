@@ -37,6 +37,7 @@ submodule (mma) mma_cpu
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use math, only: NEKO_EPS
   use profiler, only: profiler_start_region, profiler_end_region
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
 
   implicit none
 
@@ -186,6 +187,11 @@ contains
          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
     this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
+
+    ! MAXVAL and MPI_MAX can drop a NaN, which would then read as convergence.
+    ! The 2-norm keeps it on every rank: its distributed part is reduced with
+    ! MPI_SUM, and the rest is replicated.
+    if (ieee_is_nan(this%residunorm)) this%residumax = this%residunorm
   end subroutine mma_pdip_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual interior
@@ -271,6 +277,11 @@ contains
 
     this%residumax = max(abs(relambda), residual_max)
     this%residunorm = sqrt(residual_sq_norm + relambda**2)
+
+    ! MAX and MPI_MAX can drop a NaN, which would then read as convergence.
+    ! The 2-norm keeps it on every rank: its distributed part is reduced with
+    ! MPI_SUM, and the rest is replicated.
+    if (ieee_is_nan(this%residunorm)) this%residumax = this%residunorm
 
   end subroutine mma_dip_KKT_cpu
 
