@@ -141,7 +141,7 @@ contains
 
           ! Do not run simulation step on the first iteration
           if (k .ne. previous_save) then
-             if (this%neko_case%time%t .ge. this%neko_case%time%end_time) exit
+             if (this%neko_case%time%is_done()) exit
              call simulation_step(this%neko_case, dt_controller, loop_start)
           end if
 

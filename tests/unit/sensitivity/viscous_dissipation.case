@@ -29,6 +29,7 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 0.1,
+            "strict_convergence": true,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]

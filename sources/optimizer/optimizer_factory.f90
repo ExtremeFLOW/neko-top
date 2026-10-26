@@ -36,13 +36,15 @@ submodule(optimizer) optimizer_factory_mod
   use json_utils, only: json_get
   use utils, only: neko_type_error
   use mma_optimizer, only: mma_optimizer_t
+  use steepest_descent_optimizer, only: steepest_descent_optimizer_t
 
 
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(1) = [ character(len=25) :: &
-       "mma"]
+  character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
+       "mma", &
+       "steepest_descent"]
 
 contains
 
@@ -80,6 +82,8 @@ contains
     select case (trim(type))
     case ("mma")
        allocate(mma_optimizer_t::object)
+    case ("steepest_descent")
+       allocate(steepest_descent_optimizer_t::object)
     case default
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
