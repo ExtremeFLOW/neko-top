@@ -60,7 +60,6 @@ module adjoint_case
   use adjoint_scalar_convection_source_term, only: &
        adjoint_scalar_convection_source_term_t
   use json_utils_ext, only: json_key_fallback
-  use adjoint_dealias_default, only: dealias_default
   use adjoint_scalars, only: adjoint_scalars_t
   implicit none
   private
@@ -126,7 +125,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
-    logical :: dealias_adjoint_scalar_convection, dealias_fallback
+    logical :: dealias_adjoint_scalar_convection
 
     !
     ! Setup adjoint fluid
@@ -213,14 +212,17 @@ contains
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
           ! initialize the coupling term
-          dealias_fallback = dealias_default(neko_case%params)
-          call json_get_or_default(neko_case%params, &
+          json_key = json_key_fallback(neko_case%params, &
                'case.adjoint_scalar.dealias_coupling_term', &
-               dealias_adjoint_scalar_convection, dealias_fallback)
+               'case.numerics.dealias')
+          call json_get_or_default(neko_case%params, json_key, &
+               dealias_adjoint_scalar_convection, .true.)
+
           ! The over-integration stack is only needed if this term dealiases
           if (dealias_adjoint_scalar_convection) then
              call this%fluid_adj%require_gauss_stack()
           end if
+
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
                this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%scalar%s, &

@@ -53,8 +53,7 @@ module brinkman_dissipation_objective
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use utils, only: neko_error
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default
-  use adjoint_dealias_default, only: dealias_default
+  use json_utils, only: json_get, json_get_or_default
   use registry, only: neko_registry
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
@@ -148,7 +147,7 @@ contains
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Brinkman dissipation")
-    dealias_fallback = dealias_default(simulation%neko_case%params)
+    call json_get(simulation%neko_case%params, 'case.fluid.dealias', dealias_fallback)
     call json_get_or_default(json, "dealias_sensitivity", &
          dealias_sensitivity, dealias_fallback)
     call json_get_or_default(json, "dealias_forcing", &

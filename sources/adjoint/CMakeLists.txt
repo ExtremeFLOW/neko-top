@@ -3,7 +3,6 @@
 target_sources(neko-top
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_case.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_dealias_default.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_output.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_scheme.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_scheme_incompressible.f90

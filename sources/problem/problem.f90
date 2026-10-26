@@ -49,7 +49,6 @@ module problem
   use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
-  use adjoint_dealias_default, only: dealias_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log, LOG_SIZE
   use math, only: copy
@@ -350,7 +349,7 @@ contains
        allocate(augmented_lagrangian_objective_t::objective)
        select type (ALO => objective)
        class is (augmented_lagrangian_objective_t)
-          dealias_fallback = dealias_default(parameters)
+          call json_get(parameters, 'case.fluid.dealias', dealias_fallback)
           call json_get_or_default(parameters, &
                "optimization.augmented_lagrangian.dealias_sensitivity", &
                dealias, dealias_fallback)
