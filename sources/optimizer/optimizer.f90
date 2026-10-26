@@ -314,7 +314,7 @@ contains
     integer, intent(in), optional :: checkpoint_interval
     logical, intent(in), optional :: checkpoint_overwrite
     character(len=LOG_SIZE) :: msg
-    character(len=256) :: file_name
+    character(len=:), allocatable :: file_name
     logical :: exists
 
     ! Initialize internals
@@ -544,7 +544,7 @@ contains
           exit
        else if (this%out_of_time(iteration_time)) then
           block
-            character(len=256) :: filename
+            character(len=:), allocatable :: filename
             filename = checkpoint_filename(this, &
                  basename = "optimizer_rt_checkpoint")
             call this%save_checkpoint(design, .true., filename)
@@ -795,9 +795,10 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
     integer, intent(in), optional :: iteration
-    character(len=256) :: file_full
-    character(len=:), allocatable :: file_format
-    character(len=256) :: file_path, file_base, file_ext
+    character(len=:), allocatable :: file_full
+    character(len=:), allocatable :: file_path, file_base, file_format
+    character(len=:), allocatable :: file_ext
+    character(len=5) :: iteration_str
 
     ! Default, read from the optimizer's stored checkpoint settings
     file_path = trim(this%checkpoint_path)
@@ -810,10 +811,10 @@ contains
     if (present(format)) file_format = trim(format)
 
     ! Ensure the path ends with a '/'
-    if (len_trim(file_path) .eq. 0) then
+    if (len(file_path) .eq. 0) then
        file_path = './'
-    else if (file_path(len_trim(file_path):len_trim(file_path)) .ne. '/') then
-       file_path = trim(file_path) // '/'
+    else if (file_path(len(file_path):len(file_path)) .ne. '/') then
+       file_path = file_path // '/'
     end if
 
     select case (trim(file_format))
@@ -824,13 +825,14 @@ contains
             trim(file_format) // '"')
     end select
 
-    ! Construct the full filename based on overwrite flag
+    ! Construct the full filename based on overwrite flag. It is built by
+    ! concatenation, since the path alone can fill a fixed-length buffer.
     if (present(iteration)) then
-       write(file_full, '(3A,I5.5,2A)') trim(file_path), &
-            trim(file_base), "_", iteration, ".", trim(file_ext)
+       write(iteration_str, '(I5.5)') iteration
+       file_full = file_path // file_base // "_" // iteration_str // "." // &
+            file_ext
     else
-       write(file_full, '(4A)') &
-            trim(file_path), trim(file_base), ".", trim(file_ext)
+       file_full = file_path // file_base // "." // file_ext
     end if
 
   end function checkpoint_filename
@@ -854,7 +856,7 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
     integer, intent(in), optional :: iteration
-    character(len=256) :: file_full, file_path
+    character(len=:), allocatable :: file_full, file_path
     character(len=12) :: suffix
     logical :: exists, overwrite_flag
 
@@ -891,6 +893,7 @@ contains
     end if
 
     ! Extract the path and suffix from the full filename.
+    allocate(character(len=len(file_full)) :: file_path)
     call filename_path(trim(file_full), file_path)
     call filename_suffix(trim(file_full), suffix)
 
@@ -944,7 +947,7 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
     integer, intent(in), optional :: iteration
-    character(len=256) :: file_full
+    character(len=:), allocatable :: file_full
     character(len=12) :: suffix
 
     call neko_log%section('Optimizer loading checkpoint')

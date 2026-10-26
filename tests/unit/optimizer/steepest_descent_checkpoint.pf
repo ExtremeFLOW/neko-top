@@ -489,4 +489,78 @@ contains
 
   end subroutine restart_matches_original_run
 
+  !> A checkpoint path long enough that path, base name and suffix exceed
+  !! 256 characters must still give a checkpoint file. The file name used to
+  !! be built in a 256-character buffer, which aborted the run with
+  !! "Fortran runtime error: End of record".
+  @test(npes=[2])
+  subroutine long_checkpoint_path(this)
+    class(test_sd_checkpoint), intent(inout) :: this
+    type(stub_design_t) :: des
+    type(problem_t) :: prob
+    class(optimizer_t), allocatable :: opt
+    type(json_file) :: parameters
+    class(objective_t), allocatable :: obj
+    character(len=:), allocatable :: path, file_full
+    real(kind=rp), allocatable :: w(:), d(:), x0(:)
+    integer :: n
+    logical :: exists
+
+    ! Two levels below CKPT_PATH, which setUp removes, so the full name is
+    ! 265 characters long
+    path = CKPT_PATH // repeat('a', 115) // '/' // repeat('b', 115) // '/'
+    file_full = path // CKPT_BASE // '_00001.h5'
+
+    ! The other test leaves the continuation and the registries populated
+    call nekotop_continuation%free()
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+    call neko_registry%init()
+    call neko_scratch_registry%init()
+
+    if (pe_rank .eq. 0) then
+       n = 2
+       w = [1.0_rp, 1.0_rp]
+       d = [0.3_rp, 0.3_rp]
+       x0 = [0.5_rp, 0.5_rp]
+    else
+       n = 1
+       w = [1.0_rp]
+       d = [0.3_rp]
+       x0 = [0.5_rp]
+    end if
+
+    call des%init(x0)
+
+    call parameters%initialize()
+    call parameters%load_from_string('{"optimization": {"solver": ' // &
+         '{"type": "steepest_descent", "enable_output": false, ' // &
+         '"max_iterations": 1, "checkpoint": {"path": "' // path // &
+         '", "base": "' // CKPT_BASE // '", "interval": 1}}}}')
+
+    call prob%init(parameters, des)
+    allocate(quad_obj_t :: obj)
+    select type (q => obj)
+    type is (quad_obj_t)
+       call q%init_base('quadratic', n, 1.0_rp)
+       q%w = w
+       q%d = d
+    end select
+    call prob%add_objective(obj)
+
+    call optimizer_factory(opt, parameters, prob, des)
+    call parameters%destroy()
+
+    call opt%run(prob, des)
+
+    inquire(file = file_full, exist = exists)
+
+    call opt%free()
+    deallocate(opt)
+    call prob%free()
+    call des%free()
+
+    @assertTrue(exists, 'No checkpoint file ' // file_full)
+  end subroutine long_checkpoint_path
+
 end module steepest_descent_checkpoint
