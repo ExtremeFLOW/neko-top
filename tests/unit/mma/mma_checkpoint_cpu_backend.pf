@@ -1,0 +1,156 @@
+!> Unit test: saving a checkpoint must not change the state of an MMA object.
+!!
+!! On a device build every vector_t has a device copy, but an MMA object with
+!! the cpu backend keeps its state only on the host, so its device copies are
+!! stale. Copying them to the host before writing a checkpoint would replace
+!! the live state. Saving a checkpoint must therefore leave the iterates of
+!! the object unchanged. On a CPU build the test passes trivially.
+module mma_checkpoint_cpu_backend
+  use pfunit
+  use num_types, only: rp
+  use neko, only: neko_init
+  use comm, only: pe_rank
+  use mma, only: mma_t
+  use vector, only: vector_t
+  use vector_math, only: vector_glsum
+  use matrix, only: matrix_t
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_mma_checkpoint_case
+   contains
+     procedure :: setUp
+  end type test_mma_checkpoint_case
+
+  logical :: initialized = .false.
+
+  !> Number of MMA updates before the checkpoint is saved.
+  integer, parameter :: n_before = 2
+  !> Number of MMA updates after the checkpoint is saved.
+  integer, parameter :: n_after = 2
+
+contains
+
+  subroutine setUp(this)
+    class(test_mma_checkpoint_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  ! ========================================================================== !
+  ! Saving a checkpoint of a cpu-backend MMA must not change its iterates
+
+  @test(npes=[2])
+  subroutine save_keeps_cpu_state(this)
+    class(test_mma_checkpoint_case), intent(inout) :: this
+    type(vector_t) :: x_ref, x
+    character(len=64) :: msg
+    integer :: i
+
+    ! Reference: the same updates without a checkpoint in between
+    call run_mma(x_ref, '')
+
+    call run_mma(x, 'mma_checkpoint_cpu_backend.h5')
+
+    @assertEqual(x_ref%size(), x%size(), message = "size")
+    do i = 1, x%size()
+       write(msg, '(A,I0,A,I0,A)') "x(", i, ") on rank ", pe_rank, &
+            " after save"
+       @assertEqual(x_ref%x(i), x%x(i), message = trim(msg))
+    end do
+
+    call x_ref%free()
+    call x%free()
+
+  end subroutine save_keeps_cpu_state
+
+  ! ========================================================================== !
+  ! Helpers
+
+  !> Run a cpu-backend MMA for n_before + n_after updates and return the
+  !! final design on the host.
+  !! @param x The final design.
+  !! @param fname The checkpoint saved after n_before updates, or '' for none.
+  subroutine run_mma(x, fname)
+    type(vector_t), intent(inout) :: x
+    character(len=*), intent(in) :: fname
+    integer, parameter :: m = 1
+    type(mma_t) :: mma
+    type(vector_t) :: df0dx, fval
+    type(matrix_t) :: dfdx
+    real(kind=rp), allocatable :: xmin(:), xmax(:)
+    real(kind=rp), dimension(m) :: a, c, d
+    integer :: n, i, iter
+
+    ! Different local sizes on the two ranks
+    n = 3 + pe_rank
+
+    call x%init(n)
+    call df0dx%init(n)
+    call fval%init(m)
+    call dfdx%init(m, n)
+
+    do i = 1, n
+       x%x(i) = 0.7_rp + 0.05_rp * real(i, kind=rp) + 0.01_rp * &
+            real(pe_rank, kind=rp)
+    end do
+    call x%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    allocate(xmin(n), xmax(n))
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+    a = 0.0_rp
+    c = 1000.0_rp
+    d = 1.0_rp
+
+    call mma%init_from_components(x, n, m, 1.0_rp, a, c, d, xmin, xmax, &
+         bcknd = 'cpu', subsolver = 'dip')
+
+    do iter = 1, n_before + n_after
+       call quadratic_problem(x, df0dx, fval, dfdx)
+       call mma%update(iter, x, df0dx, fval, dfdx)
+       if (iter .eq. n_before .and. len(fname) .gt. 0) then
+          call mma%save_checkpoint(fname, overwrite = .true.)
+       end if
+    end do
+
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    call mma%free()
+    call df0dx%free()
+    call fval%free()
+    call dfdx%free()
+    deallocate(xmin, xmax)
+
+  end subroutine run_mma
+
+  !> Evaluate a small problem whose constraint is active at the optimum:
+  !! minimise \f$ \sum_j (x_j - 0.2)^2 \f$ subject to
+  !! \f$ 4.2 - \sum_j x_j \le 0 \f$.
+  !! @param x The design.
+  !! @param df0dx The objective sensitivities.
+  !! @param fval The constraint value.
+  !! @param dfdx The constraint sensitivities.
+  subroutine quadratic_problem(x, df0dx, fval, dfdx)
+    type(vector_t), intent(inout) :: x
+    type(vector_t), intent(inout) :: df0dx, fval
+    type(matrix_t), intent(inout) :: dfdx
+
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    df0dx%x = 2.0_rp * (x%x - 0.2_rp)
+    fval%x(1) = 4.2_rp - vector_glsum(x)
+    dfdx%x = -1.0_rp
+
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+  end subroutine quadratic_problem
+
+end module mma_checkpoint_cpu_backend
