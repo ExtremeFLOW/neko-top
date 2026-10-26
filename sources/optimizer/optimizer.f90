@@ -964,12 +964,10 @@ contains
     if (pe_rank .eq. 0) then
        block
          logical :: exists
-         character(len=256) :: msg
          inquire(file = file_full, exist = exists)
          if (.not. exists) then
-            write(msg, '(3A)') 'optimizer: Checkpoint file "', trim(file_full), &
-                 '" does not exist.'
-            call neko_error(msg)
+            call neko_error('optimizer: Checkpoint file "' // &
+                 trim(file_full) // '" does not exist.')
          end if
        end block
     end if
