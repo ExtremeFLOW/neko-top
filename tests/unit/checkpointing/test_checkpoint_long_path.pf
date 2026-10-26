@@ -1,0 +1,54 @@
+module test_checkpoint_long_path
+  use pfunit
+  use simulation_m, only: simulation_t
+  use state_recover_checkpoint, only: state_recover_checkpoint_t
+  use design, only: design_t
+  use problem, only: problem_t
+  use checkpointing_test_utils, only: initialize_runtime_once, &
+       initialize_case_from_file, finalize_case_objects
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_checkpoint_long_path_case
+   contains
+     procedure :: setUp
+  end type test_checkpoint_long_path_case
+
+contains
+
+  subroutine setUp(this)
+    class(test_checkpoint_long_path_case), intent(inout) :: this
+
+    call initialize_runtime_once()
+  end subroutine setUp
+
+  !> A checkpoint path and file name of 120 characters each, both longer than
+  !! a 79-character log line, must not overflow the initialisation log
+  !! messages. Before the fix this aborted inside `init_from_components`
+  !! with `Fortran runtime error: End of record`.
+  @test(npes=[2])
+  subroutine init_with_long_path_and_filename(this)
+    class(test_checkpoint_long_path_case), intent(inout) :: this
+
+    type(simulation_t), target :: sim
+    type(state_recover_checkpoint_t) :: chkp
+    class(design_t), allocatable :: des
+    type(problem_t) :: prob
+    character(len=:), allocatable :: path, filename
+    logical :: path_exists
+
+    path = 'long_path_checkpoints/' // repeat('p', 97) // '/'
+    filename = repeat('f', 120)
+
+    call initialize_case_from_file('checkpoint.case', sim, des, prob)
+
+    call chkp%init_from_components(sim%neko_case, 'linear', &
+         n_saves_memory = 2, path = path, filename = filename)
+
+    inquire(file = path, exist = path_exists)
+    call finalize_case_objects(sim, des, prob, chkp)
+
+    @assertTrue(path_exists, 'Checkpoint directory not created: ' // path)
+  end subroutine init_with_long_path_and_filename
+
+end module test_checkpoint_long_path
