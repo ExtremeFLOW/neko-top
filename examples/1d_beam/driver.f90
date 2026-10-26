@@ -215,7 +215,6 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
-  call neko_finalize(neko_case)
   call opt%free()
   call prob%free()
   call des%free()
@@ -226,6 +225,9 @@ program usrneko
   call all_objectives%free()
   call constraint_value%free()
   call initdesign%free()
+
+  ! Finalize the Neko environment last, since it also finalizes the device
+  call neko_finalize(neko_case)
 end program usrneko
 
 
