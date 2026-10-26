@@ -54,14 +54,15 @@ module heat_compliance
   use device_math, only: device_copy, device_cmult, device_glsc2, device_col2, &
        device_cfill, device_subcol3
   use math, only: col2, cmult, copy, glsc2, glsum
-   use ax_product, only: ax_t, ax_helm_factory
+  use ax_product, only: ax_t, ax_helm_allocator
   use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
-   use precon, only: pc_t, precon_factory, precon_destroy
+  use precon, only: pc_t, precon_factory
   use jacobi, only: jacobi_t
   use device_jacobi, only: device_jacobi_t
   use sx_jacobi, only: sx_jacobi_t
   use hsmg, only: hsmg_t
   use bc_list, only: bc_list_t
+  use scalar_bc_projector, only: scalar_bc_projector_t
   use zero_dirichlet, only: zero_dirichlet_t
   use profiler, only: profiler_start_region, profiler_end_region
   use gather_scatter, only: gs_t, GS_OP_ADD
@@ -84,6 +85,7 @@ module heat_compliance
      class(ksp_t), allocatable :: ksp
      class(pc_t), allocatable :: pc
      type(bc_list_t) :: bclst
+     type(scalar_bc_projector_t) :: bc_projector
      type(zero_dirichlet_t) :: bc_sink
      real(kind=rp) :: abstol = 1.0e-8_rp
      integer :: ksp_max_iter = 10000
@@ -115,14 +117,14 @@ module heat_compliance
      logical :: has_mask
      type(coef_t), pointer :: coef
    contains
-     procedure, pass(this) :: get_values      => thermal_conductivity_design_get_design
+     procedure, pass(this) :: get_values => thermal_conductivity_design_get_design
      procedure, pass(this) :: get_sensitivity => thermal_conductivity_design_get_sensitivity
-     procedure, pass(this) :: init            => thermal_conductivity_design_init
-     procedure, pass(this) :: update_design   => thermal_conductivity_design_update_design
-     procedure, pass(this) :: map_forward     => thermal_conductivity_design_map_forward
-     procedure, pass(this) :: map_backward    => thermal_conductivity_design_map_backward
-     procedure, pass(this) :: write           => thermal_conductivity_design_write
-     procedure, pass(this) :: free            => thermal_conductivity_design_free
+     procedure, pass(this) :: init => thermal_conductivity_design_init
+     procedure, pass(this) :: update_design => thermal_conductivity_design_update_design
+     procedure, pass(this) :: map_forward => thermal_conductivity_design_map_forward
+     procedure, pass(this) :: map_backward => thermal_conductivity_design_map_backward
+     procedure, pass(this) :: write => thermal_conductivity_design_write
+     procedure, pass(this) :: free => thermal_conductivity_design_free
   end type thermal_conductivity_design_t
 
   !> Volume constraint for thermal_conductivity_design_t
@@ -130,10 +132,10 @@ module heat_compliance
   !!   g = limit - V       (or -g if is_max = .true.)
   type, public, extends(constraint_t) :: thermal_volume_constraint_t
      private
-     logical :: is_max               ! .false. => V > V_min; .true. => V < V_max
-     real(kind=rp) :: limit          ! V_min or V_max
-     real(kind=rp) :: volume_domain  ! |Omega|
-     type(coef_t), pointer :: coef => null()  ! to access B and volume
+     logical :: is_max ! .false. => V > V_min; .true. => V < V_max
+     real(kind=rp) :: limit ! V_min or V_max
+     real(kind=rp) :: volume_domain ! |Omega|
+     type(coef_t), pointer :: coef => null() ! to access B and volume
      type(mapping_handler_t) :: constraint_mapping
      logical :: has_mapping
    contains
@@ -154,9 +156,9 @@ contains
   !=========================================================================!
   subroutine heat_compliance_init (this, design, coef, parameters)
     class(heat_compliance_t), intent(inout) :: this
-    class(design_t),          intent(in)    :: design
-    type(coef_t), target,     intent(in)    :: coef
-    type(json_file),          intent(inout), optional :: parameters
+    class(design_t), intent(in) :: design
+    type(coef_t), target, intent(in) :: coef
+    type(json_file), intent(inout), optional :: parameters
     character(len=256), parameter :: name = 'heat_compliance'
     integer :: n, n_global, ierr
     character(len=LOG_SIZE) :: log_buf
@@ -212,18 +214,18 @@ contains
 
     ! Add this bc to the list used by Ax/KSP
     call this%bclst%append(this%bc_sink)
+    call this%bc_projector%mark(this%bclst)
 
     ! ------------------------------------------------------------------ !
     ! Helmholtz operator and Krylov solver
     ! ------------------------------------------------------------------ !
-    call ax_helm_factory(this%Ax, full_formulation = .false.)
+    call ax_helm_allocator(this%Ax, type_name = "standard")
 
     call krylov_solver_factory(this%ksp, n, this%ksp_solver, &
          this%ksp_max_iter, this%abstol)
 
-    call heat_compliance_precon_factory(this%pc, this%ksp, &
-          this%coef, this%coef%dof, this%coef%gs_h, this%bclst, &
-         this%precon_type)
+    call precon_factory(this%pc, this%precon_type, &
+         this%coef, this%bclst, parameters)
 
     ! Temperature field and conductivity field
     call this%phi%init(this%coef%dof)
@@ -270,13 +272,14 @@ contains
     end if
 
     if (allocated(this%pc)) then
-       call precon_destroy(this%pc)
+       call this%pc%free()
        deallocate(this%pc)
     end if
 
+    call this%bc_projector%free()
+    call this%bclst%free()
     call this%bc_sink%free()
     call this%mapping%free()
-    call this%bclst%free()
     call this%phi%free()
     call this%thermal_conductivity%free()
 
@@ -287,7 +290,7 @@ contains
   !=========================================================================!
   subroutine heat_compliance_update_value(this, design)
     class(heat_compliance_t), intent(inout) :: this
-    class(design_t),         intent(in)    :: design
+    class(design_t), intent(in) :: design
     integer :: n
     type(field_t), pointer :: RHS, work, delta_phi
     character(len=LOG_SIZE) :: log_buf
@@ -313,9 +316,9 @@ contains
        ! ----------------------------------------------------------------!
        ! RHS: uniform heating throughout the domain
        ! ----------------------------------------------------------------!
-       call field_rone(RHS)             ! RHS = 1 everywhere
+       call field_rone(RHS) ! RHS = 1 everywhere
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(RHS%x_d, this%coef%B_d, n)     ! apply mass matrix B
+          call device_col2(RHS%x_d, this%coef%B_d, n) ! apply mass matrix B
        else
           call col2(RHS%x, this%coef%B, n)
        end if
@@ -332,15 +335,15 @@ contains
 
        ! We solve for delta phi, so use the previous phi field as initial guess
        call this%Ax%compute(work%x, this%phi%x, this%coef, this%coef%msh, &
-         this%coef%Xh)
+            this%coef%Xh)
 
-      call field_sub2(RHS, work)
+       call field_sub2(RHS, work)
 
        ! Gather-scatter on RHS
        call this%coef%gs_h%op(RHS, GS_OP_ADD)
 
        ! Apply strong BCs to RHS (Dirichlet sink on zone 2)
-       call this%bclst%apply_scalar(RHS%x, n)
+       call this%bc_projector%apply(RHS%x, n)
 
        ! Solve Helmholtz equation for phi
        call profiler_start_region('Forward solve')
@@ -349,7 +352,7 @@ contains
 
        this%ksp_results(1) = &
             this%ksp%solve(this%Ax, delta_phi, RHS%x, n, this%coef, &
-            this%bclst, this%coef%gs_h)
+            this%bc_projector, this%coef%gs_h)
        call profiler_end_region('Forward solve')
 
        ! add result
@@ -384,7 +387,7 @@ contains
   !=========================================================================!
   subroutine heat_compliance_update_sensitivity(this, design)
     class(heat_compliance_t), intent(inout) :: this
-    class(design_t),         intent(in)    :: design
+    class(design_t), intent(in) :: design
     type(field_t), pointer :: grad_phi_x, grad_phi_y, grad_phi_z
     integer :: temp_indices(3)
     integer :: n
@@ -402,17 +405,17 @@ contains
 
     call field_cmult(grad_phi_x, -1.0_rp)
     call field_cmult(grad_phi_x, this%avg_B)
-      ! if (NEKO_BCKND_DEVICE .eq. 1) then
-      !     call device_col2(grad_phi_x%x_d, this%coef%B_d, n)
-      !  else
-      !     call col2(grad_phi_x%x, this%coef%B, n)
-      !  end if
-      !  call this%coef%gs_h%op(grad_phi_x, GS_OP_ADD)
-      !  if (NEKO_BCKND_DEVICE .eq. 1) then
-      !     call device_col2(grad_phi_x%x_d, this%coef%Binv_d, n)
-      !  else
-      !     call col2(grad_phi_x%x, this%coef%Binv, n)
-      !  end if      
+    ! if (NEKO_BCKND_DEVICE .eq. 1) then
+    !     call device_col2(grad_phi_x%x_d, this%coef%B_d, n)
+    !  else
+    !     call col2(grad_phi_x%x, this%coef%B, n)
+    !  end if
+    !  call this%coef%gs_h%op(grad_phi_x, GS_OP_ADD)
+    !  if (NEKO_BCKND_DEVICE .eq. 1) then
+    !     call device_col2(grad_phi_x%x_d, this%coef%Binv_d, n)
+    !  else
+    !     call col2(grad_phi_x%x, this%coef%Binv, n)
+    !  end if
 
     select type(design)
     type is (thermal_conductivity_design_t)
@@ -430,46 +433,19 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
 
     if (this%enable_output) then
-      call this%output%sample(this%writting_counter)
-      this%writting_counter = this%writting_counter + 1
+       call this%output%sample(this%writting_counter)
+       this%writting_counter = this%writting_counter + 1
     end if
   end subroutine heat_compliance_update_sensitivity
-
-  !=========================================================================!
-  !  Preconditioner factory
-  !=========================================================================!
-   subroutine heat_compliance_precon_factory(pc, ksp, coef, dof, gs, bclst, pctype)
-    implicit none
-    class(pc_t),   allocatable, target, intent(inout) :: pc
-    class(ksp_t),  target,      intent(inout)         :: ksp
-    type(coef_t),  target,      intent(in)            :: coef
-    type(dofmap_t),target,      intent(in)            :: dof
-    type(gs_t),    target,      intent(inout)         :: gs
-    type(bc_list_t),target,     intent(inout)         :: bclst
-    character(len=*),           intent(in)            :: pctype
-
-    call precon_factory(pc, pctype)
-
-    select type (pcp => pc)
-    type is (jacobi_t)
-       call pcp%init(coef, dof, gs)
-    type is (sx_jacobi_t)
-       call pcp%init(coef, dof, gs)
-    type is (device_jacobi_t)
-       call pcp%init(coef, dof, gs)
-    end select
-
-    call ksp%set_pc(pc)
-  end subroutine heat_compliance_precon_factory
 
   !=========================================================================!
   !  Design: init
   !=========================================================================!
   subroutine thermal_conductivity_design_init(this, parameters, coef, gs)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    type(json_file),                      intent(inout) :: parameters
-    type(coef_t),              target,    intent(in)    :: coef
-    type(gs_t),    target,      intent(inout)         :: gs
+    type(json_file), intent(inout) :: parameters
+    type(coef_t), target, intent(in) :: coef
+    type(gs_t), target, intent(inout) :: gs
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
 
@@ -492,16 +468,16 @@ contains
 
     ! Design and sensitivity fields
     call neko_registry%add_field(coef%dof, "design_indicator", .true.)
-    call neko_registry%add_field(coef%dof, "sensitivity",     .true.)
+    call neko_registry%add_field(coef%dof, "sensitivity", .true.)
     this%design_indicator => neko_registry%get_field("design_indicator")
-    this%sensitivity      => neko_registry%get_field("sensitivity")
+    this%sensitivity => neko_registry%get_field("sensitivity")
 
     call this%init_base(name, this%design_indicator%dof%size())
 
     if ('initial_distribution' .in. parameters) then
        call json_get(parameters, 'initial_distribution', json_subdict)
        call set_optimization_ic(this%design_indicator, coef, gs, &
-             json_subdict)
+            json_subdict)
     else
        call field_cfill(this%design_indicator, 0.5_rp)
     end if
@@ -523,7 +499,7 @@ contains
   !=========================================================================!
   subroutine thermal_conductivity_design_update_design(this, values)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    type(vector_t),                       intent(inout) :: values
+    type(vector_t), intent(inout) :: values
     integer :: n
 
     n = this%size()
@@ -542,13 +518,13 @@ contains
 
   subroutine thermal_conductivity_design_map_backward(this, sensitivity)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    type(vector_t),                       intent(in)    :: sensitivity
+    type(vector_t), intent(in) :: sensitivity
     ! No-op: mapping back handled in heat_compliance_update_sensitivity
   end subroutine thermal_conductivity_design_map_backward
 
   subroutine thermal_conductivity_design_write(this, idx)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    integer,                             intent(in)     :: idx
+    integer, intent(in) :: idx
     ! Hook for custom writing of design if you want it
   end subroutine thermal_conductivity_design_write
 
@@ -556,8 +532,8 @@ contains
   !  Design: get current design vector
   !=========================================================================!
   subroutine thermal_conductivity_design_get_design(this, values)
-    class(thermal_conductivity_design_t), intent(in)    :: this
-    type(vector_t),                       intent(inout) :: values
+    class(thermal_conductivity_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
     integer :: n
 
     n = this%size()
@@ -574,8 +550,8 @@ contains
   !  Design: get sensitivity vector
   !=========================================================================!
   subroutine thermal_conductivity_design_get_sensitivity(this, values)
-    class(thermal_conductivity_design_t), intent(in)    :: this
-    type(vector_t),                       intent(inout) :: values
+    class(thermal_conductivity_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
     integer :: n
 
     n = this%size()
@@ -600,21 +576,21 @@ contains
   subroutine thermal_volume_constraint_init(this, design, coef, name, &
        is_max, limit, parameters)
     class(thermal_volume_constraint_t), intent(inout) :: this
-    class(design_t),                    intent(in)    :: design
-    type(coef_t),           target,     intent(in)    :: coef
-    character(len=*),                  intent(in)    :: name
-    logical,                           intent(in)    :: is_max
-    real(kind=rp),                     intent(in)    :: limit
-    type(json_file),          intent(inout), optional :: parameters
+    class(design_t), intent(in) :: design
+    type(coef_t), target, intent(in) :: coef
+    character(len=*), intent(in) :: name
+    logical, intent(in) :: is_max
+    real(kind=rp), intent(in) :: limit
+    type(json_file), intent(inout), optional :: parameters
     real(kind=rp) :: avg_B
     integer :: n, n_global, ierr
     type(vector_t) :: beforemapping
     ! Base class init (no separate mask_name)
     call this%init_base(name, design%size(), '')
 
-    this%is_max  = is_max
-    this%limit   = limit
-    this%coef    => coef
+    this%is_max = is_max
+    this%limit = limit
+    this%coef => coef
 
     n = design%size()
 
@@ -623,7 +599,7 @@ contains
     if (pe_rank ==0 ) then
        print *, "volume of full domain =", this%volume_domain
     end if
-    
+
     ! Get the PDE filter if exists as mapping
     this%has_mapping = .false.
     call this%constraint_mapping%init_base(coef)
@@ -637,37 +613,37 @@ contains
     ! Initialize value and sensitivity
     call this%update_value(design)
 
-      !  ! Sensitivity: d/d rho = -B / |Omega|   (flip sign if is_max)
-      !  if (NEKO_BCKND_DEVICE .eq. 1) then
-      !     call device_copy(this%sensitivity%x_d, this%coef%B_d, n)
-      !     call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, n)
-      !     if (this%is_max) then
-      !        call device_cmult(this%sensitivity%x_d, -1.0_rp, n)
-      !     end if
-      !  else
-      !     call copy(this%sensitivity%x, this%coef%B, n)
-      !     call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, n)
-      !     if (this%is_max) then
-      !        call cmult(this%sensitivity%x, -1.0_rp, n)
-      !     end if
-      !  end if
-   ! Sensitivity: d/d rho = -1 / |Omega|   (flip sign if is_max)
-   ! scaled by average B
-   call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM, ierr)
-   avg_B = glsum(this%coef%B, n)/n_global
-   call vector_rone(this%sensitivity, n)
-   call vector_cmult(this%sensitivity, -avg_B / this%volume_domain, n)
+    !  ! Sensitivity: d/d rho = -B / |Omega|   (flip sign if is_max)
+    !  if (NEKO_BCKND_DEVICE .eq. 1) then
+    !     call device_copy(this%sensitivity%x_d, this%coef%B_d, n)
+    !     call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, n)
+    !     if (this%is_max) then
+    !        call device_cmult(this%sensitivity%x_d, -1.0_rp, n)
+    !     end if
+    !  else
+    !     call copy(this%sensitivity%x, this%coef%B, n)
+    !     call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, n)
+    !     if (this%is_max) then
+    !        call cmult(this%sensitivity%x, -1.0_rp, n)
+    !     end if
+    !  end if
+    ! Sensitivity: d/d rho = -1 / |Omega|   (flip sign if is_max)
+    ! scaled by average B
+    call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM, ierr)
+    avg_B = glsum(this%coef%B, n)/n_global
+    call vector_rone(this%sensitivity, n)
+    call vector_cmult(this%sensitivity, -avg_B / this%volume_domain, n)
 
-   if (this%has_mapping) then
-      call beforemapping%init(n)
-      call vector_copy(beforemapping, this%sensitivity, n)
-      call this%constraint_mapping%apply_backward(this%sensitivity, beforemapping)
-      call beforemapping%free()
-   end if
-   if (this%is_max) then
-      call vector_cmult(this%sensitivity, -1.0_rp, n)
-   end if
-   
+    if (this%has_mapping) then
+       call beforemapping%init(n)
+       call vector_copy(beforemapping, this%sensitivity, n)
+       call this%constraint_mapping%apply_backward(this%sensitivity, beforemapping)
+       call beforemapping%free()
+    end if
+    if (this%is_max) then
+       call vector_cmult(this%sensitivity, -1.0_rp, n)
+    end if
+
 
   end subroutine thermal_volume_constraint_init
 
@@ -679,7 +655,7 @@ contains
   !> Recompute g(design) = limit - V/|Omega|  (flip sign if is_max)
   subroutine thermal_volume_constraint_update_value(this, design)
     class(thermal_volume_constraint_t), intent(inout) :: this
-    class(design_t),                    intent(in)    :: design
+    class(design_t), intent(in) :: design
     real(kind=rp) :: volume
 
     volume = this%compute_volume(design)
@@ -692,7 +668,7 @@ contains
   !> Sensitivity is constant in this implementation (set in init).
   subroutine thermal_volume_constraint_update_sensitivity(this, design)
     class(thermal_volume_constraint_t), intent(inout) :: this
-    class(design_t),                    intent(in)    :: design
+    class(design_t), intent(in) :: design
     ! No-op: this%sensitivity is already correct from init.
   end subroutine thermal_volume_constraint_update_sensitivity
 
@@ -702,7 +678,7 @@ contains
   ! then you should comment this function and use the one commented in the end.
   function thermal_volume_constraint_compute_volume(this, design) result(volume)
     class(thermal_volume_constraint_t), intent(inout) :: this
-    class(design_t),                    intent(in)    :: design
+    class(design_t), intent(in) :: design
     real(kind=rp) :: volume
 
     type(vector_t) :: values
@@ -730,39 +706,39 @@ contains
   end function thermal_volume_constraint_compute_volume
 
   !> Computes V(design) = ∫ rho dΩ over the whole domain
-   !   function thermal_volume_constraint_compute_volume(this, design) result(volume)
-   !     class(thermal_volume_constraint_t), intent(inout) :: this
-   !     class(design_t),                    intent(in)    :: design
-   !     real(kind=rp) :: volume
+  !   function thermal_volume_constraint_compute_volume(this, design) result(volume)
+  !     class(thermal_volume_constraint_t), intent(inout) :: this
+  !     class(design_t),                    intent(in)    :: design
+  !     real(kind=rp) :: volume
 
-   !     type(vector_t) :: values, values_aftermapping
-   !     integer :: n
+  !     type(vector_t) :: values, values_aftermapping
+  !     integer :: n
 
-   !     volume = 0.0_rp
+  !     volume = 0.0_rp
 
-   !     select type(d => design)
-   !     type is (thermal_conductivity_design_t)
-   !        n = d%size()
-   !        call d%get_values(values)
-   !        if (this%has_mapping) then
-   !           call values_aftermapping%init(n)
-   !           call this%constraint_mapping%apply_forward(values_aftermapping, values)
-   !           call vector_copy(values, values_aftermapping, n)
-   !           call values_aftermapping%free()
-   !        end if
+  !     select type(d => design)
+  !     type is (thermal_conductivity_design_t)
+  !        n = d%size()
+  !        call d%get_values(values)
+  !        if (this%has_mapping) then
+  !           call values_aftermapping%init(n)
+  !           call this%constraint_mapping%apply_forward(values_aftermapping, values)
+  !           call vector_copy(values, values_aftermapping, n)
+  !           call values_aftermapping%free()
+  !        end if
 
-   !        if (NEKO_BCKND_DEVICE .eq. 1) then
-   !           volume = device_glsc2(values%x_d, this%coef%B_d, n)
-   !        else
-   !           volume = glsc2(values%x, this%coef%B, n)
-   !        end if
+  !        if (NEKO_BCKND_DEVICE .eq. 1) then
+  !           volume = device_glsc2(values%x_d, this%coef%B_d, n)
+  !        else
+  !           volume = glsc2(values%x, this%coef%B, n)
+  !        end if
 
-   !        call values%free()
+  !        call values%free()
 
-   !     class default
-   !        call neko_error('thermal_volume_constraint_compute_volume: requires thermal_conductivity_design_t')
-   !     end select
+  !     class default
+  !        call neko_error('thermal_volume_constraint_compute_volume: requires thermal_conductivity_design_t')
+  !     end select
 
-   !   end function thermal_volume_constraint_compute_volume
+  !   end function thermal_volume_constraint_compute_volume
 
 end module heat_compliance
