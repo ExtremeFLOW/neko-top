@@ -59,12 +59,11 @@ Currently, we have added tests for the following components:
   the mask only while its probe stays that close to the boundary. Whenever the
   case or the driver's probe selection changes, confirm again that the test
   fails with the mask removed from `update_sensitivity`.
-- `brinkman_dissipation_dealias_mismatch_rejected`
-  (`brinkman_dissipation_dealias_mismatch.case`) — the same case with
-  `dealias_sensitivity` false and `dealias_forcing` left at its default. A
+- `brinkman_dissipation_rejection` — checks the invalid mixed-dealias
+  configuration directly through Neko's pFUnit error-redirection fixture. A
   mixed setting has no value its sensitivity is the gradient of, so the
-  objective must reject it; the test passes only if the run stops with that
-  error.
+  objective must raise `neko_error`; pFUnit consumes that expected exception
+  as a successful test.
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
@@ -95,9 +94,9 @@ Reuse the existing generic driver — you almost never need new Fortran code:
        "new_case.case"  # Add your new case here
    )
    ```
-   A case the driver must refuse is registered with
-   `add_rejected_case(<name> "<expected error>")` instead, which passes only
-   if the run stops with that error.
+  For a configuration that a constructor must reject, add a focused pFUnit
+  test using Neko's `error_redirection.f90` fixture and
+  `@assertExceptionRaised()`.
 3. Only write new Fortran (in `problem_tester.f90`/`sensitivity.f90`) if the
    generic driver genuinely can't express what you need — it currently
    handles any single objective or single constraint automatically.

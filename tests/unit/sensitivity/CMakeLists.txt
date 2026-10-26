@@ -67,6 +67,47 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules CACHE PATH
     "Fortran module directory" FORCE)
 
 # ============================================================================ #
+# Validate rejected objective configurations through Neko's pFUnit error
+# redirection fixture, rather than a process-level CTest failure.
+add_pfunit_ctest(brinkman_dissipation_rejection
+    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/brinkman_dissipation_rejection.pf
+    OTHER_SOURCES ${NEKO_DIR}/tests/unit/fixtures/error_redirection.f90
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    EXTRA_USE error_redirection
+    EXTRA_INITIALIZE redirect_errors
+    MAX_PES 1
+)
+add_dependencies(Unit brinkman_dissipation_rejection)
+
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/brinkman_dissipation_dealias_mismatch.case
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/brinkman_dissipation_dealias_mismatch.case
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/brinkman_dissipation_dealias_mismatch.case
+        ${CMAKE_CURRENT_BINARY_DIR}/brinkman_dissipation_dealias_mismatch.case
+)
+add_custom_target(brinkman_dissipation_rejection_case
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/brinkman_dissipation_dealias_mismatch.case
+)
+add_dependencies(brinkman_dissipation_rejection
+    sensitivity_test_prepare
+    brinkman_dissipation_rejection_case
+)
+
+set_tests_properties(brinkman_dissipation_rejection PROPERTIES
+    LABELS "sensitivity;unit"
+    ENVIRONMENT "NEKO_LOG_FILE=brinkman_dissipation_rejection.log"
+    TIMEOUT 120
+)
+
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(brinkman_dissipation_rejection PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+# ============================================================================ #
 # Loop over all case files and create tests
 foreach(case_file ${test_list})
     # Get the case name without extension
@@ -99,43 +140,6 @@ foreach(case_file ${test_list})
             TIMEOUT 300
     )
 endforeach()
-
-# ============================================================================ #
-# Cases the driver must reject. Each test passes only if the run stops with
-# the given error.
-function(add_rejected_case case_name expected_error)
-    add_custom_target(
-        ${case_name}_case_file
-        COMMENT "Copying case file ${case_name}.case to the test directory"
-        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
-        BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
-            ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-    add_dependencies(sensitivity_test_prepare ${case_name}_case_file)
-
-    add_test(NAME ${case_name}_rejected
-        COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_name}.case
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-    set_tests_properties(${case_name}_rejected
-        PROPERTIES
-            DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
-            LABELS "sensitivity;unit"
-            ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
-            PASS_REGULAR_EXPRESSION "${expected_error}"
-            TIMEOUT 300
-    )
-endfunction()
-
-# The brinkman_dissipation objective's two dealias keys select one
-# quadrature for its value, adjoint forcing and sensitivity. Set
-# differently, the sensitivity is not the gradient of the value.
-add_rejected_case(brinkman_dissipation_dealias_mismatch
-    "dealias_sensitivity and dealias_forcing must be equal")
 
 # ============================================================================ #
 # Final dependencies

@@ -1,0 +1,64 @@
+!> Regression test for invalid Brinkman-dissipation quadrature settings.
+module brinkman_dissipation_rejection
+  use mpi
+  use pfunit
+  use simulation_m, only: simulation_t
+  use brinkman_design, only: brinkman_design_t
+  use problem, only: problem_t
+  use neko, only: neko_init
+  use json_module, only: json_file
+  use json_utils, only: json_get
+  use json_utils_ext, only: json_read_file
+  use neko_top, only: neko_top_register_types
+  implicit none
+
+  character(len=*), parameter :: case_file = &
+       'brinkman_dissipation_dealias_mismatch.case'
+  logical :: initialized = .false.
+
+  @TestCase
+  type, extends(MPITestCase) :: test_brinkman_dissipation_rejection
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_brinkman_dissipation_rejection
+
+contains
+
+  subroutine setUp(this)
+    class(test_brinkman_dissipation_rejection), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+
+    call neko_init()
+    call neko_top_register_types()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_brinkman_dissipation_rejection), intent(inout) :: this
+  end subroutine tearDown
+
+  !> Mixed quadrature settings must be rejected before objective setup begins.
+  @test(npes=[1])
+  subroutine test_mismatched_dealias_is_rejected(this)
+    class(test_brinkman_dissipation_rejection), intent(inout) :: this
+    type(json_file) :: parameters, design_parameters
+    type(simulation_t) :: simulation
+    type(brinkman_design_t) :: design
+    type(problem_t) :: problem
+
+    parameters = json_read_file(case_file)
+    call json_get(parameters, 'optimization.design', design_parameters)
+
+    call simulation%init(parameters)
+    call design%init(design_parameters, simulation)
+    call problem%init(parameters, design, simulation)
+    @assertExceptionRaised()
+
+    call problem%free()
+    call design%free()
+    call simulation%free()
+  end subroutine test_mismatched_dealias_is_rejected
+
+end module brinkman_dissipation_rejection
