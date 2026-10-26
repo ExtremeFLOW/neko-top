@@ -108,11 +108,11 @@ The semantic check, covering the four ways a window can be written. The
 objectives are read as consecutive pairs, each pair selecting the same samples
 by different means:
 
-| pair | objective | first form | second form |
-|------|-----------|------------|-------------|
-| 1 | viscous dissipation | `end_time` only | the same window written out in full |
-| 2 | Brinkman dissipation | no window at all | an explicit `start_time` of zero |
-| 3 | scalar mixing | `start_time` only | a closed window running past the end of the run |
+| pair | objective            | first form        | second form                                     |
+| ---- | -------------------- | ----------------- | ----------------------------------------------- |
+| 1    | viscous dissipation  | `end_time` only   | the same window written out in full             |
+| 2    | Brinkman dissipation | no window at all  | an explicit `start_time` of zero                |
+| 3    | scalar mixing        | `start_time` only | a closed window running past the end of the run |
 
 Pair 3 also exercises a window clipped by the end of the run: its `end_time`
 of `0.06` is deliberately beyond the run's own `end_time` of `0.05`.
@@ -143,10 +143,10 @@ rather than an intention. For the `k = 20` profile, a scalar that reached the
 outlet completely unmixed would give a `scalar_mixing` objective of `0.1000`;
 one mixed to uniformity would give `0`. Measured over the whole domain:
 
-| `Pe` | objective | fraction of the split preserved |
-|------|-----------|---------------------------------|
-| `1` | `0.00869` | 9% |
-| `100` | `0.07725` | 77% |
+| `Pe`  | objective | fraction of the split preserved |
+| ----- | --------- | ------------------------------- |
+| `1`   | `0.00869` | 9%                              |
+| `100` | `0.07725` | 77%                             |
 
 At `Pe = 1` the split is gone by the outlet, which is the opposite of the
 first-iteration state the case is supposed to represent. `Pe = 100`, the value
@@ -165,14 +165,14 @@ is measured on; the masked one is what the example actually optimized.
 The boundary conditions and `Pe` are the example's. The rest is this test's,
 each number measured rather than inherited.
 
-| setting | value | why |
-|---------|-------|-----|
-| `Re` | `5.0` | At the sibling cases' `Re = 50` the fluid residual is still `9e-6` at `t = 3.0`, 39 s of run time short of the `1e-6` it needs. At `Re = 5` it reaches that by `t ≈ 1.27`. |
-| `timestep` | `0.01` | Not free. At `Pe = 100` there is no diffusion to damp grid-scale advection, and `dt = 0.02` — a perfectly comfortable CFL of 0.58 for the fluid — makes the *scalar* diverge, reaching a residual of `6e36`. It also saves less than it looks, since larger steps need more solver iterations: 600 steps at `0.02` cost 28 s against 33 s for 1000 at `0.01`. |
-| `f_max` | `50.0` | Halved alongside the timestep, so the Brinkman penalty keeps the `chi * dt` of `0.5` the other cases run at. |
-| `end_time` | `19.995` | 2000 steps, ending at `t = 20.0`, half a step off a boundary. See below — this is set by how long the scalar takes to stop drifting, not by the fluid. |
-| scalar `absolute_tolerance` | `1e-12` | The solver's own noise, not the physics, was the floor. See below. |
-| `scalar_coupled` | `false` | So the fluid freezes as soon as *it* has converged, at `t ≈ 1.27`, rather than waiting 18 more time units for the scalar. See below. |
+| setting                     | value    | why                                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Re`                        | `5.0`    | At the sibling cases' `Re = 50` the fluid residual is still `9e-6` at `t = 3.0`, 39 s of run time short of the `1e-6` it needs. At `Re = 5` it reaches that by `t ≈ 1.27`.                                                                                                                                                                                    |
+| `timestep`                  | `0.01`   | Not free. At `Pe = 100` there is no diffusion to damp grid-scale advection, and `dt = 0.02` — a perfectly comfortable CFL of 0.58 for the fluid — makes the *scalar* diverge, reaching a residual of `6e36`. It also saves less than it looks, since larger steps need more solver iterations: 600 steps at `0.02` cost 28 s against 33 s for 1000 at `0.01`. |
+| `f_max`                     | `50.0`   | Halved alongside the timestep, so the Brinkman penalty keeps the `chi * dt` of `0.5` the other cases run at.                                                                                                                                                                                                                                                  |
+| `end_time`                  | `19.995` | 2000 steps, ending at `t = 20.0`, half a step off a boundary. See below — this is set by how long the scalar takes to stop drifting, not by the fluid.                                                                                                                                                                                                        |
+| scalar `absolute_tolerance` | `1e-12`  | The solver's own noise, not the physics, was the floor. See below.                                                                                                                                                                                                                                                                                            |
+| `scalar_coupled`            | `false`  | So the fluid freezes as soon as *it* has converged, at `t ≈ 1.27`, rather than waiting 18 more time units for the scalar. See below.                                                                                                                                                                                                                          |
 
 `require_steady_state` makes the driver assert that each run really did
 converge, by checking that `steady_simcomp` froze the fluid.
@@ -185,11 +185,11 @@ e-folds about every 0.74 time units, and it starts five decades away. Measured
 directly, as the disagreement between the two paths for the same objective
 windowed at three places in one run:
 
-| window | relative difference |
-|--------|---------------------|
-| `[8, 9]` | `1.7e-5` |
-| `[11, 12]` | `4.2e-7` |
-| `[14, 15]` | `4.8e-9` |
+| window     | relative difference |
+| ---------- | ------------------- |
+| `[8, 9]`   | `1.7e-5`            |
+| `[11, 12]` | `4.2e-7`            |
+| `[14, 15]` | `4.8e-9`            |
 
 Clean exponential decay, which is why the window sits at `[19, 20]`.
 
@@ -221,12 +221,12 @@ closes the gap. Tightening the scalar solver to `1e-12` removed it.
 The fluid converges and freezes at `t ≈ 1.27`; the window is `[19, 20]`, 101
 samples.
 
-| objective | steady | unsteady average | relative difference |
-|-----------|--------|------------------|---------------------|
-| viscous dissipation | `3.29060805369292` | `3.29060805369292` | `0` |
-| Brinkman dissipation | `0.575829630750006` | `0.575829630750006` | `0` |
-| scalar mixing, whole domain | `0.0772496512776399` | `0.0772496512779822` | `4.4e-12` |
-| scalar mixing, outlet | `0.0647557680999154` | `0.0647557681012532` | `2.1e-11` |
+| objective                   | steady               | unsteady average     | relative difference |
+| --------------------------- | -------------------- | -------------------- | ------------------- |
+| viscous dissipation         | `3.29060805369292`   | `3.29060805369292`   | `0`                 |
+| Brinkman dissipation        | `0.575829630750006`  | `0.575829630750006`  | `0`                 |
+| scalar mixing, whole domain | `0.0772496512776399` | `0.0772496512779822` | `4.4e-12`           |
+| scalar mixing, outlet       | `0.0647557680999154` | `0.0647557681012532` | `2.1e-11`           |
 
 The two velocity-based objectives are bit-identical because
 `steady_simcomp` freezes the fluid on convergence, so the velocity field is
