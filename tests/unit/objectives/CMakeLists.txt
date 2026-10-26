@@ -17,6 +17,10 @@ set(OBJECTIVES_DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/time_window_tester.f90)
 set(STEP_COUNT_TEST ${CMAKE_CURRENT_SOURCE_DIR}/step_count.pf)
 set(STEP_COUNT_CASE "time_window_run_length.case")
 
+# pFUnit source for the never-sampled objective check, which reuses the same
+# case with every objective window moved past end_time
+set(NEVER_SAMPLED_TEST ${CMAKE_CURRENT_SOURCE_DIR}/never_sampled.pf)
+
 # ============================================================================ #
 # Use a private .mod folder to avoid clashes with other test targets
 set(LOCAL_MOD_DIR ${CMAKE_CURRENT_BINARY_DIR}/modules)
@@ -81,9 +85,22 @@ target_include_directories(end_time_step_count PRIVATE ${LOCAL_MOD_DIR})
 add_dependencies(Unit end_time_step_count)
 add_dependencies(end_time_step_count objectives_test_prepare)
 
+add_pfunit_ctest(objective_never_sampled
+    TEST_SOURCES ${NEVER_SAMPLED_TEST}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES objectives_user_obj Neko-TOP::neko-top
+    MAX_PES 1
+)
+target_include_directories(objective_never_sampled PRIVATE ${LOCAL_MOD_DIR})
+add_dependencies(Unit objective_never_sampled)
+add_dependencies(objective_never_sampled objectives_test_prepare)
+
 # Disable treating pFUnit's generated variables as unused.
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     target_compile_options(end_time_step_count PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+    target_compile_options(objective_never_sampled PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
 endif()
@@ -130,6 +147,16 @@ set_tests_properties(end_time_step_count
     PROPERTIES
         LABELS "objectives;unit"
         ENVIRONMENT "NEKO_LOG_FILE=end_time_step_count.log"
+        TIMEOUT 300
+)
+
+# Never-sampled check: an objective whose time window misses the run must
+# report zero, and the warning that names it must not abort the run. It
+# keeps its state recovery files in a directory of its own.
+set_tests_properties(objective_never_sampled
+    PROPERTIES
+        LABELS "objectives;unit"
+        ENVIRONMENT "NEKO_LOG_FILE=objective_never_sampled.log"
         TIMEOUT 300
 )
 
