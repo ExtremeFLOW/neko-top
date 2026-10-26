@@ -449,10 +449,10 @@ function find_neko() {
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
-        if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then
+        if [[ ! -f "configure" || "$NEKO_CLEAN" == true ]]; then
             ./regen.sh
         fi
-        if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
+        if [[ ! -f Makefile || "$NEKO_CLEAN" == true ]]; then
 
             # Only apply the user-defined flags if they are set, otherwise use
             # the default internally.
@@ -465,7 +465,7 @@ function find_neko() {
         fi
 
         # Update compile dependencies if makedepf90 is installed
-        if command -v makedepf90 2>&1 1>/dev/null; then
+        if [[ -n "$(which makedepf90)" && "$NEKO_CLEAN" == true ]]; then
             size_pre=$(stat -c %s src/.depends)
             cd src/ && make depend && cd ../
             if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
@@ -474,10 +474,12 @@ function find_neko() {
             fi
         fi
 
-        [ "$CLEAN_NEKO" == true ] && make clean
-        [ "$QUIET" == true ] && make -s -j || make -j
-        [ "$NEKO_TEST" == true ] && make check -j
-        make install
+        echo "Building and installing Neko, see logs for output"
+        rm -f build.log check.log install.log
+        [ "$NEKO_CLEAN" == true ] && make clean >> build.log
+        make -j >> build.log
+        [ "$NEKO_TEST" == true ] && make check -j >> check.log
+        make install >> install.log
 
         cd $CURRENT_DIR
 

@@ -18,6 +18,7 @@ module io_hdf5
   use vector_math, only: vector_glsc2
   use math, only: NEKO_EPS
   use utils, only: neko_error
+  use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
 
   implicit none
 
@@ -34,6 +35,8 @@ contains
   subroutine setUp(this)
     class(test_io_hdf5_case), intent(inout) :: this
 
+    call hdf5_session_init()
+
     if (initialized) return
     initialized = .true.
     call neko_init()
@@ -46,6 +49,8 @@ contains
     ! if ((NEKO_BCKND_DEVICE .eq. 1)) then
     !    call device_finalize
     ! end if
+
+    call hdf5_session_finalize()
 
   end subroutine tearDown
 
@@ -170,7 +175,6 @@ contains
     ! Read from HDF5 file
 
     ! Open file and prepare reading
-    call h5open_f(ierr)
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, MPI_INFO_NULL, ierr)
     call h5fopen_f(trim(fname), H5F_ACC_RDONLY_F, file_id, ierr, &
@@ -298,7 +302,6 @@ contains
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Check the values read from file
