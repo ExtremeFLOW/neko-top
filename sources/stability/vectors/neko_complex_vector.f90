@@ -1,5 +1,5 @@
 module neko_complex_vector
-   use LightKrylov, only: abstract_vector_cdp
+   use LightKrylov, only: abstract_vector, abstract_vector_cdp
    use LightKrylov, only: wp => dp
    use neko_vector, only: state_vector_t
 
@@ -17,6 +17,8 @@ module neko_complex_vector
       procedure, pass(self), public :: rand
       procedure, pass(self), public :: get_size
       procedure, pass(self), public :: init_like => complex_state_vector_init_like
+      procedure, pass(self), public :: assign => complex_state_vector_assign
+      procedure, pass(self), public :: swap => complex_state_vector_swap
       procedure, pass(self), public :: free => complex_state_vector_free
       procedure, pass(self), public :: write => complex_state_vector_write
    end type complex_state_vector_t
@@ -36,6 +38,44 @@ contains
       self%is_initialized = self%re%is_initialized .and. self%im%is_initialized
       self%owns_data = .true.
    end subroutine complex_state_vector_init_like
+
+   subroutine complex_state_vector_assign(self, from)
+      class(complex_state_vector_t), intent(inout) :: self
+      class(abstract_vector), intent(in) :: from
+
+      select type (from)
+      type is (complex_state_vector_t)
+         call self%re%assign(from%re)
+         call self%im%assign(from%im)
+         self%is_initialized = self%re%is_initialized .and. &
+              self%im%is_initialized
+         self%owns_data = .true.
+      class default
+         error stop 'complex_state_vector_assign: from must be a complex_state_vector_t'
+      end select
+   end subroutine complex_state_vector_assign
+
+   subroutine complex_state_vector_swap(self, other)
+      class(complex_state_vector_t), intent(inout) :: self
+      class(abstract_vector), intent(inout) :: other
+      logical :: logical_tmp
+
+      select type (other)
+      type is (complex_state_vector_t)
+         call self%re%swap(other%re)
+         call self%im%swap(other%im)
+
+         logical_tmp = self%is_initialized
+         self%is_initialized = other%is_initialized
+         other%is_initialized = logical_tmp
+
+         logical_tmp = self%owns_data
+         self%owns_data = other%owns_data
+         other%owns_data = logical_tmp
+      class default
+         error stop 'complex_state_vector_swap: other must be a complex_state_vector_t'
+      end select
+   end subroutine complex_state_vector_swap
 
    subroutine zero(self)
       class(complex_state_vector_t), intent(inout) :: self
@@ -125,9 +165,6 @@ contains
             alpha = self%norm()
             if (alpha > 0.0_wp) call self%scal(cmplx(1.0_wp / alpha, 0.0_wp, kind=wp))
          end if
-      else
-         alpha = self%norm()
-         if (alpha > 0.0_wp) call self%scal(cmplx(1.0_wp / alpha, 0.0_wp, kind=wp))
       end if
    end subroutine rand
 

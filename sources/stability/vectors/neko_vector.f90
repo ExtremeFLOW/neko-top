@@ -1,9 +1,12 @@
 module neko_vector
-   use LightKrylov, only: abstract_vector_rdp
+   use LightKrylov, only: abstract_vector, abstract_vector_rdp
    use LightKrylov, only: wp => dp
    use stdlib_optval, only: optval
    use num_types, only: rp, sp
    use field, only: field_t
+   use mesh, only: mesh_t
+   use space, only: space_t
+   use dofmap, only: dofmap_t
    use coefs, only: coef_t
    use fld_file_output, only: fld_file_output_t
    use fld_file, only: fld_file_t
@@ -14,6 +17,7 @@ module neko_vector
    use device, only: device_associated, device_memcpy, HOST_TO_DEVICE
    use gather_scatter, only: GS_OP_ADD
    use user_access_singleton, only: neko_user_access
+   use, intrinsic :: iso_c_binding, only: c_ptr
 
    implicit none
 
@@ -32,6 +36,8 @@ module neko_vector
       procedure, pass(self), public :: rand
       procedure, pass(self), public :: get_size
       procedure, pass(self), public :: init_like => state_vector_init_like
+      procedure, pass(self), public :: assign => state_vector_assign
+      procedure, pass(self), public :: swap => state_vector_swap
       ! we also want some other things
       procedure, pass(self), public :: free => state_vector_free
       procedure, pass(self), public :: write => state_vector_write
@@ -59,6 +65,89 @@ module neko_vector
       self%is_initialized = .true.
       self%owns_data = .true.
    end subroutine state_vector_init_like
+
+   subroutine state_vector_assign(self, from)
+      class(state_vector_t), intent(inout) :: self
+      class(abstract_vector), intent(in) :: from
+
+      select type (from)
+      type is (state_vector_t)
+         call self%init_like(from)
+         self%u = from%u
+         self%v = from%v
+         self%w = from%w
+         self%p = from%p
+      class default
+         error stop 'state_vector_assign: from must be a state_vector_t'
+      end select
+   end subroutine state_vector_assign
+
+   subroutine state_vector_swap(self, other)
+      class(state_vector_t), intent(inout) :: self
+      class(abstract_vector), intent(inout) :: other
+      type(coef_t), pointer :: coef_tmp
+      logical :: logical_tmp
+
+      select type (other)
+      type is (state_vector_t)
+         call field_swap(self%u, other%u)
+         call field_swap(self%v, other%v)
+         call field_swap(self%w, other%w)
+         call field_swap(self%p, other%p)
+
+         coef_tmp => self%coef
+         self%coef => other%coef
+         other%coef => coef_tmp
+
+         logical_tmp = self%if_2d
+         self%if_2d = other%if_2d
+         other%if_2d = logical_tmp
+
+         logical_tmp = self%is_initialized
+         self%is_initialized = other%is_initialized
+         other%is_initialized = logical_tmp
+
+         logical_tmp = self%owns_data
+         self%owns_data = other%owns_data
+         other%owns_data = logical_tmp
+      class default
+         error stop 'state_vector_swap: other must be a state_vector_t'
+      end select
+   end subroutine state_vector_swap
+
+   subroutine field_swap(a, b)
+      type(field_t), intent(inout) :: a, b
+      real(kind=rp), allocatable :: x_tmp(:,:,:,:)
+      type(c_ptr) :: device_tmp
+      type(dofmap_t), pointer :: dof_tmp
+      type(space_t), pointer :: space_tmp
+      type(mesh_t), pointer :: mesh_tmp
+      logical :: logical_tmp
+
+      call move_alloc(a%x, x_tmp)
+      call move_alloc(b%x, a%x)
+      call move_alloc(x_tmp, b%x)
+
+      device_tmp = a%x_d
+      a%x_d = b%x_d
+      b%x_d = device_tmp
+
+      dof_tmp => a%dof
+      a%dof => b%dof
+      b%dof => dof_tmp
+
+      space_tmp => a%Xh
+      a%Xh => b%Xh
+      b%Xh => space_tmp
+
+      mesh_tmp => a%msh
+      a%msh => b%msh
+      b%msh => mesh_tmp
+
+      logical_tmp = a%internal_dofmap
+      a%internal_dofmap = b%internal_dofmap
+      b%internal_dofmap = logical_tmp
+   end subroutine field_swap
  
    subroutine zero(self)
       class(state_vector_t), intent(inout) :: self
@@ -146,7 +235,7 @@ module neko_vector
       logical :: normalize
       real(kind=wp) :: alpha
 
-      normalize = optval(ifnorm, .true.)
+      normalize = optval(ifnorm, .false.)
       call rand_ic(self%u, self%v, self%w, self%if_2d)
       call field_rzero(self%p)
 

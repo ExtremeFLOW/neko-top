@@ -1,5 +1,5 @@
 module neko_ext_vector
-   use LightKrylov, only: abstract_vector_rdp
+   use LightKrylov, only: abstract_vector, abstract_vector_rdp
    use LightKrylov, only: wp => dp
    use neko_vector, only: state_vector_t
 
@@ -17,6 +17,8 @@ module neko_ext_vector
       procedure, pass(self), public :: rand
       procedure, pass(self), public :: get_size
       procedure, pass(self), public :: init_like => ext_state_vector_init_like
+      procedure, pass(self), public :: assign => ext_state_vector_assign
+      procedure, pass(self), public :: swap => ext_state_vector_swap
       procedure, pass(self), public :: free => ext_state_vector_free
       procedure, pass(self), public :: write => ext_state_vector_write
    end type ext_state_vector_t
@@ -37,6 +39,47 @@ contains
       self%is_initialized = self%q%is_initialized
       self%owns_data = .true.
    end subroutine ext_state_vector_init_like
+
+   subroutine ext_state_vector_assign(self, from)
+      class(ext_state_vector_t), intent(inout) :: self
+      class(abstract_vector), intent(in) :: from
+
+      select type (from)
+      type is (ext_state_vector_t)
+         call self%q%assign(from%q)
+         self%T = from%T
+         self%is_initialized = self%q%is_initialized
+         self%owns_data = .true.
+      class default
+         error stop 'ext_state_vector_assign: from must be an ext_state_vector_t'
+      end select
+   end subroutine ext_state_vector_assign
+
+   subroutine ext_state_vector_swap(self, other)
+      class(ext_state_vector_t), intent(inout) :: self
+      class(abstract_vector), intent(inout) :: other
+      real(wp) :: real_tmp
+      logical :: logical_tmp
+
+      select type (other)
+      type is (ext_state_vector_t)
+         call self%q%swap(other%q)
+
+         real_tmp = self%T
+         self%T = other%T
+         other%T = real_tmp
+
+         logical_tmp = self%is_initialized
+         self%is_initialized = other%is_initialized
+         other%is_initialized = logical_tmp
+
+         logical_tmp = self%owns_data
+         self%owns_data = other%owns_data
+         other%owns_data = logical_tmp
+      class default
+         error stop 'ext_state_vector_swap: other must be an ext_state_vector_t'
+      end select
+   end subroutine ext_state_vector_swap
 
    subroutine zero(self)
       class(ext_state_vector_t), intent(inout) :: self
@@ -90,9 +133,6 @@ contains
             alpha = self%norm()
             if (alpha > 0.0_wp) call self%scal(1.0_wp / alpha)
          end if
-      else
-         alpha = self%norm()
-         if (alpha > 0.0_wp) call self%scal(1.0_wp / alpha)
       end if
    end subroutine rand
 
