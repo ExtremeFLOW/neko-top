@@ -196,10 +196,8 @@ contains
     !
 
     call neko_log%section('Adjoint fluid')
-    write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
-    call neko_log%message(log_buf)
-    write(log_buf, '(A, A)') 'Name       : ', trim(this%name)
-    call neko_log%message(log_buf)
+    call neko_log%message('Type       : ' // trim(scheme))
+    call neko_log%message('Name       : ' // trim(this%name))
 
     ! Assign velocity fields
     call neko_registry%add_field(this%dm_Xh, 'u_adj')

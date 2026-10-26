@@ -497,10 +497,8 @@ contains
 
     call neko_log%section('MMA Parameters')
 
-    write(log_msg, '(A10,1X,A)') 'backend   ', trim(this%bcknd)
-    call neko_log%message(log_msg)
-    write(log_msg, '(A10,1X,A)') 'subsolver ', trim(this%subsolver)
-    call neko_log%message(log_msg)
+    call neko_log%message('backend    ' // trim(this%bcknd))
+    call neko_log%message('subsolver  ' // trim(this%subsolver))
 
     write(log_msg, '(A10,1X,I0)') 'n         ', this%n_global
     call neko_log%message(log_msg)
