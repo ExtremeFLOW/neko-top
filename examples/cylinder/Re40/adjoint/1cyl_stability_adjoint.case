@@ -80,7 +80,7 @@
                 "adjoint": true
             },
             "eigensolver": {
-                "number_of_eigenvalues": 2,
+                "number_of_eigenvalues": 10,
                 "tolerance": 1.0e-10
             }
         }
