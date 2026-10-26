@@ -28,6 +28,8 @@ env:
   JSON_FORTRAN_VERSION: ${{ inputs.json-fortran-version }}
   NEKO_VERSION: ${{ inputs.neko-version }}
   NEKO_TOP_VERSION: ${{ inputs.neko-top-version }}
+  HDF5_VERSION: ${{ inputs.hdf5-version }}
+  HDF5_ROOT: hdf5
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a

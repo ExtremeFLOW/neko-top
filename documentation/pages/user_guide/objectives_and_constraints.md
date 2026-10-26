@@ -72,10 +72,11 @@ objective then reports zero and a warning is written to the log.
 \warning Setting `end_time` to exactly the simulation's own `end_time` is not
 the same as leaving it at its `+\infty` default. The adjoint forcing terms that
 objectives register are gated by `source_term_t`'s time window, which compares
-against the simulation time without a tolerance, so the final step -- where the
-accumulated time lands a few ULP above the prescribed `end_time` -- silently
-loses its forcing and the sensitivity is wrong. Leave `end_time` unset unless a
-genuinely shorter window is wanted.
+against the simulation time without a tolerance. The accumulated time of the
+final step lands within a few ULP of the prescribed `end_time`, on either side
+of it, so whether that step keeps its forcing is decided by round-off rather
+than by the case file, and when it loses it the sensitivity is wrong. Leave
+`end_time` unset unless a genuinely shorter window is wanted.
 
 The window only applies to unsteady problems. A steady problem evaluates its
 objectives once, on the converged field, so `start_time` and `end_time` have no
@@ -99,10 +100,16 @@ the simulation's `end_time`, so unless `end_time` falls exactly on a step, the
 run overshoots it by up to one `dt` -- with `end_time` \f$0.0475\f$ and `dt`
 \f$0.005\f$ it takes ten steps and finishes at \f$t = 0.05\f$. A window whose
 `start_time` is the simulation's own `end_time` therefore captures precisely
-that last step and nothing before it. Keeping `end_time` off a step boundary
-also removes any dependence on which side of the comparison round-off in the
-accumulated time falls, which otherwise decides whether the run takes ten steps
-or eleven.
+that last step and nothing before it.
+
+An `end_time` falling exactly on a step needs no special care. The time is
+accumulated by repeated addition of `dt`, so it lands a few ULP either side of
+such an `end_time`, and the end-of-run check allows for that: `end_time`
+\f$0.05\f$ with `dt` \f$0.005\f$ takes ten steps and finishes at
+\f$t = 0.05\f$, on the steady and the unsteady path alike. Earlier versions
+compared without that allowance on the unsteady path, took an eleventh step
+and finished at \f$t = 0.055\f$, which is why some test cases place `end_time`
+half a step off a boundary. That is no longer required.
 
 For example,
 

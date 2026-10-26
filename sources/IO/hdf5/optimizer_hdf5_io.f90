@@ -41,16 +41,16 @@ submodule (optimizer) optimizer_hdf5_io
   use hdf5
   use mpi_f08, only: MPI_INFO_NULL
   use comm, only: NEKO_COMM
+  use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
 
 contains
 
   ! -------------------------------------------------------------------------- !
   ! Checkpointing methods for the optimizer optimizer
 
-  subroutine optimizer_save_checkpoint_hdf5(object, filename, iter, overwrite)
+  subroutine optimizer_save_checkpoint_hdf5(object, filename, overwrite)
     class(optimizer_t), intent(inout) :: object
     character(len=*), intent(in) :: filename
-    integer, intent(in) :: iter
     logical, intent(in), optional :: overwrite
     logical :: overwrite_flag, file_exists
 
@@ -67,7 +67,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Prepare the HDF5 file, settings for MPIO access and groups
 
-    call h5open_f(ierr)
+    call hdf5_session_init()
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
     call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
@@ -133,7 +133,8 @@ contains
     ddim = 1
     call h5acreate_f(grp_id, 'iter', H5T_NATIVE_INTEGER, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, object%current_iteration, &
+         ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ! ------------------------------------------------------------------------ !
@@ -142,14 +143,14 @@ contains
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
+
+    call hdf5_session_finalize()
 
   end subroutine optimizer_save_checkpoint_hdf5
 
-  subroutine optimizer_load_checkpoint_hdf5(object, filename, iter)
+  subroutine optimizer_load_checkpoint_hdf5(object, filename)
     class(optimizer_t), intent(inout) :: object
     character(len=*), intent(in) :: filename
-    integer, intent(out) :: iter
 
     ! HDF5 variables
     character(len=64) :: type_name
@@ -160,12 +161,11 @@ contains
 
     ! Initialize reader variables
     type_name = ''
-    iter = -1
 
     ! ------------------------------------------------------------------------ !
     ! Open the HDF5 context and read identification parameters
 
-    call h5open_f(ierr)
+    call hdf5_session_init()
 
     ! Prepare the HDF5 settings for MPIO access
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
@@ -185,6 +185,7 @@ contains
     end if
 
     ! Read the optimizer type and verify
+    ddim(1) = 1
     call h5aopen_f(grp_id, 'type', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, type_name, ddim, ierr)
@@ -199,10 +200,11 @@ contains
     ! Read the current optimizer iteration
     ddim(1) = 1
     call h5aopen_f(grp_id, 'iter', attr_id, ierr)
-    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, object%current_iteration, &
+         ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    if (iter .lt. 0) then
+    if (object%current_iteration .lt. 0) then
        call neko_error("Incompatible optimizer iteration in checkpoint file")
     end if
 
@@ -210,7 +212,8 @@ contains
     call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
+
+    call hdf5_session_finalize()
 
   end subroutine optimizer_load_checkpoint_hdf5
 
