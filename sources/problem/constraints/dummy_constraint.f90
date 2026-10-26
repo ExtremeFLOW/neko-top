@@ -91,6 +91,8 @@ contains
     class(dummy_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
+    call this%free()
+
     ! Initialize the base class
     call this%init_base("dummy_constraint", design%size())
 

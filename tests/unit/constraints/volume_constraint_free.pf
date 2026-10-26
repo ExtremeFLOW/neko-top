@@ -1,0 +1,186 @@
+! Verification that a `volume_constraint_t` drops its mapping cascade when it
+! is freed or re-initialised (backlog #94).
+!
+! A volume constraint initialised from JSON with a PDE_filter mapping maps
+! its sensitivity backward through the filter. Once that constraint is
+! freed, or re-initialised from components without a mapping, it must behave
+! exactly like a constraint that never had one. The mapping and its
+! `if_mapping` flag are private, so each test compares the value and the
+! sensitivity against a reference constraint built from the same components.
+! Before the fix, `free` only called `free_base` and `init_from_components`
+! never called `free`, so the stale filter was still applied.
+!
+! Two entry points are checked:
+!   1. `init_from_components` on the filtered constraint, with no `free`.
+!   2. `free`, then `init_from_components`.
+!
+! Each test builds and frees its own simulation. The PDE_filter mapping
+! registers a field under a fixed name, so a second JSON initialisation
+! against the same registry would abort.
+module volume_constraint_free
+  use mpi
+  use pfunit
+  use json_module, only: json_file
+  use json_utils, only: json_get, json_extract_item
+  use json_utils_ext, only: json_read_file
+  use simulation_m, only: simulation_t
+  use brinkman_design, only: brinkman_design_t
+  use volume_constraint, only: volume_constraint_t
+  use neko, only: neko_init
+  use neko_top, only: neko_top_register_types
+  use vector, only: vector_t
+  use num_types, only: rp
+  use registry, only: neko_registry
+  use scratch_registry, only: neko_scratch_registry
+  use device, only: DEVICE_TO_HOST
+  implicit none
+
+  !> Case file with the simulation, the design and the filtered constraint.
+  character(len=*), parameter :: case_file = "volume_constraint_free.case"
+
+  !> Components shared by the constraint under test and the reference.
+  character(len=*), parameter :: mask_name = "optimization_domain"
+  real(kind=rp), parameter :: limit = 0.2_rp
+  logical, parameter :: is_max = .false.
+
+  !> Both constraints run the same arithmetic, so they must agree tightly.
+  real(kind=rp), parameter :: match_tol = 1.0e-12_rp
+
+  !> The filter must move the sensitivity by at least this fraction of its
+  !! magnitude, or the test could not tell a stale mapping from none.
+  real(kind=rp), parameter :: min_filter_effect = 1.0e-2_rp
+
+  @TestCase
+  type, extends(MPITestCase) :: test_volume_free
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_volume_free
+
+  logical :: initialized_lock = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_volume_free), intent(inout) :: this
+
+    if (initialized_lock) return
+    initialized_lock = .true.
+
+    call neko_init()
+    call neko_top_register_types()
+
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_volume_free), intent(inout) :: this
+
+  end subroutine tearDown
+
+  !> Copy the sensitivity of a constraint into a host-side vector.
+  !! @param constraint The constraint to read.
+  !! @param sensitivity The vector to fill.
+  subroutine get_host_sensitivity(constraint, sensitivity)
+    type(volume_constraint_t), intent(in) :: constraint
+    type(vector_t), intent(inout) :: sensitivity
+
+    call constraint%get_sensitivity(sensitivity)
+    call sensitivity%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+  end subroutine get_host_sensitivity
+
+  !> Initialise a filtered volume constraint from JSON, re-initialise it
+  !! from components without a mapping, and measure it against a reference
+  !! constraint that never had one. Everything is freed before returning, so
+  !! the caller asserts on plain numbers.
+  !! @param explicit_free Whether to call `free` before re-initialising.
+  !! @param filter_effect Relative sensitivity change from the filter.
+  !! @param sens_diff Relative sensitivity mismatch after re-initialising.
+  !! @param value_diff Absolute value mismatch after re-initialising.
+  subroutine run_reinit(explicit_free, filter_effect, sens_diff, value_diff)
+    logical, intent(in) :: explicit_free
+    real(kind=rp), intent(out) :: filter_effect
+    real(kind=rp), intent(out) :: sens_diff
+    real(kind=rp), intent(out) :: value_diff
+
+    type(json_file) :: parameters, design_parameters, constraint_parameters
+    type(simulation_t), target :: sim
+    type(brinkman_design_t) :: des
+    type(volume_constraint_t) :: con, ref
+    type(vector_t) :: s_con, s_ref
+    real(kind=rp) :: scale
+
+    parameters = json_read_file(case_file)
+    call json_get(parameters, 'optimization.design', design_parameters)
+    call json_extract_item(parameters, 'optimization.constraints', 1, &
+         constraint_parameters)
+
+    call sim%init(parameters)
+    call des%init(design_parameters, sim)
+
+    ! The reference has the same components and never a mapping.
+    call ref%init_from_components(des, sim, "reference", mask_name, is_max, &
+         limit)
+    call ref%update_sensitivity(des)
+    call get_host_sensitivity(ref, s_ref)
+    scale = maxval(abs(s_ref%x))
+
+    ! The constraint under test starts out filtered.
+    call con%init(constraint_parameters, des, sim)
+    call con%update_sensitivity(des)
+    call get_host_sensitivity(con, s_con)
+    filter_effect = maxval(abs(s_con%x - s_ref%x)) / scale
+
+    ! Drop the mapping and compare against the reference.
+    if (explicit_free) call con%free()
+    call con%init_from_components(des, sim, "volume", mask_name, is_max, &
+         limit)
+    call con%update_sensitivity(des)
+    call get_host_sensitivity(con, s_con)
+    sens_diff = maxval(abs(s_con%x - s_ref%x)) / scale
+    value_diff = abs(con%get_value() - ref%get_value())
+
+    call s_con%free()
+    call s_ref%free()
+    call con%free()
+    call ref%free()
+    call des%free()
+    call sim%free()
+
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+    call neko_registry%init()
+    call neko_scratch_registry%init()
+
+  end subroutine run_reinit
+
+  ! ========================================================================== !
+  ! Test entry points.
+
+  @test(npes=[1])
+  subroutine reinit_drops_mapping(this)
+    class(test_volume_free), intent(inout) :: this
+    real(kind=rp) :: filter_effect, sens_diff, value_diff
+
+    call run_reinit(.false., filter_effect, sens_diff, value_diff)
+
+    @assertGreaterThan(filter_effect, min_filter_effect, "filter is inert")
+    @assertEqual(0.0_rp, sens_diff, match_tol, "stale sensitivity mapping")
+    @assertEqual(0.0_rp, value_diff, match_tol, "stale value mapping")
+
+  end subroutine reinit_drops_mapping
+
+  @test(npes=[1])
+  subroutine free_drops_mapping(this)
+    class(test_volume_free), intent(inout) :: this
+    real(kind=rp) :: filter_effect, sens_diff, value_diff
+
+    call run_reinit(.true., filter_effect, sens_diff, value_diff)
+
+    @assertGreaterThan(filter_effect, min_filter_effect, "filter is inert")
+    @assertEqual(0.0_rp, sens_diff, match_tol, "stale sensitivity mapping")
+    @assertEqual(0.0_rp, value_diff, match_tol, "stale value mapping")
+
+  end subroutine free_drops_mapping
+
+end module volume_constraint_free

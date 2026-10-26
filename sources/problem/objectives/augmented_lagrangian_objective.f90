@@ -161,6 +161,8 @@ contains
     character(len=*), intent(in) :: mask_name
     logical, intent(in) :: dealias
 
+    call this%free()
+
     call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
@@ -200,8 +202,12 @@ contains
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
     if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
+    nullify(this%Xh_GLL)
+    nullify(this%c_Xh_GLL)
+    nullify(this%Xh_GL)
+    nullify(this%c_Xh_GL)
+    nullify(this%GLL_to_GL)
     nullify(this%scratch_GL)
-
 
   end subroutine augmented_lagrangian_free
 

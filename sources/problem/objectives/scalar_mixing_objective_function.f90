@@ -167,6 +167,8 @@ contains
        call neko_error("adjoint passive scalar not initialized")
     end if
 
+    call this%free()
+
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name, &
          start_time, end_time)
@@ -231,6 +233,9 @@ contains
     this%u_adj => null()
     this%v_adj => null()
     this%w_adj => null()
+    this%coef => null()
+
+    if (allocated(this%scalar_name)) deallocate(this%scalar_name)
 
   end subroutine scalar_mixing_free
 

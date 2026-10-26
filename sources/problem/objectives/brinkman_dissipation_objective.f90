@@ -186,6 +186,8 @@ contains
 
     type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
 
+    call this%free()
+
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name, &
          start_time, end_time)
