@@ -3,5 +3,4 @@ target_sources(
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_vector.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_ext_vector.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/neko_complex_vector.f90
 )
