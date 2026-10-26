@@ -1,13 +1,72 @@
-# CMakeLists.txt for optimizer_checkpoint unit test
-# This file requires HDF5 support to be enabled.
+# CMakeLists.txt for the optimizer unit tests.
+
+set(CMAKE_FOLDER "Tests/Unit/Optimizer")
+
+# ============================================================================ #
+# steepest_descent_kernels: hand-computed checks of the D22-D24 kernels,
+# via both the device-dispatch path (steepest_descent_math) and the CPU
+# kernels directly. No mesh, no case file, no HDF5: must pass unconditionally.
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_kernels)
+
+add_pfunit_ctest(steepest_descent_kernels
+    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_kernels.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_kernels
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 1
+)
+add_dependencies(Unit steepest_descent_kernels)
+set_tests_properties(steepest_descent_kernels PROPERTIES
+    LABELS "unit;optimizer"
+    ENVIRONMENT "NEKO_LOG_FILE=steepest_descent_kernels.log"
+    TIMEOUT 120
+)
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(steepest_descent_kernels PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+# ============================================================================ #
+# steepest_descent_convergence: trajectory, pinning, zero-gradient and CSV
+# continuation-column checks, via the real optimizer (optimizer_factory).
+# No HDF5. Two ranks with an uneven split, since neko_init()'s setUp does a
+# collective MPI_Comm_dup that a single-rank subtest would hang against.
+
+file(MAKE_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_convergence)
+
+add_pfunit_ctest(steepest_descent_convergence
+    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_convergence.pf
+    WORKING_DIRECTORY
+        ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_convergence
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 2
+)
+add_dependencies(Unit steepest_descent_convergence)
+set_tests_properties(steepest_descent_convergence PROPERTIES
+    LABELS "unit;optimizer"
+    ENVIRONMENT "NEKO_LOG_FILE=steepest_descent_convergence.log"
+    TIMEOUT 120
+)
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(steepest_descent_convergence PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+# ============================================================================ #
+# Everything below this point requires HDF5: the pre-existing MMA
+# save/restart test, and the steepest-descent delta/xold1/xold2 checkpoint
+# test. CI most likely builds without HDF5, so anything placed below this
+# guard would silently vanish from that build -- which is exactly why the
+# two tests above are defined before it.
 
 if (NOT HAVE_HDF5)
     message(STATUS "Skipping optimizer_checkpoint test since HDF5 is not found")
+    message(STATUS "Skipping steepest_descent_checkpoint test since HDF5 is not found")
     return()
 endif()
-
-# Define the CTest for optimizer_checkpoint
-set(CMAKE_FOLDER "Tests/Unit/OptimizerCheckpoint")
 
 # Ensure the Neko binaries can be added to the PATH and the library directories
 set(neko_PATH "${neko_PREFIX}/bin:$ENV{PATH}")
@@ -56,7 +115,7 @@ add_pfunit_ctest(optimizer_checkpoint
     TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/optimizer_checkpoint.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
-    MAX_PES 2
+    MAX_PES 1
 )
 
 add_dependencies(Unit optimizer_checkpoint)
@@ -65,7 +124,7 @@ add_dependencies(Unit optimizer_checkpoint)
 set_tests_properties(optimizer_checkpoint PROPERTIES
     LABELS "unit;optimizer;hdf5"
     ENVIRONMENT "NEKO_LOG_FILE=optimizer_checkpoint.log"
-    TIMEOUT 300
+    TIMEOUT 600
 )
 
 # Add dependencies to ensure preparation is done before the test runs
@@ -107,6 +166,34 @@ set_tests_properties(optimizer_checkpoint PROPERTIES
 # Disable treating unused-variable as error for pfunit tests
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     target_compile_options(optimizer_checkpoint PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+# ============================================================================ #
+# steepest_descent_checkpoint: HDF5 round-trip of the private delta/xold1/
+# xold2 state, and of the base-class continuation-on-restart fix. Its own
+# WORKING_DIRECTORY, so it cannot collide with optimizer_checkpoint's
+# cleanup fixture above under `ctest --parallel`.
+
+file(MAKE_DIRECTORY
+    ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_checkpoint)
+
+add_pfunit_ctest(steepest_descent_checkpoint
+    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_checkpoint.pf
+    WORKING_DIRECTORY
+        ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_checkpoint
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 2
+)
+add_dependencies(Unit steepest_descent_checkpoint)
+set_tests_properties(steepest_descent_checkpoint PROPERTIES
+    LABELS "unit;optimizer;hdf5"
+    ENVIRONMENT "NEKO_LOG_FILE=steepest_descent_checkpoint.log"
+    TIMEOUT 120
+)
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(steepest_descent_checkpoint PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
 endif()
