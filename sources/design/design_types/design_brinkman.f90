@@ -267,7 +267,6 @@ contains
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
     character(len=:), allocatable :: output_format_str, output_precision_str
-    character(len=:), allocatable :: json_key
     logical :: dealias, dealias_fallback, verbose_design, verbose_sensitivity
     integer :: output_precision
 
