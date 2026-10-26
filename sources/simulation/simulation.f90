@@ -340,6 +340,7 @@ contains
     class(simulation_t), intent(inout) :: this
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
+    type(json_file) :: dt_params
 
     call init_dt_controller(dt_controller, this%neko_case%params)
 
@@ -368,6 +369,7 @@ contains
   subroutine simulation_run_backward(this)
     class(simulation_t), intent(inout) :: this
     type(time_step_controller_t) :: dt_controller
+    type(json_file) :: dt_params
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
     integer :: i
