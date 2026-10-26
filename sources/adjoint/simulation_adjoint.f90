@@ -105,7 +105,7 @@ contains
     if (present(n_steps)) then
        stopped_short = C%time%tstep .lt. n_steps
     else
-       stopped_short = C%time%t .lt. C%time%end_time
+       stopped_short = .not. C%time%is_done()
     end if
 
     if (.not. (output_at_end) .and. stopped_short) then
