@@ -20,7 +20,7 @@ has to run a flow to a genuine steady state.
 - `time_window_tester.f90`: the driver. It runs the case once per entry in
   `optimization.time_window_test.end_times` and compares the objective values
   across those runs and, optionally, against each other within a run.
-- `step_count_tester.f90`: the driver for `end_time_step_count` alone, which
+- `step_count.pf`: the pFUnit test for `end_time_step_count` alone, which
   checks where a run stops rather than what its objectives report.
 
 With `compare_steady` set it also runs the case with `simulation_t%unsteady`
@@ -298,8 +298,8 @@ this case reach.
 The run-length guard. It runs `time_window_run_length.case`, whose
 `end_time = 0.05` lies on a step boundary for its `dt = 0.005`, once through
 each branch of `problem_t%compute`, and requires each run to take exactly ten
-steps and stop at `t = 0.05`. It has its own driver, `step_count_tester.f90`,
-which checks nothing but where the runs stop, and refuses a case whose
+steps and stop at `t = 0.05`. Its pFUnit test, `step_count.pf`, checks nothing
+but where the runs stop, and refuses a case whose
 `end_time` is not on a step boundary, since only there does the check bite. It
 costs 4 s.
 
