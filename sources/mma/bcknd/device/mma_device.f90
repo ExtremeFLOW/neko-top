@@ -244,6 +244,11 @@ contains
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
 
+    ! device_maxval, MAXVAL and MPI_MAX can drop a NaN, which would then read
+    ! as convergence. The 2-norm keeps it on every rank: its distributed part
+    ! is reduced with MPI_SUM, and the rest is replicated.
+    if (ieee_is_nan(this%residunorm)) this%residumax = this%residunorm
+
     call this%scratch%relinquish(ind)
   end subroutine mma_pdip_KKT_device
 

@@ -1,10 +1,11 @@
 # CMakeLists.txt for the MMA unit tests.
 #
-# mma_kkt_nan: a NaN sensitivity on one rank must make the max-norm of the CPU
-# KKT residual NaN on every rank, for both subsolvers, so that the optimiser
-# cannot read a NaN design as converged. It needs two ranks on every backend,
-# so it is registered here rather than in the shared list in the parent
-# CMakeLists.txt, which runs device builds with a single rank.
+# mma_kkt_nan: a NaN sensitivity on one rank must make the max-norm of the KKT
+# residual NaN on every rank, for both subsolvers and, in a device build, for
+# both MMA backends, so that the optimiser cannot read a NaN design as
+# converged. It needs two ranks on every backend, so it is registered here
+# rather than in the shared list in the parent CMakeLists.txt, which runs
+# device builds with a single rank.
 
 set(CMAKE_FOLDER "Tests/Unit/MMA")
 
