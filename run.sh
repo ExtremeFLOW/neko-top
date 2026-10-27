@@ -440,7 +440,7 @@ for case in ${example_list[@]}; do
 
         [ -n "$CLUSTER" ] && printf '\t%-12s %-s\n' "Restarting:" "$example"
 
-    elif [[ -f "$log/output.log" ]]; then
+    elif [[ -s "$log/output.log" ]]; then
         printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Skipped:" "$example"
         continue
     fi
