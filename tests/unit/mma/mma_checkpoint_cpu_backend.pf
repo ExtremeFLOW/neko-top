@@ -50,22 +50,26 @@ contains
     class(test_mma_checkpoint_case), intent(inout) :: this
     type(vector_t) :: x_ref, x
     character(len=64) :: msg
-    integer :: i
+    logical :: same_size
+    real(kind=rp) :: max_diff
 
     ! Reference: the same updates without a checkpoint in between
     call run_mma(x_ref, '')
 
     call run_mma(x, 'mma_checkpoint_cpu_backend.h5')
 
-    @assertEqual(x_ref%size(), x%size(), message = "size")
-    do i = 1, x%size()
-       write(msg, '(A,I0,A,I0,A)') "x(", i, ") on rank ", pe_rank, &
-            " after save"
-       @assertEqual(x_ref%x(i), x%x(i), message = trim(msg))
-    end do
+    ! Compare before freeing, and free before asserting: a failed assertion
+    ! returns from the test
+    same_size = x_ref%size() .eq. x%size()
+    max_diff = huge(0.0_rp)
+    if (same_size) max_diff = maxval(abs(x_ref%x - x%x))
 
     call x_ref%free()
     call x%free()
+
+    write(msg, '(A,I0)') "max |x_ref - x| after save on rank ", pe_rank
+    @assertTrue(same_size, message = "size")
+    @assertEqual(0.0_rp, max_diff, message = trim(msg))
 
   end subroutine save_keeps_cpu_state
 

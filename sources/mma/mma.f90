@@ -395,6 +395,12 @@ contains
     call this%xold2%init(n)
     this%xold1 = x
     this%xold2 = x
+    ! On device builds the assignment copies device memory only, while the
+    ! cpu backend keeps its state on the host
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call this%xold1%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call this%xold2%copy_from(DEVICE_TO_HOST, sync = .true.)
+    end if
 
     call this%alpha%init(n)
     call this%beta%init(n)
