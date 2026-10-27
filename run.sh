@@ -122,6 +122,15 @@ if [ -n "$CLUSTER" ]; then
         printf >&2 "\e[1;31mInvalid Cluster:\e[m $CLUSTER\n"
         exit 1
     fi
+
+    case "$CLUSTER" in
+        "MN5")
+            export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$MN5_ACCOUNT}
+            ;;
+        "LUMI-C" | "LUMI-G")
+            export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$LUMI_ACCOUNT}
+            ;;
+    esac
 fi
 
 if [ "$NEKO" == true ]; then
@@ -137,12 +146,6 @@ if [ "$NEKO" == true ]; then
     export LPATH="$LPATH/neko"
 fi
 
-# Setup variables used when submitting jobs to a cluster
-if [ $CLUSTER == "MN5" ]; then
-    export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$MN5_ACCOUNT}
-elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
-    export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$LUMI_ACCOUNT}
-fi
 
 # End of user inputs
 # ============================================================================ #
@@ -253,8 +256,8 @@ for i in ${!example_list[@]}; do
 
 done
 
-# Remove duplicates and check for nested examples
-example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
+# Remove duplicates while preserving the original order.
+example_list=($(printf '%s\n' "${example_list[@]}" | awk '!seen[$0]++'))
 
 # If multiple examples with same name and  different file extensions are found
 # we stop the execution and print an error message.
