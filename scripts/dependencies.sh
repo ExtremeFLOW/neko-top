@@ -24,9 +24,63 @@ function check_system_dependencies() {
         exit 1
     fi
 
-    # Check for correct version of cmake executable. The dependencies built
-    # below may need a newer one, which is checked before each is configured.
-    require_cmake 3.21 "Neko-TOP"
+    # Check for correct version of cmake executable. Neko-TOP needs 3.21, and
+    # the dependencies built from source below may need more, so check what
+    # each one needs before building any of them. The conditions mirror the
+    # find_* functions. GSLIB and ParMETIS need no more than Neko-TOP.
+    check_environment
+    local required=("3.21 Neko-TOP") dir lib name
+
+    # JSON-Fortran is built unless an installation is found.
+    dir=${JSON_FORTRAN_DIR:-"json-fortran"}
+    if [ "${dir:0:1}" != "/" ]; then dir="$EXTERNAL_DIR/$dir"; fi
+    lib=$(find "$dir" -type d -name 'lib*' \
+        -exec test -f '{}'/libjsonfortran.so \; -print 2>/dev/null) || true
+    if [[ ! -d "$lib" ]]; then
+        name="JSON-Fortran $JSON_FORTRAN_VERSION"
+        required+=("$JSON_FORTRAN_CMAKE_MINIMUM $name")
+    fi
+
+    # HDF5 is built if requested, not found, and the prefix is writable.
+    dir=${HDF5_ROOT:-$HDF5_DIR}
+    if [ -n "$dir" ]; then
+        if [ "${dir:0:1}" != "/" ]; then dir="$EXTERNAL_DIR/$dir"; fi
+        lib=$(find "$dir" -type d -name 'lib*' \
+            -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) ||
+            true
+        if [[ ! -d "$lib" && (! -d "$dir" || -w "$dir") ]]; then
+            required+=("$HDF5_CMAKE_MINIMUM HDF5 $HDF5_VERSION")
+        fi
+    fi
+
+    # pFUnit is built if requested (setup.sh sets PFUNIT_DIR for the tests)
+    # and not found.
+    dir=$PFUNIT_DIR
+    if [ -n "$dir" ]; then
+        if [ "${dir:0:1}" != "/" ]; then dir="$EXTERNAL_DIR/$dir"; fi
+        if [[ -z "$(find "$dir" -name libpfunit.a 2>/dev/null)" ]]; then
+            required+=("$PFUNIT_CMAKE_MINIMUM pFUnit $PFUNIT_VERSION")
+        fi
+    fi
+
+    local found=0 outdated=false req version major minor
+    CMAKE_VERSION=$(cmake --version | head -n 1)
+    if [[ "$CMAKE_VERSION" =~ version\ ([0-9]+)\.([0-9]+) ]]; then
+        found=$((BASH_REMATCH[1] * 1000 + BASH_REMATCH[2]))
+    fi
+    for req in "${required[@]}"; do
+        read -r version name <<<"$req"
+        IFS=. read -r major minor _ <<<"$version"
+        if ((found < major * 1000 + minor)); then
+            printf "CMake version >= %s is required to build %s, found: %s\n" \
+                "$version" "$name" "$CMAKE_VERSION"
+            outdated=true
+        fi
+    done
+    if [ "$outdated" == true ]; then
+        printf "Please update your CMake installation.\n"
+        exit 1
+    fi
 
 }
 
@@ -53,8 +107,6 @@ function find_json_fortran() {
         fi
 
         # Install JSON-Fortran
-        require_cmake "$(cmake_minimum_of "$JSON_FORTRAN_DIR")" \
-            "JSON-Fortran $JSON_FORTRAN_VERSION"
         cmake -S $JSON_FORTRAN_DIR -B $JSON_FORTRAN_DIR/build \
             --install-prefix $JSON_FORTRAN_DIR \
             -Wno-dev \
@@ -197,8 +249,6 @@ _ACEOF
     fi
 
     if [[ -z "$(find $PFUNIT_DIR -name libpfunit.a)" ]]; then
-        require_cmake "$(cmake_minimum_of "$PFUNIT_DIR")" \
-            "pFUnit $PFUNIT_VERSION"
         cmake -B $PFUNIT_DIR/build -S $PFUNIT_DIR -Wno-dev \
             --install-prefix=$PFUNIT_DIR -DCMAKE_BUILD_TYPE=Release -DMPI=YES
         cmake --build $PFUNIT_DIR/build
@@ -258,7 +308,6 @@ function find_hdf5() {
         fi
 
         # Build and install HDF5
-        require_cmake "$(cmake_minimum_of "$HDF5_ROOT")" "HDF5 $HDF5_VERSION"
         cmake -B $HDF5_ROOT/build -S $HDF5_ROOT --install-prefix $HDF5_ROOT \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
@@ -623,29 +672,6 @@ function find_gmsh2nek() {
 
 function error() {
     echo -e "$1" >&2
-}
-
-# Exit unless the cmake executable is at least version $1 (major.minor), which
-# $2 needs to be built. An empty $1 requires nothing.
-function require_cmake() {
-    local found major minor
-    IFS=. read -r major minor <<<"$1"
-    found=$(cmake --version | head -n 1)
-    if [[ ! "$found" =~ version\ ([0-9]+)\.([0-9]+) ]] ||
-        ((BASH_REMATCH[1] < major ||
-            (BASH_REMATCH[1] == major && BASH_REMATCH[2] < minor))); then
-        error "CMake version >= $1 is required to build $2, found: $found"
-        error "Please update your CMake installation."
-        exit 1
-    fi
-}
-
-# Print the version (major.minor) that the CMakeLists.txt of the source tree $1
-# passes to cmake_minimum_required, or nothing if it cannot be read.
-function cmake_minimum_of() {
-    grep -m 1 -iE '^[[:space:]]*cmake_minimum_required' "$1/CMakeLists.txt" \
-        2>/dev/null | grep -ioE 'VERSION[[:space:]]+[0-9]+\.[0-9]+' |
-        grep -oE '[0-9.]+$'
 }
 
 function check_environment() {
