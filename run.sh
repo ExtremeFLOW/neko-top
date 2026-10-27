@@ -322,23 +322,23 @@ function Submit() {
             return
         fi
 
-        # Deal with sequential submission and job dependencies
-        id=""
-        DEP=""
-        for i in $(seq 1 $N_JOBS); do
-            if [[ -n "$id" && -n "$SEQ_DEP" ]]; then
-                DEP="--dependency=afterany:$id:$SEQ_DEP"
-            elif [ -n "$id" ]; then
-                DEP="--dependency=afterany:$id"
-            elif [ -n "$SEQ_DEP" ]; then
-                DEP="--dependency=afterany:$SEQ_DEP"
-            fi
+        # Serialise duplicate jobs by name, then optionally wait for earlier
+        # examples submitted with --sequential.
+        submitted_ids=""
+        DEP="--dependency=singleton"
+        if [[ -n "$SEQ_DEP" ]]; then
+            DEP="$DEP,afterany:$SEQ_DEP"
+        fi
 
-            id=$(sbatch --parsable -J $1 $DEP job_script.sh)
+        for i in $(seq 1 "$N_JOBS"); do
+            id=$(sbatch --parsable -J "$1" "$DEP" job_script.sh)
             if [ "$SEQUENTIAL" == true ]; then
-                SEQ_DEP="$SEQ_DEP:$id"
+                submitted_ids="${submitted_ids:+$submitted_ids:}$id"
             fi
         done
+        if [[ "$SEQUENTIAL" == true && -n "$submitted_ids" ]]; then
+            SEQ_DEP="${SEQ_DEP:+$SEQ_DEP:}$submitted_ids"
+        fi
     else
         printf >&2 "Unknown submission system.\n"
         exit 1
