@@ -510,16 +510,18 @@ contains
     path = CKPT_PATH // repeat('a', 115) // '/' // repeat('b', 115) // '/'
     file_full = path // CKPT_BASE // '_00001.h5'
 
-    ! Run A: one iteration, which writes the checkpoint
+    ! Run A: one iteration from 0.5, which writes the checkpoint
     call run_one_iteration('"checkpoint": {"path": "' // path // &
-         '", "base": "' // CKPT_BASE // '", "interval": 1}', x_a)
+         '", "base": "' // CKPT_BASE // '", "interval": 1}', 0.5_rp, x_a)
 
     inquire(file = file_full, exist = exists)
     @assertTrue(exists, 'No checkpoint file ' // file_full)
 
     ! Run B: a fresh optimizer restarted from that file, with nothing left to
-    ! iterate, so it must hold the design Run A checkpointed
-    call run_one_iteration('"restart_file": "' // file_full // '"', x_b)
+    ! iterate, so it must hold the design Run A checkpointed. It starts from
+    ! 0.9, so a restart that loaded nothing ends elsewhere.
+    call run_one_iteration('"restart_file": "' // file_full // '"', 0.9_rp, &
+         x_b)
 
     local_diff = maxval(abs(x_b%x - x_a%x))
     call MPI_Allreduce(local_diff, global_diff, 1, &
@@ -534,9 +536,11 @@ contains
   !> Run a one-iteration steepest-descent optimisation of a small quadratic
   !! from a fresh state, and return the final design.
   !! @param solver_entry Extra JSON entry of the solver object.
+  !! @param start The value of every design variable at the start.
   !! @param x The final design.
-  subroutine run_one_iteration(solver_entry, x)
+  subroutine run_one_iteration(solver_entry, start, x)
     character(len=*), intent(in) :: solver_entry
+    real(kind=rp), intent(in) :: start
     type(vector_t), intent(inout) :: x
     type(stub_design_t) :: des
     type(problem_t) :: prob
@@ -557,13 +561,13 @@ contains
        n = 2
        w = [1.0_rp, 1.0_rp]
        d = [0.3_rp, 0.3_rp]
-       x0 = [0.5_rp, 0.5_rp]
     else
        n = 1
        w = [1.0_rp]
        d = [0.3_rp]
-       x0 = [0.5_rp]
     end if
+    allocate(x0(n))
+    x0 = start
 
     call des%init(x0)
 

@@ -369,10 +369,11 @@ contains
     this%max_runtime = -1.0_rp
     this%stop_design_change = -1.0_rp
     this%max_design_change = 0.0_rp
-    this%restart_file = ''
-    this%checkpoint_path = './checkpoints/'
-    this%checkpoint_base = 'optimizer_checkpoint'
-    this%checkpoint_format = 'hdf5'
+    if (allocated(this%restart_file)) deallocate(this%restart_file)
+    if (allocated(this%checkpoint_path)) deallocate(this%checkpoint_path)
+    if (allocated(this%checkpoint_base)) deallocate(this%checkpoint_base)
+    if (allocated(this%checkpoint_format)) deallocate(this%checkpoint_format)
+    call optimizer_default_file_settings(this)
     this%checkpoint_interval = -1
     this%checkpoint_overwrite = .false.
 
@@ -482,6 +483,9 @@ contains
     real(kind=rp) :: iteration_time
     logical :: converged
     integer :: stop_flag
+
+    ! The checkpoint name is built from these settings
+    call optimizer_default_file_settings(this)
 
     ! Initialize variables
     stop_flag = 1
@@ -884,6 +888,8 @@ contains
     character(len=12) :: suffix
     logical :: exists, overwrite_flag
 
+    call optimizer_default_file_settings(this)
+
     call neko_log%section('Optimizer save checkpoint')
     call profiler_start_region('Optimizer save checkpoint')
 
@@ -973,6 +979,8 @@ contains
     integer, intent(in), optional :: iteration
     character(len=:), allocatable :: file_full
     character(len=12) :: suffix
+
+    call optimizer_default_file_settings(this)
 
     call neko_log%section('Optimizer loading checkpoint')
     call profiler_start_region('Optimizer load checkpoint')

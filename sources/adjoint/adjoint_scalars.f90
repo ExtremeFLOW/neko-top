@@ -120,7 +120,7 @@ contains
     integer :: i, j
     character(len=:), allocatable :: field_name
     character(len=256), allocatable :: field_names(:)
-    character(len=12) :: index_str
+    character(len=12) :: index_str, limit_str
     character(len=:), allocatable :: primal_name, trial_primal_name
     logical :: found_primal
 
@@ -159,9 +159,10 @@ contains
              field_name = 's_' // trim(index_str) // '_adj'
           end if
 
+          write(limit_str, '(I0)') len(field_names)
           if (len_trim(field_name) .gt. len(field_names)) then
              call neko_error("Adjoint scalar name longer than " // &
-                  "256 characters: " // trim(field_name))
+                  trim(limit_str) // " characters: " // trim(field_name))
           end if
           field_names(i) = trim(field_name)
 
@@ -174,8 +175,10 @@ contains
                 ! A name cut back to the same length would never become
                 ! unique, so the loop would not end
                 if (len(field_name) .gt. len(field_names)) then
-                   call neko_error("Adjoint scalar name too long to " // &
-                        "make unique: " // field_name)
+                   call neko_error("Adjoint scalar name " // &
+                        trim(field_names(i)) // " is a duplicate, and " // &
+                        "its _" // trim(index_str) // " suffix would " // &
+                        "exceed " // trim(limit_str) // " characters.")
                 end if
                 field_names(i) = trim(field_name)
                 j = 1 ! Start over to check if new name is unique
