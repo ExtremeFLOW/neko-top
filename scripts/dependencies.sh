@@ -29,37 +29,36 @@ function check_system_dependencies() {
     # each one needs before building any of them. The conditions mirror the
     # find_* functions. GSLIB and ParMETIS need no more than Neko-TOP.
     check_environment
-    local required=("3.21 Neko-TOP") dir lib name
+    local required=("3.21 Neko-TOP") dir lib minimum name
 
     # JSON-Fortran is built unless an installation is found.
     dir=${JSON_FORTRAN_DIR:-"json-fortran"}
     if [ "${dir:0:1}" != "/" ]; then dir="$EXTERNAL_DIR/$dir"; fi
     lib=$(find "$dir" -type d -name 'lib*' \
         -exec test -f '{}'/libjsonfortran.so \; -print 2>/dev/null) || true
-    if [[ ! -d "$lib" ]]; then
-        name="JSON-Fortran $JSON_FORTRAN_VERSION"
-        required+=("$JSON_FORTRAN_CMAKE_MINIMUM $name")
+    if [[ ! -d "$lib" ]] && minimum=$(cmake_minimum JSON_FORTRAN); then
+        required+=("$minimum JSON-Fortran $JSON_FORTRAN_VERSION")
     fi
 
     # HDF5 is built if requested, not found, and the prefix is writable.
     dir=${HDF5_ROOT:-$HDF5_DIR}
-    if [ -n "$dir" ]; then
+    if [ -n "$dir" ] && minimum=$(cmake_minimum HDF5); then
         if [ "${dir:0:1}" != "/" ]; then dir="$EXTERNAL_DIR/$dir"; fi
         lib=$(find "$dir" -type d -name 'lib*' \
             -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) ||
             true
         if [[ ! -d "$lib" && (! -d "$dir" || -w "$dir") ]]; then
-            required+=("$HDF5_CMAKE_MINIMUM HDF5 $HDF5_VERSION")
+            required+=("$minimum HDF5 $HDF5_VERSION")
         fi
     fi
 
     # pFUnit is built if requested (setup.sh sets PFUNIT_DIR for the tests)
     # and not found.
     dir=$PFUNIT_DIR
-    if [ -n "$dir" ]; then
+    if [ -n "$dir" ] && minimum=$(cmake_minimum PFUNIT); then
         if [ "${dir:0:1}" != "/" ]; then dir="$EXTERNAL_DIR/$dir"; fi
         if [[ -z "$(find "$dir" -name libpfunit.a 2>/dev/null)" ]]; then
-            required+=("$PFUNIT_CMAKE_MINIMUM pFUnit $PFUNIT_VERSION")
+            required+=("$minimum pFUnit $PFUNIT_VERSION")
         fi
     fi
 
@@ -681,4 +680,22 @@ function check_environment() {
 
     source $MAIN_DIR/config/dependency-versions.env
     mkdir -p $EXTERNAL_DIR
+}
+
+# Print the oldest CMake needed to build a dependency, given its variable
+# prefix (e.g. PFUNIT): <prefix>_CMAKE_MINIMUM if set, else the minimum in
+# <prefix>_CMAKE_PIN (config/dependency-versions.env) if <prefix>_VERSION is
+# the version it is pinned for. Fail otherwise, leaving the dependency's own
+# cmake_minimum_required to report a CMake too old for the version in use.
+function cmake_minimum() {
+    local override="${1}_CMAKE_MINIMUM" pin="${1}_CMAKE_PIN"
+    local version="${1}_VERSION" pinned minimum
+    read -r pinned minimum <<<"${!pin}"
+    if [ -n "${!override}" ]; then
+        echo "${!override}"
+    elif [ "$pinned" == "${!version}" ]; then
+        echo "$minimum"
+    else
+        return 1
+    fi
 }
