@@ -68,7 +68,7 @@ program time_window_tester
   type(vector_t) :: values
 
   real(kind=rp) :: tolerance, reference, difference
-  logical :: pairwise, compare_steady, require_steady_state, failed
+  logical :: pairwise, compare_steady, require_steady_state, failed, found
   integer :: n_runs, n_unsteady, first_unsteady
   integer :: n_objectives, n_declared, i, j
   ! Wider than LOG_SIZE: these lines carry full-precision values.
@@ -88,6 +88,13 @@ program time_window_tester
   call get_command_argument(1, parameter_file)
 
   parameters = json_read_file(trim(parameter_file))
+
+  ! The tests here share a working directory and may run concurrently, so each
+  ! case keeps its state recovery files in a directory named after it.
+  call parameters%update('state_recovery.path', &
+       parameter_file(1:index(parameter_file, '.case', back = .true.) - 1) &
+       // '_checkpoints/', found)
+
   call json_get(parameters, 'optimization.design', design_parameters)
 
   call json_get_or_default(parameters, &
