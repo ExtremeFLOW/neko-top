@@ -111,10 +111,16 @@ endif()
 # PKG_CONFIG_PATH environment variable. FindPkgConfig searches the environment
 # PKG_CONFIG_PATH before the CMAKE_PREFIX_PATH entries, so without this an
 # explicitly requested prefix loses to any matching .pc file already on it.
+# Callers restore the previous value once the package has been resolved, so
+# the prefix cannot leak into later lookups. An empty prefix is ignored.
 function(prepend_pkg_config_path prefix)
+    if ("${prefix}" STREQUAL "")
+        return()
+    endif()
+
     set(_dirs)
     foreach(_sub lib/pkgconfig lib64/pkgconfig share/pkgconfig)
-        if (IS_DIRECTORY ${prefix}/${_sub})
+        if (IS_DIRECTORY "${prefix}/${_sub}")
             list(APPEND _dirs ${prefix}/${_sub})
         endif()
     endforeach()
@@ -144,10 +150,12 @@ else()
 endif()
 
 set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
-prepend_pkg_config_path(${JSON_FORTRAN_DIR})
+set(_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
+prepend_pkg_config_path("${JSON_FORTRAN_DIR}")
 
 # Find the JSON-Fortran library
 pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
+set(ENV{PKG_CONFIG_PATH} "${_saved_pkg_config_path}")
 
 # ............................................................................ #
 # Setup of the Neko library
@@ -165,11 +173,13 @@ else()
 endif()
 
 set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
-prepend_pkg_config_path(${NEKO_DIR})
+set(_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
+prepend_pkg_config_path("${NEKO_DIR}")
 
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
+set(ENV{PKG_CONFIG_PATH} "${_saved_pkg_config_path}")
 
 # ............................................................................ #
 # HDF5 Support
