@@ -83,12 +83,13 @@ module optimizer
      logical, private :: initialized = .false.
 
      !> Checkpoint file to be restarted from.
-     character(len=256), private :: restart_file = ''
+     character(len=:), allocatable, private :: restart_file
 
-     ! Checkpoint related information
-     character(len=256), private :: checkpoint_path = './checkpoints/'
-     character(len=256), private :: checkpoint_base = 'optimizer_checkpoint'
-     character(len=256), private :: checkpoint_format = 'hdf5'
+     ! Checkpoint related information, defaulted by
+     ! optimizer_default_file_settings
+     character(len=:), allocatable, private :: checkpoint_path
+     character(len=:), allocatable, private :: checkpoint_base
+     character(len=:), allocatable, private :: checkpoint_format
      integer, private :: checkpoint_interval = -1
      logical, private :: checkpoint_overwrite = .false.
 
@@ -326,6 +327,7 @@ contains
     this%max_iterations = max_iterations
 
     ! Optional settings
+    call optimizer_default_file_settings(this)
     if (present(max_runtime)) this%max_runtime = max_runtime
     if (present(stop_design_change)) this%stop_design_change = stop_design_change
     if (present(restart_file)) this%restart_file = restart_file
@@ -404,6 +406,9 @@ contains
        call neko_error('optimizer: Base settings already initialized.')
     end if
 
+    ! The current settings are the defaults of the reads below
+    call optimizer_default_file_settings(this)
+
     call json_get_or_default(solver_params, 'max_runtime', read_str, "")
     call read_duration(read_str, this%max_runtime)
     call json_get_or_default(solver_params, 'stop_design_change', &
@@ -430,6 +435,25 @@ contains
     this%checkpoint_overwrite = read_logical
 
   end subroutine optimizer_read_base_settings
+
+  !> Give the restart file and the checkpoint settings their defaults, where
+  !! they are not set yet. They have deferred length, since a checkpoint
+  !! name can be longer than any fixed buffer.
+  !! @param this The optimizer object.
+  subroutine optimizer_default_file_settings(this)
+    class(optimizer_t), intent(inout) :: this
+
+    if (.not. allocated(this%restart_file)) this%restart_file = ''
+    if (.not. allocated(this%checkpoint_path)) then
+       this%checkpoint_path = './checkpoints/'
+    end if
+    if (.not. allocated(this%checkpoint_base)) then
+       this%checkpoint_base = 'optimizer_checkpoint'
+    end if
+    if (.not. allocated(this%checkpoint_format)) then
+       this%checkpoint_format = 'hdf5'
+    end if
+  end subroutine optimizer_default_file_settings
 
   ! -------------------------------------------------------------------------- !
   ! Optimization loop routine
@@ -893,7 +917,7 @@ contains
     end if
 
     ! Extract the path and suffix from the full filename.
-    allocate(character(len=len(file_full)) :: file_path)
+    allocate(character(len=len(file_full) + 2) :: file_path)
     call filename_path(trim(file_full), file_path)
     call filename_suffix(trim(file_full), suffix)
 
