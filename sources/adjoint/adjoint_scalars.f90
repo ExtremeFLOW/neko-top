@@ -159,6 +159,10 @@ contains
              field_name = 's_' // trim(index_str) // '_adj'
           end if
 
+          if (len_trim(field_name) .gt. len(field_names)) then
+             call neko_error("Adjoint scalar name longer than " // &
+                  "256 characters: " // trim(field_name))
+          end if
           field_names(i) = trim(field_name)
 
           ! If there's a duplicate, append a number until unique
@@ -167,6 +171,12 @@ contains
              if (trim(field_names(i)) == trim(field_names(j))) then
                 write(index_str, '(I0)') j
                 field_name = trim(field_names(i)) // '_' // trim(index_str)
+                ! A name cut back to the same length would never become
+                ! unique, so the loop would not end
+                if (len(field_name) .gt. len(field_names)) then
+                   call neko_error("Adjoint scalar name too long to " // &
+                        "make unique: " // field_name)
+                end if
                 field_names(i) = trim(field_name)
                 j = 1 ! Start over to check if new name is unique
              else

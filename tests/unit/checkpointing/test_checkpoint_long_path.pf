@@ -1,8 +1,6 @@
 module test_checkpoint_long_path
   use pfunit
   use, intrinsic :: iso_c_binding, only: c_char, c_int, c_null_char
-  ! Renamed, since pfunit also exports MPI_Barrier from the mpi module
-  use mpi_f08, only: barrier_f08 => MPI_Barrier
   use comm, only: pe_rank, NEKO_COMM
   use simulation_m, only: simulation_t
   use state_recover_checkpoint, only: state_recover_checkpoint_t
@@ -50,13 +48,15 @@ contains
     class(design_t), allocatable :: des
     type(problem_t) :: prob
     character(len=:), allocatable :: path, filename
-    logical :: path_exists
+    logical :: path_exists, stale_exists
 
     path = top_dir // '/' // repeat('p', 97) // '/'
     filename = repeat('f', 120)
 
     ! A tree left by an earlier run would make the existence check pass
     call remove_path(path)
+    inquire(file = top_dir, exist = stale_exists)
+    @assertFalse(stale_exists, 'Stale checkpoint tree not removed: ' // top_dir)
 
     call initialize_case_from_file('checkpoint.case', sim, des, prob)
 
@@ -75,13 +75,16 @@ contains
   !! @param path The checkpoint path, top_dir/<subdirectory>/.
   subroutine remove_path(path)
     character(len=*), intent(in) :: path
-    integer(c_int) :: ierr
+    integer(c_int) :: stat
+    integer :: ierr
 
+    ! No rank may still be using the tree when rank 0 removes it
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
     if (pe_rank .eq. 0) then
-       ierr = c_rmdir(path // c_null_char)
-       ierr = c_rmdir(top_dir // c_null_char)
+       stat = c_rmdir(path // c_null_char)
+       stat = c_rmdir(top_dir // c_null_char)
     end if
-    call barrier_f08(NEKO_COMM)
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
   end subroutine remove_path
 
 end module test_checkpoint_long_path
