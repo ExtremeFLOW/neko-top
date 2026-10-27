@@ -109,11 +109,21 @@ endif()
 
 # Prepend the pkg-config directories of an installation prefix to the
 # PKG_CONFIG_PATH environment variable. FindPkgConfig searches the environment
-# PKG_CONFIG_PATH before the CMAKE_PREFIX_PATH entries, so without this an
-# explicitly requested prefix loses to any matching .pc file already on it.
-# Callers restore the previous value once the package has been resolved, so
-# the prefix cannot leak into later lookups. An empty prefix is ignored.
+# PKG_CONFIG_PATH before the CMAKE_PREFIX_PATH entries, so without this the
+# configured prefix (JSON_FORTRAN_DIR or NEKO_DIR, including their defaults
+# under ${EXTERNAL_DIR}) loses to any matching .pc file already on it.
+# Callers run restore_pkg_config_path() once the package has been resolved,
+# so the prefix cannot leak into later lookups. An empty prefix is ignored.
 function(prepend_pkg_config_path prefix)
+    # Record the previous value, and whether it was set at all, for
+    # restore_pkg_config_path().
+    if (DEFINED ENV{PKG_CONFIG_PATH})
+        set(_had_pkg_config_path TRUE PARENT_SCOPE)
+        set(_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}" PARENT_SCOPE)
+    else()
+        set(_had_pkg_config_path FALSE PARENT_SCOPE)
+    endif()
+
     if ("${prefix}" STREQUAL "")
         return()
     endif()
@@ -134,6 +144,16 @@ function(prepend_pkg_config_path prefix)
     endif()
 endfunction()
 
+# Restore PKG_CONFIG_PATH to the state recorded by prepend_pkg_config_path(),
+# unsetting it again if it was not set before.
+function(restore_pkg_config_path)
+    if (_had_pkg_config_path)
+        set(ENV{PKG_CONFIG_PATH} "${_saved_pkg_config_path}")
+    else()
+        unset(ENV{PKG_CONFIG_PATH})
+    endif()
+endfunction()
+
 # ............................................................................ #
 # Setup of JSON-Fortran
 
@@ -150,12 +170,11 @@ else()
 endif()
 
 set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
-set(_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
 prepend_pkg_config_path("${JSON_FORTRAN_DIR}")
 
 # Find the JSON-Fortran library
 pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
-set(ENV{PKG_CONFIG_PATH} "${_saved_pkg_config_path}")
+restore_pkg_config_path()
 
 # ............................................................................ #
 # Setup of the Neko library
@@ -173,13 +192,12 @@ else()
 endif()
 
 set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
-set(_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}")
 prepend_pkg_config_path("${NEKO_DIR}")
 
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
-set(ENV{PKG_CONFIG_PATH} "${_saved_pkg_config_path}")
+restore_pkg_config_path()
 
 # ............................................................................ #
 # HDF5 Support
