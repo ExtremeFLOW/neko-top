@@ -46,8 +46,10 @@ program time_window_tester
   implicit none
 
   ! JSON related arguments
-  integer :: argc
+  integer :: argc, stem_end
   character(len=256) :: parameter_file
+  !> Parameter file name without its '.case' suffix.
+  character(len=:), allocatable :: case_stem
   type(json_file) :: parameters, design_parameters
 
   !> The simulation we are working with
@@ -91,9 +93,14 @@ program time_window_tester
 
   ! The tests here share a working directory and may run concurrently, so each
   ! case keeps its state recovery files in a directory named after it.
-  call parameters%update('state_recovery.path', &
-       parameter_file(1:index(parameter_file, '.case', back = .true.) - 1) &
-       // '_checkpoints/', found)
+  stem_end = index(parameter_file, '.case', back = .true.)
+  if (stem_end .eq. 0) then
+     case_stem = trim(parameter_file)
+  else
+     case_stem = parameter_file(1:stem_end - 1)
+  end if
+  call parameters%update('state_recovery.path', case_stem // '_checkpoints/', &
+       found)
 
   call json_get(parameters, 'optimization.design', design_parameters)
 
