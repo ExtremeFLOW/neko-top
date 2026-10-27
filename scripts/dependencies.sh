@@ -24,16 +24,9 @@ function check_system_dependencies() {
         exit 1
     fi
 
-    # Check for correct version of cmake executable (>= 3.21).
-    CMAKE_VERSION=$(cmake --version | head -n 1)
-    if [[ ! "$CMAKE_VERSION" =~ version\ ([0-9]+)\.([0-9]+) ]] ||
-        ((BASH_REMATCH[1] < 3 ||
-            (BASH_REMATCH[1] == 3 && BASH_REMATCH[2] < 21))); then
-        printf "CMake version >= 3.21 is required, found: %s\n" \
-            "$CMAKE_VERSION"
-        printf "Please update your CMake installation.\n"
-        exit 1
-    fi
+    # Check for correct version of cmake executable. The dependencies built
+    # below may need a newer one, which is checked before each is configured.
+    require_cmake 3.21 "Neko-TOP"
 
 }
 
@@ -60,6 +53,8 @@ function find_json_fortran() {
         fi
 
         # Install JSON-Fortran
+        require_cmake "$(cmake_minimum_of "$JSON_FORTRAN_DIR")" \
+            "JSON-Fortran $JSON_FORTRAN_VERSION"
         cmake -S $JSON_FORTRAN_DIR -B $JSON_FORTRAN_DIR/build \
             --install-prefix $JSON_FORTRAN_DIR \
             -Wno-dev \
@@ -202,6 +197,8 @@ _ACEOF
     fi
 
     if [[ -z "$(find $PFUNIT_DIR -name libpfunit.a)" ]]; then
+        require_cmake "$(cmake_minimum_of "$PFUNIT_DIR")" \
+            "pFUnit $PFUNIT_VERSION"
         cmake -B $PFUNIT_DIR/build -S $PFUNIT_DIR -Wno-dev \
             --install-prefix=$PFUNIT_DIR -DCMAKE_BUILD_TYPE=Release -DMPI=YES
         cmake --build $PFUNIT_DIR/build
@@ -261,6 +258,7 @@ function find_hdf5() {
         fi
 
         # Build and install HDF5
+        require_cmake "$(cmake_minimum_of "$HDF5_ROOT")" "HDF5 $HDF5_VERSION"
         cmake -B $HDF5_ROOT/build -S $HDF5_ROOT --install-prefix $HDF5_ROOT \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
@@ -625,6 +623,29 @@ function find_gmsh2nek() {
 
 function error() {
     echo -e "$1" >&2
+}
+
+# Exit unless the cmake executable is at least version $1 (major.minor), which
+# $2 needs to be built. An empty $1 requires nothing.
+function require_cmake() {
+    local found major minor
+    IFS=. read -r major minor <<<"$1"
+    found=$(cmake --version | head -n 1)
+    if [[ ! "$found" =~ version\ ([0-9]+)\.([0-9]+) ]] ||
+        ((BASH_REMATCH[1] < major ||
+            (BASH_REMATCH[1] == major && BASH_REMATCH[2] < minor))); then
+        error "CMake version >= $1 is required to build $2, found: $found"
+        error "Please update your CMake installation."
+        exit 1
+    fi
+}
+
+# Print the version (major.minor) that the CMakeLists.txt of the source tree $1
+# passes to cmake_minimum_required, or nothing if it cannot be read.
+function cmake_minimum_of() {
+    grep -m 1 -iE '^[[:space:]]*cmake_minimum_required' "$1/CMakeLists.txt" \
+        2>/dev/null | grep -ioE 'VERSION[[:space:]]+[0-9]+\.[0-9]+' |
+        grep -oE '[0-9.]+$'
 }
 
 function check_environment() {
