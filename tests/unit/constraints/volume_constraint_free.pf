@@ -21,7 +21,7 @@ module volume_constraint_free
   use mpi
   use pfunit
   use json_module, only: json_file
-  use json_utils, only: json_get, json_extract_item
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use json_utils_ext, only: json_read_file
   use simulation_m, only: simulation_t
   use brinkman_design, only: brinkman_design_t
@@ -38,17 +38,15 @@ module volume_constraint_free
   !> Case file with the simulation, the design and the filtered constraint.
   character(len=*), parameter :: case_file = "volume_constraint_free.case"
 
-  !> Components shared by the constraint under test and the reference.
-  character(len=*), parameter :: mask_name = "optimization_domain"
-  real(kind=rp), parameter :: limit = 0.2_rp
-  logical, parameter :: is_max = .false.
-
   !> Both constraints run the same arithmetic, so they must agree tightly.
   real(kind=rp), parameter :: match_tol = 1.0e-12_rp
 
   !> The filter must move the sensitivity by at least this fraction of its
   !! magnitude, or the test could not tell a stale mapping from none.
   real(kind=rp), parameter :: min_filter_effect = 1.0e-2_rp
+
+  !> Likewise, the filter must move the value far beyond `match_tol`.
+  real(kind=rp), parameter :: min_value_effect = 1.0e-6_rp
 
   @TestCase
   type, extends(MPITestCase) :: test_volume_free
@@ -95,11 +93,14 @@ contains
   !! the caller asserts on plain numbers.
   !! @param explicit_free Whether to call `free` before re-initialising.
   !! @param filter_effect Relative sensitivity change from the filter.
+  !! @param value_effect Absolute value change from the filter.
   !! @param sens_diff Relative sensitivity mismatch after re-initialising.
   !! @param value_diff Absolute value mismatch after re-initialising.
-  subroutine run_reinit(explicit_free, filter_effect, sens_diff, value_diff)
+  subroutine run_reinit(explicit_free, filter_effect, value_effect, &
+       sens_diff, value_diff)
     logical, intent(in) :: explicit_free
     real(kind=rp), intent(out) :: filter_effect
+    real(kind=rp), intent(out) :: value_effect
     real(kind=rp), intent(out) :: sens_diff
     real(kind=rp), intent(out) :: value_diff
 
@@ -109,11 +110,19 @@ contains
     type(volume_constraint_t) :: con, ref
     type(vector_t) :: s_con, s_ref
     real(kind=rp) :: scale
+    character(len=:), allocatable :: mask_name
+    logical :: is_max
+    real(kind=rp) :: limit
 
     parameters = json_read_file(case_file)
     call json_get(parameters, 'optimization.design', design_parameters)
     call json_extract_item(parameters, 'optimization.constraints', 1, &
          constraint_parameters)
+
+    ! Same keys and defaults as volume_constraint_init_json_sim.
+    call json_get_or_default(constraint_parameters, "mask_name", mask_name, "")
+    call json_get_or_default(constraint_parameters, "is_max", is_max, .false.)
+    call json_get(constraint_parameters, "limit", limit)
 
     call sim%init(parameters)
     call des%init(design_parameters, sim)
@@ -130,6 +139,7 @@ contains
     call con%update_sensitivity(des)
     call get_host_sensitivity(con, s_con)
     filter_effect = maxval(abs(s_con%x - s_ref%x)) / scale
+    value_effect = abs(con%get_value() - ref%get_value())
 
     ! Drop the mapping and compare against the reference.
     if (explicit_free) call con%free()
@@ -146,6 +156,7 @@ contains
     call ref%free()
     call des%free()
     call sim%free()
+    deallocate(mask_name)
 
     call neko_registry%free()
     call neko_scratch_registry%free()
@@ -160,11 +171,13 @@ contains
   @test(npes=[1])
   subroutine reinit_drops_mapping(this)
     class(test_volume_free), intent(inout) :: this
-    real(kind=rp) :: filter_effect, sens_diff, value_diff
+    real(kind=rp) :: filter_effect, value_effect, sens_diff, value_diff
 
-    call run_reinit(.false., filter_effect, sens_diff, value_diff)
+    call run_reinit(.false., filter_effect, value_effect, sens_diff, &
+         value_diff)
 
     @assertGreaterThan(filter_effect, min_filter_effect, "filter is inert")
+    @assertGreaterThan(value_effect, min_value_effect, "value filter is inert")
     @assertEqual(0.0_rp, sens_diff, match_tol, "stale sensitivity mapping")
     @assertEqual(0.0_rp, value_diff, match_tol, "stale value mapping")
 
@@ -173,11 +186,13 @@ contains
   @test(npes=[1])
   subroutine free_drops_mapping(this)
     class(test_volume_free), intent(inout) :: this
-    real(kind=rp) :: filter_effect, sens_diff, value_diff
+    real(kind=rp) :: filter_effect, value_effect, sens_diff, value_diff
 
-    call run_reinit(.true., filter_effect, sens_diff, value_diff)
+    call run_reinit(.true., filter_effect, value_effect, sens_diff, &
+         value_diff)
 
     @assertGreaterThan(filter_effect, min_filter_effect, "filter is inert")
+    @assertGreaterThan(value_effect, min_value_effect, "value filter is inert")
     @assertEqual(0.0_rp, sens_diff, match_tol, "stale sensitivity mapping")
     @assertEqual(0.0_rp, value_diff, match_tol, "stale value mapping")
 
