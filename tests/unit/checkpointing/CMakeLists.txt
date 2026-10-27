@@ -81,25 +81,36 @@ endif()
 # ============================================================================ #
 # Define pFUnit checkpointing tests
 
-set(CHECKPOINT_COMMON_SOURCES
+# The helper module shared by the tests below holds no tests, so it is built
+# once and linked into each of them. Listing it in TEST_SOURCES instead would
+# have every target regenerate the same preprocessed file next to the source,
+# and register it as an empty test suite.
+set(CHECKPOINT_UTILS_MOD_DIR
+    ${CMAKE_CURRENT_BINARY_DIR}/mod/checkpointing_test_utils_obj)
+add_library(checkpointing_test_utils_obj OBJECT EXCLUDE_FROM_ALL
     ${CMAKE_CURRENT_SOURCE_DIR}/checkpointing_test_utils.f90
 )
+set_target_properties(checkpointing_test_utils_obj PROPERTIES
+    Fortran_MODULE_DIRECTORY ${CHECKPOINT_UTILS_MOD_DIR}
+)
+target_include_directories(checkpointing_test_utils_obj
+    INTERFACE ${CHECKPOINT_UTILS_MOD_DIR}
+)
+target_link_libraries(checkpointing_test_utils_obj PRIVATE Neko-TOP::neko-top)
 
 add_pfunit_ctest(checkpoint_restore_consistency
     TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency.pf
-        ${CHECKPOINT_COMMON_SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    LINK_LIBRARIES Neko-TOP::neko-top
+    LINK_LIBRARIES checkpointing_test_utils_obj Neko-TOP::neko-top
     MAX_PES 2
 )
 
 add_pfunit_ctest(checkpoint_end_of_run_gating
     TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_end_of_run_gating.pf
-        ${CHECKPOINT_COMMON_SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    LINK_LIBRARIES Neko-TOP::neko-top
+    LINK_LIBRARIES checkpointing_test_utils_obj Neko-TOP::neko-top
     MAX_PES 2
 )
 
@@ -153,9 +164,8 @@ if (HAVE_HDF5)
     add_pfunit_ctest(checkpoint_restore_consistency_hdf5
         TEST_SOURCES
             ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency_hdf5.pf
-            ${CHECKPOINT_COMMON_SOURCES}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-        LINK_LIBRARIES Neko-TOP::neko-top
+        LINK_LIBRARIES checkpointing_test_utils_obj Neko-TOP::neko-top
         MAX_PES 2
     )
     set(CHECKPOINT_RESTORE_HDF5_ENV
