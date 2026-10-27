@@ -19,9 +19,9 @@ contains
 
     type(field_t), pointer :: s
 
-    ! See scalar.name in the case file, makes sure that we only
-    ! run this for the scalar field.
-    if (scheme_name .eq. 'temperature') then
+    ! The case template leaves scalar.name unset, so the scalar has Neko's
+    ! default name 's'. This makes sure that we only run this for the scalar.
+    if (scheme_name .eq. 's') then
        s => fields%items(1)%ptr
        call scalar_z_split_ic(s, 0.5_rp, 0.0_rp, 1.0_rp)
     end if
@@ -41,7 +41,7 @@ contains
     if (time%tstep .ne. 1) return
 
     is_velocity_bc = fields%items(1)%ptr%name == "u"
-    is_scalar_bc = fields%items(1)%ptr%name == "temperature"
+    is_scalar_bc = fields%items(1)%ptr%name == "s"
 
     ! ------------------------------------------------------------------------ !
     ! Assign a boundary condition for the velocity field here if needed.
@@ -75,7 +75,7 @@ contains
     ! Assign the boundary condition for the scalar field here.
 
     if (is_scalar_bc) then
-       s => fields%get("temperature")
+       s => fields%get("s")
 
        do i = 1, bc%msk(0)
           z = bc%dof%z%x(bc%msk(i), 1, 1, 1)
