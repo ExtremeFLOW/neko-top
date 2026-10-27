@@ -88,19 +88,18 @@ module brinkman_dissipation_objective
 
      ! ---- everything GLL ----
      !> The coefs
-     type(coef_t), pointer :: c_Xh_GLL
+     type(coef_t), pointer :: c_Xh_GLL => null()
      !> The original space used in the simulation
-     type(space_t), pointer :: Xh_GLL
-
+     type(space_t), pointer :: Xh_GLL => null()
      ! ---- everything for GL ----
      !> The additional higher-order space used in dealiasing
-     type(space_t), pointer :: Xh_GL
+     type(space_t), pointer :: Xh_GL => null()
      !> coefs of the higher-order space
-     type(coef_t), pointer :: c_Xh_GL
+     type(coef_t), pointer :: c_Xh_GL => null()
      !> Interpolator between the original and higher-order spaces
-     type(interpolator_t), pointer :: GLL_to_GL
+     type(interpolator_t), pointer :: GLL_to_GL => null()
      !> GL scratch registry
-     type(scratch_registry_t), pointer :: scratch_GL
+     type(scratch_registry_t), pointer :: scratch_GL => null()
      !> Physical dimension
      integer :: gdim
 
