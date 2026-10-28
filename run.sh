@@ -122,6 +122,19 @@ if [ -n "$CLUSTER" ]; then
         printf >&2 "\e[1;31mInvalid Cluster:\e[m $CLUSTER\n"
         exit 1
     fi
+
+    case "$CLUSTER" in
+        "MN5")
+            export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$MN5_ACCOUNT}
+            SCHEDULER="slurm"
+            ;;
+        "LUMI-C" | "LUMI-G")
+            export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$LUMI_ACCOUNT}
+            SCHEDULER="slurm"
+            ;;
+        *)
+            echo "Unknown cluster: $CLUSTER"; exit 1;;
+    esac
 fi
 
 if [ "$NEKO" == true ]; then
@@ -136,6 +149,7 @@ if [ "$NEKO" == true ]; then
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"
 fi
+
 
 # End of user inputs
 # ============================================================================ #
@@ -246,8 +260,8 @@ for i in ${!example_list[@]}; do
 
 done
 
-# Remove duplicates and check for nested examples
-example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
+# Remove duplicates while preserving the original order.
+example_list=($(printf '%s\n' "${example_list[@]}" | awk '!seen[$0]++'))
 
 # If multiple examples with same name and  different file extensions are found
 # we stop the execution and print an error message.
@@ -306,60 +320,42 @@ function Submit() {
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
 
-    if [ $CLUSTER == "MN5" ]; then
-        if [ -z "$MN5_ACCOUNT" ]; then
-            printf >&2 "No account specified for Marenostrum5.\n"
-            printf >&2 "Using SLURM environment variables if available\n"
-            printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
-            printf >&2 "this message."
-        else
-            export SBATCH_ACCOUNT="$MN5_ACCOUNT"
-        fi
-
-    elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
-        if [ -z "$LUMI_ACCOUNT" ]; then
-            printf >&2 "No account specified for LUMI.\n"
-            printf >&2 "Using SLURM environment variables if available\n"
-            printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
-            printf >&2 "this message."
-        else
-            export SBATCH_ACCOUNT="$LUMI_ACCOUNT"
-        fi
-    fi
-
-    if [ -n "$(which bsub 2>/dev/null)" ]; then
-        bsub -J $1 -env "all" <job_script.sh
-    elif [ -n "$(which sbatch 2>/dev/null)" ]; then
-        if [ "$(squeue -h --name=$1 --me | wc -l)" -gt 0 ]; then
-            printf '\t%-12s %-s\n' "In queue:" "$1"
-            cd $CURRENT_DIR
-            return
-        fi
-
-        # Deal with sequential submission and job dependencies
-        id=""
-        DEP=""
-        for i in $(seq 1 $N_JOBS); do
-            if [[ -n "$id" && -n "$SEQ_DEP" ]]; then
-                DEP="--dependency=afterany:$id:$SEQ_DEP"
-            elif [ -n "$id" ]; then
-                DEP="--dependency=afterany:$id"
-            elif [ -n "$SEQ_DEP" ]; then
-                DEP="--dependency=afterany:$SEQ_DEP"
-            fi
-
-            id=$(sbatch --parsable -J $1 $DEP job_script.sh)
-            if [ "$SEQUENTIAL" == true ]; then
-                SEQ_DEP="$SEQ_DEP:$id"
-            fi
-        done
-    else
-        printf >&2 "Unknown submission system.\n"
-        exit 1
-    fi
+    case "$SCHEDULER" in
+        "slurm") SubmitSlurm $1 ;;
+        "lsf") SubmitLSF $1 ;;
+        *) printf >&2 "Unknown submission system.\n" && exit 1 ;;
+    esac
 
     printf '\t%-12s %-s\n' "Submitted:" "$1"
     cd $CURRENT_DIR
+}
+function SubmitLSF() {
+    bsub -J $1 -env "all" <job_script.sh
+}
+function SubmitSlurm() {
+    if [ "$(squeue -h --name=$1 --account=$SBATCH_ACCOUNT --me | wc -l)" -gt 0 ]; then
+        printf '\t%-12s %-s\n' "In queue:" "$1"
+        cd $CURRENT_DIR
+        return
+    fi
+
+    # Serialise duplicate jobs by name, then optionally wait for earlier
+    # examples submitted with --sequential.
+    submitted_ids=""
+    DEP="--dependency=singleton"
+    if [[ -n "$SEQ_DEP" ]]; then
+        DEP="$DEP,afterany:$SEQ_DEP"
+    fi
+
+    for i in $(seq 1 "$N_JOBS"); do
+        id=$(sbatch --parsable -J "$1" "$DEP" job_script.sh)
+        if [ "$SEQUENTIAL" == true ]; then
+            submitted_ids="${submitted_ids:+$submitted_ids:}$id"
+        fi
+    done
+    if [[ "$SEQUENTIAL" == true && -n "$submitted_ids" ]]; then
+        SEQ_DEP="${SEQ_DEP:+$SEQ_DEP:}$submitted_ids"
+    fi
 }
 
 # Definition of a interrupt handler
@@ -410,29 +406,25 @@ for case in ${example_list[@]}; do
         continue
     fi
 
-    case "$CLUSTER" in
-        "MN5" | "LUMI-C" | "LUMI-G")
-            if [[ "$(squeue -h --name=$example --me | wc -l)" -gt 0 ]]; then
-                printf '\t\e[1;33m%-12s\e[m %s %-s\n' "In queue:" "$example"
-                continue
-            fi
-        ;;
-        "") ;;
-    esac
-
-    export log=$LPATH/$example
-    if [[ "$CLEAN" == true && -d "$log" ]]; then
-        rm -fr $log
+    if [ "$SCHEDULER" == "slurm" ]; then
+        if [[ "$(squeue -h --name=$example --account=$SBATCH_ACCOUNT --me | wc -l)" -gt 0 ]]; then
+            printf '\t\e[1;33m%-12s\e[m %s %-s\n' "In queue:" "$example"
+            continue
+        fi
     fi
 
     # Setup the log folder
-    if [[ -f "$log/output.log" &&
-        "$(head -n 1 $log/output.log)" == "Ready" ]]; then
-        rm -f $log/error.log && touch $log/error.log
+    export log=$LPATH/$example
+    if [[ "$CLEAN" == true && -d "$log" ]]; then
+        rm -fr $log/*
+    elif [[ ! -d "$log" ]]; then
+        mkdir -p $log
+    fi
+    touch $log/output.log $log/error.log
 
-        [ -n "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
-        QUEUE="$QUEUE $example"
-        continue
+    if [[ "$(head -n 1 $log/output.log 2>/dev/null)" == "Ready" ]]; then
+        rm -f $log/output.log && touch $log/output.log
+        rm -f $log/error.log && touch $log/error.log
 
     elif [[ -s "$log/error.log" ]]; then
         # Move old log files to folder with counter padded to 2 digits
@@ -447,16 +439,11 @@ for case in ${example_list[@]}; do
         echo "Ready" >$log/output.log
 
         [ -n "$CLUSTER" ] && printf '\t%-12s %-s\n' "Restarting:" "$example"
-        QUEUE="$QUEUE $example"
-        continue
 
-    elif [[ -f "$log/output.log" ]]; then
+    elif [[ -s "$log/output.log" ]]; then
         printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Skipped:" "$example"
         continue
     fi
-
-    mkdir -p $log
-    touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
     if [ ${case: -6} == "run.sh" ]; then
@@ -474,7 +461,8 @@ for case in ${example_list[@]}; do
         -exec rsync -r {} $log \;
 
     # Create symbolic links to the mesh files to avoid copying massive files
-    find $EPATH/$case_dir -name "*.nmsh" -exec ln -fs {} $log \;
+    find "$EPATH/$case_dir" -type f -name "*.nmsh" \
+        -exec sh -c 'ln "$1" "$2" || cp "$1" "$2"' sh {} "$log" \;
 
     # Copy the job script to the log folder
     cp -f $SPATH/functions.sh $log/functions.sh
