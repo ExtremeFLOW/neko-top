@@ -125,7 +125,7 @@ contains
     call profiler_end_region("MMA KKT computation")
   end subroutine mma_KKT_cpu
 
-  !> Implementation of the KKT residual computation for dual primal interior
+  !> Implementation of the KKT residual computation for primal-dual interior
   ! point method (pdip) subsolve of MMA algorithm.
   module subroutine mma_pdip_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
@@ -446,11 +446,11 @@ contains
     end associate
   end subroutine mma_gensub_cpu
 
-  !> solve the subproblem defined by this%pij, this%qij, etc using Dual-primal
+  !> solve the subproblem defined by this%pij, this%qij, etc using primal-dual
   !! interior point method.
   subroutine mma_subsolve_pdip_cpu(this, designx)
     ! ------------------------------------------------------- !
-    ! Dual-primal interior point method using Newton's step   !
+    ! Primal-dual interior point method using Newton's step   !
     ! to solve MMA sub problem.                               !
     ! A Backtracking Line Search approach is used to compute  !
     ! the step size; starting with the full Newton's step     !
@@ -518,7 +518,7 @@ contains
          mpi_real_precision, MPI_MIN, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
-    ! The main loop of the dual-primal interior point method.
+    ! The main loop of the primal-dual interior point method.
 
     do while (epsi .gt. minimal_epsilon)
 
@@ -936,7 +936,7 @@ contains
     residual_max = 1.0_rp
 
     ! ------------------------------------------------------------------------ !
-    ! The main loop of the dual-primal interior point method.
+    ! The main loop of the dual interior point method.
 
     do while (epsi .gt. minimal_epsilon)
 
