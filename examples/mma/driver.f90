@@ -55,11 +55,6 @@ program usrneko
   real(kind=rp) :: t_start, t_end
 
   ! -------------------------------------------------------------------------- !
-  ! Initialize the MPI environment
-
-  call MPI_Init(ierr)
-
-  ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
 
   argc = command_argument_count()

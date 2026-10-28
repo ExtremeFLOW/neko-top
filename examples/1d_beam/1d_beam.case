@@ -65,6 +65,7 @@
             "mma": {
                 "max_iter": 100,
                 "subsolver": "dip",
+                "move_limit": 1.0,
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
