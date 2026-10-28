@@ -48,10 +48,11 @@ submodule (mma) mma_hdf5_io
 contains
 
   !> Write the MMA object to an HDF5 file (parallel-aware).
-  !! This routine will first ensure device-host synchronization for all
-  !! vectors and matrices, then perform the write. Currently the low-level
-  !! HDF5 write is delegated to the project's I/O layer. If no I/O layer is
-  !! available at link time a runtime error will be raised.
+  !! For the device backend this routine first copies all vectors and
+  !! matrices from the device to the host, then performs the write; the cpu
+  !! backend keeps its state on the host (see mma_copy_from). Currently the
+  !! low-level HDF5 write is delegated to the project's I/O layer. If no I/O
+  !! layer is available at link time a runtime error will be raised.
   !! @param object The MMA object to save.
   !! @param filename The HDF5 file to write to.
   !! @param overwrite Logical flag to allow overwriting existing files.
@@ -70,7 +71,8 @@ contains
     overwrite_flag = .false.
     if (present(overwrite)) overwrite_flag = overwrite
 
-    ! Ensure device state is on host
+    ! For the device backend, copy the state to the host; the cpu backend
+    ! keeps its state on the host (see mma_copy_from)
     call object%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     ! Gather the per-rank n values
@@ -335,8 +337,9 @@ contains
   end subroutine mma_save_checkpoint_hdf5
 
   !> Read the MMA object from an HDF5 file (parallel-aware).
-  !! This routine will perform the read and then ensure device-host
-  !! synchronization for all vectors and matrices.
+  !! This routine performs the read and then, for the device backend, copies
+  !! all vectors and matrices from the host to the device; the cpu backend
+  !! keeps its state on the host (see mma_copy_from).
   !! @param object The MMA object to load data into.
   !! @param filename The HDF5 file to read from.
   module subroutine mma_load_checkpoint_hdf5(object, filename)
@@ -585,7 +588,8 @@ contains
 
     call hdf5_session_finalize()
 
-    ! Ensure device state is updated
+    ! For the device backend, copy the state to the device; the cpu backend
+    ! keeps its state on the host (see mma_copy_from)
     call object%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine mma_load_checkpoint_hdf5
