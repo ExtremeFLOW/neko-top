@@ -396,6 +396,12 @@ contains
     call this%xold2%init(n)
     this%xold1 = x
     this%xold2 = x
+    ! On device builds the assignment copies device memory only, while the
+    ! cpu backend keeps its state on the host
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call this%xold1%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call this%xold2%copy_from(DEVICE_TO_HOST, sync = .true.)
+    end if
 
     call this%alpha%init(n)
     call this%beta%init(n)
@@ -720,11 +726,19 @@ contains
   ! ========================================================================== !
   ! Private utilities
 
-  !> Sync device memory to host for all internal vectors/matrices
+  !> Copy all internal vectors/matrices between host and device.
+  !! Only the device backend keeps the state on the device. With the cpu
+  !! backend the live state is on the host and the device copies are stale,
+  !! so nothing is copied.
+  !! @param this The MMA object.
+  !! @param direction HOST_TO_DEVICE or DEVICE_TO_HOST.
+  !! @param sync Whether to synchronise after the last copy.
   subroutine mma_copy_from(this, direction, sync)
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: direction
     logical, intent(in) :: sync
+
+    if (this%bcknd .ne. "device") return
 
     call this%xold1%copy_from(direction, sync = .false.)
     call this%xold2%copy_from(direction, sync = .false.)
