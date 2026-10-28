@@ -993,7 +993,7 @@ contains
     class(base_functional_t), intent(in) :: functional
     integer, parameter :: width = 256
     character(len=width), allocatable :: headers(:)
-    integer :: j, n, width
+    integer :: j, n
 
     n = functional%get_log_size()
     if (n .lt. 1) return
