@@ -267,12 +267,14 @@ contains
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
     character(len=:), allocatable :: output_format_str, output_precision_str
-    logical :: dealias, verbose_design, verbose_sensitivity
+    logical :: dealias, dealias_fallback, verbose_design, verbose_sensitivity
     integer :: output_precision
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
-    call json_get_or_default(parameters, 'dealias', dealias, .true.)
+    call json_get(simulation%neko_case%params, 'case.fluid.dealias', &
+         dealias_fallback)
+    call json_get_or_default(parameters, 'dealias', dealias, dealias_fallback)
     call json_get_or_default(parameters, 'verbose_design', verbose_design, &
          .false.)
     call json_get_or_default(parameters, 'verbose_sensitivity', &
@@ -418,6 +420,11 @@ contains
 
     ! compute the average mass matrix
     this%avg_B = this%coef%volume / real(simulation%fluid%glb_unique_points)
+
+    ! The over-integration stack is only needed if the Brinkman terms dealias
+    if (dealias) then
+       call simulation%adjoint_fluid%require_gauss_stack()
+    end if
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &

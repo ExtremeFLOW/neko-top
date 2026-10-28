@@ -53,7 +53,7 @@ module brinkman_dissipation_objective
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use utils, only: neko_error
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default
+  use json_utils, only: json_get, json_get_or_default
   use registry, only: neko_registry
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
@@ -140,17 +140,18 @@ contains
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
     real(kind=rp) :: weight
-    logical :: dealias_sensitivity, dealias_forcing
+    logical :: dealias_sensitivity, dealias_forcing, dealias_fallback
     real(kind=rp) :: start_time, end_time
 
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Brinkman dissipation")
+    call json_get(simulation%neko_case%params, 'case.fluid.dealias', dealias_fallback)
     call json_get_or_default(json, "dealias_sensitivity", &
-         dealias_sensitivity, .true.)
+         dealias_sensitivity, dealias_fallback)
     call json_get_or_default(json, "dealias_forcing", &
-         dealias_forcing, .true.)
+         dealias_forcing, dealias_fallback)
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
@@ -213,6 +214,11 @@ contains
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
     this%Xh_GLL => simulation%neko_case%fluid%c_Xh%Xh
     this%gdim = this%c_Xh_GLL%msh%gdim
+
+    ! The over-integration stack is only needed if this objective dealiases
+    if (dealias_sensitivity .or. dealias_forcing) then
+       call simulation%adjoint_case%fluid_adj%require_gauss_stack()
+    end if
 
     ! GL
     this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
