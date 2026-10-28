@@ -47,7 +47,7 @@ module simulation_m
   use time_step_controller, only: time_step_controller_t
   use field_output, only: field_output_t
   use simcomp_executor, only: neko_simcomps
-  use neko_ext, only: reset, reset_adjoint, init_dt_controller
+  use neko_ext, only: reset, reset_adjoint
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
@@ -342,7 +342,8 @@ contains
     real(kind=dp) :: loop_start
     type(json_file) :: dt_params
 
-    call init_dt_controller(dt_controller, this%neko_case%params)
+    call json_get(this%neko_case%params, 'case.time', dt_params)
+    call dt_controller%init(dt_params)
 
     call this%neko_case%time%reset()
     call simulation_init(this%neko_case, dt_controller)
@@ -374,7 +375,8 @@ contains
     real(kind=rp) :: cfl
     integer :: i
 
-    call init_dt_controller(dt_controller, this%neko_case%params)
+    call json_get(this%neko_case%params, 'case.time', dt_params)
+    call dt_controller%init(dt_params)
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 

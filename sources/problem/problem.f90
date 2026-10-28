@@ -55,7 +55,6 @@ module problem
   use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
   use time_step_controller, only: time_step_controller_t
-  use neko_ext, only: init_dt_controller
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize
@@ -518,7 +517,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
 
-    call init_dt_controller(dt_controller, simulation%neko_case%params)
+    call dt_controller%init(simulation%neko_case%params)
 
     call simulation%reset()
     call simulation_init(simulation%neko_case, dt_controller)
@@ -582,7 +581,7 @@ contains
     integer :: i
     type(time_state_t) :: accumulation_time
 
-    call init_dt_controller(dt_controller, simulation%neko_case%params)
+    call dt_controller%init(simulation%neko_case%params)
 
     call simulation_adjoint_init(simulation%adjoint_case, dt_controller)
 
