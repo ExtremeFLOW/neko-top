@@ -156,6 +156,12 @@ contains
   !! @param fld_name Registry name of the field storing the unmapped input.
   !! If it is taken, e.g. by a second mapping of the same type in one run,
   !! the first free name of the form `fld_name_2`, `fld_name_3`, ... is used.
+  !! @note Neko's registry cannot remove a field and `free` does not release
+  !! it, so a re-initialised mapping also takes the next free suffix, while a
+  !! lookup of the base name still returns the field of the first, stale
+  !! instance. Lookups by name, e.g. in examples/wiggles/user.f90 or through
+  !! the checkpoint `extra_fields`, are reliable only for the first
+  !! initialisation.
   subroutine mapping_init_base(this, json, coef, fld_name)
     class(mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json

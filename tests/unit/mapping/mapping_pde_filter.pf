@@ -490,6 +490,8 @@ contains
 
   !> Largest pointwise difference between two fields, compared on the host.
   !! Only meaningful on a single rank, as there is no global reduction.
+  !! @param a The first field, copied to the host on device backends.
+  !! @param b The second field, copied to the host on device backends.
   function max_abs_diff(a, b) result(d)
     type(field_t), intent(inout) :: a, b
     real(kind=rp) :: d
@@ -502,6 +504,9 @@ contains
 
   end function max_abs_diff
 
+  !> Check 4: two PDE filters initialised from JSON in one run each own a
+  !! registry field, so neither overwrites the input stored by the other, and
+  !! the first keeps the registry name "PDE_filter_mapping".
   @test(npes=[1])
   subroutine test_pde_filter_two_instances(this)
     class(test_pde_filter), intent(inout) :: this
