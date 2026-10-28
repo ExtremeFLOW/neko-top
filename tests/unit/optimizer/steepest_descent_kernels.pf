@@ -243,8 +243,8 @@ contains
     class(test_sd_kernels), intent(inout) :: this
     integer, parameter :: n = 3
     real(kind=rp), parameter :: sentinel = -999.0_rp
-    character(len=LOG_SIZE) :: msg
     real(kind=rp) :: g(n)
+    character(len=LOG_SIZE) :: msg
 
     g = [1.0_rp, 2.0_rp, 3.0_rp]
     this%v1 = g
@@ -257,7 +257,8 @@ contains
 
     call sd_direction(this%v1, this%v2, 0.0_rp, 1.0_rp, n = 0)
     call this%v1%copy_from(DEVICE_TO_HOST, .true.)
-    @assertEqual(g, this%v1%x(1:n), 0.0_rp, 'n=0 sd_direction touched s')
+    write(msg, '(A)') 'n=0 sd_direction touched s'
+    @assertEqual(g, this%v1%x(1:n), 0.0_rp, msg)
 
     call sd_update_move_limits(this%v5, this%v2, this%v3, this%v4, 0.7_rp, &
          1.1_rp, 0.01_rp, 0.2_rp, n = 0)
@@ -270,7 +271,6 @@ contains
     call this%v6%copy_from(DEVICE_TO_HOST, .true.)
     write(msg, '(A)') 'n=0 sd_update_design touched x_new'
     @assertEqual([sentinel, sentinel, sentinel], this%v6%x(1:n), 0.0_rp, msg)
-
   end subroutine dispatch_handles_n_zero
 
 end module steepest_descent_kernels
