@@ -106,7 +106,7 @@ contains
 
     call this%free_base()
 
-    this%name = name
+    this%name = trim(name)
     call this%sensitivity%init(design_size)
 
     if (present(mask_name)) then
@@ -134,7 +134,7 @@ contains
   subroutine constraint_free_base(this)
     class(constraint_t), target, intent(inout) :: this
 
-    this%name = ""
+    if (allocated(this%name)) deallocate(this%name)
 
     this%value = 0.0_rp
     this%value_weight = 0.0_rp

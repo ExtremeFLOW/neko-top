@@ -382,13 +382,13 @@ contains
   subroutine volume_constraint_get_log_headers(this, headers)
     class(volume_constraint_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
-    character(len=64) :: prefix
+    character(len=:), allocatable :: prefix
 
     if (size(headers) .lt. 1) return
-    prefix = trim(this%name)
+    prefix = this%get_name()
     headers(1) = prefix
     if (size(headers) .lt. 2) return
-    headers(2) = trim(prefix) // '.volume'
+    headers(2) = prefix // '.volume'
 
   end subroutine volume_constraint_get_log_headers
 
