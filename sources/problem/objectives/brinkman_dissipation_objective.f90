@@ -61,7 +61,8 @@ module brinkman_dissipation_objective
   use math, only: glsc2, copy, col2, invcol2
   use device_math, only: device_copy, device_glsc2, device_col2, device_invcol2
   use math_ext, only: glsc2_mask
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
+  use field_math, only: field_col3, field_addcol3, field_cmult, field_col2, &
+       field_copy
   use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
@@ -79,10 +80,10 @@ module brinkman_dissipation_objective
      type(field_t), pointer :: w => null()
      !> Pointer to the brinkman amplitude field.
      type(field_t), pointer :: brinkman_amplitude => null()
-     !> dealias sensitivity
-     logical :: dealias_sensitivity
-     !> dealias forcing
-     logical :: dealias_forcing
+     !> Integrate on the GL points rather than the GLL points. One choice
+     !! for the value, the adjoint forcing and the sensitivity, so that the
+     !! latter two are derivatives of the former.
+     logical :: dealias
      !> volume of objective domain
      real(kind=rp) :: volume
 
@@ -154,9 +155,15 @@ contains
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
+    ! The two keys select one quadrature. Set differently, the sensitivity
+    ! is not the gradient of any value this objective could report.
+    if (dealias_sensitivity .neqv. dealias_forcing) then
+       call neko_error("brinkman_dissipation: dealias_sensitivity and " // &
+            "dealias_forcing must be equal")
+    end if
+
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, dealias_sensitivity, dealias_forcing, start_time, &
-         end_time)
+         mask_name, dealias_forcing, start_time, end_time)
   end subroutine brinkman_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -166,21 +173,19 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
-  !! @param dealias_sensitivity use dealiasing on the sensitivity.
-  !! @param dealias_forcing use dealiasing on the adjoint forcing.
+  !! @param dealias integrate the value, the adjoint forcing and the
+  !! sensitivity on the GL points.
   !! @param start_time start of the integration window.
   !! @param end_time end of the integration window.
   subroutine brinkman_dissipation_init_attributes(this, design, simulation, &
-       weight, name, mask_name, dealias_sensitivity, dealias_forcing, &
-       start_time, end_time)
+       weight, name, mask_name, dealias, start_time, end_time)
     class(brinkman_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
-    logical, intent(in) :: dealias_sensitivity
-    logical, intent(in) :: dealias_forcing
+    logical, intent(in) :: dealias
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
 
@@ -190,8 +195,7 @@ contains
     call this%init_base(name, design%size(), weight, mask_name, &
          start_time, end_time)
 
-    this%dealias_forcing = dealias_forcing
-    this%dealias_sensitivity = dealias_sensitivity
+    this%dealias = dealias
 
     ! Grab the Brinkman amplitude field.
     select type (design)
@@ -239,7 +243,7 @@ contains
       call brinkman_dissipation%init_from_components(f_adj_x, f_adj_y, &
            f_adj_z, design, this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
-           this%dealias_forcing, this%volume, this%scratch_GL, this%gdim, &
+           this%dealias, this%volume, this%scratch_GL, this%gdim, &
            this%start_time, this%end_time)
 
     end associate
@@ -271,6 +275,9 @@ contains
   end subroutine brinkman_dissipation_free
 
   !> Compute the objective function.
+  !! With dealiasing the integrand is built on the GL points exactly as the
+  !! adjoint forcing and the sensitivity differentiate it, from the masked
+  !! \f$\chi\f$ interpolated to GL.
   !! @param this The objective.
   !! @param design the design.
   subroutine brinkman_dissipation_update_value(this, design)
@@ -278,31 +285,69 @@ contains
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
+    integer :: n_GL, nel
+    type(field_t), pointer :: accumulate, fld_GL, chi_GL
+    integer :: temp_indices_GL(3)
 
     call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
-    call field_col3(work, this%u, this%u)
-    call field_addcol3(work, this%v, this%v)
-    if (this%gdim .eq. 3) then
-       call field_addcol3(work, this%w, this%w)
-    end if
-    call field_col2(work, this%brinkman_amplitude)
+    if (this%dealias) then
+       nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), &
+            .false.)
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), .false.)
+       call this%scratch_GL%request_field(chi_GL, temp_indices_GL(3), .false.)
 
-    if (this%has_mask) then
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          ! note, this could be done more elagantly by writing
-          ! device_glsc2_mask
+       call field_copy(work, this%brinkman_amplitude)
+       if (this%has_mask) then
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, design%size())
-       else
-          this%value = glsc2_mask(work%x, this%c_Xh_GLL%B, design%size(), &
-               this%mask%mask%get(), this%mask%size)
        end if
-    else
-       if (neko_bcknd_device .eq. 1) then
-          this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, design%size())
+       call this%GLL_to_GL%map(chi_GL%x, work%x, nel, this%Xh_GL)
+
+       call this%GLL_to_GL%map(fld_GL%x, this%u%x, nel, this%Xh_GL)
+       call field_col3(accumulate, fld_GL, fld_GL)
+       call this%GLL_to_GL%map(fld_GL%x, this%v%x, nel, this%Xh_GL)
+       call field_addcol3(accumulate, fld_GL, fld_GL)
+       if (this%gdim .eq. 3) then
+          call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
+          call field_addcol3(accumulate, fld_GL, fld_GL)
+       end if
+       call field_col2(accumulate, chi_GL)
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          this%value = device_glsc2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
        else
-          this%value = glsc2(work%x, this%c_Xh_GLL%B, design%size())
+          this%value = glsc2(accumulate%x, this%c_Xh_GL%B, n_GL)
+       end if
+
+       call this%scratch_GL%relinquish_field(temp_indices_GL)
+    else
+       call field_col3(work, this%u, this%u)
+       call field_addcol3(work, this%v, this%v)
+       if (this%gdim .eq. 3) then
+          call field_addcol3(work, this%w, this%w)
+       end if
+       call field_col2(work, this%brinkman_amplitude)
+
+       if (this%has_mask) then
+          if (NEKO_BCKND_DEVICE .eq. 1) then
+             ! note, this could be done more elagantly by writing
+             ! device_glsc2_mask
+             call mask_exterior_const(work, this%mask, 0.0_rp)
+             this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, &
+                  design%size())
+          else
+             this%value = glsc2_mask(work%x, this%c_Xh_GLL%B, design%size(), &
+                  this%mask%mask%get(), this%mask%size)
+          end if
+       else
+          if (neko_bcknd_device .eq. 1) then
+             this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, &
+                  design%size())
+          else
+             this%value = glsc2(work%x, this%c_Xh_GLL%B, design%size())
+          end if
        end if
     end if
     this%value = 0.5_rp * this%value / this%volume
@@ -328,7 +373,7 @@ contains
 
     call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
-    if(this%dealias_sensitivity) then
+    if (this%dealias) then
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
        call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), &
@@ -367,6 +412,12 @@ contains
        end if
        ! scale
        call field_cmult(work, this%weight * 0.5_rp / this%volume)
+    end if
+
+    ! chi enters the value only inside the mask, so the sensitivity is zero
+    ! outside it
+    if (this%has_mask) then
+       call mask_exterior_const(work, this%mask, 0.0_rp)
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
