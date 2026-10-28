@@ -87,9 +87,13 @@ contains
   end subroutine dummy_constraint_init_json
 
   !> The direct initializer from attributes.
+  !! @param this The constraint.
+  !! @param design The design.
   subroutine dummy_constraint_init_attributes(this, design)
     class(dummy_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
+
+    call this%free()
 
     ! Initialize the base class
     call this%init_base("dummy_constraint", design%size())
