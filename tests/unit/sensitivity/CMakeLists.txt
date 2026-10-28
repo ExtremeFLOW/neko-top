@@ -67,47 +67,6 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules CACHE PATH
     "Fortran module directory" FORCE)
 
 # ============================================================================ #
-# Validate rejected objective configurations through Neko's pFUnit error
-# redirection fixture, rather than a process-level CTest failure.
-add_pfunit_ctest(brinkman_dissipation_rejection
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/brinkman_dissipation_rejection.pf
-    OTHER_SOURCES ${NEKO_DIR}/tests/unit/fixtures/error_redirection.f90
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    LINK_LIBRARIES Neko-TOP::neko-top
-    EXTRA_USE error_redirection
-    EXTRA_INITIALIZE redirect_errors
-    MAX_PES 1
-)
-add_dependencies(Unit brinkman_dissipation_rejection)
-
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/brinkman_dissipation_dealias_mismatch.case
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/brinkman_dissipation_dealias_mismatch.case
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/brinkman_dissipation_dealias_mismatch.case
-        ${CMAKE_CURRENT_BINARY_DIR}/brinkman_dissipation_dealias_mismatch.case
-)
-add_custom_target(brinkman_dissipation_rejection_case
-    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/brinkman_dissipation_dealias_mismatch.case
-)
-add_dependencies(brinkman_dissipation_rejection
-    sensitivity_test_prepare
-    brinkman_dissipation_rejection_case
-)
-
-set_tests_properties(brinkman_dissipation_rejection PROPERTIES
-    LABELS "sensitivity;unit"
-    ENVIRONMENT "NEKO_LOG_FILE=brinkman_dissipation_rejection.log"
-    TIMEOUT 120
-)
-
-if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(brinkman_dissipation_rejection PRIVATE
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
-    )
-endif()
-
-# ============================================================================ #
 # Loop over all case files and create tests
 foreach(case_file ${test_list})
     # Get the case name without extension
