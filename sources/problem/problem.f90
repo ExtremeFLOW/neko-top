@@ -958,7 +958,7 @@ contains
     if (present(include_constraints)) then
        do_constraints = include_constraints
     else
-       do_constraints = .true.
+       do_constraints = this%get_n_constraints() .gt. 0
     end if
 
     do i = 1, this%get_n_objectives()
