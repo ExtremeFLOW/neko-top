@@ -54,6 +54,7 @@ submodule (mma) mma_device
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
+  use logger, only: LOG_SIZE
   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
 
   implicit none
@@ -360,6 +361,7 @@ contains
     type(matrix_t), pointer :: AA
 
     integer :: info
+    character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: re_sq_norm
 
     integer :: ind(35)
@@ -605,8 +607,9 @@ contains
           ! Device solve for the linear system
           call device_solve_linear_system(AA%x_d, bb%x_d, this%m + 1, info)
           if (info .ne. 0) then
-             call neko_error("Linear solver failed on the device in  " // &
-                  "mma_subsolve_pdip")
+             write(log_buf, '(A,I0)') "Linear solver failed on the " // &
+                  "device in mma_subsolve_pdip, info = ", info
+             call neko_error(trim(log_buf))
           end if
 
           call device_copy(dlambda%x_d, bb%x_d, this%m)
@@ -825,6 +828,7 @@ contains
     type(matrix_t), pointer :: Hess
 
     integer :: info, ind(15)
+    character(len=LOG_SIZE) :: log_buf
 
     real(kind=rp) :: minimal_epsilon
 
@@ -996,8 +1000,9 @@ contains
             call device_solve_linear_system(Hess%x_d, gradlambda%x_d, &
                  this%m, info)
             if (info .ne. 0) then
-               call neko_error("Linear solver failed on the device in  " // &
-                    "mma_subsolve_dip")
+               write(log_buf, '(A,I0)') "Linear solver failed on the " // &
+                    "device in mma_subsolve_dip, info = ", info
+               call neko_error(trim(log_buf))
             end if
 
             call device_copy(dlambda%x_d, gradlambda%x_d, this%m)

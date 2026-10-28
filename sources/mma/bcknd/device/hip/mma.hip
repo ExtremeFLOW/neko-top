@@ -108,20 +108,29 @@ void hipSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     HIP_CHECK(hipMalloc(&info, sizeof(int)));
 
     // LU factorization and solve
-    hipsolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
+    status = hipsolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv,
+                               info);
 
-    // Copy info from device to host to check if factorization succeeded
+    // Copy info from device to host to check if factorization succeeded.
+    // A failed call may leave info unwritten, so it is reported as -1.
     HIP_CHECK(hipMemcpyAsync(&host_info, info, sizeof(int),
                              hipMemcpyDeviceToHost, stream));
     HIP_CHECK(hipStreamSynchronize(stream));
+    if (status != HIPSOLVER_STATUS_SUCCESS) {
+        host_info = -1;
+    }
 
     if (host_info == 0) {
         // Only solve if factorization was successful
-        hipsolverDnDgetrs(handle, HIPSOLVER_OP_N, n, 1, (double*)A, n, ipiv, (double*)b, n, info);
+        status = hipsolverDnDgetrs(handle, HIPSOLVER_OP_N, n, 1, (double*)A, n,
+                                   ipiv, (double*)b, n, info);
         // Copy the final info value
         HIP_CHECK(hipMemcpyAsync(&host_info, info, sizeof(int),
                                  hipMemcpyDeviceToHost, stream));
         HIP_CHECK(hipStreamSynchronize(stream));
+        if (status != HIPSOLVER_STATUS_SUCCESS) {
+            host_info = -1;
+        }
     }
 
     // Return the actual info value through jj
@@ -338,6 +347,7 @@ void mma_gensub4_hip(const void* x, const void* low, const void* upp,
                      static_cast<const real*>(pij),
                      static_cast<const real*>(qij),
                      temp, N, M);
+  HIP_CHECK(hipGetLastError());
 
   for (int i = 0; i < M; ++i) {
     hipLaunchKernelGGL(mmasum_kernel<real>, nblcks, nthrds, 0, stream,
@@ -454,6 +464,7 @@ void hip_relambda(void* relambda, void* x, void* xupp, void* xlow,
     hipLaunchKernelGGL(relambda_kernel<real>, nblcks, nthrds, 0, stream,
         temp, (real*)x, (real*)xupp, (real*)xlow,
         (real*)pij, (real*)qij, *n, *m);
+    HIP_CHECK(hipGetLastError());
 
     for (int i = 0; i < (*m); i++) {
         hipLaunchKernelGGL(mmasum_kernel<real>, nblcks, nthrds, 0, stream,

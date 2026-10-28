@@ -197,20 +197,29 @@ extern "C" {
     CUDA_CHECK(cudaMalloc(&info, sizeof(int)));
 
     // LU factorization and solve
-    cusolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
+    status = cusolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv,
+                              info);
 
-    // Copy info from device to host to check if factorization succeeded
+    // Copy info from device to host to check if factorization succeeded.
+    // A failed call may leave info unwritten, so it is reported as -1.
     CUDA_CHECK(cudaMemcpyAsync(&host_info, info, sizeof(int),
                                cudaMemcpyDeviceToHost, stream));
     CUDA_CHECK(cudaStreamSynchronize(stream));
+    if (status != CUSOLVER_STATUS_SUCCESS) {
+        host_info = -1;
+    }
 
     if (host_info == 0) {
         // Only solve if factorization was successful
-        cusolverDnDgetrs(handle, CUBLAS_OP_N, n, 1, (double*)A, n, ipiv, (double*)b, n, info);
+        status = cusolverDnDgetrs(handle, CUBLAS_OP_N, n, 1, (double*)A, n,
+                                  ipiv, (double*)b, n, info);
         // Copy the final info value
         CUDA_CHECK(cudaMemcpyAsync(&host_info, info, sizeof(int),
                                    cudaMemcpyDeviceToHost, stream));
         CUDA_CHECK(cudaStreamSynchronize(stream));
+        if (status != CUSOLVER_STATUS_SUCCESS) {
+            host_info = -1;
+        }
     }
 
 
@@ -348,6 +357,7 @@ extern "C" {
         static_cast<const real*>(pij),
         static_cast<const real*>(qij),
         temp, N, M);
+    CUDA_CHECK(cudaGetLastError());
 
     for (int i = 0; i < M; ++i) {
         mmasum_kernel<real><<<nblcks, nthrds, 0, stream>>>(
@@ -451,6 +461,7 @@ extern "C" {
     CUDA_CHECK(cudaMalloc(&temp, (*n) * (*m) * sizeof(real)));
     relambda_kernel<real> <<<nblcks, nthrds, 0, stream >>> (temp, (real*)x,
          (real*)xupp, (real*)xlow, (real*)pij, (real*)qij, *n, *m);
+    CUDA_CHECK(cudaGetLastError());
     for (int i = 0; i < (*m); i++) {
        mmasum_kernel <real> <<<nblcks, nthrds, 0, stream >>>
             (temp, mma_bufred_d, (*n),(*m), i);
