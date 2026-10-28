@@ -52,7 +52,11 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
 set(CMAKE_Fortran_PREPROCESS ON)
+
+# ............................................................................ #
+# Include the utility functions
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(NekoTopUtilities)
 
 # ............................................................................ #
 # Options
@@ -106,53 +110,6 @@ if (DEFINED ENV{EXTERNAL_DIR})
 else()
     set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
 endif()
-
-# Prepend the pkg-config directories of an installation prefix to the
-# PKG_CONFIG_PATH environment variable. FindPkgConfig searches the environment
-# PKG_CONFIG_PATH before the CMAKE_PREFIX_PATH entries, so without this the
-# configured prefix (JSON_FORTRAN_DIR or NEKO_DIR, including their defaults
-# under ${EXTERNAL_DIR}) loses to any matching .pc file already on it.
-# Callers run restore_pkg_config_path() once the package has been resolved,
-# so the prefix cannot leak into later lookups. An empty prefix is ignored.
-function(prepend_pkg_config_path prefix)
-    # Record the previous value, and whether it was set at all, for
-    # restore_pkg_config_path().
-    if (DEFINED ENV{PKG_CONFIG_PATH})
-        set(_had_pkg_config_path TRUE PARENT_SCOPE)
-        set(_saved_pkg_config_path "$ENV{PKG_CONFIG_PATH}" PARENT_SCOPE)
-    else()
-        set(_had_pkg_config_path FALSE PARENT_SCOPE)
-    endif()
-
-    if ("${prefix}" STREQUAL "")
-        return()
-    endif()
-
-    set(_dirs)
-    foreach(_sub lib/pkgconfig lib64/pkgconfig share/pkgconfig)
-        if (IS_DIRECTORY "${prefix}/${_sub}")
-            list(APPEND _dirs ${prefix}/${_sub})
-        endif()
-    endforeach()
-
-    if (_dirs)
-        string(REPLACE ";" ":" _path "${_dirs}")
-        if (DEFINED ENV{PKG_CONFIG_PATH})
-            set(_path "${_path}:$ENV{PKG_CONFIG_PATH}")
-        endif()
-        set(ENV{PKG_CONFIG_PATH} "${_path}")
-    endif()
-endfunction()
-
-# Restore PKG_CONFIG_PATH to the state recorded by prepend_pkg_config_path(),
-# unsetting it again if it was not set before.
-function(restore_pkg_config_path)
-    if (_had_pkg_config_path)
-        set(ENV{PKG_CONFIG_PATH} "${_saved_pkg_config_path}")
-    else()
-        unset(ENV{PKG_CONFIG_PATH})
-    endif()
-endfunction()
 
 # ............................................................................ #
 # Setup of JSON-Fortran
@@ -243,7 +200,8 @@ endif()
 # ============================================================================ #
 
 # Set the compiler flags
-include(${CMAKE_Fortran_COMPILER_ID} OPTIONAL RESULT_VARIABLE compiler_flags_found)
+include(NekoTopCompiler${CMAKE_Fortran_COMPILER_ID} OPTIONAL
+    RESULT_VARIABLE compiler_flags_found)
 if (NOT compiler_flags_found)
     message(WARNING "No specific compiler flags found for "
         "${CMAKE_Fortran_COMPILER_ID}.")
