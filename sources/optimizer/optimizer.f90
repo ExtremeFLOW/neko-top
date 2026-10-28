@@ -83,12 +83,13 @@ module optimizer
      logical, private :: initialized = .false.
 
      !> Checkpoint file to be restarted from.
-     character(len=256), private :: restart_file = ''
+     character(len=:), allocatable, private :: restart_file
 
-     ! Checkpoint related information
-     character(len=256), private :: checkpoint_path = './checkpoints/'
-     character(len=256), private :: checkpoint_base = 'optimizer_checkpoint'
-     character(len=256), private :: checkpoint_format = 'hdf5'
+     ! Checkpoint related information, defaulted by
+     ! optimizer_default_file_settings
+     character(len=:), allocatable, private :: checkpoint_path
+     character(len=:), allocatable, private :: checkpoint_base
+     character(len=:), allocatable, private :: checkpoint_format
      integer, private :: checkpoint_interval = -1
      logical, private :: checkpoint_overwrite = .false.
 
@@ -314,7 +315,7 @@ contains
     integer, intent(in), optional :: checkpoint_interval
     logical, intent(in), optional :: checkpoint_overwrite
     character(len=LOG_SIZE) :: msg
-    character(len=256) :: file_name
+    character(len=:), allocatable :: file_name
     logical :: exists
 
     ! Initialize internals
@@ -326,6 +327,7 @@ contains
     this%max_iterations = max_iterations
 
     ! Optional settings
+    call optimizer_default_file_settings(this)
     if (present(max_runtime)) this%max_runtime = max_runtime
     if (present(stop_design_change)) this%stop_design_change = stop_design_change
     if (present(restart_file)) this%restart_file = restart_file
@@ -367,10 +369,11 @@ contains
     this%max_runtime = -1.0_rp
     this%stop_design_change = -1.0_rp
     this%max_design_change = 0.0_rp
-    this%restart_file = ''
-    this%checkpoint_path = './checkpoints/'
-    this%checkpoint_base = 'optimizer_checkpoint'
-    this%checkpoint_format = 'hdf5'
+    if (allocated(this%restart_file)) deallocate(this%restart_file)
+    if (allocated(this%checkpoint_path)) deallocate(this%checkpoint_path)
+    if (allocated(this%checkpoint_base)) deallocate(this%checkpoint_base)
+    if (allocated(this%checkpoint_format)) deallocate(this%checkpoint_format)
+    call optimizer_default_file_settings(this)
     this%checkpoint_interval = -1
     this%checkpoint_overwrite = .false.
 
@@ -404,6 +407,9 @@ contains
        call neko_error('optimizer: Base settings already initialized.')
     end if
 
+    ! The current settings are the defaults of the reads below
+    call optimizer_default_file_settings(this)
+
     call json_get_or_default(solver_params, 'max_runtime', read_str, "")
     call read_duration(read_str, this%max_runtime)
     call json_get_or_default(solver_params, 'stop_design_change', &
@@ -430,6 +436,25 @@ contains
     this%checkpoint_overwrite = read_logical
 
   end subroutine optimizer_read_base_settings
+
+  !> Give the restart file and the checkpoint settings their defaults, where
+  !! they are not set yet. They have deferred length, since a checkpoint
+  !! name can be longer than any fixed buffer.
+  !! @param this The optimizer object.
+  subroutine optimizer_default_file_settings(this)
+    class(optimizer_t), intent(inout) :: this
+
+    if (.not. allocated(this%restart_file)) this%restart_file = ''
+    if (.not. allocated(this%checkpoint_path)) then
+       this%checkpoint_path = './checkpoints/'
+    end if
+    if (.not. allocated(this%checkpoint_base)) then
+       this%checkpoint_base = 'optimizer_checkpoint'
+    end if
+    if (.not. allocated(this%checkpoint_format)) then
+       this%checkpoint_format = 'hdf5'
+    end if
+  end subroutine optimizer_default_file_settings
 
   ! -------------------------------------------------------------------------- !
   ! Optimization loop routine
@@ -458,6 +483,9 @@ contains
     real(kind=rp) :: iteration_time
     logical :: converged
     integer :: stop_flag
+
+    ! The checkpoint name is built from these settings
+    call optimizer_default_file_settings(this)
 
     ! Initialize variables
     stop_flag = 1
@@ -544,7 +572,7 @@ contains
           exit
        else if (this%out_of_time(iteration_time)) then
           block
-            character(len=256) :: filename
+            character(len=:), allocatable :: filename
             filename = checkpoint_filename(this, &
                  basename = "optimizer_rt_checkpoint")
             call this%save_checkpoint(design, .true., filename)
@@ -795,9 +823,10 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
     integer, intent(in), optional :: iteration
-    character(len=256) :: file_full
-    character(len=:), allocatable :: file_format
-    character(len=256) :: file_path, file_base, file_ext
+    character(len=:), allocatable :: file_full
+    character(len=:), allocatable :: file_path, file_base, file_format
+    character(len=:), allocatable :: file_ext
+    character(len=5) :: iteration_str
 
     ! Default, read from the optimizer's stored checkpoint settings
     file_path = trim(this%checkpoint_path)
@@ -810,10 +839,10 @@ contains
     if (present(format)) file_format = trim(format)
 
     ! Ensure the path ends with a '/'
-    if (len_trim(file_path) .eq. 0) then
+    if (len(file_path) .eq. 0) then
        file_path = './'
-    else if (file_path(len_trim(file_path):len_trim(file_path)) .ne. '/') then
-       file_path = trim(file_path) // '/'
+    else if (file_path(len(file_path):len(file_path)) .ne. '/') then
+       file_path = file_path // '/'
     end if
 
     select case (trim(file_format))
@@ -824,13 +853,14 @@ contains
             trim(file_format) // '"')
     end select
 
-    ! Construct the full filename based on overwrite flag
+    ! Construct the full filename based on overwrite flag. It is built by
+    ! concatenation, since the path alone can fill a fixed-length buffer.
     if (present(iteration)) then
-       write(file_full, '(3A,I5.5,2A)') trim(file_path), &
-            trim(file_base), "_", iteration, ".", trim(file_ext)
+       write(iteration_str, '(I5.5)') iteration
+       file_full = file_path // file_base // "_" // iteration_str // "." // &
+            file_ext
     else
-       write(file_full, '(4A)') &
-            trim(file_path), trim(file_base), ".", trim(file_ext)
+       file_full = file_path // file_base // "." // file_ext
     end if
 
   end function checkpoint_filename
@@ -854,9 +884,11 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
     integer, intent(in), optional :: iteration
-    character(len=256) :: file_full, file_path
+    character(len=:), allocatable :: file_full, file_path
     character(len=12) :: suffix
     logical :: exists, overwrite_flag
+
+    call optimizer_default_file_settings(this)
 
     call neko_log%section('Optimizer save checkpoint')
     call profiler_start_region('Optimizer save checkpoint')
@@ -891,6 +923,7 @@ contains
     end if
 
     ! Extract the path and suffix from the full filename.
+    allocate(character(len=len(file_full) + 2) :: file_path)
     call filename_path(trim(file_full), file_path)
     call filename_suffix(trim(file_full), suffix)
 
@@ -944,8 +977,10 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
     integer, intent(in), optional :: iteration
-    character(len=256) :: file_full
+    character(len=:), allocatable :: file_full
     character(len=12) :: suffix
+
+    call optimizer_default_file_settings(this)
 
     call neko_log%section('Optimizer loading checkpoint')
     call profiler_start_region('Optimizer load checkpoint')
@@ -964,12 +999,10 @@ contains
     if (pe_rank .eq. 0) then
        block
          logical :: exists
-         character(len=256) :: msg
          inquire(file = file_full, exist = exists)
          if (.not. exists) then
-            write(msg, '(3A)') 'optimizer: Checkpoint file "', trim(file_full), &
-                 '" does not exist.'
-            call neko_error(msg)
+            call neko_error('optimizer: Checkpoint file "' // &
+                 trim(file_full) // '" does not exist.')
          end if
        end block
     end if

@@ -489,4 +489,116 @@ contains
 
   end subroutine restart_matches_original_run
 
+  !> A checkpoint path long enough that path, base name and suffix exceed
+  !! 256 characters must still give a checkpoint file, and a restart from
+  !! that file must load it. The file name used to be built in a
+  !! 256-character buffer, which aborted with "Fortran runtime error: End of
+  !! record", and the restart file name was cut to 256 characters, so the
+  !! restart aborted because the file did not exist.
+  @test(npes=[2])
+  subroutine long_checkpoint_path(this)
+    class(test_sd_checkpoint), intent(inout) :: this
+    type(vector_t) :: x_a, x_b
+    character(len=:), allocatable :: path, file_full
+    character(len=256) :: msg
+    real(kind=rp) :: local_diff, global_diff
+    integer :: ierr
+    logical :: exists
+
+    ! Two levels below CKPT_PATH, which setUp removes, so the full name is
+    ! 265 characters long
+    path = CKPT_PATH // repeat('a', 115) // '/' // repeat('b', 115) // '/'
+    file_full = path // CKPT_BASE // '_00001.h5'
+
+    ! Run A: one iteration from 0.5, which writes the checkpoint
+    call run_one_iteration('"checkpoint": {"path": "' // path // &
+         '", "base": "' // CKPT_BASE // '", "interval": 1}', 0.5_rp, x_a)
+
+    inquire(file = file_full, exist = exists)
+    @assertTrue(exists, 'No checkpoint file ' // file_full)
+
+    ! Run B: a fresh optimizer restarted from that file, with nothing left to
+    ! iterate, so it must hold the design Run A checkpointed. It starts from
+    ! 0.9, so a restart that loaded nothing ends elsewhere.
+    call run_one_iteration('"restart_file": "' // file_full // '"', 0.9_rp, &
+         x_b)
+
+    local_diff = maxval(abs(x_b%x - x_a%x))
+    call MPI_Allreduce(local_diff, global_diff, 1, &
+         MPI_REAL_PRECISION%mpi_val, MPI_MAX, NEKO_COMM%mpi_val, ierr)
+    write(msg, '(A)') 'the restart should load the checkpointed design'
+    @assertEqual(0.0_rp, global_diff, 0.0_rp, msg)
+
+    call x_a%free()
+    call x_b%free()
+  end subroutine long_checkpoint_path
+
+  !> Run a one-iteration steepest-descent optimisation of a small quadratic
+  !! from a fresh state, and return the final design.
+  !! @param solver_entry Extra JSON entry of the solver object.
+  !! @param start The value of every design variable at the start.
+  !! @param x The final design.
+  subroutine run_one_iteration(solver_entry, start, x)
+    character(len=*), intent(in) :: solver_entry
+    real(kind=rp), intent(in) :: start
+    type(vector_t), intent(inout) :: x
+    type(stub_design_t) :: des
+    type(problem_t) :: prob
+    class(optimizer_t), allocatable :: opt
+    type(json_file) :: parameters
+    class(objective_t), allocatable :: obj
+    real(kind=rp), allocatable :: w(:), d(:), x0(:)
+    integer :: n
+
+    ! An earlier run leaves the continuation and the registries populated
+    call nekotop_continuation%free()
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+    call neko_registry%init()
+    call neko_scratch_registry%init()
+
+    if (pe_rank .eq. 0) then
+       n = 2
+       w = [1.0_rp, 1.0_rp]
+       d = [0.3_rp, 0.3_rp]
+    else
+       n = 1
+       w = [1.0_rp]
+       d = [0.3_rp]
+    end if
+    allocate(x0(n))
+    x0 = start
+
+    call des%init(x0)
+
+    call parameters%initialize()
+    call parameters%load_from_string('{"optimization": {"solver": ' // &
+         '{"type": "steepest_descent", "enable_output": false, ' // &
+         '"max_iterations": 1, ' // solver_entry // '}}}')
+
+    call prob%init(parameters, des)
+    allocate(quad_obj_t :: obj)
+    select type (q => obj)
+    type is (quad_obj_t)
+       call q%init_base('quadratic', n, 1.0_rp)
+       q%w = w
+       q%d = d
+    end select
+    call prob%add_objective(obj)
+
+    call optimizer_factory(opt, parameters, prob, des)
+    call parameters%destroy()
+
+    call opt%run(prob, des)
+
+    call x%init(n)
+    call des%get_values(x)
+    call x%copy_from(DEVICE_TO_HOST, .true.)
+
+    call opt%free()
+    deallocate(opt)
+    call prob%free()
+    call des%free()
+  end subroutine run_one_iteration
+
 end module steepest_descent_checkpoint

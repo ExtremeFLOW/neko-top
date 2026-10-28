@@ -267,8 +267,7 @@ contains
     end if
 
     call neko_log%section('Restarting from checkpoint')
-    write(log_buf, '(A,A)') 'File :   ', trim(restart_file)
-    call neko_log%message(log_buf)
+    call neko_log%message('File :   ' // trim(restart_file))
     write(log_buf, '(A,E15.7)') 'Time : ', C%time%t
     call neko_log%message(log_buf)
     call neko_log%end_section()

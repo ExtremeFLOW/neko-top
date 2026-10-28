@@ -1,0 +1,111 @@
+!> @file never_sampled.pf
+!! pFUnit regression test: an objective whose time window misses the run
+!! must report zero, and be warned about without aborting the run.
+!!
+!! The warning names the objective. It used to be written into a
+!! 79-character log buffer, so an ordinary name such as
+!! `brinkman_dissipation` aborted the run with "Fortran runtime error: End
+!! of record".
+module never_sampled
+  use pfunit
+  use simulation_m, only: simulation_t
+  use brinkman_design, only: brinkman_design_t
+  use problem, only: problem_t
+  use neko, only: neko_init
+  use json_module, only: json_file
+  use json_utils, only: json_get
+  use json_utils_ext, only: json_read_file
+  use neko_top, only: neko_top_register_types
+  use num_types, only: rp, dp
+  use vector, only: vector_t
+  use objectives_user, only: objectives_user_setup
+
+  implicit none
+
+  character(len=*), parameter :: case_file = 'time_window_run_length.case'
+  !> Number of objectives the case file declares
+  integer, parameter :: n_declared = 3
+  !> Number of steps the case takes, from end_time and the timestep
+  integer, parameter :: n_steps = 10
+
+  @TestCase
+  type, extends(MPITestCase) :: test_never_sampled_case
+   contains
+     procedure :: setUp
+  end type test_never_sampled_case
+
+  logical :: initialized = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_never_sampled_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+
+    call neko_init()
+    call neko_top_register_types()
+  end subroutine setUp
+
+  !> Every declared objective gets a window after end_time, and one gets an
+  !! ordinary 20-character name. The unsteady run must finish and report
+  !! zero for all of them.
+  @test(npes=[1])
+  subroutine window_after_end_time(this)
+    class(test_never_sampled_case), intent(inout) :: this
+
+    type(json_file) :: parameters, design_parameters
+    type(simulation_t) :: sim
+    type(brinkman_design_t) :: des
+    type(problem_t) :: prob
+    type(vector_t) :: values
+    character(len=64) :: key
+    integer :: i, n_taken
+    real(kind=rp) :: max_value
+    logical :: found
+
+    parameters = json_read_file(case_file)
+
+    ! Move every declared window past end_time, so that none is sampled
+    do i = 1, n_declared
+       write(key, '(A,I0,A)') 'optimization.objectives(', i, ').start_time'
+       call parameters%update(trim(key), 1.0_dp, found)
+       write(key, '(A,I0,A)') 'optimization.objectives(', i, ').end_time'
+       call parameters%update(trim(key), 2.0_dp, found)
+    end do
+    call parameters%update('optimization.objectives(2).name', &
+         'brinkman_dissipation', found)
+
+    ! Keep the state recovery files apart from the other tests here
+    call parameters%update('state_recovery.path', &
+         'never_sampled_checkpoints/', found)
+
+    call json_get(parameters, 'optimization.design', design_parameters)
+
+    ! Register the user-defined inflow before the case is built.
+    call objectives_user_setup(sim%neko_case%user)
+
+    call sim%init(parameters)
+    call des%init(design_parameters, sim)
+    call prob%init(parameters, des, sim)
+
+    ! The window check runs at the end of the unsteady forward run
+    sim%unsteady = .true.
+    call prob%compute(des, sim)
+    n_taken = sim%n_timesteps
+
+    call values%init(prob%get_n_objectives())
+    call prob%get_all_objective_values(values)
+    max_value = maxval(abs(values%x(1:n_declared)))
+
+    call values%free()
+    call prob%free()
+    call des%free()
+    call sim%free()
+
+    @assertEqual(n_steps, n_taken, 'The run did not take every step')
+    @assertEqual(0.0_rp, max_value, 0.0_rp, 'An unsampled objective is not 0')
+  end subroutine window_after_end_time
+
+end module never_sampled
