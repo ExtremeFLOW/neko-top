@@ -27,7 +27,7 @@ contains
     character(len=*), intent(in) :: scheme_name
     type(field_list_t), intent(inout) :: fields
 
-    type(field_t), pointer :: u, v, w, s, brinkman_indicator
+    type(field_t), pointer :: u, v, w, p, s, brinkman_indicator
 
     brinkman_indicator => neko_registry%get_field("brinkman_indicator")
 
@@ -42,11 +42,13 @@ contains
        u => fields%get("u")
        v => fields%get("v")
        w => fields%get("w")
+       p => fields%get("p")
 
        call field_cfill(u, 1.0_rp)
        call field_subcol3(u, u, brinkman_indicator)
        call field_rzero(v)
        call field_rzero(w)
+       call field_rzero(p)
     end if
   end subroutine initial_conditions
 
