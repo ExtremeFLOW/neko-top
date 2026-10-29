@@ -74,14 +74,12 @@ from pathlib import Path
 
 import numpy as np
 
-from vtkhdf_backend import (CHUNK_OVERHEAD, MAPPING_OVERHEAD, Chunk,
-                            FileInfo, VtkhdfError, cell_types,
-                            chunk_estimate, find_step, format_size, inspect,
-                            mesh_bytes, open_input, parse_size,
-                            plan_by_count, prepare_split, protected_paths,
-                            size_model, smallest_max_size, stat_sources,
-                            step_files, step_label, strictly_increasing,
-                            write_chunk, write_extract, write_manifest)
+from vtkhdf_backend import (
+    CHUNK_OVERHEAD, MAPPING_OVERHEAD, Chunk, FileInfo, VtkhdfError, cell_types,
+    chunk_estimate, find_step, format_size, inspect, mesh_bytes, open_input,
+    parse_size, plan_by_count, prepare_split, protected_paths, size_model,
+    smallest_max_size, stat_sources, step_files, step_label,
+    strictly_increasing, write_chunk, write_extract, write_manifest)
 
 VTK_CELL_NAMES = {
     9: "VTK_QUAD",
@@ -121,31 +119,44 @@ def parse_args() -> Namespace:
         "extract", help="write one step as a static VTKHDF file")
     extract.add_argument("file", type=Path, help="main .vtkhdf file")
     which = extract.add_mutually_exclusive_group(required=True)
-    which.add_argument("--step", type=int,
+    which.add_argument("--step",
+                       type=int,
                        help="step index; negative counts from the end")
-    which.add_argument("--time", type=float,
+    which.add_argument("--time",
+                       type=float,
                        help="pick the step nearest to this time")
     extract.add_argument(
-        "-o", "--output", type=Path, default=None,
+        "-o",
+        "--output",
+        type=Path,
+        default=None,
         help="output file (default <input_dir>/<stem>_step_<s>.vtkhdf)")
-    extract.add_argument("--overwrite", action="store_true",
+    extract.add_argument("--overwrite",
+                         action="store_true",
                          help="replace an existing output file")
 
     split = commands.add_parser(
         "split", help="write chunks of steps that reference the originals")
     split.add_argument("file", type=Path, help="main .vtkhdf file")
     mode = split.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--steps-per-chunk", type=int, metavar="N",
+    mode.add_argument("--steps-per-chunk",
+                      type=int,
+                      metavar="N",
                       help="N consecutive steps per chunk")
-    mode.add_argument("--time-window", type=float, metavar="W",
+    mode.add_argument("--time-window",
+                      type=float,
+                      metavar="W",
                       help="one chunk per time window [m W, (m+1) W)")
     mode.add_argument(
-        "--max-size", metavar="SIZE",
+        "--max-size",
+        metavar="SIZE",
         help="largest footprint per chunk: bytes, or with K, M, G, T or "
         "KiB, MiB, GiB, TiB (powers of 1024), e.g. 40G or '233.5 MiB'")
-    split.add_argument("--dry-run", action="store_true",
+    split.add_argument("--dry-run",
+                       action="store_true",
                        help="validate and print the plan, write nothing")
-    split.add_argument("--overwrite", action="store_true",
+    split.add_argument("--overwrite",
+                       action="store_true",
                        help="replace existing chunks and manifests")
     return parser.parse_args()
 
@@ -168,10 +179,10 @@ def describe_time(info: FileInfo) -> str:
         return "no (static)"
     times = info.times
     finite = times[np.isfinite(times)]
-    span = (f"t = {finite[0]:g} .. {finite[-1]:g}" if len(finite)
-            else "no finite time")
-    order = ("strictly increasing" if strictly_increasing(times)
-             else "NOT strictly increasing")
+    span = (f"t = {finite[0]:g} .. {finite[-1]:g}"
+            if len(finite) else "no finite time")
+    order = ("strictly increasing"
+             if strictly_increasing(times) else "NOT strictly increasing")
     if len(finite) < len(times):
         order += f", {len(times) - len(finite)} non-finite"
     return f"yes: {info.n_steps} steps, {span}, {order}"
@@ -193,8 +204,10 @@ def print_sizes(f, info: FileInfo) -> None:
         return
     sizes, problems = stat_sources(info)
     bad = {path for _, path, _ in problems}
-    complete = [s for s in range(info.n_steps)
-                if not bad.intersection(step_files(info, s))]
+    complete = [
+        s for s in range(info.n_steps)
+        if not bad.intersection(step_files(info, s))
+    ]
     print(f"step files  {sized(sum(sizes.values()))} in {len(sizes)} "
           f"files, {len(complete)} of {info.n_steps} steps complete")
     print(f"total       {sized(main + sum(sizes.values()))}")
@@ -226,10 +239,11 @@ def print_sizes(f, info: FileInfo) -> None:
           f"{format_size(smallest, round_up=True)} (exactly {smallest} B)")
     n = info.n_steps
     for k in [k for k in EXAMPLE_STEPS if k < n] + [n]:
-        worst = max(chunk_estimate(fixed, per_step, steps)
-                    for steps in plan_by_count(n, k))
-        label = (f"all {n} steps in one chunk" if k == n
-                 else f"{k} steps per chunk")
+        worst = max(
+            chunk_estimate(fixed, per_step, steps)
+            for steps in plan_by_count(n, k))
+        label = (f"all {n} steps in one chunk"
+                 if k == n else f"{k} steps per chunk")
         print(f"            {label}: about {format_size(worst)}")
 
 
@@ -239,8 +253,8 @@ def run_info(args: Namespace) -> None:
         types = cell_types(f)
         print_warnings(info)
         version = ".".join(str(v) for v in info.version) or "?"
-        type_names = ", ".join(
-            f"{t} ({VTK_CELL_NAMES.get(t, 'unknown')})" for t in types)
+        type_names = ", ".join(f"{t} ({VTK_CELL_NAMES.get(t, 'unknown')})"
+                               for t in types)
         print(f"file        {info.path}")
         print(f"type        {info.vtk_type}, VTKHDF version {version}")
         print(f"temporal    {describe_time(info)}")
@@ -289,10 +303,12 @@ def run_split(args: Namespace) -> None:
     with open_input(args.file) as f:
         info = inspect(f, args.file)
         print_warnings(info)
-        chunks, warnings = prepare_split(
-            f, info, steps_per_chunk=args.steps_per_chunk,
-            time_window=args.time_window, max_size=max_size,
-            overwrite=args.overwrite)
+        chunks, warnings = prepare_split(f,
+                                         info,
+                                         steps_per_chunk=args.steps_per_chunk,
+                                         time_window=args.time_window,
+                                         max_size=max_size,
+                                         overwrite=args.overwrite)
         for message in warnings:
             print(f"warning: {message}", file=sys.stderr)
         print(f"split {info.path}: {info.n_steps} steps into "
@@ -312,9 +328,11 @@ def run_split(args: Namespace) -> None:
             footprint = chunk.path.stat().st_size + chunk.source_bytes
             describe_chunk(info, chunk, format_size(footprint))
             if max_size is not None and footprint > max_size:
-                print(f"warning: {chunk.path.name} footprint "
-                      f"{format_size(footprint)} exceeds --max-size "
-                      f"{format_size(max_size)}", file=sys.stderr)
+                print(
+                    f"warning: {chunk.path.name} footprint "
+                    f"{format_size(footprint)} exceeds --max-size "
+                    f"{format_size(max_size)}",
+                    file=sys.stderr)
 
 
 def on_signal(signum: int, frame) -> None:
@@ -328,8 +346,7 @@ def main() -> None:
     for name in ("SIGTERM", "SIGHUP"):
         if hasattr(signal, name):
             signal.signal(getattr(signal, name), on_signal)
-    commands = {"info": run_info, "extract": run_extract,
-                "split": run_split}
+    commands = {"info": run_info, "extract": run_extract, "split": run_split}
     try:
         commands[args.command](args)
     except (VtkhdfError, OSError) as error:
