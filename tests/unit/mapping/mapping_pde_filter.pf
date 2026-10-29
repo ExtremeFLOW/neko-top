@@ -182,7 +182,10 @@ contains
 
   end subroutine build_map
 
-  !> Set a single field entry (on host and device).
+  !> Set a single field entry on the host, then copy the whole host array to
+  !! the device. Any other entries must therefore already be correct on the
+  !! host: the impulse builders below zero `f%x` on the host, not with
+  !! field_cfill, which only fills the device copy on device backends.
   subroutine set_point(f, i, j, k, e, val)
     type(field_t), intent(inout) :: f
     integer, intent(in) :: i, j, k, e
@@ -201,7 +204,7 @@ contains
     type(field_t), intent(inout) :: f
     real(kind=rp), intent(in) :: amp
 
-    call field_cfill(f, 0.0_rp)
+    f%x = 0.0_rp
     call set_point(f, 4, 4, 4, 1, amp)
 
   end subroutine make_interior_impulse
@@ -214,7 +217,7 @@ contains
     type(field_t), intent(inout) :: f
     real(kind=rp), intent(in) :: amp
 
-    call field_cfill(f, 0.0_rp)
+    f%x = 0.0_rp
     call set_point(f, 8, 4, 4, 1, amp)
     call set_point(f, 1, 4, 4, 2, amp)
 
