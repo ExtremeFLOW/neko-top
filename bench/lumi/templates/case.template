@@ -189,7 +189,7 @@
             {
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
-                "target_concentration": 0.5,
+                "phi_ref": 0.5,
                 "weight": 1.0
             }
         ],
