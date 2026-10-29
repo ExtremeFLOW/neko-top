@@ -6,7 +6,9 @@ set(test_list
     "volume.case"
     "volume_filtered.case"
     "viscous_dissipation.case"
+    "viscous_dissipation_continuation.case"
     "brinkman_dissipation.case"
+    "brinkman_dissipation_continuation.case"
     "unsteady_brinkman_dissipation.case"
     "unsteady_brinkman_dissipation_masked.case"
 )
