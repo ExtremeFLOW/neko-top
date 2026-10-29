@@ -38,6 +38,15 @@ Currently, we have added tests for the following components:
   this objective's own `update_sensitivity` is empty.
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
+- `viscous_dissipation_objective_t` and `brinkman_dissipation_objective_t`
+  after a weight continuation step (`viscous_dissipation_continuation.case`,
+  `brinkman_dissipation_continuation.case`) — the same cases with the weight
+  given as `[10.0, 1.0]`. The optional key
+  `optimization.fd_test_continuation_iteration` makes the driver advance the
+  continuation scheduler to that iteration before differentiating. The
+  adjoint forcing must follow the weight: with it frozen at 10 the error at
+  the smallest perturbation was `-8.99e-1` (viscous) and `-5.16e-1`
+  (Brinkman). Following it, both reproduce the plain cases exactly.
 - `brinkman_dissipation_objective_t`, unsteady
   (`unsteady_brinkman_dissipation.case`) — 20 time steps at polynomial order
   3, with a PDE filter and the objective's default over-integration. It checks
