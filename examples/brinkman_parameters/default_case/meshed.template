@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/brinkman_parameters/meshed_M3.nmsh",
+        "mesh_file": "data_local/brinkman_parameters/meshed_M2.nmsh",
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
