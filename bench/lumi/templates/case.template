@@ -73,27 +73,28 @@
             },
             "boundary_conditions": [
                 {
-                    "type": "user",
+                    "type": "user_dirichlet",
                     "zone_indices": [ 1 ]
                 },
                 {
                     "type": "neumann",
-                    "flux": 0,
+                    "flux": 0.0,
                     "zone_indices": [ 2, 3, 4, 5, 6 ]
                 }
             ]
         },
         "adjoint_scalar": {
             "enabled": true,
+            "primal_name": "temperature",
             "boundary_conditions": [
                 {
                     "type": "dirichlet",
-                    "value": 0,
+                    "value": 0.0,
                     "zone_indices": [ 1 ]
                 },
                 {
                     "type": "neumann",
-                    "flux": 0,
+                    "flux": 0.0,
                     "zone_indices": [ 2, 3, 4, 5, 6 ]
                 }
             ],
@@ -142,17 +143,15 @@
             }
         ]
     },
-    "checkpoints": {
+    "unsteady": true,
+    "state_recovery": {
+        "type": "checkpoint",
         "enabled": true,
         "format": "hdf5",
         "n_memory": 100,
         "keep_checkpoints": false
     },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
             "mapping": [
@@ -162,7 +161,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 1000
+                    "f_max": 1000.0
                 }
             ],
             "initial_distribution": {
@@ -170,6 +169,10 @@
                 "base_value": 0.0,
                 "zone_value": 1.0,
                 "zone_name": "initial_design"
+            },
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
             }
         },
         "solver": {
