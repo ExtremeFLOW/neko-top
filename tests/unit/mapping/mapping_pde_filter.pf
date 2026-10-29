@@ -240,6 +240,9 @@ contains
 
     call diff%init(coef%dof, 'diff')
     call field_sub3(diff, actual, expected)
+    ! field_sub3 only updates the device copy on device backends, so bring
+    ! the difference back before taking its norm on the host.
+    call diff%copy_from(DEVICE_TO_HOST, .true.)
 
     norm_diff = sqrt(glsc3(diff%x, coef%B, diff%x, n))
     norm_ref = sqrt(glsc3(expected%x, coef%B, expected%x, n))
