@@ -38,7 +38,7 @@ cmake_minimum_required(VERSION 3.21)
 
 # Define the list of available build types and default to Release
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
-set(CMAKE_BUILD_TYPE_LIST
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
     Debug
     Release
     Testing
