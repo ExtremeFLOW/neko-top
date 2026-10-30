@@ -115,7 +115,6 @@ foreach(case_file ${test_list})
     )
     set_tests_properties(${case_name}
         PROPERTIES
-            DEPENDS "time_window_tester_bin;objectives_test_prepare"
             LABELS "objectives;unit"
             ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
             TIMEOUT 300
