@@ -11,4 +11,12 @@ Neko-TOP:
 
 ## Neko
 
-We need the `feature/brinkman_study` branch of Neko.
+The example builds and runs against current Neko `develop`.
+
+The `brinkman` default case template uses a `distance_transform` of type
+`smooth_step` rather than `step`, because Neko's `step` transform currently
+produces an all-zero indicator.
+
+The `idw` template needs the source term type `idw`, which is only available
+on Neko's unmerged `feature/idw_wip` branch
+(`src/source_terms/idw_source_term.f90`); it is not yet on `develop`.
