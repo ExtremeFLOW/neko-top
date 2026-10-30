@@ -19,11 +19,15 @@ the originals:
 """
 
 import contextlib
+import errno
 import math
 import os
 import re
+import secrets
+import stat
 from collections.abc import Iterator
 from dataclasses import dataclass
+from fractions import Fraction
 from pathlib import Path
 
 import h5py
@@ -42,6 +46,9 @@ COUNT_DATASETS = ("NumberOfPoints", "NumberOfCells",
 STEP_OFFSETS = ("PartOffsets", "PointOffsets", "CellOffsets",
                 "ConnectivityIdOffsets")
 SIZE_UNITS = "KMGT"
+SIZE_PATTERN = re.compile(
+    r"\s*(\d+(?:\.\d*)?|\.\d+)\s*(?:([KMGT])(i?)B?|(B))?\s*",
+    re.IGNORECASE)
 CHUNK_OVERHEAD = 1024**2
 """Fixed allowance for a chunk's HDF5 metadata in size estimates."""
 MAPPING_OVERHEAD = 256
@@ -94,7 +101,9 @@ class FileInfo:
     """Validated metadata of an input file.
 
     A non-temporal file has n_steps == 1 and times None. part_counts maps
-    each NumberOf* dataset name to its P per-part entries.
+    each NumberOf* dataset name to its P per-part entries. derived_from is
+    the file named by a chunk's or extract's source_file attribute,
+    resolved next to it, or None.
     """
     path: Path
     vtk_type: str
@@ -109,17 +118,43 @@ class FileInfo:
     part_counts: dict[str, np.ndarray]
     fields: list[FieldInfo]
     warnings: list[str]
+    derived_from: Path | None = None
+
+
+@dataclass(frozen=True)
+class Protected:
+    """Originals an output must never replace: files (real paths and
+    (st_dev, st_ino) identities) and directories of per-step files."""
+    files: frozenset[str]
+    file_ids: frozenset[tuple[int, int]]
+    dirs: frozenset[str]
+    dir_ids: frozenset[tuple[int, int]]
 
 
 # --------------------------------------------------------------------------
 # Reading and validating
 
 
+def stat_problem(path: Path) -> str | None:
+    """Why path is not a readable regular file, or None if it is."""
+    try:
+        st = os.stat(path)
+    except OSError as err:
+        return ("no such file" if err.errno == errno.ENOENT
+                else err.strerror or str(err))
+    if not stat.S_ISREG(st.st_mode):
+        return "not a regular file"
+    if not os.access(path, os.R_OK):
+        return os.strerror(errno.EACCES)
+    return None
+
+
 def open_input(path: Path) -> h5py.File:
     """Open an input or per-step source file; the only way either is
     opened."""
-    if not path.is_file():
-        raise VtkhdfError(f"{path}: no such file")
+    problem = stat_problem(path)
+    if problem:
+        raise VtkhdfError(f"{path}: {problem}")
     try:
         return h5py.File(path, "r", locking="best-effort")
     except OSError as err:
@@ -135,16 +170,26 @@ def inspect(f: h5py.File, path: Path) -> FileInfo:
     if vtk_type != "UnstructuredGrid":
         raise VtkhdfError(f"{path}: VTKHDF type {vtk_type!r} is not "
                           "supported, only UnstructuredGrid")
-    version = tuple(int(v) for v in np.ravel(root.attrs.get("Version", [])))
+    version = np.ravel(root.attrs.get("Version", np.array([], np.int32)))
+    if version.dtype.kind not in "iu":
+        raise VtkhdfError(f"{path}: /VTKHDF Version is {version.tolist()}, "
+                          "expected integers")
+    version = tuple(int(v) for v in version)
     warnings: list[str] = []
 
     steps = root.get("Steps")
     temporal = steps is not None
     if temporal:
+        group(root, "Steps", path)
         n_steps = int(scalar_attr(steps, "NSteps", path))
         if n_steps < 1:
             raise VtkhdfError(f"{path}: Steps/NSteps is {n_steps}")
         times = head(steps, "Values", n_steps, path).astype(np.float64)
+        bad = np.flatnonzero(~np.isfinite(times))
+        if len(bad):
+            many = "s" if len(bad) > 1 else ""
+            warnings.append(f"{path}: non-finite time{many} at step{many} "
+                            f"{list_steps(bad)}; --time ignores them")
         parts = head(steps, "NumberOfParts", n_steps, path)
         if np.any(parts != parts[0]):
             raise VtkhdfError(f"{path}: NumberOfParts changes between "
@@ -184,7 +229,10 @@ def inspect(f: h5py.File, path: Path) -> FileInfo:
     fields = []
     point_data = root.get("PointData")
     if point_data is not None:
-        offsets = steps.get("PointDataOffsets") if temporal else None
+        group(root, "PointData", path)
+        offsets = None
+        if temporal and "PointDataOffsets" in steps:
+            offsets = group(steps, "PointDataOffsets", path)
         for name in point_data:
             fields.append(inspect_field(point_data, name, offsets, n_steps,
                                         n_points, temporal, path))
@@ -194,9 +242,13 @@ def inspect(f: h5py.File, path: Path) -> FileInfo:
                         "relative VDS sources against it first, this tool "
                         "against the input's directory")
 
+    origin = f.attrs.get("source_file")
+    derived_from = None
+    if isinstance(origin, (bytes, str)) and origin:
+        derived_from = path.parent / os.fsdecode(origin)
     return FileInfo(path, vtk_type, version, temporal, n_steps, times,
                     n_parts, n_points, n_cells, n_conn, part_counts, fields,
-                    warnings)
+                    warnings, derived_from)
 
 
 def inspect_field(point_data: h5py.Group, name: str,
@@ -232,8 +284,12 @@ def inspect_field(point_data: h5py.Group, name: str,
     count = dcpl.get_virtual_count()
     if count == 0:
         raise VtkhdfError(f"{where} is a VDS without mappings")
-    names = tuple(dcpl.get_virtual_filename(i) for i in range(count))
-    dsets = {dcpl.get_virtual_dsetname(i) for i in range(count)}
+    try:
+        names = tuple(dcpl.get_virtual_filename(i) for i in range(count))
+        dsets = {dcpl.get_virtual_dsetname(i) for i in range(count)}
+    except UnicodeDecodeError:
+        raise VtkhdfError(f"{where}: a VDS source name is not valid UTF-8: "
+                          "not supported") from None
     row_shape = tuple(dcpl.get_virtual_vspace(0).shape[1:])
     for stored in names:
         check_vds_name(stored, where)
@@ -313,14 +369,30 @@ def attr_text(obj: h5py.HLObject, name: str) -> str:
 
 
 def scalar_attr(obj: h5py.HLObject, name: str, path: Path):
-    """A one-element attribute as a numpy scalar."""
+    """A one-element integer attribute as a numpy scalar."""
     if name not in obj.attrs:
         raise VtkhdfError(f"{path}: attribute {obj.name}/{name} missing")
     value = np.asarray(obj.attrs[name])
-    if value.size != 1:
-        raise VtkhdfError(f"{path}: attribute {obj.name}/{name} has "
-                          f"{value.size} entries, expected 1")
+    if value.size != 1 or value.dtype.kind not in "iu":
+        raise VtkhdfError(f"{path}: attribute {obj.name}/{name} is "
+                          f"{value.tolist()}, expected one integer")
     return value.reshape(-1)[0]
+
+
+def group(parent: h5py.Group, name: str, path: Path) -> h5py.Group:
+    """A member that must be a group."""
+    obj = parent.get(name)
+    if not isinstance(obj, h5py.Group):
+        raise VtkhdfError(f"{path}: {parent.name.rstrip('/')}/{name} is not "
+                          "a group")
+    return obj
+
+
+def list_steps(steps, limit: int = 8) -> str:
+    """Step indices for a message, shortened after limit of them."""
+    shown = ", ".join(str(int(s)) for s in steps[:limit])
+    return shown + (f" (+{len(steps) - limit} more)"
+                    if len(steps) > limit else "")
 
 
 def dataset(group: h5py.Group, name: str, path: Path) -> h5py.Dataset:
@@ -337,6 +409,9 @@ def head(group: h5py.Group, name: str, n: int, path: Path) -> np.ndarray:
     if len(ds.shape) != 1 or ds.shape[0] < n:
         raise VtkhdfError(f"{path}: {ds.name} has shape {ds.shape}, "
                           f"expected at least {n} entries")
+    if ds.dtype.kind not in "iuf":
+        raise VtkhdfError(f"{path}: {ds.name} has dtype {ds.dtype}, "
+                          "expected numbers")
     return ds[:n]
 
 
@@ -386,21 +461,23 @@ def step_files(info: FileInfo, step: int) -> list[Path]:
     return list(files)
 
 
-def stat_sources(info: FileInfo) -> list[tuple[int, int, list[Path]]]:
-    """Per step: (step, bytes of present files, missing files).
-
-    Uses stat only; no source file is opened.
-    """
-    result = []
+def stat_sources(info: FileInfo) -> tuple[dict[Path, int],
+                                          list[tuple[int, Path, str]]]:
+    """Sizes of the present per-step files, and (step, file, reason) for
+    each one that is missing or unreadable. Uses stat only; no source file
+    is opened."""
+    sizes: dict[Path, int] = {}
+    problems = []
     for step in range(info.n_steps):
-        nbytes, missing = 0, []
         for source in step_files(info, step):
-            try:
-                nbytes += source.stat().st_size
-            except FileNotFoundError:
-                missing.append(source)
-        result.append((step, nbytes, missing))
-    return result
+            if source in sizes:
+                continue
+            problem = stat_problem(source)
+            if problem:
+                problems.append((step, source, problem))
+            else:
+                sizes[source] = source.stat().st_size
+    return sizes, problems
 
 
 def check_sources(info: FileInfo,
@@ -423,9 +500,13 @@ def check_sources(info: FileInfo,
                 by_file.setdefault(source, []).append((fld, dset))
         nbytes = 0
         for source, items in by_file.items():
-            if not source.is_file():
+            problem = stat_problem(source)
+            if problem == "no such file":
                 raise VtkhdfError(f"step {step}: per-step file {source} "
                                   "is missing")
+            if problem:
+                raise VtkhdfError(f"step {step}: per-step file {source}: "
+                                  f"{problem}")
             with open_input(source) as src:
                 for fld, dset in items:
                     ds = src.get(dset)
@@ -459,12 +540,17 @@ def find_step(info: FileInfo, step: int | None = None,
     if time is None or not math.isfinite(time):
         raise VtkhdfError(f"invalid time {time}")
     times = info.times
-    dist = np.abs(times - time)
+    finite = np.isfinite(times)
+    if not finite.any():
+        raise VtkhdfError(f"{info.path} has no finite step time")
+    dist = np.where(finite, np.abs(times - time), np.inf)
     best = int(np.argmin(dist))
     # A tie is two steps equally far away up to float noise, measured
     # against their own spacing; equal times (restarts) always tie.
-    ties = np.flatnonzero(dist - dist[best]
-                          <= TIME_EPS * np.abs(times - times[best]))
+    # Non-finite times are never candidates.
+    with np.errstate(invalid="ignore"):
+        ties = np.flatnonzero(finite & (dist - dist[best] <= TIME_EPS
+                                        * np.abs(times - times[best])))
     if len(ties) > 1:
         cands = ", ".join(f"{s} (t = {times[s]:g})" for s in ties)
         raise VtkhdfError(f"time {time:g} is equally close to steps "
@@ -478,12 +564,15 @@ def step_label(n_steps: int, step: int) -> str:
 
 
 def strictly_increasing(times: np.ndarray) -> bool:
-    return bool(np.all(np.diff(times) > 0))
+    """True if all times are finite and each exceeds the previous one."""
+    return bool(np.all(np.isfinite(times)) and np.all(np.diff(times) > 0))
 
 
 def time_order_warning(info: FileInfo) -> str | None:
-    """A warning naming the first step whose time does not increase."""
-    bad = np.flatnonzero(np.diff(info.times) <= 0)
+    """A warning naming the first step whose time does not increase
+    (a non-finite time never does)."""
+    with np.errstate(invalid="ignore"):
+        bad = np.flatnonzero(~(np.diff(info.times) > 0))
     if not len(bad):
         return None
     s = int(bad[0]) + 1
@@ -507,12 +596,24 @@ def plan_by_time(times: np.ndarray, width: float) -> list[range]:
     """Group steps by absolute window [m W, (m + 1) W); empty windows are
     skipped. TIME_EPS absorbs float noise at window edges."""
     if not (math.isfinite(width) and width > 0):
-        raise VtkhdfError(f"--time-window must be positive, got {width:g}")
+        raise VtkhdfError(f"--time-window must be positive and finite, got "
+                          f"{width:g}")
+    bad = np.flatnonzero(~np.isfinite(times))
+    if len(bad):
+        raise VtkhdfError(f"--time-window needs finite times, and steps "
+                          f"{list_steps(bad)} have non-finite ones; use "
+                          "--steps-per-chunk or --max-size")
     if not strictly_increasing(times):
         raise VtkhdfError("--time-window needs strictly increasing times, "
                           "and this file's are not; use --steps-per-chunk "
                           "or --max-size")
-    index = np.floor(times / width + TIME_EPS).astype(np.int64)
+    with np.errstate(over="ignore"):
+        scaled = times / width + TIME_EPS
+    if not (np.all(np.isfinite(scaled))
+            and np.max(np.abs(scaled)) < 2.0**62):
+        raise VtkhdfError(f"--time-window {width:g} is too small for times "
+                          f"up to {np.max(np.abs(times)):g}")
+    index = np.floor(scaled).astype(np.int64)
     edges = [0, *(np.flatnonzero(np.diff(index)) + 1).tolist(), len(times)]
     return [range(a, b) for a, b in zip(edges[:-1], edges[1:])]
 
@@ -544,22 +645,59 @@ def mesh_bytes(f: h5py.File) -> int:
                for name in MESH_DATASETS)
 
 
+def size_model(f: h5py.File, info: FileInfo,
+               sizes: dict[Path, int]) -> tuple[int, list[int]]:
+    """The footprint estimate behind split --max-size, also reported by
+    info: (fixed, per_step).
+
+    A chunk of steps S is estimated as fixed + sum(per_step[s] for s in
+    S): fixed is the mesh payload the chunk copies plus CHUNK_OVERHEAD,
+    and per_step[s] the bytes of step s's per-step files (those in sizes;
+    missing ones count 0) plus MAPPING_OVERHEAD per field.
+    """
+    fixed = mesh_bytes(f) + CHUNK_OVERHEAD
+    mappings = MAPPING_OVERHEAD * len(info.fields)
+    per_step = [sum(sizes.get(p, 0) for p in step_files(info, s)) + mappings
+                for s in range(info.n_steps)]
+    return fixed, per_step
+
+
+def chunk_estimate(fixed: int, per_step: list[int], steps: range) -> int:
+    return fixed + sum(per_step[s] for s in steps)
+
+
+def smallest_max_size(fixed: int, per_step: list[int]) -> int:
+    """The smallest --max-size split accepts: the largest single step."""
+    return fixed + max(per_step)
+
+
 def source_relpath(info: FileInfo, source: Path) -> str:
     """A per-step file's path relative to the input's directory, as a
     chunk's VDS mapping and manifest store it.
 
     It must lie inside that directory, or an rsync --files-from manifest
-    cannot ship it, and contain no '%', which HDF5 would printf-parse and
-    Neko's reader would not.
+    cannot ship it; name the same file (a '..' after a symlinked directory
+    does not); and be UTF-8 without '%', which h5py needs to read the
+    mapping back and HDF5 would printf-parse.
     """
+    input_dir = info.path.parent
     rel = os.path.relpath(os.path.abspath(source),
-                          os.path.abspath(info.path.parent))
+                          os.path.abspath(input_dir))
     if ".." in Path(rel).parts:
         raise VtkhdfError(f"per-step file {source} is outside the input's "
                           "directory, so a chunk manifest cannot ship it")
+    if not os.path.samefile(input_dir / rel, source):
+        raise VtkhdfError(f"per-step file {source} resolves through a "
+                          f"symlink to a different file than {rel}: not "
+                          "supported in a chunk")
     if "%" in rel:
         raise VtkhdfError(f"per-step file {rel!r} contains '%': not "
                           "supported in a chunk's VDS mapping")
+    try:
+        rel.encode("utf-8")
+    except UnicodeEncodeError:
+        raise VtkhdfError(f"per-step file {rel!r} is not valid UTF-8: not "
+                          "supported in a chunk's VDS mapping") from None
     return rel
 
 
@@ -597,16 +735,13 @@ def prepare_split(f: h5py.File, info: FileInfo, *,
     checked = check_sources(info, range(info.n_steps))
     sizes = {p: p.stat().st_size for _, files, _ in checked for p in files}
     rel = {p: source_relpath(info, p) for p in sizes}
-    step_cost = [sum(sizes[p] for p in files)
-                 + MAPPING_OVERHEAD * len(info.fields)
-                 for _, files, _ in checked]
-    fixed = mesh_bytes(f) + CHUNK_OVERHEAD
+    fixed, per_step = size_model(f, info, sizes)
     if steps_per_chunk is not None:
         plan = plan_by_count(info.n_steps, steps_per_chunk)
     elif time_window is not None:
         plan = plan_by_time(info.times, time_window)
     else:
-        plan = plan_by_size(step_cost, fixed, max_size)
+        plan = plan_by_size(per_step, fixed, max_size)
 
     protected = protected_paths(info)
     chunks = []
@@ -620,7 +755,7 @@ def prepare_split(f: h5py.File, info: FileInfo, *,
         chunks.append(Chunk(steps, path, manifest,
                             tuple(rel[p] for p in files),
                             sum(sizes[p] for p in files),
-                            fixed + sum(step_cost[s] for s in steps)))
+                            chunk_estimate(fixed, per_step, steps)))
     return chunks, warnings
 
 
@@ -628,20 +763,63 @@ def prepare_split(f: h5py.File, info: FileInfo, *,
 # Writing
 
 
-def protected_paths(info: FileInfo) -> set[str]:
-    """Real paths of the input and of every per-step file it references."""
-    sources = {info.path}
+def file_id(path: Path | str) -> tuple[int, int] | None:
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return st.st_dev, st.st_ino
+
+
+def protected_paths(info: FileInfo) -> Protected:
+    """The originals no output may replace.
+
+    Files: the input, every per-step file it references, the file it was
+    derived from (source_file) and the main file <stem>.vtkhdf of each
+    <stem>.data directory. Directories: those directly holding per-step
+    files, except the input's own, where outputs go by default; no output
+    may be written directly in them, so neither a step file the input
+    does not reference (another chunk's, or one past NSteps in a live
+    run) nor a new file lands among the originals.
+    Both are kept as real paths and as (st_dev, st_ino), which also
+    catches aliases realpath misses (hard links, case-insensitive file
+    systems, bind mounts).
+    """
+    files, dirs = {info.path}, set()
     for step in range(info.n_steps):
-        sources.update(step_files(info, step))
-    return {os.path.realpath(p) for p in sources}
+        for source in step_files(info, step):
+            files.add(source)
+            dirs.add(source.parent)
+    for folder in dirs:
+        if folder.name.endswith(".data"):
+            files.add(folder.parent / (folder.name[:-5] + ".vtkhdf"))
+    if info.derived_from is not None:
+        files.add(info.derived_from)
+    input_dir = os.path.realpath(info.path.parent)
+    real_dirs = {os.path.realpath(d) for d in dirs} - {input_dir}
+    input_dir_id = file_id(input_dir)
+    return Protected(
+        frozenset(os.path.realpath(p) for p in files),
+        frozenset(filter(None, map(file_id, files))),
+        frozenset(real_dirs),
+        frozenset(i for i in map(file_id, real_dirs)
+                  if i is not None and i != input_dir_id))
 
 
-def check_output(path: Path, overwrite: bool, protected: set[str]) -> None:
-    """Refuse an output that is an original, exists without overwrite, or
-    cannot be created."""
-    if os.path.realpath(path) in protected:
+def check_output(path: Path, overwrite: bool, protected: Protected) -> None:
+    """Refuse an output that is or lies among originals, exists without
+    overwrite, or cannot be created."""
+    real = Path(os.path.realpath(path))
+    out_id = file_id(path)
+    if str(real) in protected.files or out_id in protected.file_ids:
         raise VtkhdfError(f"refusing to write {path}: it is the input or "
-                          "one of its per-step files")
+                          "an original file it depends on")
+    folder = Path(os.path.abspath(path)).parent
+    if (str(real.parent) in protected.dirs
+            or file_id(folder) in protected.dir_ids):
+        raise VtkhdfError(f"refusing to write {path}: it lies in "
+                          f"{path.parent}, a directory of the input's "
+                          "per-step files")
     if path.is_dir():
         raise VtkhdfError(f"output {path} is a directory")
     if not path.parent.is_dir():
@@ -653,9 +831,14 @@ def check_output(path: Path, overwrite: bool, protected: set[str]) -> None:
 
 @contextlib.contextmanager
 def atomic_output(path: Path, overwrite: bool) -> Iterator[Path]:
-    """Yield a temporary path next to path; move it into place on success,
-    delete it on any error."""
-    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}")
+    """Yield a new, empty temporary file next to path, which the caller
+    overwrites (h5py mode "w"); move it into place on success, delete it
+    on any error. The name is unique (pid and random) and created
+    exclusively, so only a file this call created is ever deleted.
+    """
+    tmp = path.with_name(f".{path.name}.tmp-{os.getpid()}-"
+                         f"{secrets.token_hex(4)}")
+    os.close(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666))
     try:
         yield tmp
         if not overwrite and os.path.lexists(path):
@@ -681,6 +864,9 @@ def copy_attrs(src: h5py.HLObject, dst: h5py.HLObject,
         key = name.encode()
         attr = h5a.open(src.id, key)
         ftype, space = attr.get_type(), attr.get_space()
+        if space.get_simple_extent_type() == h5s.NULL:
+            h5a.create(dst.id, key, ftype, space)
+            continue
         buf = np.empty(space.shape, dtype=ftype.dtype)
         attr.read(buf, mtype=ftype)
         h5a.create(dst.id, key, ftype, space).write(buf, mtype=ftype)
@@ -781,7 +967,7 @@ def write_vds(info: FileInfo, field: FieldInfo, steps: range,
 
 def write_chunk(f: h5py.File, info: FileInfo, steps: range, out: Path,
                 overwrite: bool,
-                protected: set[str] | None = None) -> list[Path]:
+                protected: Protected | None = None) -> list[Path]:
     """Write one split chunk: the mesh, Steps for its k steps and point
     data as VDS referencing the original per-step files; FieldData/Time
     only when k == 1, as VTK reads a 1-step file as static. Returns the
@@ -793,7 +979,7 @@ def write_chunk(f: h5py.File, info: FileInfo, steps: range, out: Path,
     check_output(out, overwrite, protected if protected is not None
                  else protected_paths(info))
     src_root = f["VTKHDF"]
-    with atomic_output(out, overwrite) as tmp, h5py.File(tmp, "x") as dst:
+    with atomic_output(out, overwrite) as tmp, h5py.File(tmp, "w") as dst:
         root = dst.create_group("VTKHDF")
         copy_attrs(src_root, root)
         copy_mesh(src_root, root)
@@ -806,17 +992,18 @@ def write_chunk(f: h5py.File, info: FileInfo, steps: range, out: Path,
         if len(steps) == 1:
             root.create_group("FieldData").create_dataset(
                 "Time", data=info.times[steps.start:steps.stop])
-        dst.attrs["source_file"] = info.path.name
+        dst.attrs["source_file"] = np.bytes_(os.fsencode(info.path.name))
         dst.attrs["source_steps"] = np.array([steps[0], steps[-1]],
                                              dtype=np.int64)
     return list(dict.fromkeys(p for s in steps for p in step_files(info, s)))
 
 
 def write_manifest(path: Path, entries: list[str], overwrite: bool) -> None:
-    """Write one path per line, atomically."""
+    """Write one path per line, atomically, as the file system's bytes."""
     with atomic_output(path, overwrite) as tmp:
-        with open(tmp, "x", encoding="utf-8") as handle:
-            handle.writelines(f"{entry}\n" for entry in entries)
+        with open(tmp, "wb") as handle:
+            handle.writelines(os.fsencode(entry) + b"\n"
+                              for entry in entries)
 
 
 def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
@@ -829,7 +1016,7 @@ def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
     check_sources(info, [step])
     check_output(out, overwrite, protected_paths(info))
     src_root = f["VTKHDF"]
-    with atomic_output(out, overwrite) as tmp, h5py.File(tmp, "x") as dst:
+    with atomic_output(out, overwrite) as tmp, h5py.File(tmp, "w") as dst:
         root = dst.create_group("VTKHDF")
         copy_attrs(src_root, root)
         copy_mesh(src_root, root)
@@ -848,7 +1035,7 @@ def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
         # A scalar dataspace is rejected by VTK, so Time has shape (1,).
         root.create_group("FieldData").create_dataset(
             "Time", data=np.array([info.times[step]], dtype=np.float64))
-        dst.attrs["source_file"] = info.path.name
+        dst.attrs["source_file"] = np.bytes_(os.fsencode(info.path.name))
         dst.attrs["source_step"] = np.int64(step)
 
 
@@ -857,25 +1044,37 @@ def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
 
 
 def parse_size(text: str) -> int:
-    """Bytes from e.g. '512', '40M' or '1.5G' (K/M/G/T are powers of
-    1024)."""
-    match = re.fullmatch(r"\s*(\d+(?:\.\d*)?)\s*([KMGT]?)\s*", text,
-                         re.IGNORECASE)
+    """Bytes from a size as format_size prints it, or as typed: '512',
+    '40M', '1.5G', '233.5MiB', '1.5 GiB' or '1023 B'. K, M, G, T and KiB,
+    MiB, GiB, TiB are all powers of 1024, in any case; a fraction of a
+    byte is dropped. KB, MB, GB, TB are refused as ambiguous.
+    """
+    match = SIZE_PATTERN.fullmatch(text)
     if match is None:
-        raise VtkhdfError(f"invalid size {text!r}: expected a number with "
-                          "an optional K, M, G or T suffix")
-    number, unit = match.groups()
-    power = SIZE_UNITS.index(unit.upper()) + 1 if unit else 0
-    return int(float(number) * 1024**power)
+        raise VtkhdfError(f"invalid size {text!r}: expected a positive "
+                          "number of bytes, optionally with K, M, G, T or "
+                          "KiB, MiB, GiB, TiB (powers of 1024)")
+    number, prefix, binary, _ = match.groups()
+    if prefix and not binary and text.strip()[-1] in "bB":
+        raise VtkhdfError(f"ambiguous size {text!r}: use {prefix.upper()}iB "
+                          f"(or {prefix.upper()}) for powers of 1024")
+    power = SIZE_UNITS.index(prefix.upper()) + 1 if prefix else 0
+    nbytes = math.floor(Fraction(number) * 1024**power)
+    if nbytes < 1:
+        raise VtkhdfError(f"invalid size {text!r}: must be at least 1 byte")
+    return nbytes
 
 
-def format_size(nbytes: int) -> str:
-    """Bytes as a short human-readable string in powers of 1024."""
+def format_size(nbytes: int, round_up: bool = False) -> str:
+    """Bytes as a short string in powers of 1024 that parse_size reads
+    back, e.g. '233.5 MiB'. With round_up, the printed value is rounded
+    up at its precision, so parse_size(...) >= nbytes."""
     if nbytes < 1024:
         return f"{nbytes} B"
-    value = float(nbytes)
-    for unit in SIZE_UNITS:
-        value /= 1024
-        if value < 1024:
-            break
-    return f"{value:.1f} {unit}iB"
+    power = 1
+    while power < len(SIZE_UNITS) and nbytes >= 1024**(power + 1):
+        power += 1
+    scale = 1024**power
+    tenths = (-(-10 * nbytes // scale) if round_up
+              else round(Fraction(10 * nbytes, scale)))
+    return f"{tenths // 10}.{tenths % 10} {SIZE_UNITS[power - 1]}iB"

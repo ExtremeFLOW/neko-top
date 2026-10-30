@@ -15,9 +15,12 @@ Usage:
 
 info
     Print the type and version, the steps and their time range, the mesh
-    sizes and cell types, every field with its dtype, components and
-    storage (printf VDS, explicit VDS or inline), and the size of the
-    main file and the per-step files, listing any that are missing. The
+    sizes and cell types, and every field with its dtype, components and
+    storage (printf VDS, explicit VDS or inline). Then the sizes: main
+    file, per-step files and total, the size of one step's files (min,
+    mean and max if they differ), any missing or unreadable per-step
+    files (excluded from the sizes), and the footprint model split
+    --max-size uses, with the smallest --max-size it accepts. The
     per-step files are only stat'ed, never opened.
 
 extract
@@ -40,7 +43,10 @@ split
     (--steps-per-chunk), the steps of each absolute time window
     [m W, (m+1) W) (--time-window, needs strictly increasing times), or as
     many steps as fit within SIZE bytes of footprint, chunk file plus its
-    per-step files (--max-size; K, M, G, T suffixes are powers of 1024).
+    per-step files (--max-size, as estimated by the model info prints).
+    SIZE is bytes, optionally with K, M, G, T or KiB, MiB, GiB, TiB (all
+    powers of 1024, any case, e.g. 40G or "233.5 MiB"); every size the
+    tool prints is accepted. KB, MB, GB, TB are refused as ambiguous.
     A 1-step chunk also gets FieldData/Time, as VTK reads it as static.
     a and b are step indices of FILE, so a chunk can itself be split or
     extracted from. Every per-step file and every output name is validated
@@ -52,22 +58,30 @@ the input or one of its per-step files. Each output is written to a
 temporary file and moved into place, so an error never leaves a partial
 file behind.
 
-Errors are reported as a single line on stderr with exit status 1.
+Errors are reported as a single line on stderr with exit status 1;
+SIGTERM, SIGHUP and Ctrl-C remove any partial output and exit with
+128 + the signal number. Set VTKHDF_EXTRACT_TRACEBACK=1 to see the
+traceback of an unexpected (internal) error.
 Requires h5py and numpy (see requirements.txt).
 """
 
+import os
 import shlex
+import signal
 import sys
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 import numpy as np
 
-from vtkhdf_backend import (Chunk, FileInfo, VtkhdfError, cell_types,
-                            find_step, format_size, inspect, open_input,
-                            parse_size, prepare_split, protected_paths,
-                            stat_sources, step_label, write_chunk,
-                            write_extract, write_manifest)
+from vtkhdf_backend import (CHUNK_OVERHEAD, MAPPING_OVERHEAD, Chunk,
+                            FileInfo, VtkhdfError, cell_types,
+                            chunk_estimate, find_step, format_size, inspect,
+                            mesh_bytes, open_input, parse_size,
+                            plan_by_count, prepare_split, protected_paths,
+                            size_model, smallest_max_size, stat_sources,
+                            step_files, step_label, strictly_increasing,
+                            write_chunk, write_extract, write_manifest)
 
 VTK_CELL_NAMES = {
     9: "VTK_QUAD",
@@ -81,6 +95,16 @@ STORAGE_NAMES = {
     "inline": "inline",
 }
 MAX_MISSING_LISTED = 10
+EXAMPLE_STEPS = (10, 100, 1000, 10000)
+
+
+class Terminated(BaseException):
+    """Raised by the SIGTERM/SIGHUP handler, so that partial outputs are
+    removed on the way out."""
+
+    def __init__(self, signum: int):
+        super().__init__(signum)
+        self.signum = signum
 
 
 def parse_args() -> Namespace:
@@ -115,8 +139,10 @@ def parse_args() -> Namespace:
                       help="N consecutive steps per chunk")
     mode.add_argument("--time-window", type=float, metavar="W",
                       help="one chunk per time window [m W, (m+1) W)")
-    mode.add_argument("--max-size", metavar="SIZE",
-                      help="largest footprint per chunk, e.g. 40G")
+    mode.add_argument(
+        "--max-size", metavar="SIZE",
+        help="largest footprint per chunk: bytes, or with K, M, G, T or "
+        "KiB, MiB, GiB, TiB (powers of 1024), e.g. 40G or '233.5 MiB'")
     split.add_argument("--dry-run", action="store_true",
                        help="validate and print the plan, write nothing")
     split.add_argument("--overwrite", action="store_true",
@@ -141,65 +167,97 @@ def describe_time(info: FileInfo) -> str:
     if not info.temporal:
         return "no (static)"
     times = info.times
-    order = ("strictly increasing" if np.all(np.diff(times) > 0)
+    finite = times[np.isfinite(times)]
+    span = (f"t = {finite[0]:g} .. {finite[-1]:g}" if len(finite)
+            else "no finite time")
+    order = ("strictly increasing" if strictly_increasing(times)
              else "NOT strictly increasing")
-    return (f"yes: {info.n_steps} steps, t = {times[0]:g} .. "
-            f"{times[-1]:g}, {order}")
+    if len(finite) < len(times):
+        order += f", {len(times) - len(finite)} non-finite"
+    return f"yes: {info.n_steps} steps, {span}, {order}"
 
 
-def print_sources(info: FileInfo) -> None:
-    sources = stat_sources(info)
-    sizes = [nbytes for _, nbytes, missing in sources if not missing]
-    missing = [(step, path) for step, _, paths in sources for path in paths]
+def sized(nbytes: int) -> str:
+    return f"{format_size(nbytes)} ({nbytes} B)"
+
+
+def print_sizes(f, info: FileInfo) -> None:
+    """Sizes from stat only, and the split footprint model (the same
+    size_model split --max-size plans with)."""
+    main = info.path.stat().st_size
+    print(f"main file   {sized(main)}")
     if not any(fld.kind != "inline" for fld in info.fields):
         print("step files  none (all point data inline)")
+        print(f"total       {sized(main)}")
+        print("split size  not possible: no per-step files to reference")
         return
-    complete = len(sizes)
-    line = (f"step files  {complete} of {info.n_steps} steps complete, "
-            f"{format_size(sum(n for _, n, _ in sources))} total")
-    if sizes:
-        low, high = min(sizes), max(sizes)
-        per_step = (format_size(low) if low == high
-                    else f"{format_size(low)} .. {format_size(high)}")
-        line += f", {per_step} per step"
-    print(line)
-    if not missing:
+    sizes, problems = stat_sources(info)
+    bad = {path for _, path, _ in problems}
+    complete = [s for s in range(info.n_steps)
+                if not bad.intersection(step_files(info, s))]
+    print(f"step files  {sized(sum(sizes.values()))} in {len(sizes)} "
+          f"files, {len(complete)} of {info.n_steps} steps complete")
+    print(f"total       {sized(main + sum(sizes.values()))}")
+    per = [sum(sizes[p] for p in step_files(info, s)) for s in complete]
+    if per and min(per) == max(per):
+        print(f"per step    {sized(per[0])}")
+    elif per:
+        print(f"per step    min {sized(min(per))}, mean "
+              f"{format_size(round(sum(per) / len(per)))},")
+        print(f"            max {sized(max(per))}")
+    if problems:
+        print(f"missing     {len(problems)} file(s), excluded from the "
+              "sizes above:")
+        for step, path, why in problems[:MAX_MISSING_LISTED]:
+            print(f"  step {step}: {path} ({why})")
+        if len(problems) > MAX_MISSING_LISTED:
+            print(f"  ... and {len(problems) - MAX_MISSING_LISTED} more")
+    else:
         print("missing     none")
+    if not info.temporal:
         return
-    print(f"missing     {len(missing)} file(s):")
-    for step, path in missing[:MAX_MISSING_LISTED]:
-        print(f"  step {step}: {path}")
-    if len(missing) > MAX_MISSING_LISTED:
-        print(f"  ... and {len(missing) - MAX_MISSING_LISTED} more")
+    fixed, per_step = size_model(f, info, sizes)
+    smallest = smallest_max_size(fixed, per_step)
+    print(f"split size  per chunk: mesh {sized(mesh_bytes(f))}")
+    print(f"            + overhead {sized(CHUNK_OVERHEAD)}")
+    print(f"            per step: its files + {MAPPING_OVERHEAD} B per "
+          f"field ({MAPPING_OVERHEAD * len(info.fields)} B)")
+    print(f"            smallest --max-size "
+          f"{format_size(smallest, round_up=True)} (exactly {smallest} B)")
+    n = info.n_steps
+    for k in [k for k in EXAMPLE_STEPS if k < n] + [n]:
+        worst = max(chunk_estimate(fixed, per_step, steps)
+                    for steps in plan_by_count(n, k))
+        label = (f"all {n} steps in one chunk" if k == n
+                 else f"{k} steps per chunk")
+        print(f"            {label}: about {format_size(worst)}")
 
 
 def run_info(args: Namespace) -> None:
     with open_input(args.file) as f:
         info = inspect(f, args.file)
         types = cell_types(f)
-    print_warnings(info)
-
-    version = ".".join(str(v) for v in info.version) or "?"
-    type_names = ", ".join(
-        f"{t} ({VTK_CELL_NAMES.get(t, 'unknown')})" for t in types)
-    print(f"file        {info.path} "
-          f"({format_size(info.path.stat().st_size)})")
-    print(f"type        {info.vtk_type}, VTKHDF version {version}")
-    print(f"temporal    {describe_time(info)}")
-    print(f"mesh        {info.n_points} points, {info.n_cells} cells, "
-          f"{info.n_conn} connectivity ids, {info.n_parts} part(s)")
-    print(f"cell types  {type_names or 'none'}")
-    print(f"fields      {len(info.fields)}")
-    width = max((len(fld.name) for fld in info.fields), default=0)
-    for fld in info.fields:
-        storage = STORAGE_NAMES[fld.kind]
-        if fld.kind == "printf":
-            storage += f" {fld.names[0]}"
-        elif fld.kind == "explicit":
-            storage += f" ({len(fld.names)} mappings)"
-        print(f"  {fld.name:<{width}}  {str(fld.dtype):<8} "
-              f"{describe_rows(fld.row_shape):<13} {storage}")
-    print_sources(info)
+        print_warnings(info)
+        version = ".".join(str(v) for v in info.version) or "?"
+        type_names = ", ".join(
+            f"{t} ({VTK_CELL_NAMES.get(t, 'unknown')})" for t in types)
+        print(f"file        {info.path}")
+        print(f"type        {info.vtk_type}, VTKHDF version {version}")
+        print(f"temporal    {describe_time(info)}")
+        print(f"mesh        {info.n_points} points, {info.n_cells} cells, "
+              f"{info.n_conn} connectivity ids, {info.n_parts} part(s)")
+        print(f"cell types  {type_names or 'none'}")
+        print(f"fields      {len(info.fields)}")
+        width = max((len(fld.name) for fld in info.fields), default=0)
+        for fld in info.fields:
+            storage = STORAGE_NAMES[fld.kind]
+            if fld.kind == "printf":
+                storage += f" {fld.names[0]}"
+            elif fld.kind == "explicit":
+                storage += f" ({len(fld.names)} mappings)"
+            print(f"  {fld.name:<{width}}  {str(fld.dtype):<8} "
+                  f"{describe_rows(fld.row_shape):<13} {storage}")
+        print_sizes(f, info)
 
 
 def run_extract(args: Namespace) -> None:
@@ -259,14 +317,36 @@ def run_split(args: Namespace) -> None:
                       f"{format_size(max_size)}", file=sys.stderr)
 
 
+def on_signal(signum: int, frame) -> None:
+    raise Terminated(signum)
+
+
 def main() -> None:
     args = parse_args()
+    # Paths are printed as the file system's bytes, whatever the locale.
+    sys.stdout.reconfigure(errors="surrogateescape")
+    for name in ("SIGTERM", "SIGHUP"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), on_signal)
     commands = {"info": run_info, "extract": run_extract,
                 "split": run_split}
     try:
         commands[args.command](args)
     except (VtkhdfError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
+        sys.exit(1)
+    except Terminated as stop:
+        print(f"error: terminated by {signal.Signals(stop.signum).name}",
+              file=sys.stderr)
+        sys.exit(128 + stop.signum)
+    except KeyboardInterrupt:
+        print("error: interrupted", file=sys.stderr)
+        sys.exit(130)
+    except Exception as error:  # last resort: no traceback for users
+        if os.environ.get("VTKHDF_EXTRACT_TRACEBACK"):
+            raise
+        print(f"error: internal error: {type(error).__name__}: {error}",
+              file=sys.stderr)
         sys.exit(1)
 
 
