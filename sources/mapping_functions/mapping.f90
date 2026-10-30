@@ -150,14 +150,36 @@ module mapping
 contains
 
   !> Constructor for the `mapping_t` (base) class.
+  !! @param this The mapping object.
+  !! @param json The JSON with properties.
+  !! @param coef The SEM coefficients.
+  !! @param fld_name Registry name of the field storing the unmapped input.
+  !! If it is taken, e.g. by a second mapping of the same type in one run,
+  !! the first free name of the form `fld_name_2`, `fld_name_3`, ... is used.
+  !! @note Neko's registry cannot remove a field and `free` does not release
+  !! it, so a re-initialised mapping also takes the next free suffix, while a
+  !! lookup of the base name still returns the field of the first, stale
+  !! instance. Lookups by name, e.g. in examples/wiggles/user.f90 or through
+  !! the checkpoint `extra_fields`, are reliable only for the first
+  !! initialisation.
   subroutine mapping_init_base(this, json, coef, fld_name)
     class(mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     character(len=*), intent(in) :: fld_name
     type(coef_t), intent(inout), target :: coef
+    integer :: i
 
     this%coef => coef
+
+    ! Each instance needs its own field, since the backward mapping uses the
+    ! input stored by the forward mapping of the same instance.
     this%fld_name = fld_name
+    i = 1
+    do while (neko_registry%field_exists(trim(this%fld_name)))
+       i = i + 1
+       write(this%fld_name, '(A,"_",I0)') trim(fld_name), i
+    end do
+
     ! The mapping handler will take care of naming this field
     call neko_registry%add_field(coef%dof, this%fld_name)
     this%X_in => neko_registry%get_field(this%fld_name)

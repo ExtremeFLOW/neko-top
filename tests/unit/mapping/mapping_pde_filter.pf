@@ -26,6 +26,11 @@
 !      at all -- see the comments in PDE_filter_mapping.f90 around
 !      backward_mapping, lines ~297-315).
 !
+!   4. Two filters initialised from JSON in one run, as for a filtered design
+!      plus a filtered volume constraint, each own a registry field: storing
+!      an input in one does not overwrite the input stored by the other, and
+!      the first keeps the registry name "PDE_filter_mapping".
+!
 ! Two impulse-field variants are used throughout: an "interior" impulse,
 ! nonzero only at a node strictly inside element 1, and an "interface"
 ! impulse, nonzero (with a consistently-set value) at both local copies of a
@@ -44,6 +49,8 @@ module mapping_pde_filter
   use math, only: glsc3
   use field_math, only: field_copy, field_cmult, field_add2s2, field_sub3
   use PDE_filter_mapping, only: PDE_filter_t
+  use json_module, only: json_file
+  use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
   use comm, only: NEKO_COMM, pe_rank, pe_size, comm_init
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -480,5 +487,95 @@ contains
     call neko_scratch_registry%free()
 
   end subroutine test_pde_filter_regression
+
+  !> Largest pointwise difference between two fields, compared on the host.
+  !! Only meaningful on a single rank, as there is no global reduction.
+  !! @param a The first field, copied to the host on device backends.
+  !! @param b The second field, copied to the host on device backends.
+  function max_abs_diff(a, b) result(d)
+    type(field_t), intent(inout) :: a, b
+    real(kind=rp) :: d
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(a%x, a%x_d, a%size(), DEVICE_TO_HOST, .true.)
+       call device_memcpy(b%x, b%x_d, b%size(), DEVICE_TO_HOST, .true.)
+    end if
+    d = maxval(abs(a%x - b%x))
+
+  end function max_abs_diff
+
+  !> Check 4: two PDE filters initialised from JSON in one run each own a
+  !! registry field, so neither overwrites the input stored by the other, and
+  !! the first keeps the registry name "PDE_filter_mapping".
+  @test(npes=[1])
+  subroutine test_pde_filter_two_instances(this)
+    class(test_pde_filter), intent(inout) :: this
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t), target :: coef
+    type(PDE_filter_t) :: map_a, map_b
+    type(json_file) :: json_a, json_b
+    type(field_t) :: v, w, F_a, F_b
+    real(kind=rp) :: d
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+    call neko_registry%init()
+
+    ! Different radii, so that the two filters can be told apart below.
+    call json_a%initialize()
+    call json_a%load_from_string('{"r": 0.1}')
+    call json_b%initialize()
+    call json_b%load_from_string('{"r": 0.3}')
+    call map_a%init(json_a, coef)
+    call map_b%init(json_b, coef)
+
+    call v%init(coef%dof, 'v')
+    call w%init(coef%dof, 'w')
+    call F_a%init(coef%dof, 'F_a')
+    call F_b%init(coef%dof, 'F_b')
+
+    ! Filtering w with the second filter must leave the input stored by the
+    ! first filter intact, as the backward mapping relies on it.
+    call make_interior_impulse(v, impulse_amp)
+    call field_cfill(w, x0_val)
+    call map_a%apply_forward(F_a, v)
+    call map_b%apply_forward(F_b, w)
+    @assertEqual(0.0_rp, max_abs_diff(map_a%X_in, v))
+    @assertEqual(0.0_rp, max_abs_diff(map_b%X_in, w))
+    @assertFalse(associated(map_a%X_in, map_b%X_in))
+
+    ! The same input filtered with the two radii gives different results.
+    call map_b%apply_forward(F_b, v)
+    d = max_abs_diff(F_a, F_b)
+    @assertGreaterThan(d, 0.1_rp * maxval(abs(F_a%x)))
+
+    ! The first filter keeps the name existing user code looks up.
+    @assertEqual('PDE_filter_mapping', trim(map_a%fld_name))
+    @assertEqual('PDE_filter_mapping_2', trim(map_b%fld_name))
+
+    call v%free()
+    call w%free()
+    call F_a%free()
+    call F_b%free()
+    call map_a%free()
+    call map_b%free()
+    call json_a%destroy()
+    call json_b%destroy()
+    call neko_registry%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+    call neko_scratch_registry%free()
+
+  end subroutine test_pde_filter_two_instances
 
 end module mapping_pde_filter
