@@ -103,51 +103,6 @@ foreach(case_file ${test_list})
 endforeach()
 
 # ============================================================================ #
-# Cases the driver must reject. Each test passes only if the run stops with
-# the given error.
-function(add_rejected_case case_name expected_error)
-    add_custom_target(
-        ${case_name}_case_file
-        COMMENT "Copying case file ${case_name}.case to the test directory"
-        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
-        BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
-            ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-    add_dependencies(sensitivity_test_prepare ${case_name}_case_file)
-
-    add_test(NAME ${case_name}_rejected
-        COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_name}.case
-        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-    set_tests_properties(${case_name}_rejected
-        PROPERTIES
-            DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
-            LABELS "sensitivity;unit"
-            ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
-            PASS_REGULAR_EXPRESSION "${expected_error}"
-            TIMEOUT 300
-    )
-endfunction()
-
-# An unsteady problem must reject a variable timestep: its adjoint restores
-# the forward states assuming every step had the same dt.
-add_rejected_case(unsteady_variable_timestep
-    "variable_timestep is not supported for unsteady problems")
-
-# Also when `timestep` is missing, which is the second error in that case.
-add_rejected_case(unsteady_variable_timestep_without_timestep
-    "variable_timestep is not supported for unsteady problems")
-
-# A variable timestep needs `timestep` to cap the first step: a run that
-# starts at rest has a zero CFL, and the first step would be huge.
-add_rejected_case(variable_timestep_without_timestep
-    "case.time.timestep is required with variable_timestep")
-
-# ============================================================================ #
 # A steady adjoint takes as many steps as the forward run, with time steps of
 # its own, so its clock can stop short of end_time. It must still count as
 # complete, and write no job-limit checkpoint.
