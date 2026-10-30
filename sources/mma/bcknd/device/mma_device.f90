@@ -54,6 +54,7 @@ submodule (mma) mma_device
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
+  use logger, only: LOG_SIZE
   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
 
   implicit none
@@ -77,6 +78,8 @@ contains
        call neko_error("The MMA object is not initialized.")
     end if
 
+    call profiler_start_region("MMA update")
+
     call profiler_start_region("MMA gensub")
     ! generate a convex approximation of the problem
     call mma_gensub_device(this, iter, x, df0dx, fval, dfdx)
@@ -92,6 +95,8 @@ contains
        call neko_error("Unrecognized subsolver for MMA in mma_device.")
     end if
     call profiler_end_region("MMA subsolve")
+
+    call profiler_end_region("MMA update")
 
     this%is_updated = .true.
   end subroutine mma_update_device
@@ -165,8 +170,8 @@ contains
     call this%scratch%relinquish(ind)
   end subroutine mma_dip_KKT_device
 
-  !> Implementation of the KKT residual computation for dual primal interior
-  ! point method (pdip) subsolve of MMA algorithm.
+  !> Implementation of the KKT residual computation for primal-dual interior
+  !! point method (pdip) subsolve of MMA algorithm.
   module subroutine mma_pdip_KKT_device(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
     type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
@@ -243,6 +248,11 @@ contains
          rezeta**2 + &
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
+
+    ! device_maxval, MAXVAL and MPI_MAX can drop a NaN, which would then read
+    ! as convergence. The 2-norm keeps it on every rank: its distributed part
+    ! is reduced with MPI_SUM, and the rest is replicated.
+    if (ieee_is_nan(this%residunorm)) this%residumax = this%residunorm
 
     call this%scratch%relinquish(ind)
   end subroutine mma_pdip_KKT_device
@@ -339,7 +349,7 @@ contains
     call this%scratch%relinquish(ind)
   end subroutine mma_gensub_device
 
-  !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
+  !> solve the subproblem defined by this%pij, this%qij, etc. using primal-dual
   !! interior point method
   subroutine mma_subsolve_pdip_device(this, designx_d)
     class(mma_t), intent(inout) :: this
@@ -360,6 +370,7 @@ contains
     type(matrix_t), pointer :: AA
 
     integer :: info
+    character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: re_sq_norm
 
     integer :: ind(35)
@@ -427,7 +438,7 @@ contains
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
-    ! The main loop of the dual-primal interior point method.
+    ! The main loop of the primal-dual interior point method.
 
     do while (epsi .gt. minimal_epsilon)
 
@@ -605,8 +616,9 @@ contains
           ! Device solve for the linear system
           call device_solve_linear_system(AA%x_d, bb%x_d, this%m + 1, info)
           if (info .ne. 0) then
-             call neko_error("Linear solver failed on the device in  " // &
-                  "mma_subsolve_pdip")
+             write(log_buf, '(A,I0)') "Linear solver failed on the " // &
+                  "device in mma_subsolve_pdip, info = ", info
+             call neko_error(trim(log_buf))
           end if
 
           call device_copy(dlambda%x_d, bb%x_d, this%m)
@@ -825,6 +837,7 @@ contains
     type(matrix_t), pointer :: Hess
 
     integer :: info, ind(15)
+    character(len=LOG_SIZE) :: log_buf
 
     real(kind=rp) :: minimal_epsilon
 
@@ -875,7 +888,7 @@ contains
     residumax = 1.0_rp
 
     ! ------------------------------------------------------------------------ !
-    ! The main loop of the dual-primal interior point method.
+    ! The main loop of the dual interior point method.
 
     outer: do while (epsi .gt. minimal_epsilon)
        ! Compute x(λ), y(λ), z(λ) for the current λ. The residual is carried
@@ -996,8 +1009,9 @@ contains
             call device_solve_linear_system(Hess%x_d, gradlambda%x_d, &
                  this%m, info)
             if (info .ne. 0) then
-               call neko_error("Linear solver failed on the device in  " // &
-                    "mma_subsolve_dip")
+               write(log_buf, '(A,I0)') "Linear solver failed on the " // &
+                    "device in mma_subsolve_dip, info = ", info
+               call neko_error(trim(log_buf))
             end if
 
             call device_copy(dlambda%x_d, gradlambda%x_d, this%m)

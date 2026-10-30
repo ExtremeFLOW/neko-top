@@ -143,7 +143,7 @@ contains
   subroutine scalar_ic(scheme_name, fields)
     character(len=*), intent(in) :: scheme_name
     type(field_list_t), intent(inout) :: fields
-    type(field_t), pointer :: s, u, v, w
+    type(field_t), pointer :: s, u, v, w, p
     real(kind=rp) :: x, y, z
     integer :: i
 
@@ -161,6 +161,7 @@ contains
        u => fields%get("u")
        v => fields%get("v")
        w => fields%get("w")
+       p => fields%get("p")
 
        do i = 1, u%size()
           x = u%dof%x%x(i, 1, 1, 1)
@@ -174,9 +175,10 @@ contains
 
        call field_cfill(v, 0.0_rp)
        call field_cfill(w, 0.0_rp)
+       call field_cfill(p, 0.0_rp)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, sync=.true.)
+          call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, sync=.true.)
        end if
     end if
 

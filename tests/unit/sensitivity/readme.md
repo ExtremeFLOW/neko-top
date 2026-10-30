@@ -25,8 +25,8 @@ The test is done through a few common files:
   `optimization` (optional, JSON) overrides the default assertion tolerance
   — linear/state-independent functionals (e.g. the volume constraint) can use
   a tight round-off tolerance; PDE-coupled objectives need a looser one
-  matched to their discretisation/steady-state floor (determine this
-  empirically per case, don't guess).
+  matched to the bias their discretisation and unconverged steady state
+  leave (determine this empirically per case, don't guess).
 - `CMakeLists.txt`: Defines the build process and, via the `test_list`
   variable, registers one CTest per case file.
 
@@ -38,6 +38,71 @@ Currently, we have added tests for the following components:
   this objective's own `update_sensitivity` is empty.
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
+- `viscous_dissipation_variable_dt.case` — the same objective with
+  `case.time.variable_timestep`, a regression gate for backlog #55. It fails
+  if the driver ignores the `case.time` settings (the run then marches at a
+  placeholder `dt = 1.0`), or if one run's last `dt` leaks into the next
+  run's time-step history. Its time steps do not depend on the design, by
+  construction: the CFL stays far below `target_cfl`, so every run ramps
+  from `timestep` by the controller's largest factor, 1.2 per step, until
+  `max_timestep` caps it. The finite differences therefore compare runs with
+  identical steps. The flow starts from the inflow velocity rather than from
+  rest, because Neko's controller divides by the CFL of the first step, and
+  a zero CFL stops a Debug build on a floating-point trap (backlog #103).
+  The finite-difference estimate converges at first order to a limit about
+  0.6% above the adjoint sensitivity. That limit is a bias, not a floor:
+  the forward run has not reached a steady state at `end_time`, while the
+  steady adjoint assumes it has. Starting from rest doubles it to 1.3%; the
+  fixed-timestep `viscous_dissipation.case` has 0.6% too.
+- `viscous_dissipation_variable_dt_weighted.case` — the same case with the
+  objective weighted by 1e4. The adjoint equations are linear, so its
+  relative finite-difference error must equal that of the unweighted case.
+  It fails if the adjoint sizes its time steps by the adjoint velocity, whose
+  amplitude follows the weight, instead of by the primal velocity that
+  convects it.
+- `adjoint_joblimit_variable_dt.case`, run by its own driver
+  `adjoint_joblimit_tester.f90`. A steady adjoint takes as many steps as the
+  forward run did, with time steps of its own, so its clock can stop short
+  of `end_time`. It must still count as complete and write no job-limit
+  checkpoint. The forward run starts almost at rest, so its first step is
+  the full `timestep`; its later steps follow the CFL of the developing
+  flow. Every adjoint step follows the CFL of the developed flow, which is
+  higher, so the adjoint steps are shorter. `max_timestep` caps every step
+  at 8e-3, which keeps the explicit Brinkman term stable: BDF3/EXT3 needs
+  `chi * dt` below 20/21, and `chi` reaches 100 here. The driver also
+  checks that the adjoint's clock did stop short, so that the check cannot
+  pass vacuously.
+- The guards against a variable timestep in an unsteady problem
+  (`unsteady_variable_timestep.case`) and against a variable timestep
+  without the `timestep` that caps its first step
+  (`variable_timestep_without_timestep.case`). They are not in `test_list`:
+  each passes only if the run stops with its error.
+- `brinkman_dissipation_objective_t`, unsteady
+  (`unsteady_brinkman_dissipation.case`) — 20 time steps at polynomial order
+  3, with a PDE filter and the objective's default over-integration. It checks
+  that the reported value is integrated with the quadrature its adjoint
+  forcing and sensitivity differentiate. With the value on the GLL points and
+  its derivatives on the GL points, the error at the smallest perturbation was
+  `+1.775e-2`; with one quadrature it is `+1.05e-5`, which is first-order
+  truncation (`+5.25e-5` at `5e-4`). The tolerance of `1e-4` lies between the
+  two.
+- `brinkman_dissipation_objective_t`, unsteady and masked
+  (`unsteady_brinkman_dissipation_masked.case`) — the same case with the
+  objective masked to the design domain. The PDE filter's transpose carries
+  any sensitivity reported outside the mask onto the design variables next to
+  the domain boundary, and the probed variable lies `0.015` inside it. With
+  the sensitivity unmasked the error was `-6.24e-2`; masked it is `+1.13e-5`.
+  The driver probes the variable with the largest |sensitivity|, today number
+  1259 at `y = 0.2155`: `0.0155` inside the mask's `y = 0.2` boundary, so
+  within the filter radius (`0.05`) of the region outside it. The test guards
+  the mask only while its probe stays that close to the boundary. Whenever the
+  case or the driver's probe selection changes, confirm again that the test
+  fails with the mask removed from `update_sensitivity`.
+- `brinkman_dissipation_rejection` — checks the invalid mixed-dealias
+  configuration directly through Neko's pFUnit error-redirection fixture. A
+  mixed setting has no value its sensitivity is the gradient of, so the
+  objective must raise `neko_error`; pFUnit consumes that expected exception
+  as a successful test.
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
@@ -68,6 +133,9 @@ Reuse the existing generic driver — you almost never need new Fortran code:
        "new_case.case"  # Add your new case here
    )
    ```
+  For a configuration that a constructor must reject, add a focused pFUnit
+  test using Neko's `error_redirection.f90` fixture and
+  `@assertExceptionRaised()`.
 3. Only write new Fortran (in `problem_tester.f90`/`sensitivity.f90`) if the
    generic driver genuinely can't express what you need — it currently
    handles any single objective or single constraint automatically.

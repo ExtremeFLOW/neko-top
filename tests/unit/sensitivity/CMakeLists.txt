@@ -7,6 +7,10 @@ set(test_list
     "volume_filtered.case"
     "viscous_dissipation.case"
     "brinkman_dissipation.case"
+    "viscous_dissipation_variable_dt.case"
+    "viscous_dissipation_variable_dt_weighted.case"
+    "unsteady_brinkman_dissipation.case"
+    "unsteady_brinkman_dissipation_masked.case"
 )
 
 # Path to the common driver source
@@ -97,6 +101,44 @@ foreach(case_file ${test_list})
             TIMEOUT 300
     )
 endforeach()
+
+# ============================================================================ #
+# A steady adjoint takes as many steps as the forward run, with time steps of
+# its own, so its clock can stop short of end_time. It must still count as
+# complete, and write no job-limit checkpoint.
+set(case_name "adjoint_joblimit_variable_dt")
+add_executable(adjoint_joblimit_tester_bin EXCLUDE_FROM_ALL
+    ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_joblimit_tester.f90
+)
+target_link_libraries(adjoint_joblimit_tester_bin
+    PRIVATE Neko-TOP::neko-top
+)
+add_dependencies(Unit adjoint_joblimit_tester_bin)
+
+add_custom_target(
+    ${case_name}_case_file
+    COMMENT "Copying case file ${case_name}.case to the test directory"
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+        ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+add_dependencies(sensitivity_test_prepare ${case_name}_case_file)
+
+add_test(NAME ${case_name}
+    COMMAND $<TARGET_FILE:adjoint_joblimit_tester_bin> ${case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+set_tests_properties(${case_name}
+    PROPERTIES
+        DEPENDS "adjoint_joblimit_tester_bin;sensitivity_test_prepare"
+        LABELS "sensitivity;unit"
+        ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
+        TIMEOUT 300
+)
 
 # ============================================================================ #
 # Final dependencies
