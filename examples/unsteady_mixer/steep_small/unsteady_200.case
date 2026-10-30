@@ -11,7 +11,7 @@
         },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 5,
+            "polynomial_order": 3,
             "dealias": false
         },
         "fluid": {
@@ -188,6 +188,7 @@
             "stop_design_change": 0.01,
             "tolerance": 1.0e-13,
             "steepest_descent": {
+                "move_limit": { "max": 0.2 },
                 "xmin": 0.0,
                 "xmax": 1.0
             },

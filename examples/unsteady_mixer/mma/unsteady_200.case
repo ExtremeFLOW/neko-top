@@ -11,7 +11,7 @@
         },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 5,
+            "polynomial_order": 3,
             "dealias": false
         },
         "fluid": {
@@ -155,7 +155,7 @@
     "optimization": {
         "design": {
             "type": "brinkman",
-            "verbose_design": false,
+            "verbose_design": true,
             "verbose_sensitivity": false,
             "output_format": "vtkhdf",
             "mapping": [
