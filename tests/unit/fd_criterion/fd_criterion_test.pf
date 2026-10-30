@@ -1,0 +1,461 @@
+! Regression tests for the strict finite-difference criterion
+! (tests/shared/fd_criterion.f90), written directly against its public API
+! (fd_evaluate) with no MPI, mesh, or case file involved -- the module was
+! deliberately kept free of both so it could be exercised this way.
+!
+! Covered here, entirely through fd_evaluate returning a verdict:
+!
+!  * The five real sweeps (Neko sha a7fdcd7f3) that motivated the strict
+!    criterion, with the exact bias/order pinned. #43
+!    (unsteady_brinkman_dissipation) is the case that exposed the false
+!    green in the historical rule and a false red in a previously-drafted
+!    replacement; see test_sweep_43_fit.
+!  * The four guards that report a verdict rather than aborting: fewer than
+!    4 points, an all-noise sweep with no truncation branch and no plateau,
+!    a degenerate analytic sensitivity, and a tolerance below what the
+!    sweep's own noise permits.
+!  * The duplicate-magnitude guard's two controls: the de-duplicated real
+!    measurements (2 points -> INCONCLUSIVE) and a legitimate 9-point sweep
+!    that must still pass.
+!  * Positive controls (clean FIT, clean BOUNDED) and two ways a genuinely
+!    wrong gradient must fail (a 100x bias, a sign flip).
+!
+! NOT covered here: the four guards that reject a sweep via `neko_error`,
+! which is an `error stop` and so cannot be caught in-process by pFUnit --
+! see mapping_finite_difference.pf's test_convex_up_detection for the
+! established precedent of testing the predicate instead where possible.
+! Three of those four guards (a repeated perturbation magnitude, a NaN/
+! overflow entry, mixed-sign perturbations) have no non-fatal predicate to
+! fall back on: the offending input has to actually reach fd_evaluate for
+! the guard to mean anything. Those, plus the option reader's
+! order_tolerance-vs-order guard (in tests/shared/sensitivity.f90, also
+! `error stop`), are instead exercised as small standalone probes that are
+! expected to abort -- see fd_criterion_reject.f90 and its four
+! WILL_FAIL ctest entries in CMakeLists.txt.
+module fd_criterion_test
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use fd_criterion, only: fd_strict_options_t, fd_verdict_t, fd_evaluate, &
+       FD_BRANCH_FIT, FD_BRANCH_BOUNDED, &
+       FD_STATUS_OK, FD_STATUS_FLOOR_EXCEEDED, FD_STATUS_INCONCLUSIVE, &
+       FD_STATUS_DEGENERATE, FD_STATUS_UNREACHABLE
+  implicit none
+
+  ! ---- The five real sweeps, copied from /tmp/fd-criterion/realdata.py (a
+  ! throwaway probe script) so the test no longer depends on it. Every
+  ! sweep has a NEGATIVE perturbation and SIGNED relative errors -- see that
+  ! script's header for the sign convention.
+
+  ! #43, unsteady_brinkman_dissipation: 4-point sweep, r = 10.
+  real(kind=rp), parameter :: pert_43(4) = &
+       [-1.0e-1_rp, -1.0e-2_rp, -1.0e-3_rp, -1.0e-4_rp]
+  real(kind=rp), parameter :: err_43(4) = &
+       [-0.11926740394713609e-1_rp, -0.12022146350578529e-2_rp, &
+       -0.10733324016689514e-3_rp, 0.23047656070843778e-5_rp]
+  real(kind=rp), parameter :: tol_43 = 1.0e-3_rp
+  real(kind=rp), parameter :: c_hat_43 = 1.463711e-05_rp
+  real(kind=rp), parameter :: p_hat_43 = 0.995208_rp
+
+  ! The 8-point sweep shared by the four develop unit-tier baselines.
+  real(kind=rp), parameter :: pert_8(8) = &
+       [-0.5_rp, -0.1_rp, -0.05_rp, -0.01_rp, -0.005_rp, -0.001_rp, &
+       -0.0005_rp, -0.0001_rp]
+
+  real(kind=rp), parameter :: err_brinkman(8) = &
+       [-0.32915900838806827_rp, -0.87903270674947034e-1_rp, &
+       -0.44971494634990242e-1_rp, -0.76023713566977097e-2_rp, &
+       -0.27246683606550631e-2_rp, 0.12119300596208009e-2_rp, &
+       0.17059729789540431e-2_rp, 0.21025774086085537e-2_rp]
+  real(kind=rp), parameter :: tol_brinkman = 1.0e-2_rp
+  real(kind=rp), parameter :: c_hat_brinkman = 2.203528e-03_rp
+
+  real(kind=rp), parameter :: err_viscous(8) = &
+       [-0.34088503614406984_rp, -0.95431569757587459e-1_rp, &
+       -0.51279907901644425e-1_rp, -0.12733356885001521e-1_rp, &
+       -0.76943406984967145e-2_rp, -0.36281819555787236e-2_rp, &
+       -0.31170518946582546e-2_rp, -0.27069067120169201e-2_rp]
+  real(kind=rp), parameter :: tol_viscous = 1.0e-2_rp
+  real(kind=rp), parameter :: c_hat_viscous = -2.602543e-03_rp
+
+  real(kind=rp), parameter :: err_volume(8) = &
+       [0.46967295297075647e-14_rp, 0.26466705593081818e-12_rp, &
+       0.26466705593081818e-12_rp, 0.54640735839530304e-11_rp, &
+       0.54640735839530304e-11_rp, 0.83455171504286214e-10_rp, &
+       -0.46529991696269097e-10_rp, 0.12533216403092841e-8_rp]
+  real(kind=rp), parameter :: tol_volume = 1.0e-5_rp
+  real(kind=rp), parameter :: c_hat_volume = 1.627136e-10_rp
+
+  real(kind=rp), parameter :: err_volume_filt(8) = &
+       [0.59521644821422006e-11_rp, 0.27774542347133572e-10_rp, &
+       0.94161896695450688e-10_rp, 0.52666565076666518e-9_rp, &
+       0.42807057005134275e-9_rp, 0.56601828533444544e-8_rp, &
+       0.60545631762057444e-8_rp, 0.57061084932932561e-7_rp]
+  real(kind=rp), parameter :: tol_volume_filt = 1.0e-5_rp
+  real(kind=rp), parameter :: c_hat_volume_filt = 8.732307e-09_rp
+
+  !> Relative tolerance for comparing a computed c_hat/p_hat against the
+  !! 6-7 significant-figure reference values above.
+  real(kind=rp), parameter :: ref_rtol = 1.0e-4_rp
+
+  @TestCase
+  type, extends(MPITestCase) :: test_fd_criterion
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_fd_criterion
+
+contains
+
+  subroutine setUp(this)
+    class(test_fd_criterion), intent(inout) :: this
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_fd_criterion), intent(inout) :: this
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! The five real sweeps.
+
+  !> #43 is the case that motivated this whole rework: today's old rule
+  !! reads its sign-crossing artefact 2.30e-6 (the smallest-perturbation
+  !! error, err_43(4)) and gives a false green; a previously-drafted
+  !! replacement reads 1.054e-3 and gives a false red. The strict criterion
+  !! must return +1.46e-5, correctly green -- pinning all three numbers
+  !! documents the bug better than prose.
+  @test(npes=[1])
+  subroutine test_sweep_43_fit(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+
+    call fd_evaluate(pert_43, err_43, tol_43, opts, v)
+
+    @assertEqual(FD_BRANCH_FIT, v%branch)
+    @assertEqual(FD_STATUS_OK, v%status)
+    @assertTrue(v%passed)
+    @assertTrue(v%has_c_hat)
+    @assertRelativelyEqual(c_hat_43, v%c_hat, ref_rtol)
+    @assertTrue(v%has_p_hat)
+    @assertRelativelyEqual(p_hat_43, v%p_hat, ref_rtol)
+  end subroutine test_sweep_43_fit
+
+  @test(npes=[1])
+  subroutine test_sweep_brinkman_fit(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+
+    call fd_evaluate(pert_8, err_brinkman, tol_brinkman, opts, v)
+
+    @assertEqual(FD_BRANCH_FIT, v%branch)
+    @assertEqual(FD_STATUS_OK, v%status)
+    @assertTrue(v%passed)
+    @assertRelativelyEqual(c_hat_brinkman, v%c_hat, ref_rtol)
+  end subroutine test_sweep_brinkman_fit
+
+  @test(npes=[1])
+  subroutine test_sweep_viscous_fit(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+
+    call fd_evaluate(pert_8, err_viscous, tol_viscous, opts, v)
+
+    @assertEqual(FD_BRANCH_FIT, v%branch)
+    @assertEqual(FD_STATUS_OK, v%status)
+    @assertTrue(v%passed)
+    @assertRelativelyEqual(c_hat_viscous, v%c_hat, ref_rtol)
+  end subroutine test_sweep_viscous_fit
+
+  !> Load-bearing: volume is exactly linear in the design variable, has no
+  !! truncation branch at all, and finds no order run at any order
+  !! tolerance up to 2.0 -- only BOUNDED can pass it. This is the
+  !! regression guard for anyone who later "simplifies" the two-certificate
+  !! design down to one.
+  @test(npes=[1])
+  subroutine test_sweep_volume_bounded(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+
+    call fd_evaluate(pert_8, err_volume, tol_volume, opts, v)
+
+    @assertEqual(FD_BRANCH_BOUNDED, v%branch)
+    @assertEqual(FD_STATUS_OK, v%status)
+    @assertTrue(v%passed)
+    @assertFalse(v%has_p_hat)
+    @assertRelativelyEqual(c_hat_volume, v%c_hat, ref_rtol)
+  end subroutine test_sweep_volume_bounded
+
+  !> Load-bearing for the same reason as test_sweep_volume_bounded.
+  @test(npes=[1])
+  subroutine test_sweep_volume_filt_bounded(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+
+    call fd_evaluate(pert_8, err_volume_filt, tol_volume_filt, opts, v)
+
+    @assertEqual(FD_BRANCH_BOUNDED, v%branch)
+    @assertEqual(FD_STATUS_OK, v%status)
+    @assertTrue(v%passed)
+    @assertFalse(v%has_p_hat)
+    @assertRelativelyEqual(c_hat_volume_filt, v%c_hat, ref_rtol)
+  end subroutine test_sweep_volume_filt_bounded
+
+  ! ========================================================================== !
+  ! Guards that report a verdict rather than aborting.
+
+  !> Fewer than 4 points must be INCONCLUSIVE, never a pass -- even though
+  !! the 3 points here (the steepest part of a real sweep) trivially "fit"
+  !! nothing so a naive implementation could be tempted to just skip
+  !! straight to a plateau check.
+  @test(npes=[1])
+  subroutine test_min_points_inconclusive(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+
+    call fd_evaluate(pert_8(1:3), err_brinkman(1:3), tol_brinkman, opts, v)
+
+    @assertEqual(FD_STATUS_INCONCLUSIVE, v%status)
+    @assertFalse(v%passed)
+    ! Guard against a vacuous pass: confirm the sweep was actually
+    ! processed, not skipped straight to a zero-initialised verdict.
+    @assertRelativelyEqual(4.497149e-2_rp, v%min_abs_error, 1.0e-6_rp)
+  end subroutine test_min_points_inconclusive
+
+  !> A sweep with no truncation regime (every consecutive difference ratio
+  !! alternates sign, so no order run can ever be found) and no plateau
+  !! (the oscillation is far wider than plateau_fraction * tolerance) must
+  !! be INCONCLUSIVE: the sweep is inadequate, which is explicitly not the
+  !! same statement as the gradient being wrong. The tolerance is chosen
+  !! between this sweep's own reachable-tolerance floor and the plateau
+  !! threshold so that neither of those (correctly) fires instead and masks
+  !! the branch actually under test.
+  @test(npes=[1])
+  subroutine test_roundoff_inconclusive(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    real(kind=rp) :: e(8)
+
+    e = [1.0e-2_rp, -1.0e-2_rp, 1.0e-2_rp, -1.0e-2_rp, 1.0e-2_rp, &
+         -1.0e-2_rp, 1.0e-2_rp, -1.0e-2_rp]
+
+    call fd_evaluate(pert_8, e, 0.04_rp, opts, v)
+
+    @assertEqual(FD_STATUS_INCONCLUSIVE, v%status)
+    @assertFalse(v%passed)
+    @assertFalse(v%has_window)
+    @assertFalse(v%has_p_hat)
+    @assertRelativelyEqual(1.0e-2_rp, v%min_abs_error, 1.0e-10_rp)
+  end subroutine test_roundoff_inconclusive
+
+  !> A degenerate analytic sensitivity must report DEGENERATE rather than
+  !! passing on a relative error normalised by a floor: the caller sets
+  !! `degenerate = .true.` and no branch is evaluated at all.
+  @test(npes=[1])
+  subroutine test_degenerate_reported(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+
+    call fd_evaluate(pert_43, err_43, tol_43, opts, v, degenerate=.true.)
+
+    @assertEqual(FD_STATUS_DEGENERATE, v%status)
+    @assertFalse(v%passed)
+    @assertFalse(v%has_c_hat)
+  end subroutine test_degenerate_reported
+
+  !> A tolerance far below what this sweep's own noise permits must fail as
+  !! TOLERANCE_UNREACHABLE, distinguishing "the sweep cannot decide this"
+  !! from "the gradient is wrong" -- the #43 sweep's bias (1.46e-5) is
+  !! actually well inside a normal tolerance, so a bare FLOOR_EXCEEDED here
+  !! would be reporting the wrong reason for the same red.
+  @test(npes=[1])
+  subroutine test_tolerance_unreachable(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    logical :: reported
+    integer :: k
+
+    call fd_evaluate(pert_43, err_43, 1.0e-12_rp, opts, v)
+
+    reported = .false.
+    do k = 1, v%n_messages
+       if (index(v%message(k), 'TOLERANCE_UNREACHABLE') .gt. 0) then
+          reported = .true.
+       end if
+    end do
+
+    @assertEqual(FD_STATUS_UNREACHABLE, v%status)
+    @assertFalse(v%passed)
+    @assertTrue(v%has_tol_min)
+    @assertTrue(v%tol_min .gt. 1.0e-12_rp)
+    @assertTrue(reported)
+  end subroutine test_tolerance_unreachable
+
+  ! ========================================================================== !
+  ! The duplicate-magnitude guard's two controls.
+
+  !> Before the fix, the 9-point sweep m = [1e-4 x7, 3.16e-5, 1e-5],
+  !! e = [1e-3 x7, 3e-3, 9e-3] (rejected outright now -- see
+  !! fd_criterion_reject.f90 scenario 1) returned
+  !! passed=T status=OK branch=BOUNDED, claiming "8 consecutive points"
+  !! bounded the bias. Those 8 points are really only TWO measurements: the
+  !! magnitude 1e-4 (repeated 7x, error 1e-3) and the magnitude 3.16e-5
+  !! (error 3e-3). De-duplicated to those two real points, the sweep has
+  !! only 2 points -- fewer than fd_plateau_points and fewer than the order
+  !! check's minimum of 4 -- so it must be INCONCLUSIVE, not a bogus
+  !! BOUNDED pass from "8 points". A blanket refusal of every duplicate
+  !! sweep would also make this INCONCLUSIVE, so this alone does not
+  !! distinguish the fix from a broken one; test_nine_point_sweep_passes
+  !! is the other half of that distinction.
+  @test(npes=[1])
+  subroutine test_dedup_inconclusive(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    real(kind=rp) :: m(2), e(2)
+
+    m = [-1.0e-4_rp, -3.16e-5_rp]
+    e = [1.0e-3_rp, 3.0e-3_rp]
+
+    call fd_evaluate(m, e, 1.0e-2_rp, opts, v)
+
+    @assertEqual(FD_STATUS_INCONCLUSIVE, v%status)
+    @assertFalse(v%passed)
+  end subroutine test_dedup_inconclusive
+
+  !> The other half of the distinction test_dedup_inconclusive draws: a
+  !! legitimate 9-point sweep, every magnitude distinct, must still pass.
+  !! A criterion that rejects every sweep touching the duplicate-magnitude
+  !! guard's code path (rather than only genuine duplicates) would satisfy
+  !! test_dedup_inconclusive while destroying the module, and would fail
+  !! here instead. The sweep is exactly linear in log(m) (e = C + A*m) so
+  !! the fit is exact and p_hat is pinned to 1.0, not just "close".
+  @test(npes=[1])
+  subroutine test_nine_point_sweep_passes(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    real(kind=rp), parameter :: c_true = 1.0e-4_rp, a_true = 2.0_rp
+    real(kind=rp) :: m(9), e(9)
+    integer :: k
+
+    do k = 1, 9
+       m(k) = -10.0_rp**(-k)
+       e(k) = c_true + a_true * m(k)
+    end do
+
+    call fd_evaluate(m, e, 1.0e-3_rp, opts, v)
+
+    @assertEqual(FD_BRANCH_FIT, v%branch)
+    @assertEqual(FD_STATUS_OK, v%status)
+    @assertTrue(v%passed)
+    @assertEqual(9, v%n_truncation_points)
+    @assertRelativelyEqual(1.0_rp, v%p_hat, 1.0e-6_rp)
+    @assertRelativelyEqual(c_true, v%c_hat, 1.0e-6_rp)
+  end subroutine test_nine_point_sweep_passes
+
+  ! ========================================================================== !
+  ! Positive controls and genuinely wrong gradients.
+
+  !> A clean, exactly-linear order-1 sweep passes via FIT with the expected
+  !! order. Distinct from test_nine_point_sweep_passes only in intent (a
+  !! minimal sanity check rather than a duplicate-magnitude control) --
+  !! kept as its own test so it survives independently of that guard.
+  @test(npes=[1])
+  subroutine test_clean_fit_sweep(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    real(kind=rp), parameter :: c_true = -5.0e-5_rp, a_true = 3.0_rp
+    real(kind=rp) :: m(6), e(6)
+    integer :: k
+
+    do k = 1, 6
+       m(k) = -10.0_rp**(-k)
+       e(k) = c_true + a_true * m(k)
+    end do
+
+    call fd_evaluate(m, e, 1.0e-3_rp, opts, v)
+
+    @assertEqual(FD_BRANCH_FIT, v%branch)
+    @assertTrue(v%passed)
+    @assertRelativelyEqual(1.0_rp, v%p_hat, 1.0e-6_rp)
+    @assertRelativelyEqual(c_true, v%c_hat, 1.0e-6_rp)
+  end subroutine test_clean_fit_sweep
+
+  !> A clean plateau passes via BOUNDED. The five errors vary only at the
+  !! 1e-8 relative level (round-off, not truncation) and their differences
+  !! alternate in sign, so no order run can be found -- exercising the
+  !! BOUNDED branch in isolation from FIT.
+  @test(npes=[1])
+  subroutine test_clean_bounded_sweep(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    real(kind=rp) :: m(5), e(5)
+
+    m = [-1.0e-1_rp, -1.0e-2_rp, -1.0e-3_rp, -1.0e-4_rp, -1.0e-5_rp]
+    e = [1.0000e-4_rp, 1.0002e-4_rp, 0.9999e-4_rp, 1.0001e-4_rp, 1.0000e-4_rp]
+
+    call fd_evaluate(m, e, 1.0e-2_rp, opts, v)
+
+    @assertEqual(FD_BRANCH_BOUNDED, v%branch)
+    @assertTrue(v%passed)
+    @assertFalse(v%has_p_hat)
+    @assertRelativelyEqual(1.00004e-4_rp, v%c_hat, 1.0e-4_rp)
+  end subroutine test_clean_bounded_sweep
+
+  !> A genuinely biased gradient must fail. Every #43 error is shifted by
+  !! the same constant so that the converged bias becomes 100x its true
+  !! value (1.4637e-3 against a 1e-3 tolerance) while the truncation shape
+  !! -- and so the order run and p_hat -- is untouched, since a constant
+  !! shift does not change any difference e(k) - e(k+1).
+  @test(npes=[1])
+  subroutine test_biased_gradient_100x(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    real(kind=rp) :: e(4), shift
+
+    shift = 99.0_rp * c_hat_43
+    e = err_43 + shift
+
+    call fd_evaluate(pert_43, e, tol_43, opts, v)
+
+    @assertEqual(FD_STATUS_FLOOR_EXCEEDED, v%status)
+    @assertFalse(v%passed)
+    @assertTrue(v%has_c_hat)
+    @assertRelativelyEqual(100.0_rp * c_hat_43, v%c_hat, 1.0e-3_rp)
+  end subroutine test_biased_gradient_100x
+
+  !> A sign-flipped gradient must also fail. The classic symptom of using
+  !! the negative of the true analytic sensitivity in a relative-error
+  !! finite-difference check is a bias converging to -2, not to zero: the
+  !! #43 errors are shifted so their bias becomes exactly that.
+  @test(npes=[1])
+  subroutine test_sign_flipped_gradient(this)
+    class(test_fd_criterion), intent(inout) :: this
+    type(fd_strict_options_t) :: opts
+    type(fd_verdict_t) :: v
+    real(kind=rp) :: e(4), shift
+
+    shift = -2.0_rp - c_hat_43
+    e = err_43 + shift
+
+    call fd_evaluate(pert_43, e, tol_43, opts, v)
+
+    @assertEqual(FD_STATUS_FLOOR_EXCEEDED, v%status)
+    @assertFalse(v%passed)
+    @assertTrue(v%has_c_hat)
+    @assertRelativelyEqual(-2.0_rp, v%c_hat, 1.0e-6_rp)
+  end subroutine test_sign_flipped_gradient
+
+end module fd_criterion_test

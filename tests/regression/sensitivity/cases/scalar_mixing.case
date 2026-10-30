@@ -1,0 +1,514 @@
+{
+    // Split-inlet scalar-mixing sensitivity case.
+    //
+    // Binary scalar (0 on the lower half of the inlet, 1 on the upper half,
+    // expressed via the built-in `step()` expression function -- no
+    // user.f90 needed) advects through a Brinkman design region and is read
+    // out at the outlet by THREE scalar_mixing objectives:
+    //   1. the lower-outlet quarter (y in [0, 0.25]), phi_ref = 0
+    //   2. the upper-outlet quarter (y in [0.75, 1]), phi_ref = 1
+    //   3. the whole outlet,                          phi_ref = 0.5
+    // Advection-dominated transport keeps 1 and 2 near zero (the outer
+    // quarters retain their inlet values) while 3 is large; a diffusive
+    // regime drives everything toward 0.5.
+    //
+    // =====================================================================
+    // EVERY NUMBER BELOW WAS RE-MEASURED AFTER THE INLET FIX.
+    // =====================================================================
+    // Until Neko c528651e9, `expression_dirichlet` never set `bc_type`, so
+    // scalar_pnpn never marked the condition into bc_projector and the
+    // imposed inlet value was overwritten by s = s + ds inside the same
+    // timestep. This case therefore had NO scalar inflow whatsoever: what
+    // reached the outlet was the decay of the initial condition, not a
+    // mixing problem. Every Pe, end_time and cost figure derived before
+    // that fix is void, and has been deleted here rather than annotated.
+    // NEKO_DIR must carry that fix (see prepare.env); a measurement taken
+    // against a Neko without it says nothing about this case.
+    //
+    // Pe = 1000: GATED ON THE MEASURED OUTFLOW DISTRIBUTION, not assumed.
+    // Forward-only, run to steady state, 2 MPI ranks, at end_time 5.0 and
+    // this resolution. obj1 is the lower-outlet quarter (phi_ref 0) and
+    // obj3 the whole outlet (phi_ref 0.5):
+    //
+    //   Pe      obj1         obj3         regime
+    //   2       1.200e-01    3.122e-05    diffusively saturated
+    //   20      3.353e-02    1.805e-02    transitional
+    //   200     4.027e-05    8.826e-02    advection-dominated
+    //   1000    7.499e-13    1.088e-01    advection-dominated, strongly
+    //   2000    4.640e-19    1.136e-01    below double precision
+    //
+    // Pe = 2 and Pe = 20 sit in the diffusive regime this case is not
+    // testing: the outlet is nearly fully mixed, so the quarter objectives
+    // are large and the whole-outlet one small -- the exact inversion of
+    // the intended signature. Pe = 1000 reproduces the advection-dominated
+    // signature strongly (the quarters hold their inlet extremes to
+    // ~1e-12) and is the Pe of the known-good examples/unsteady_mixer
+    // reference.
+    //
+    // Pe = 2000 was REJECTED DELIBERATELY, and NOT for instability. The
+    // claim that used to sit here -- that 2000 is numerically unstable at
+    // this dt -- is FALSE under the corrected configuration: re-measured,
+    // it runs cleanly at dt = 1.0e-3 with a smooth, monotonic scalar
+    // residual (0.657 -> 1.19e-6) and no NaN. It is rejected because its
+    // quarter objectives reach 4.64e-19, three orders BELOW
+    // double-precision epsilon (~2.2e-16) for a field valued in [0, 1].
+    // Such a value is indistinguishable from round-off, and a sensitivity
+    // that an MMA optimiser will differentiate must not be founded on one.
+    // Pe = 1000's 7.5e-13 is small but still ~3000x epsilon, i.e. a real
+    // number rather than accumulated noise. This is the non-obvious half
+    // of the choice: the rejection is about representability, not
+    // stability.
+    //
+    // phi_ref of 0 and 1 are maximally off-centre, so this case leans hard
+    // on the backlog-#40 fix (b37ec1e on this branch) that made "phi_ref"
+    // readable at all -- on any commit before that fix every one of these
+    // three objectives would have silently run at the phi_ref=0.5 default,
+    // making objectives 1 and 2 identical to 3. This case is the only
+    // committed regression test for that fix.
+    //
+    // Mesh: non-periodic in y (unlike the other nine cases in this
+    // directory, which share a periodic-y box) so the outlet actually has
+    // a y in [0,1] extent to split into quarters -- generated as its own
+    // 26x13-element box by run_sensitivity_regression_check.sh, since it
+    // cannot share the shared periodic-y box (geometry differs) or that
+    // box's coarser resolution (see below).
+    //
+    // RESOLUTION (moved here from the unit tier, which could not certify
+    // this case at all -- TOLERANCE_UNREACHABLE, tol_min = 0.902, the FD
+    // estimate not converging with eps across nearly a decade):
+    //
+    // polynomial_order was raised to 5 first, matching every sibling case
+    // in this directory (dissipation.case, passive_scalar.case, ...) --
+    // a spectral-element code gets far better dispersion behaviour per
+    // degree of freedom from order than from `h` for advection-dominated
+    // transport, so order was the first lever, not the last resort. At the
+    // *shared* mesh resolution the other cases use (16x8 elements,
+    // h = 0.125), P=5's minimum GLL spacing is 0.234944676/2 * 0.125 =
+    // 0.01468 (ratio for the N=5 GLL nodes, see below). A *modest*
+    // additional mesh bump (16x8 -> 26x13, i.e. ~1.6x linear, ~2.7x
+    // elements -- not the large jump `h` alone would need without the
+    // order increase) brings the minimum GLL spacing to
+    // 0.234944676070535/2 * h (0.234944676070535 is the smallest of the 6
+    // GLL node spacings on [-1,1] for a 6-point/order-5 element; halved
+    // because it maps a length-2 reference interval), and at
+    // h = 2/26 = 0.076923 that is 0.0090363. Kept at P=5 rather than
+    // pushed further, and at this modest an N, because the explicit
+    // viscous term that actually limits the time step scales as
+    // nu*dt/dx_min^2 (see below), so a finer mesh or a higher order
+    // tightens that limit quadratically while buying only accuracy per
+    // DOF.
+    //
+    // CELL PECLET AT THE SELECTED Pe -- recorded as NOT met rather than
+    // quietly dropped. The derivation above was made against Pe = 200 and
+    // targets a cell Peclet (Pe * minimum nodal spacing) below ~2, which
+    // it achieves there: 200 * 0.0090363 = 1.807. At the Pe = 1000
+    // selected above, the same resolution gives 9.04, well over that
+    // target. What was measured in its place, on this mesh at both
+    // Pe = 1000 and Pe = 2000: the scalar residual falls smoothly and
+    // monotonically to the steady simcomp's 1e-6 tolerance with no NaN and
+    // no stagnation, and the objective values vary smoothly and
+    // monotonically across the whole Pe ladder above -- none of the
+    // wiggle-and-diverge signature of an under-resolved advection problem.
+    // The mesh and polynomial_order were settled independently of Pe and
+    // are deliberately left untouched here. If the FD certification below
+    // ever degrades, under-resolution at this cell Peclet is the first
+    // hypothesis to test, and it needs no edit to this file: raise
+    // NEKO_TOP_SCALAR_MIXING_MESH_NX / _NY.
+    //
+    // dt and time_order: the derivation that used to sit here reasoned
+    // from an advective CFL of ~0.11 and concluded that the fine mesh
+    // forced dt = 2.5e-4. That was the wrong constraint. A root-cause
+    // investigation -- reproduced in PURE NEKO, with no Neko-TOP in the
+    // loop -- found the blowup is not advective at all, but comes from the
+    // one explicitly-treated viscous term in pnpn:
+    //
+    //   fluid_pnpn.f90:701 builds the extrapolated velocity u_e by EXT
+    //   extrapolation at order case.numerics.time_order, and
+    //   pnpn_res_cpu.f90:80-96 takes its double curl and scales it by
+    //   mu/rho into the pressure Poisson right-hand side. That
+    //   nu*curl(curl(u_e)) term is the Karniadakis-Israeli-Orszag
+    //   high-order pressure boundary condition, and it is the ONLY place
+    //   nu appears explicitly -- everywhere else in pnpn the viscosity is
+    //   implicit, inside the Helmholtz solve, and so unconditionally
+    //   stable.
+    //
+    // The binding number is therefore viscous, and it lives at the
+    // boundary: nu*dt/dx_min^2 = 12.2 here (Re = 1, so nu = 1, against the
+    // minimum GLL spacing derived above), not the advective CFL of 0.11.
+    // An explicit term sitting at 12.2 survives at all only because the
+    // EXT extrapolation feeding it is damped at low order; the EXT gain is
+    // 1, 3, 7 at time_order 1, 2, 3, so stability degrades sharply with
+    // extrapolation order rather than with dt alone. That mechanism is a
+    // property of the FLUID (Re), not of the scalar, so the Pe change
+    // above leaves it untouched.
+    //
+    // Four measurements pin the mechanism, all at the resolution above:
+    //   * time_order 3 diverges at step 271;
+    //   * time_order 2 and time_order 1 both run clean;
+    //   * time_order 3 at Re = 10 (nu 10x smaller) runs clean;
+    //   * time_order 3 on a periodic-y box runs clean -- no y wall, hence
+    //     no boundary for the KIO term to act on.
+    // Lowering Re, or removing the wall, fixes it; lowering dt alone only
+    // postpones it. Hence time_order = 2 here, and dt back at the ordinary
+    // 1.0e-3 the rest of the suite uses.
+    //
+    // Margin at time_order 2 was measured, not assumed: stable at
+    // dt = 1e-3, 2e-3 AND 4e-3, i.e. 4x headroom, where time_order 3 has
+    // none whatsoever at 1e-3. Dropping the extrapolation order costs this
+    // case nothing: it is a steady-state case driven to convergence by the
+    // `steady` simcomp, so the temporal order affects only the path to the
+    // converged state, not the converged answer the objectives read.
+    //
+    // Why this case alone: the five sibling cases registered in this suite
+    // that carry an identical Re = 1 / time_order = 3 /
+    // polynomial_order = 5 / timestep = 1e-3 combination
+    // (viscous_dissipation, brinkman_dissipation, dissipation,
+    // dissipation_weights and passive_scalar) are not stable by virtue of
+    // any better-chosen number -- they survive because they all sit on the
+    // shared periodic-y box, where y has no wall and the KIO term never
+    // bites. scalar_mixing is the suite's only non-periodic-y case (it
+    // needs a real y in [0,1] outlet to split into quarters), and is
+    // therefore the only one exposed to this. Do not "fix" the siblings by
+    // copying time_order 2 across; equally, any future non-periodic-y case
+    // added to this directory inherits this constraint.
+    //
+    // Retained from the superseded derivation, because it is an
+    // independent measured finding and still true: a JSON-only fix
+    // (case.time.variable_timestep) was tried and rejected because
+    // Neko-TOP's own simulation driver (sources/simulation/simulation.f90)
+    // passes the *whole* case params object to time_step_controller%init
+    // instead of the case.time subtree Neko's own neko.f90 extracts first,
+    // so every variable-timestep key is looked up at the wrong JSON scope
+    // and silently falls back to its Fortran default (huge()) -- confirmed
+    // by the printed dt jumping to a nonsensical 1.0 rather than honouring
+    // max_timestep. That is a Neko-TOP bug worth its own backlog entry,
+    // not something to work around inside this case file.
+    //
+    // end_time = 5.0: MEASURED LADDER, not extrapolated. Forward-only,
+    // 2 MPI ranks, this resolution, at Pe = 200:
+    //
+    //   end_time   obj1          obj3
+    //   2.0        2.780e-05     8.957e-02
+    //   5.0        4.027e-05     8.826e-02
+    //   10.0       4.027e-05     8.826e-02
+    //   15.0       4.027e-05     8.826e-02
+    //
+    // t = 5, 10 and 15 agree to ALL TEN printed significant figures, so
+    // the objectives are read off a field that has genuinely stopped
+    // moving; the `steady` simcomp reaches a scalar residual of 1.63e-6 at
+    // t ~ 2.9. t = 2.0 is still ~30% out on obj1, so convergence really
+    // does happen between 2 and 5 rather than immediately -- the ladder
+    // brackets it rather than merely confirming a guess. 5.0 keeps ~1.7x
+    // margin past convergence at negligible cost, and that margin is not
+    // decoration: the FD sweep evaluates this case once per perturbation
+    // with a PERTURBED design, and each of those trajectories has to
+    // converge too, not just the baseline's.
+    //
+    // The old end_time of 185 came from the dead-inlet configuration,
+    // where the only thing left to relax was the slow transverse-diffusion
+    // decay of the initial condition (measured half-life 11.343, hence the
+    // extrapolation to t ~ 183). With a live inlet the steady state is set
+    // by advective washout through a domain of length 2 at u = 1, which is
+    // why it is reached ~35x sooner. Nothing of the old figure survives.
+    //
+    // Convergence was re-confirmed AT THE SHIPPED Pe, not just at the
+    // Pe = 200 the ladder was run at: in the FD sweep's own baseline
+    // solve at Pe = 1000, steady_state_data.csv logs a scalar residual of
+    // 1.768e-6 at t = 2.60 and then stops logging (the simcomp only logs
+    // while unconverged, every 50 steps), so convergence lands in
+    // t = (2.60, 2.65]. end_time 5.0 is ~1.9x that.
+    //
+    // COST: MEASURED at 2 MPI ranks (RECORD THE RANK COUNT alongside any
+    // measurement here, since dFdx has been observed to differ by ~5.6e-7
+    // between rank counts in this suite). One forward solve to t = 5.0 is
+    // ~260 s; the adjoint solve is the expensive one at ~0.26 s/step
+    // against the forward's ~0.05. The complete four-point FD sweep --
+    // baseline, adjoint, 4 perturbed solves, 1 baseline restore -- was
+    // timed end to end by CTest at 2336 s (39 min), against the 26-36 h
+    // the pre-inlet-fix configuration implied. Note the `steady` simcomp
+    // freezes only the FLUID on convergence (steady_simcomp.f90 carries
+    // an explicit @todo for the scalar), so steps after t ~ 2.6 still
+    // cost a scalar solve each -- cheap, but not free.
+    //
+    // A higher MPI rank count was tried and rejected for a measured
+    // reason: this container's /dev/shm is capped at 64 MiB, and OpenMPI's
+    // vader BTL requests a 16 MiB sm_segment per rank, so 8 ranks (128
+    // MiB) cannot fit regardless of stale-segment cleanup. Measured
+    // directly: an 8-rank run of this exact case failed after 123.6s with
+    // repeated "not enough space" warnings, not a clean FD-tolerance
+    // verdict -- see CMakeLists.txt.
+    "version": 1.0,
+    "case": {
+        "mesh_file": "scalar_mixing_mesh/box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": false,
+        "time": {
+            "end_time": 5.0,
+            "timestep": 1.0e-3
+        },
+        "numerics": {
+            "time_order": 2,
+            "polynomial_order": 5,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 1.0,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 1.0, 0.0, 0.0 ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-16,
+                "max_iterations": 50
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-12,
+                "max_iterations": 50
+            },
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1, 3, 4 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 2 ]
+                }
+            ],
+            "output_control": "never"
+        },
+        "scalar": {
+            "enabled": true,
+            "Pe": 1000.0,
+            "solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-18,
+                "max_iterations": 50
+            },
+            "initial_condition": {
+                "type": "expression",
+                "value": "step(y - 0.5)"
+            },
+            "boundary_conditions": [
+                {
+                    "type": "expression_dirichlet",
+                    "value": "step(y - 0.5)",
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0.0,
+                    "zone_indices": [ 2, 3, 4 ]
+                }
+            ]
+        },
+        "adjoint_scalar": {
+            "enabled": true,
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 0.0,
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0.0,
+                    "zone_indices": [ 2, 3, 4 ]
+                }
+            ],
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
+            }
+        },
+        "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 3, 4 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 2 ]
+                }
+            ]
+        },
+        "simulation_components": [
+            {
+                "type": "steady",
+                "tol": 1e-6,
+                "compute_control": "tsteps",
+                "compute_value": 1,
+                "scalar_coupled": true
+            }
+        ],
+        "point_zones": [
+            {
+                "name": "optimization_domain",
+                "geometry": "box",
+                "x_bounds": [ 0.2, 0.8 ],
+                "y_bounds": [ 0.2, 0.8 ],
+                "z_bounds": [ -1.0, 1.0 ]
+            },
+            {
+                "name": "initial_ball",
+                "geometry": "cylinder",
+                "start": [ 0.5, 0.5, -0.5 ],
+                "end": [ 0.5, 0.5, 1.5 ],
+                "radius": 0.25
+            },
+            {
+                "name": "outlet_low",
+                "geometry": "box",
+                "x_bounds": [ 1.8, 2.0 ],
+                "y_bounds": [ 0.0, 0.25 ],
+                "z_bounds": [ -1.0, 1.0 ]
+            },
+            {
+                "name": "outlet_high",
+                "geometry": "box",
+                "x_bounds": [ 1.8, 2.0 ],
+                "y_bounds": [ 0.75, 1.0 ],
+                "z_bounds": [ -1.0, 1.0 ]
+            },
+            {
+                "name": "outlet_full",
+                "geometry": "box",
+                "x_bounds": [ 1.8, 2.0 ],
+                "y_bounds": [ 0.0, 1.0 ],
+                "z_bounds": [ -1.0, 1.0 ]
+            }
+        ]
+    },
+    "optimization": {
+        "fd_test_strict": true,
+        // MEASURED, then set at ~2x the measured bias, per readme.md's
+        // "Tolerances of the four unit cases" convention. The red half of
+        // red-then-green is on record: this same sweep, at the provisional
+        // 1.0e-6 that used to sit here, returned
+        //
+        //   p_hat 1.0143   C_hat +1.932e-3   branch FIT (estimate)
+        //   3-term cross-check bias +1.926e-3   tol_min 5.018e-5
+        //   BRACKETED, 4 truncation points, 1 sign crossing
+        //   status TOLERANCE_UNREACHABLE, exit 1
+        //
+        // and the Richardson bias agreeing with the independent 3-term
+        // cross-check to 0.3% is what makes C_hat trustworthy here.
+        //
+        // 4.0e-3 is 2.07x C_hat and 80x tol_min: reachable, and still
+        // tight enough to enforce something. The measured bias is 0.19%
+        // relative; a sign error, a missing chain-rule term or a dropped
+        // adjoint forcing shows up as a relative error of order 1, i.e.
+        // ~250x this tolerance. Do NOT read 4.0e-3 as "this gradient is
+        // accurate to 0.4%" -- read it as "this gradient carries a
+        // measured 0.19% bias that nobody has explained yet". The two
+        // dissipation siblings sit at 4.5e-3 and 5.0e-3 over biases of
+        // 2.2e-3 and 2.6e-3, the same order as this one, which is itself
+        // evidence the residue is shared across the suite rather than
+        // specific to scalar_mixing (adjacent to known-bugs #6).
+        //
+        // The single sign crossing inside the sweep is exactly why
+        // fd_test_strict is on: the historical assertion reads the error
+        // at the SMALLEST perturbation, which here is +1.563e-3, and would
+        // have certified a number that is not the bias.
+        "fd_test_tolerance": 4.0e-3,
+        // Minimal viable sweep for the strict criterion at this case's
+        // cost: 4 points is the floor for the order check ("needs at
+        // least 4 sweep points"), spanning 0.3 down to 0.01 (geometric,
+        // ratio ~3). MEASURED ADEQUATE, not assumed: it lands on the FIT
+        // branch with a single order run covering all four points at
+        // p_hat = 1.0143 -- inside the default 1.0 +- 0.10 band -- and
+        // the harness reports the round-off upturn as BRACKETED, so the
+        // sweep spans truncation and floor rather than sitting on one
+        // side of the minimum. This case therefore behaves like the
+        // FIT-branch siblings (viscous/brinkman_dissipation) and not like
+        // the old unit-tier attempt, which never converged with eps.
+        // Adding points would cost a full forward solve (~260 s) each and
+        // buy this verdict nothing.
+        "fd_test_perturbations": [
+            3.0e-1, 1.0e-1, 3.0e-2, 1.0e-2
+        ],
+        "domain": {
+            "type": "point_zone",
+            "zone_name": "optimization_domain"
+        },
+        "design": {
+            "type": "brinkman",
+            "mapping": [
+                {
+                    "type": "PDE_filter",
+                    "r": 0.05,
+                    "tol": 1.0e-20,
+                    "max_iter": 600
+                },
+                {
+                    "type": "RAMP",
+                    "f_max": 100.0
+                }
+            ],
+            "initial_distribution": {
+                "type": "point_zone",
+                "base_value": 0.0,
+                "zone_value": 1.0,
+                "zone_name": "initial_ball"
+            }
+        },
+        "solver": {
+            "type": "mma",
+            "max_iterations": 0,
+            "tolerance": 1.0e-3,
+            "mma": {
+                "max_iter": 100,
+                "asyinit": 0.5,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "scale": 1.0,
+                "auto_scale": false,
+                "xmin": 0.0,
+                "xmax": 1.0,
+                "a0": 1.0,
+                "a": 0.0,
+                "c": 1000.0,
+                "d": 0.0
+            }
+        },
+        "objectives": [
+            {
+                "type": "scalar_mixing",
+                "mask_name": "outlet_low",
+                "phi_ref": 0.0,
+                "weight": 1.0
+            },
+            {
+                "type": "scalar_mixing",
+                "mask_name": "outlet_high",
+                "phi_ref": 1.0,
+                "weight": 1.0
+            },
+            {
+                "type": "scalar_mixing",
+                "mask_name": "outlet_full",
+                "phi_ref": 0.5,
+                "weight": 1.0
+            }
+        ]
+    }
+}
