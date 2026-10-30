@@ -88,7 +88,8 @@ module cuda_mma_math
        integer(c_int) :: offset, n
      end subroutine delta_1dbeam_cuda
 
-     subroutine cuda_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m) bind(c, name = 'cuda_Hess')
+     subroutine cuda_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m) &
+          bind(c, name = 'cuda_Hess')
        import c_int, c_ptr
        type(c_ptr), value :: Hess_d, hijx_d, Ljjxinv_d
        integer(c_int) :: n, m

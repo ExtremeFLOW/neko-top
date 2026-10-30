@@ -57,6 +57,7 @@
             ]
         },
         "scalar": {
+            "name": "temperature",
             "enabled": true,
             "Pe": 1000.0,
             "solver": {
