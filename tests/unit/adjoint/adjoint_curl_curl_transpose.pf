@@ -1,0 +1,518 @@
+! Verifies that the adjoint curl-curl load added to the adjoint velocity
+! forcing (adjoint_curl_curl_load, sources/adjoint/adjoint_curl_curl.f90) is
+! the exact transpose of the primal's Karniadakis-Israeli-Orszag curl-curl
+! contribution to the pressure residual, as computed by Neko's
+! pnpn_prs_res_cpu (src/fluid/bcknd/cpu/pnpn_res_cpu.f90). A boundary-only
+! surrogate built from grad, the boundary normal crossed with grad p, and
+! curl was used previously and is not the transpose of that term.
+!
+! The primal contribution is
+!
+!   r_cc(u_e) = sum_i cdtp_i( Binv * gs( -(mu/rho) * B * W_i ) ),
+!   W = curl(curl(u_e))
+!
+! and its exact adjoint with respect to u_e, acting on the adjoint pressure
+! p_adj, is what adjoint_curl_curl_load returns:
+!
+!   L(p_adj) = (mu/rho) * Dc^T M^T Dc^T M^T G p_adj
+!
+! so that for every continuous velocity field u_e and every continuous
+! adjoint pressure p_adj,
+!
+!   <u_e, L(p_adj)> == -<p_adj, r_cc(u_e)>
+!
+! (plain dot products, summed over all local, non-unique nodes, and reduced
+! across MPI ranks by field_glsc2).
+!
+! adjoint_curl_curl_load already includes the (mu/rho) factor internally
+! (it matches r_cc's own (mu/rho) scaling exactly), so this test asserts
+! the identity at that level -- against the module's own return value L,
+! not against the further net load that reaches the velocity right-hand
+! side once the call site's makeabf applies its own rho multiplication.
+! That extra rho-cancellation is a property of the call site, not of this
+! module, and is out of scope for a unit test of the module in isolation.
+!
+! Both u_e and p_adj are random, but continuous: independent random values
+! per local node are gather-scattered and divided by nodal multiplicity, so
+! that shared local copies of the same global node carry a single value.
+! Random, rather than smooth, fields probe the identity off the
+! smooth-field family that made the boundary-only surrogate look plausible
+! for the primal's term.
+!
+! The mesh is a small 2x2x2-element box with real walls -- no periodic
+! boundary in any direction -- partitioned across the available MPI ranks,
+! so the check exercises interior gather-scatter coupling in all three
+! directions, genuine (non-periodic) exterior boundary faces, and, at
+! npes=2, cross-rank coupling at the shared partition interface. It is
+! checked at P=2 and P=5, with mu = 0.7 and rho = 1.9 (both != 1, so a
+! dropped or misplaced material-property factor cannot hide).
+!
+! A third test checks the accompanying `adjoint_curl_curl_check` guard's
+! green path: a three-dimensional mesh with no symmetry facets marked and
+! no cyclic boundaries must not raise an error.
+module adjoint_curl_curl_transpose
+  use mpi
+  use pfunit
+  use num_types, only: rp, dp
+  use point, only: point_t
+  use mesh, only: mesh_t
+  use datadist, only: linear_dist_t
+  use space, only: space_t, GLL
+  use dofmap, only: dofmap_t
+  use gather_scatter, only: gs_t
+  use gs_ops, only: GS_OP_ADD
+  use field, only: field_t
+  use coefs, only: coef_t
+  use operators, only: curl, cdtp
+  use math, only: col2, col3, cmult
+  use field_math, only: field_glsc2, field_add2, field_add3
+  use comm, only: NEKO_COMM, pe_rank, pe_size
+  use pfunit_comm_utils, only: comm_init_test, comm_free_test
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_init, device_finalize, device_memcpy, &
+       HOST_TO_DEVICE
+  use device_math, only: device_col2, device_col3, device_cmult
+  use facet_normal, only: facet_normal_t
+  use adjoint_curl_curl, only: adjoint_curl_curl_load, adjoint_curl_curl_check
+  implicit none
+
+  !> Material properties for the check, deliberately both != 1 so that a
+  !! dropped or misapplied mu/rho factor cannot pass unnoticed.
+  real(kind=rp), parameter :: mu_val = 0.7_rp
+  real(kind=rp), parameter :: rho_val = 1.9_rp
+
+  !> Relative tolerance for the transpose identity. The true transpose
+  !! agrees to 1e-13 - 1e-15 relative error in dense and random checks,
+  !! while a wrong load (a sign error, or the boundary-only surrogate)
+  !! disagrees at the 0.1-2x level, so this tolerance has orders of margin
+  !! either way.
+  real(kind=rp), parameter :: transpose_rtol = 1.0e-9_rp
+
+  !> Floor below which a reference magnitude is treated as numerically
+  !! zero, guarding against a vacuous pass on an all-zero field.
+  real(kind=rp), parameter :: magnitude_floor = 1.0e-6_rp
+
+  @TestCase
+  type, extends(MPITestCase) :: test_curl_curl_transpose
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_curl_curl_transpose
+
+contains
+
+  !> Set up the per-test MPI communicator state from pFUnit's own
+  !! (possibly reduced) participant communicator, not `MPI_COMM_WORLD`:
+  !! with `npes=[1,2]` and `MAX_PES 2`, an `npes=1` test only has rank 0
+  !! call `setUp`, so any collective here must be scoped to
+  !! `this%getMpiCommunicator()` -- the pattern Neko's own mixed-`npes`
+  !! parallel unit tests use (e.g. `tests/unit/mesh/test_mesh_parallel.pf`).
+  !! Calling Neko's plain `comm_init`, which duplicates `MPI_COMM_WORLD`,
+  !! would deadlock here, since the non-participating rank(s) never reach
+  !! a matching call.
+  subroutine setUp(this)
+    class(test_curl_curl_transpose), intent(inout) :: this
+    call comm_init_test(this%getMpiCommunicator())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_curl_curl_transpose), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+    call comm_free_test()
+  end subroutine tearDown
+
+  !> Build a structured, non-periodic (walled) box mesh of
+  !! `nex * ney * nez` hexahedra spanning `[0,Lx] x [0,Ly] x [0,Lz]`,
+  !! partitioned into contiguous blocks of elements across the MPI ranks
+  !! in `NEKO_COMM` (`pe_rank`/`pe_size` must already be set). Interior
+  !! vertices, including those on the inter-rank partition interface, are
+  !! shared by point id, so `finalize` finds genuine interior faces/edges
+  !! for gather-scatter to act on, whether they are local to one rank or
+  !! span two; no face is periodically identified with another, so every
+  !! exterior face is a real wall. Each element's 8 corners are passed in
+  !! Neko's tensor-product (bit) order -- (r-,s-,t-), (r+,s-,t-),
+  !! (r-,s+,t-), (r+,s+,t-), then the same pattern at t+ -- not a
+  !! perimeter walk; verified against a standalone build of this exact
+  !! mesh that a perimeter-walk order instead leaves half the domain's
+  !! Jacobian negative (`coef%jac < 0`, `coef%B < 0`), which Neko flags as
+  !! "Non positive definite metric" but does not treat as fatal.
+  !! @param msh The mesh to build.
+  !! @param nex Number of elements in x.
+  !! @param ney Number of elements in y.
+  !! @param nez Number of elements in z.
+  !! @param Lx Domain extent in x.
+  !! @param Ly Domain extent in y.
+  !! @param Lz Domain extent in z.
+  subroutine gen_box_mesh(msh, nex, ney, nez, Lx, Ly, Lz)
+    type(mesh_t), intent(inout) :: msh
+    integer, intent(in) :: nex, ney, nez
+    real(kind=dp), intent(in) :: Lx, Ly, Lz
+    type(point_t) :: p(nex + 1, ney + 1, nez + 1)
+    type(linear_dist_t) :: dist
+    integer :: i, j, k, e_glb, e_loc, ex, ey, ez, pid
+
+    do k = 1, nez + 1
+       do j = 1, ney + 1
+          do i = 1, nex + 1
+             pid = i + (nex + 1) * ((j - 1) + (ney + 1) * (k - 1))
+             call p(i, j, k)%init( &
+                  Lx * real(i - 1, dp) / real(nex, dp), &
+                  Ly * real(j - 1, dp) / real(ney, dp), &
+                  Lz * real(k - 1, dp) / real(nez, dp), pid)
+          end do
+       end do
+    end do
+
+    dist = linear_dist_t(nex * ney * nez, pe_rank, pe_size, NEKO_COMM)
+    call msh%init(3, dist)
+
+    e_glb = 0
+    do ez = 1, nez
+       do ey = 1, ney
+          do ex = 1, nex
+             e_glb = e_glb + 1
+             if (e_glb .gt. dist%start_idx() .and. &
+                  e_glb .le. dist%start_idx() + dist%num_local()) then
+                e_loc = e_glb - dist%start_idx()
+                call msh%add_element(e_loc, e_glb, &
+                     p(ex, ey, ez), p(ex + 1, ey, ez), &
+                     p(ex, ey + 1, ez), p(ex + 1, ey + 1, ez), &
+                     p(ex, ey, ez + 1), p(ex + 1, ey, ez + 1), &
+                     p(ex, ey + 1, ez + 1), p(ex + 1, ey + 1, ez + 1))
+             end if
+          end do
+       end do
+    end do
+
+    call msh%finalize()
+
+  end subroutine gen_box_mesh
+
+  !> Seed the intrinsic RNG deterministically, so the test is repeatable.
+  !! @param seed_val Seed value, broadcast to every element of the
+  !! generator's seed array.
+  subroutine seed_rng(seed_val)
+    integer, intent(in) :: seed_val
+    integer :: nseed
+    integer, allocatable :: seed(:)
+
+    call random_seed(size = nseed)
+    allocate(seed(nseed))
+    seed = seed_val
+    call random_seed(put = seed)
+    deallocate(seed)
+
+  end subroutine seed_rng
+
+  !> Fill `f` with a random, but continuous, field: independent random
+  !! values per local node are gather-scattered and divided by nodal
+  !! multiplicity, so every local copy of a shared node ends up with the
+  !! same value. Device-safe: the host fill is synced to the device
+  !! before the (device-dispatching) gather-scatter runs, and the
+  !! averaging by `coef%mult` is done on whichever side holds the data.
+  !! @param f Field to fill.
+  !! @param coef The SEM coefficients (supplies `mult`).
+  !! @param gs The gather-scatter operator.
+  subroutine random_continuous_field(f, coef, gs)
+    type(field_t), intent(inout) :: f
+    type(coef_t), intent(in) :: coef
+    type(gs_t), intent(inout) :: gs
+    integer :: n
+
+    n = f%size()
+    call random_number(f%x)
+    f%x = 2.0_rp * f%x - 1.0_rp
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(f%x, f%x_d, n, HOST_TO_DEVICE, .true.)
+    end if
+
+    call gs%op(f, GS_OP_ADD)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(f%x_d, coef%mult_d, n)
+    else
+       call col2(f%x, coef%mult, n)
+    end if
+
+  end subroutine random_continuous_field
+
+  !> Build the primal KIO curl-curl pressure-residual contribution
+  !! exactly as `pnpn_prs_res_cpu_compute` does: curl(curl(u_e)), scaled
+  !! by `-(mu/rho)` and weighted by the element-local mass matrix `B`,
+  !! gather-scattered, divided by the assembled mass `Binv`, then mapped
+  !! through the weak-derivative transpose `cdtp` and summed over the
+  !! three components. There is no cyclic BC in this mesh, so the
+  !! `rotate_cyc` no-op step is omitted, and no pressure-Poisson/surface
+  !! terms are built, since only the curl-curl contribution is under
+  !! test. Device-safe: `curl`, `cdtp`, `gs%op`, `field_add3` and
+  !! `field_add2` already dispatch on the device internally; the plain
+  !! `col2`/`col3`/`cmult` calls that read/write a field's raw array do
+  !! not, so they are replaced by their `device_*` equivalents on the
+  !! field's device buffer when `NEKO_BCKND_DEVICE == 1`.
+  !! @param rcc The resulting scalar contribution to the pressure
+  !! residual.
+  !! @param u1 x component of the extrapolated velocity.
+  !! @param u2 y component of the extrapolated velocity.
+  !! @param u3 z component of the extrapolated velocity.
+  !! @param coef The SEM coefficients.
+  !! @param gs The gather-scatter operator.
+  !! @param mu The constant dynamic viscosity.
+  !! @param rho The constant density.
+  !! @param ta1 Work field.
+  !! @param ta2 Work field.
+  !! @param ta3 Work field.
+  !! @param wa1 Work field.
+  !! @param wa2 Work field.
+  !! @param wa3 Work field.
+  !! @param cwork1 Work field for `curl`'s own temporaries.
+  !! @param cwork2 Work field for `curl`'s own temporaries.
+  subroutine primal_curl_curl_term(rcc, u1, u2, u3, coef, gs, mu, rho, &
+       ta1, ta2, ta3, wa1, wa2, wa3, cwork1, cwork2)
+    type(field_t), intent(inout) :: rcc
+    type(field_t), intent(in) :: u1, u2, u3
+    type(coef_t), intent(in) :: coef
+    type(gs_t), intent(inout) :: gs
+    real(kind=rp), intent(in) :: mu, rho
+    type(field_t), intent(inout) :: ta1, ta2, ta3
+    type(field_t), intent(inout) :: wa1, wa2, wa3
+    type(field_t), intent(inout) :: cwork1, cwork2
+    integer :: n
+
+    n = coef%dof%size()
+
+    ! curl(u_e) -> ta;  W = curl(curl(u_e)) -> wa
+    call curl(ta1, ta2, ta3, u1, u2, u3, cwork1, cwork2, coef)
+    call curl(wa1, wa2, wa3, ta1, ta2, ta3, cwork1, cwork2, coef)
+
+    ! ta = -(mu/rho) * B * W, element-local, before gather-scatter
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col3(ta1%x_d, wa1%x_d, coef%B_d, n)
+       call device_col3(ta2%x_d, wa2%x_d, coef%B_d, n)
+       call device_col3(ta3%x_d, wa3%x_d, coef%B_d, n)
+       call device_cmult(ta1%x_d, -(mu / rho), n)
+       call device_cmult(ta2%x_d, -(mu / rho), n)
+       call device_cmult(ta3%x_d, -(mu / rho), n)
+    else
+       call col3(ta1%x, wa1%x, coef%B, n)
+       call col3(ta2%x, wa2%x, coef%B, n)
+       call col3(ta3%x, wa3%x, coef%B, n)
+       call cmult(ta1%x, -(mu / rho), n)
+       call cmult(ta2%x, -(mu / rho), n)
+       call cmult(ta3%x, -(mu / rho), n)
+    end if
+
+    call gs%op(ta1, GS_OP_ADD)
+    call gs%op(ta2, GS_OP_ADD)
+    call gs%op(ta3, GS_OP_ADD)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(ta1%x_d, coef%Binv_d, n)
+       call device_col2(ta2%x_d, coef%Binv_d, n)
+       call device_col2(ta3%x_d, coef%Binv_d, n)
+    else
+       call col2(ta1%x, coef%Binv, n)
+       call col2(ta2%x, coef%Binv, n)
+       call col2(ta3%x, coef%Binv, n)
+    end if
+
+    call cdtp(wa1%x, ta1%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
+    call cdtp(wa2%x, ta2%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
+    call cdtp(wa3%x, ta3%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
+
+    call field_add3(rcc, wa1, wa2)
+    call field_add2(rcc, wa3)
+
+  end subroutine primal_curl_curl_term
+
+  !> Build a P = `lx - 1` fixture, generate random continuous `u_e` and
+  !! `p_adj`, and check that the production `adjoint_curl_curl_load`
+  !! agrees with minus the primal curl-curl residual's pairing with
+  !! `p_adj`, to `transpose_rtol`.
+  !! @param lx Number of GLL points per direction (P = lx - 1).
+  subroutine run_transpose_check(lx)
+    integer, intent(in) :: lx
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t) :: coef
+    type(field_t) :: u1, u2, u3, p_adj
+    type(field_t) :: load_x, load_y, load_z
+    type(field_t) :: work1, work2, work3, work4
+    type(field_t) :: ta1, ta2, ta3, wa1, wa2, wa3, cwork1, cwork2
+    type(field_t) :: rcc
+    real(kind=rp) :: lhs, rhs, u_mag2, p_mag2
+
+    call gen_box_mesh(msh, 2, 2, 2, 1.3_dp, 0.8_dp, 0.6_dp)
+    call Xh%init(GLL, lx, lx, lx)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+
+    call u1%init(coef%dof, 'u1')
+    call u2%init(coef%dof, 'u2')
+    call u3%init(coef%dof, 'u3')
+    call p_adj%init(coef%dof, 'p_adj')
+    call load_x%init(coef%dof, 'load_x')
+    call load_y%init(coef%dof, 'load_y')
+    call load_z%init(coef%dof, 'load_z')
+    call work1%init(coef%dof, 'work1')
+    call work2%init(coef%dof, 'work2')
+    call work3%init(coef%dof, 'work3')
+    call work4%init(coef%dof, 'work4')
+    call ta1%init(coef%dof, 'ta1')
+    call ta2%init(coef%dof, 'ta2')
+    call ta3%init(coef%dof, 'ta3')
+    call wa1%init(coef%dof, 'wa1')
+    call wa2%init(coef%dof, 'wa2')
+    call wa3%init(coef%dof, 'wa3')
+    call cwork1%init(coef%dof, 'cwork1')
+    call cwork2%init(coef%dof, 'cwork2')
+    call rcc%init(coef%dof, 'rcc')
+
+    call seed_rng(20260926)
+    call random_continuous_field(u1, coef, gs)
+    call random_continuous_field(u2, coef, gs)
+    call random_continuous_field(u3, coef, gs)
+    call random_continuous_field(p_adj, coef, gs)
+
+    ! Guard against a vacuous pass on an all-zero (or accidentally
+    ! degenerate) field. Stored in locals and asserted only after every
+    ! field is freed below, so a failure here still runs the frees instead
+    ! of leaking device buffers into later tests (pFUnit's `@assert`
+    ! returns from the subroutine immediately on failure).
+    u_mag2 = field_glsc2(u1, u1) + field_glsc2(u2, u2) &
+         + field_glsc2(u3, u3)
+    p_mag2 = field_glsc2(p_adj, p_adj)
+
+    ! Production adjoint curl-curl load: L = (mu/rho) Dc^T M^T Dc^T M^T
+    ! G p_adj, as returned by adjoint_curl_curl_load (see module header
+    ! for the scaling this asserts).
+    call adjoint_curl_curl_load(load_x, load_y, load_z, p_adj, coef, gs, &
+         mu_val, rho_val, work1, work2, work3, work4)
+
+    ! Primal KIO curl-curl pressure-residual contribution, r_cc(u_e).
+    call primal_curl_curl_term(rcc, u1, u2, u3, coef, gs, mu_val, rho_val, &
+         ta1, ta2, ta3, wa1, wa2, wa3, cwork1, cwork2)
+
+    lhs = field_glsc2(u1, load_x) + field_glsc2(u2, load_y) &
+         + field_glsc2(u3, load_z)
+    rhs = -field_glsc2(p_adj, rcc)
+
+    if (pe_rank .eq. 0) then
+       print '(A,I0,A,I0,A,ES13.6,A,ES13.6,A,ES13.6)', &
+            'adjoint_curl_curl_transpose: lx=', lx, ' npes=', pe_size, &
+            ' rhs=', rhs, ' lhs=', lhs, ' relerr=', &
+            abs(rhs - lhs) / max(abs(rhs), magnitude_floor)
+    end if
+
+    call rcc%free()
+    call cwork2%free()
+    call cwork1%free()
+    call wa3%free()
+    call wa2%free()
+    call wa1%free()
+    call ta3%free()
+    call ta2%free()
+    call ta1%free()
+    call work4%free()
+    call work3%free()
+    call work2%free()
+    call work1%free()
+    call load_z%free()
+    call load_y%free()
+    call load_x%free()
+    call p_adj%free()
+    call u3%free()
+    call u2%free()
+    call u1%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+    @assertTrue(u_mag2 > magnitude_floor, &
+         'random velocity field is numerically zero -- vacuous test')
+    @assertTrue(p_mag2 > magnitude_floor, &
+         'random adjoint pressure field is numerically zero -- vacuous test')
+    @assertTrue(abs(rhs) > magnitude_floor, &
+         'reference pairing is numerically zero -- vacuous test')
+    @assertRelativelyEqual(rhs, lhs, tolerance = transpose_rtol)
+
+  end subroutine run_transpose_check
+
+  ! ========================================================================== !
+  ! Test entry points.
+
+  @test(npes=[1,2])
+  subroutine test_transpose_p2(this)
+    class(test_curl_curl_transpose), intent(inout) :: this
+
+    call run_transpose_check(3)
+
+  end subroutine test_transpose_p2
+
+  @test(npes=[1,2])
+  subroutine test_transpose_p5(this)
+    class(test_curl_curl_transpose), intent(inout) :: this
+
+    call run_transpose_check(6)
+
+  end subroutine test_transpose_p5
+
+  !> Green path of `adjoint_curl_curl_check`: a three-dimensional mesh, no
+  !! symmetry facets marked on either boundary condition, and no cyclic
+  !! boundaries must not raise an error.
+  @test(npes=[1])
+  subroutine test_check_green_path(this)
+    class(test_curl_curl_transpose), intent(inout) :: this
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t) :: coef
+    type(facet_normal_t) :: prim_sym, adj_sym
+    integer :: n_prim_facet, n_adj_facet
+
+    call gen_box_mesh(msh, 2, 2, 2, 1.0_dp, 1.0_dp, 1.0_dp)
+    call Xh%init(GLL, 3, 3, 3)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+
+    call prim_sym%init_from_components(coef)
+    call adj_sym%init_from_components(coef)
+
+    ! Stored in locals so the counts can be asserted after every field is
+    ! freed below (pFUnit's `@assert` returns immediately on failure,
+    ! which would otherwise skip the frees and leak device buffers into
+    ! later tests).
+    n_prim_facet = prim_sym%marked_facet%size()
+    n_adj_facet = adj_sym%marked_facet%size()
+
+    ! The mesh dimension is not checked here: adjoint_case_init_common
+    ! rejects a mesh that is not three-dimensional before the adjoint
+    ! fluid, and hence this check, is reached.
+    call adjoint_curl_curl_check(prim_sym, adj_sym, .false.)
+
+    call adj_sym%free()
+    call prim_sym%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+    @assertEqual(0, n_prim_facet)
+    @assertEqual(0, n_adj_facet)
+
+  end subroutine test_check_green_path
+
+end module adjoint_curl_curl_transpose
