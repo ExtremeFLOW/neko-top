@@ -81,13 +81,8 @@ endif()
 # ============================================================================ #
 # Define pFUnit checkpointing tests
 
-# The helper module shared by the tests below holds no tests, so it is built
-# once and linked into each of them. Listing it in TEST_SOURCES instead would
-# have every target regenerate the same preprocessed file next to the source,
-# and register it as an empty test suite. It is a static library, not an
-# object library, because the Ninja generator of CMake 3.21 does not see the
-# Fortran modules of a linked object library, and so would not rebuild the
-# tests when the interface of the helper changes.
+# The helper module shared by the tests below, it is built once and linked into
+# each of them.
 set(CHECKPOINT_UTILS_MOD_DIR
     ${CMAKE_CURRENT_BINARY_DIR}/mod/checkpointing_test_utils)
 add_library(checkpointing_test_utils STATIC
