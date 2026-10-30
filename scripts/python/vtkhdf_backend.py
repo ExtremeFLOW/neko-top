@@ -13,7 +13,9 @@ the originals:
   is_virtual and creation property list are used, and step data is read
   from the source file directly;
 - bulk data only moves through copy_rows(), whose buffer is at most
-  BLOCK_BYTES; metadata reads are O(NSteps + number of parts).
+  BLOCK_BYTES; metadata reads are O(NSteps + number of parts);
+- a split chunk copies only the mesh: its point data are virtual datasets
+  referencing the original per-step files, so it moves no field data.
 """
 
 import contextlib
@@ -26,7 +28,7 @@ from pathlib import Path
 
 import h5py
 import numpy as np
-from h5py import h5a, h5s
+from h5py import h5a, h5d, h5p, h5s
 
 BLOCK_BYTES = 64 * 1024**2
 """Largest buffer used for any bulk copy."""
@@ -40,6 +42,10 @@ COUNT_DATASETS = ("NumberOfPoints", "NumberOfCells",
 STEP_OFFSETS = ("PartOffsets", "PointOffsets", "CellOffsets",
                 "ConnectivityIdOffsets")
 SIZE_UNITS = "KMGT"
+CHUNK_OVERHEAD = 1024**2
+"""Fixed allowance for a chunk's HDF5 metadata in size estimates."""
+MAPPING_OVERHEAD = 256
+"""Allowance per step and field for a VDS mapping (about 90 B)."""
 
 StepSources = tuple[int, list[Path], int]
 """(step, distinct source files, their total bytes)."""
@@ -65,6 +71,22 @@ class FieldInfo:
     kind: str
     names: tuple[str, ...]
     dset: str
+
+
+@dataclass(frozen=True)
+class Chunk:
+    """One planned split chunk.
+
+    files are the per-step files it references, relative to the input's
+    directory, in step order; source_bytes is their total size and
+    estimate the planned footprint (chunk file plus files).
+    """
+    steps: range
+    path: Path
+    manifest: Path
+    files: tuple[str, ...]
+    source_bytes: int
+    estimate: int
 
 
 @dataclass
@@ -386,34 +408,34 @@ def check_sources(info: FileInfo,
     """Validate the source data of each step.
 
     Each referenced file is opened read-only, one at a time, and every
-    field's dataset in it must hold the step's N rows of the right row
-    shape. HDF5 would read a missing source silently as fill values, so
-    this runs before anything is written.
+    field's dataset in it must have exactly the step's N rows of the right
+    row shape: a VDS mapping selects the whole source, and HDF5 refuses to
+    read a mapping whose source has a different size. HDF5 would read a
+    missing source silently as fill values, so this runs before anything
+    is written.
     """
     result = []
     for step in steps:
-        by_file: dict[Path, list[tuple[FieldInfo, str, int]]] = {}
+        by_file: dict[Path, list[tuple[FieldInfo, str]]] = {}
         for fld in info.fields:
             if fld.kind != "inline":
-                source, dset, row0 = step_source(info, fld, step)
-                by_file.setdefault(source, []).append((fld, dset, row0))
+                source, dset, _ = step_source(info, fld, step)
+                by_file.setdefault(source, []).append((fld, dset))
         nbytes = 0
         for source, items in by_file.items():
             if not source.is_file():
                 raise VtkhdfError(f"step {step}: per-step file {source} "
                                   "is missing")
             with open_input(source) as src:
-                for fld, dset, row0 in items:
+                for fld, dset in items:
                     ds = src.get(dset)
-                    want = (row0 + info.n_points,) + fld.row_shape
+                    want = (info.n_points,) + fld.row_shape
                     if not isinstance(ds, h5py.Dataset):
                         raise VtkhdfError(f"step {step}: {source} has no "
                                           f"dataset {dset!r}")
-                    shape = ds.shape
-                    if (len(shape) != len(want) or shape[0] < want[0]
-                            or shape[1:] != want[1:]):
+                    if ds.shape != want:
                         raise VtkhdfError(f"step {step}: {source}:{dset} "
-                                          f"has shape {shape}, expected "
+                                          f"has shape {ds.shape}, expected "
                                           f"{want}")
             nbytes += source.stat().st_size
         result.append((step, list(by_file), nbytes))
@@ -453,6 +475,153 @@ def find_step(info: FileInfo, step: int | None = None,
 def step_label(n_steps: int, step: int) -> str:
     """The step index zero-padded to the width of n_steps - 1."""
     return f"{step:0{len(str(n_steps - 1))}d}"
+
+
+def strictly_increasing(times: np.ndarray) -> bool:
+    return bool(np.all(np.diff(times) > 0))
+
+
+def time_order_warning(info: FileInfo) -> str | None:
+    """A warning naming the first step whose time does not increase."""
+    bad = np.flatnonzero(np.diff(info.times) <= 0)
+    if not len(bad):
+        return None
+    s = int(bad[0]) + 1
+    return (f"{info.path}: times are not strictly increasing (step {s} has "
+            f"t = {info.times[s]:g} after t = {info.times[s - 1]:g}); "
+            "each chunk keeps them as they are")
+
+
+# --------------------------------------------------------------------------
+# Chunk planning
+
+
+def plan_by_count(n_steps: int, k: int) -> list[range]:
+    """Consecutive runs of k steps; the last one may be shorter."""
+    if k < 1:
+        raise VtkhdfError(f"--steps-per-chunk must be at least 1, got {k}")
+    return [range(a, min(a + k, n_steps)) for a in range(0, n_steps, k)]
+
+
+def plan_by_time(times: np.ndarray, width: float) -> list[range]:
+    """Group steps by absolute window [m W, (m + 1) W); empty windows are
+    skipped. TIME_EPS absorbs float noise at window edges."""
+    if not (math.isfinite(width) and width > 0):
+        raise VtkhdfError(f"--time-window must be positive, got {width:g}")
+    if not strictly_increasing(times):
+        raise VtkhdfError("--time-window needs strictly increasing times, "
+                          "and this file's are not; use --steps-per-chunk "
+                          "or --max-size")
+    index = np.floor(times / width + TIME_EPS).astype(np.int64)
+    edges = [0, *(np.flatnonzero(np.diff(index)) + 1).tolist(), len(times)]
+    return [range(a, b) for a, b in zip(edges[:-1], edges[1:])]
+
+
+def plan_by_size(step_bytes: list[int], fixed_bytes: int,
+                 limit: int) -> list[range]:
+    """Greedy packing: add steps while fixed_bytes plus the steps' bytes
+    stay within limit. A step that alone exceeds it is an error."""
+    chunks, start, used = [], 0, fixed_bytes
+    for step, nbytes in enumerate(step_bytes):
+        need = fixed_bytes + nbytes
+        if need > limit:
+            raise VtkhdfError(f"step {step} alone needs about "
+                              f"{format_size(need)} ({need} B: mesh, chunk "
+                              "overhead and its per-step files), more than "
+                              f"--max-size {format_size(limit)} ({limit} B)")
+        if used + nbytes > limit:
+            chunks.append(range(start, step))
+            start, used = step, fixed_bytes
+        used += nbytes
+    chunks.append(range(start, len(step_bytes)))
+    return chunks
+
+
+def mesh_bytes(f: h5py.File) -> int:
+    """Payload bytes of the mesh datasets a chunk copies."""
+    root = f["VTKHDF"]
+    return sum(root[name].dtype.itemsize * math.prod(root[name].shape)
+               for name in MESH_DATASETS)
+
+
+def source_relpath(info: FileInfo, source: Path) -> str:
+    """A per-step file's path relative to the input's directory, as a
+    chunk's VDS mapping and manifest store it.
+
+    It must lie inside that directory, or an rsync --files-from manifest
+    cannot ship it, and contain no '%', which HDF5 would printf-parse and
+    Neko's reader would not.
+    """
+    rel = os.path.relpath(os.path.abspath(source),
+                          os.path.abspath(info.path.parent))
+    if ".." in Path(rel).parts:
+        raise VtkhdfError(f"per-step file {source} is outside the input's "
+                          "directory, so a chunk manifest cannot ship it")
+    if "%" in rel:
+        raise VtkhdfError(f"per-step file {rel!r} contains '%': not "
+                          "supported in a chunk's VDS mapping")
+    return rel
+
+
+def chunk_stem(info: FileInfo, steps: range) -> str:
+    first = step_label(info.n_steps, steps[0])
+    last = step_label(info.n_steps, steps[-1])
+    return f"{info.path.stem}_steps_{first}-{last}"
+
+
+def prepare_split(f: h5py.File, info: FileInfo, *,
+                  steps_per_chunk: int | None = None,
+                  time_window: float | None = None,
+                  max_size: int | None = None,
+                  overwrite: bool = False) -> tuple[list[Chunk], list[str]]:
+    """Validate everything a split needs and plan its chunks: returns the
+    chunks and any warnings. Writes nothing.
+
+    Exactly one of steps_per_chunk, time_window and max_size selects the
+    planning mode. Every per-step file is checked with check_sources, and
+    every planned output with check_output, before anything is written.
+    """
+    if not info.temporal:
+        raise VtkhdfError(f"{info.path} is not temporal (no Steps group): "
+                          "nothing to split")
+    inline = [fld.name for fld in info.fields if fld.kind == "inline"]
+    if inline:
+        raise VtkhdfError(f"{info.path}: point data {', '.join(inline)} "
+                          "are stored inline in the main file, so a chunk "
+                          "has nothing to reference; use extract")
+    warnings = []
+    order = time_order_warning(info)
+    if order and time_window is None:
+        warnings.append(order)
+
+    checked = check_sources(info, range(info.n_steps))
+    sizes = {p: p.stat().st_size for _, files, _ in checked for p in files}
+    rel = {p: source_relpath(info, p) for p in sizes}
+    step_cost = [sum(sizes[p] for p in files)
+                 + MAPPING_OVERHEAD * len(info.fields)
+                 for _, files, _ in checked]
+    fixed = mesh_bytes(f) + CHUNK_OVERHEAD
+    if steps_per_chunk is not None:
+        plan = plan_by_count(info.n_steps, steps_per_chunk)
+    elif time_window is not None:
+        plan = plan_by_time(info.times, time_window)
+    else:
+        plan = plan_by_size(step_cost, fixed, max_size)
+
+    protected = protected_paths(info)
+    chunks = []
+    for steps in plan:
+        stem = chunk_stem(info, steps)
+        path = info.path.parent / f"{stem}.vtkhdf"
+        manifest = info.path.parent / f"{stem}.files"
+        for out in (path, manifest):
+            check_output(out, overwrite, protected)
+        files = list(dict.fromkeys(p for s in steps for p in checked[s][1]))
+        chunks.append(Chunk(steps, path, manifest,
+                            tuple(rel[p] for p in files),
+                            sum(sizes[p] for p in files),
+                            fixed + sum(step_cost[s] for s in steps)))
+    return chunks, warnings
 
 
 # --------------------------------------------------------------------------
@@ -551,6 +720,103 @@ def write_part_counts(info: FileInfo, dst_vtkhdf: h5py.Group,
                                         dtype=counts.dtype)
         for r in range(repeats):
             dst[r * p:(r + 1) * p] = counts
+
+
+def fill_value(dtype: np.dtype):
+    """Fill for a chunk's VDS, read wherever a source is missing: NaN for
+    floats, the most negative value for signed and the largest for
+    unsigned integers, HDF5's default (zero) otherwise."""
+    if dtype.kind in "fc":
+        return np.nan
+    if dtype.kind == "i":
+        return np.iinfo(dtype).min
+    if dtype.kind == "u":
+        return np.iinfo(dtype).max
+    return None
+
+
+def write_steps(info: FileInfo, steps: range, dst_vtkhdf: h5py.Group) -> None:
+    """The chunk's Steps group: original times, P parts, zero offsets and
+    PointDataOffsets j * N for its k steps."""
+    k = len(steps)
+    group = dst_vtkhdf.create_group("Steps")
+    group.attrs.create("NSteps", k, dtype=np.int32)
+    group.create_dataset("Values", data=info.times[steps.start:steps.stop])
+    group.create_dataset("NumberOfParts",
+                         data=np.full(k, info.n_parts, dtype=np.int64))
+    for name in STEP_OFFSETS:
+        group.create_dataset(name, data=np.zeros(k, dtype=np.int64))
+    offsets = group.create_group("PointDataOffsets")
+    for fld in info.fields:
+        offsets.create_dataset(
+            fld.name, data=np.arange(k, dtype=np.int64) * info.n_points)
+
+
+def write_vds(info: FileInfo, field: FieldInfo, steps: range,
+              src: h5py.Dataset, dst_group: h5py.Group) -> None:
+    """A fixed-shape VDS whose mapping j covers rows [jN, (j+1)N) and
+    selects all of the source of step steps[j]; mappings are added in
+    ascending j because Neko's reader uses mapping index == step."""
+    n, rows = info.n_points, field.row_shape
+    shape = (len(steps) * n,) + rows
+    dcpl = h5p.create(h5p.DATASET_CREATE)
+    # No timestamps in the object header, as h5py's create_dataset does,
+    # so that outputs are reproducible.
+    dcpl.set_obj_track_times(False)
+    fill = fill_value(field.dtype)
+    if fill is not None:
+        dcpl.set_fill_value(np.array(fill, dtype=field.dtype))
+    vspace = h5s.create_simple(shape)
+    src_space = h5s.create_simple((n,) + rows)
+    for j, step in enumerate(steps):
+        source, dset, _ = step_source(info, field, step)
+        vspace.select_hyperslab((j * n,) + (0,) * len(rows),
+                                (1,) * len(shape), block=(n,) + rows)
+        dcpl.set_virtual(vspace, source_relpath(info, source).encode(),
+                         dset.encode(), src_space)
+    dsid = h5d.create(dst_group.id, field.name.encode(), src.id.get_type(),
+                      h5s.create_simple(shape), dcpl=dcpl)
+    copy_attrs(src, h5py.Dataset(dsid))
+
+
+def write_chunk(f: h5py.File, info: FileInfo, steps: range, out: Path,
+                overwrite: bool,
+                protected: set[str] | None = None) -> list[Path]:
+    """Write one split chunk: the mesh, Steps for its k steps and point
+    data as VDS referencing the original per-step files; FieldData/Time
+    only when k == 1, as VTK reads a 1-step file as static. Returns the
+    referenced files. protected defaults to protected_paths(info).
+    """
+    if any(fld.kind == "inline" for fld in info.fields):
+        raise VtkhdfError(f"{info.path}: inline point data cannot be "
+                          "referenced by a chunk")
+    check_output(out, overwrite, protected if protected is not None
+                 else protected_paths(info))
+    src_root = f["VTKHDF"]
+    with atomic_output(out, overwrite) as tmp, h5py.File(tmp, "x") as dst:
+        root = dst.create_group("VTKHDF")
+        copy_attrs(src_root, root)
+        copy_mesh(src_root, root)
+        write_part_counts(info, root, len(steps))
+        write_steps(info, steps, root)
+        point_data = root.create_group("PointData")
+        for fld in info.fields:
+            write_vds(info, fld, steps, src_root["PointData"][fld.name],
+                      point_data)
+        if len(steps) == 1:
+            root.create_group("FieldData").create_dataset(
+                "Time", data=info.times[steps.start:steps.stop])
+        dst.attrs["source_file"] = info.path.name
+        dst.attrs["source_steps"] = np.array([steps[0], steps[-1]],
+                                             dtype=np.int64)
+    return list(dict.fromkeys(p for s in steps for p in step_files(info, s)))
+
+
+def write_manifest(path: Path, entries: list[str], overwrite: bool) -> None:
+    """Write one path per line, atomically."""
+    with atomic_output(path, overwrite) as tmp:
+        with open(tmp, "x", encoding="utf-8") as handle:
+            handle.writelines(f"{entry}\n" for entry in entries)
 
 
 def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
