@@ -91,6 +91,7 @@
         },
         "adjoint_scalar": {
             "enabled": true,
+            "primal_name": "temperature",
             "boundary_conditions": [
                 {
                     "type": "dirichlet",
@@ -150,7 +151,8 @@
         ]
     },
     "unsteady": true,
-    "checkpoints": {
+    "state_recovery": {
+        "type": "checkpoint",
         "enabled": true,
         "format": "chkp",
         "n_memory": 100,
@@ -169,8 +171,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 1000.0,
-                    "q": 3.0,
-                    "convex_up": true
+                    "q": 3.0
                 }
             ],
             "initial_distribution": {

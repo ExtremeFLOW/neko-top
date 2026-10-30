@@ -96,24 +96,28 @@
             {
                 "order": 1,
                 "type": "derivative",
+                "name": "derivative_du_dx",
                 "field": "u",
                 "direction": "x"
             },
             {
                 "order": 2,
                 "type": "derivative",
+                "name": "derivative_du_dy",
                 "field": "u",
                 "direction": "y"
             },
             {
                 "order": 3,
                 "type": "derivative",
+                "name": "derivative_dv_dx",
                 "field": "v",
                 "direction": "x"
             },
             {
                 "order": 4,
                 "type": "derivative",
+                "name": "derivative_dv_dy",
                 "field": "v",
                 "direction": "y"
             },
@@ -123,13 +127,14 @@
                 "compute_control": "tsteps",
                 "compute_value": 5,
                 "output_control": "simulationtime",
-                "output_value": 50,
+                "output_value": 50.0,
                 "start_time": 50.0,
                 "set_of_stats": "basic"
             },
             // one BL (45 degrees)
             {
                 "type": "probes",
+                "name": "probes_BL_45",
                 "fields": [
                     "u",
                     "v",
@@ -156,6 +161,7 @@
             // one BL (30 degrees)
             {
                 "type": "probes",
+                "name": "probes_BL_30",
                 "fields": [
                     "u",
                     "v",
@@ -182,6 +188,7 @@
             // one BL (60 degrees)
             {
                 "type": "probes",
+                "name": "probes_BL_60",
                 "fields": [
                     "u",
                     "v",
@@ -208,6 +215,7 @@
             // circles 0.48
             {
                 "type": "probes",
+                "name": "probes_circ_048",
                 "fields": [
                     "u",
                     "v",
@@ -236,6 +244,7 @@
             // circles 0.50
             {
                 "type": "probes",
+                "name": "probes_circ_050",
                 "fields": [
                     "u",
                     "v",
@@ -264,6 +273,7 @@
             // circles 0.501
             {
                 "type": "probes",
+                "name": "probes_circ_0501",
                 "fields": [
                     "u",
                     "v",
@@ -291,6 +301,7 @@
             // circles 0.502
             {
                 "type": "probes",
+                "name": "probes_circ_0502",
                 "fields": [
                     "u",
                     "v",
@@ -318,6 +329,7 @@
             // circles 0.505
             {
                 "type": "probes",
+                "name": "probes_circ_0505",
                 "fields": [
                     "u",
                     "v",
@@ -345,6 +357,7 @@
             // circles 0.51
             {
                 "type": "probes",
+                "name": "probes_circ_051",
                 "fields": [
                     "u",
                     "v",
@@ -372,6 +385,7 @@
             // circles 0.52
             {
                 "type": "probes",
+                "name": "probes_circ_052",
                 "fields": [
                     "u",
                     "v",
@@ -400,6 +414,7 @@
             // circles 0.55
             {
                 "type": "probes",
+                "name": "probes_circ_055",
                 "fields": [
                     "u",
                     "v",
