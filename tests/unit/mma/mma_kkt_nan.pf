@@ -1,9 +1,10 @@
-!> Unit tests for NaN handling in the KKT residual of the CPU MMA backend.
+!> Unit tests for NaN handling in the KKT residual of the MMA backends.
 !!
 !! The MMA optimiser stops once the max-norm of the KKT residual, residumax,
-!! drops below its tolerance. MAX, MAXVAL and MPI_MAX can all drop a NaN, so
-!! a NaN in the sensitivities on a single rank must still make residumax NaN
-!! on every rank. Otherwise the optimiser can read a NaN design as converged.
+!! drops below its tolerance. MAX, MAXVAL and MPI_MAX can all drop a NaN, and
+!! so can the device max-reductions, so a NaN in the sensitivities on a single
+!! rank must still make residumax NaN on every rank. Otherwise the optimiser
+!! can read a NaN design as converged.
 module mma_kkt_nan
   use pfunit
   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_value, &
@@ -13,12 +14,13 @@ module mma_kkt_nan
        ieee_set_halting_mode
   use num_types, only: rp
   use neko, only: neko_init
+  use neko_config, only: NEKO_BCKND_DEVICE
   use comm, only: pe_rank
   use mma, only: mma_t
   use vector, only: vector_t
   use vector_math, only: vector_glsum
   use matrix, only: matrix_t
-  use device, only: HOST_TO_DEVICE
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
 
   implicit none
 
@@ -48,7 +50,7 @@ contains
   subroutine dip_nan_on_one_rank(this)
     class(test_mma_kkt_nan_case), intent(inout) :: this
 
-    call check_nan_on_one_rank('dip')
+    call check_nan_on_one_rank('dip', 'cpu')
 
   end subroutine dip_nan_on_one_rank
 
@@ -56,9 +58,30 @@ contains
   subroutine pdip_nan_on_one_rank(this)
     class(test_mma_kkt_nan_case), intent(inout) :: this
 
-    call check_nan_on_one_rank('pdip')
+    call check_nan_on_one_rank('pdip', 'cpu')
 
   end subroutine pdip_nan_on_one_rank
+
+  ! The device backend exists in a device build only, so these two pass
+  ! without checking anything in a CPU build
+
+  @test(npes=[2])
+  subroutine dip_nan_on_one_rank_device(this)
+    class(test_mma_kkt_nan_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    call check_nan_on_one_rank('dip', 'device')
+
+  end subroutine dip_nan_on_one_rank_device
+
+  @test(npes=[2])
+  subroutine pdip_nan_on_one_rank_device(this)
+    class(test_mma_kkt_nan_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    call check_nan_on_one_rank('pdip', 'device')
+
+  end subroutine pdip_nan_on_one_rank_device
 
   ! ========================================================================== !
   ! Helpers
@@ -67,8 +90,9 @@ contains
   !! the new design twice: once as it is, and once with a NaN in a single
   !! objective sensitivity on rank 1 only.
   !! @param subsolver The MMA subsolver, 'dip' or 'pdip'.
-  subroutine check_nan_on_one_rank(subsolver)
-    character(len=*), intent(in) :: subsolver
+  !! @param bcknd The MMA backend, 'cpu' or 'device'.
+  subroutine check_nan_on_one_rank(subsolver, bcknd)
+    character(len=*), intent(in) :: subsolver, bcknd
     integer, parameter :: n = 3, m = 1
     type(mma_t) :: mma
     type(vector_t) :: x, df0dx, fval
@@ -92,10 +116,12 @@ contains
     d = 1.0_rp
 
     call mma%init_from_components(x, n, m, 1.0_rp, a, c, d, xmin, xmax, &
-         bcknd = 'cpu', subsolver = subsolver)
+         bcknd = bcknd, subsolver = subsolver)
 
     call quadratic_problem(x, df0dx, fval, dfdx)
     call mma%update(1, x, df0dx, fval, dfdx)
+    ! The device backend updates the design on the device only
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
     call quadratic_problem(x, df0dx, fval, dfdx)
 
     ! Control: the finite design gives a finite residual

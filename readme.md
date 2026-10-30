@@ -16,6 +16,7 @@ https://extremeflow.github.io/neko-top/.
 
 The Neko-TOP library is dependent on the following libraries:
 
+- CMake 3.21 or higher.
 - Fortran 2008  
     We assume gfortran, use `FC` environment variable to override.
 - MPI: We tested with OpenMPI 3.1.

@@ -21,6 +21,11 @@ top level of the case file:
 The available implementation is `checkpoint`, which restarts the forward
 problem from stored checkpoints.
 
+Unsteady problems need a fixed timestep. The adjoint restores the forward
+states one step at a time and assumes every step had the same `dt`, so a case
+that sets `case.time.variable_timestep` together with `"unsteady": true` stops
+with an error.
+
 ## Checkpoint based state recovery
 
 A straight forward approach is to simply store the entire forward state at each

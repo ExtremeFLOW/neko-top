@@ -67,11 +67,11 @@ module scalar_mixing_objective
      private
 
      !> pointer to the primal passive scalar fields \f$\phi\f$
-     type(field_t), pointer :: phi
+     type(field_t), pointer :: phi => null()
      !> Target concentration in the optimized region \f$\phi_{ref}\f$
      real(kind=rp) :: phi_ref
      !> Coefficients defined on a given mesh
-     class(coef_t), pointer :: coef
+     class(coef_t), pointer :: coef => null()
      !> Volume of the domain \f$|\Omega_{obj}|\f$
      real(kind=rp) :: domain_volume
      !> name of the scalar field being acted on
@@ -81,7 +81,9 @@ module scalar_mixing_objective
      ! THESE SHOULD BE DELETED WHEN THE DESIGN UPDATE COMES IN.
      ! These sensitivity should return zero, and the simulation
      ! should compute the u u_adj component
-     type(field_t), pointer :: u, v, w, u_adj, v_adj, w_adj
+     type(field_t), pointer :: u => null(), v => null(), w => null()
+     type(field_t), pointer :: u_adj => null(), v_adj => null(), &
+          w_adj => null()
 
    contains
 
@@ -161,11 +163,16 @@ contains
 
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
     integer :: i_scalar, i_adjoint_scalar
+    character(len=:), allocatable :: scalar_name_copy
 
     ! Start by checking if the adjoint scalar has been initialized
     if (.not.allocated(simulation%adjoint_case%adjoint_scalars)) then
        call neko_error("adjoint passive scalar not initialized")
     end if
+
+    ! Copy before free, in case the argument is this%scalar_name.
+    scalar_name_copy = trim(scalar_name)
+    call this%free()
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name, &
@@ -181,7 +188,7 @@ contains
        this%domain_volume = this%coef%volume
     end if
 
-    this%scalar_name = trim(scalar_name)
+    call move_alloc(scalar_name_copy, this%scalar_name)
 
     ! figure out the index associated with the scalar and adjoint scalar.
     call get_scalar_indicies(i_scalar, i_adjoint_scalar, simulation%scalars, &
@@ -220,6 +227,7 @@ contains
   end subroutine scalar_mixing_init_attributes
 
   !> Destructor.
+  !! @param this The objective.
   subroutine scalar_mixing_free(this)
     class(scalar_mixing_objective_t), intent(inout) :: this
     call this%free_base()
@@ -231,6 +239,9 @@ contains
     this%u_adj => null()
     this%v_adj => null()
     this%w_adj => null()
+    this%coef => null()
+
+    if (allocated(this%scalar_name)) deallocate(this%scalar_name)
 
   end subroutine scalar_mixing_free
 
