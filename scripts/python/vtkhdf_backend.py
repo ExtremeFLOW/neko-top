@@ -41,8 +41,7 @@ TIME_EPS = 1e-9
 """Relative tolerance used to compare times."""
 
 MESH_DATASETS = ("Points", "Connectivity", "Offsets", "Types")
-COUNT_DATASETS = ("NumberOfPoints", "NumberOfCells",
-                  "NumberOfConnectivityIds")
+COUNT_DATASETS = ("NumberOfPoints", "NumberOfCells", "NumberOfConnectivityIds")
 STEP_OFFSETS = ("PartOffsets", "PointOffsets", "CellOffsets",
                 "ConnectivityIdOffsets")
 SIZE_UNITS = "KMGT"
@@ -207,14 +206,16 @@ def inspect(f: h5py.File, path: Path) -> FileInfo:
     if n_parts < 1:
         raise VtkhdfError(f"{path}: the file has {n_parts} parts")
 
-    part_counts = {name: head(root, name, n_parts, path)
-                   for name in COUNT_DATASETS}
+    part_counts = {
+        name: head(root, name, n_parts, path)
+        for name in COUNT_DATASETS
+    }
     n_points, n_cells, n_conn = (int(part_counts[name].sum())
                                  for name in COUNT_DATASETS)
     expect_shape(root, "Points", (n_points, 3), path)
-    expect_shape(root, "Types", (n_cells,), path)
-    expect_shape(root, "Offsets", (n_cells + n_parts,), path)
-    expect_shape(root, "Connectivity", (n_conn,), path)
+    expect_shape(root, "Types", (n_cells, ), path)
+    expect_shape(root, "Offsets", (n_cells + n_parts, ), path)
+    expect_shape(root, "Connectivity", (n_conn, ), path)
 
     cell_data = root.get("CellData")
     if isinstance(cell_data, h5py.Group) and len(cell_data):
@@ -223,8 +224,8 @@ def inspect(f: h5py.File, path: Path) -> FileInfo:
     if isinstance(field_data, h5py.Group):
         extra = sorted(set(field_data) - {"Time"})
         if extra:
-            warnings.append(f"{path}: input FieldData is ignored: "
-                            + ", ".join(extra))
+            warnings.append(f"{path}: input FieldData is ignored: " +
+                            ", ".join(extra))
 
     fields = []
     point_data = root.get("PointData")
@@ -234,21 +235,17 @@ def inspect(f: h5py.File, path: Path) -> FileInfo:
         if temporal and "PointDataOffsets" in steps:
             offsets = group(steps, "PointDataOffsets", path)
         for name in point_data:
-            fields.append(inspect_field(point_data, name, offsets, n_steps,
-                                        n_points, temporal, path))
+            fields.append(
+                inspect_field(point_data, name, offsets, n_steps, n_points,
+                              temporal, path))
     if (os.environ.get("HDF5_VDS_PREFIX")
             and any(fld.kind != "inline" for fld in fields)):
         warnings.append("HDF5_VDS_PREFIX is set: HDF5 and VTK resolve "
                         "relative VDS sources against it first, this tool "
                         "against the input's directory")
 
-    origin = f.attrs.get("source_file")
-    derived_from = None
-    if isinstance(origin, (bytes, str)) and origin:
-        derived_from = path.parent / os.fsdecode(origin)
-    return FileInfo(path, vtk_type, version, temporal, n_steps, times,
-                    n_parts, n_points, n_cells, n_conn, part_counts, fields,
-                    warnings, derived_from)
+    return FileInfo(path, vtk_type, version, temporal, n_steps, times, n_parts,
+                    n_points, n_cells, n_conn, part_counts, fields, warnings)
 
 
 def inspect_field(point_data: h5py.Group, name: str,
@@ -271,8 +268,7 @@ def inspect_field(point_data: h5py.Group, name: str,
     if not ds.is_virtual:
         shape = ds.shape
         rows = n_steps * n_points
-        if not shape or shape[0] < rows or (not temporal
-                                           and shape[0] != rows):
+        if not shape or shape[0] < rows or (not temporal and shape[0] != rows):
             raise VtkhdfError(f"{where} has shape {shape}, expected "
                               f"{rows} rows")
         return FieldInfo(name, ds.dtype, shape[1:], "inline", (), ds.name)
@@ -296,8 +292,9 @@ def inspect_field(point_data: h5py.Group, name: str,
     if len(dsets) != 1 or "%" in next(iter(dsets)):
         raise VtkhdfError(f"{where}: VDS source dataset names "
                           f"{sorted(dsets)} not supported")
-    if any(dcpl.get_virtual_srcspace(i).get_select_type() != h5s.SEL_ALL
-           for i in range(count)):
+    if any(
+            dcpl.get_virtual_srcspace(i).get_select_type() != h5s.SEL_ALL
+            for i in range(count)):
         raise VtkhdfError(f"{where}: VDS source selection is not ALL: "
                           "not supported")
 
@@ -339,10 +336,8 @@ def is_printf_mapping(vspace: h5s.SpaceID, n_points: int,
             or not vspace.is_regular_hyperslab()):
         return False
     start, stride, count, block = vspace.get_regular_hyperslab()
-    return (all(s == 0 for s in start)
-            and stride[0] == block[0] == n_points
-            and count[0] == h5s.UNLIMITED
-            and all(c == 1 for c in count[1:])
+    return (all(s == 0 for s in start) and stride[0] == block[0] == n_points
+            and count[0] == h5s.UNLIMITED and all(c == 1 for c in count[1:])
             and tuple(block[1:]) == row_shape)
 
 
@@ -353,9 +348,8 @@ def is_step_rows(vspace: h5s.SpaceID, step: int, n_points: int,
         return False
     low, high = vspace.get_select_bounds()
     return (tuple(vspace.shape[1:]) == row_shape
-            and low == (step * n_points,) + (0,) * len(row_shape)
-            and high == ((step + 1) * n_points - 1,)
-            + tuple(r - 1 for r in row_shape))
+            and low == (step * n_points, ) + (0, ) * len(row_shape) and high
+            == ((step + 1) * n_points - 1, ) + tuple(r - 1 for r in row_shape))
 
 
 def attr_text(obj: h5py.HLObject, name: str) -> str:
@@ -456,8 +450,9 @@ def step_source(info: FileInfo, field: FieldInfo,
 
 def step_files(info: FileInfo, step: int) -> list[Path]:
     """The distinct per-step source files of one step."""
-    files = dict.fromkeys(step_source(info, fld, step)[0]
-                          for fld in info.fields if fld.kind != "inline")
+    files = dict.fromkeys(
+        step_source(info, fld, step)[0] for fld in info.fields
+        if fld.kind != "inline")
     return list(files)
 
 
@@ -510,7 +505,7 @@ def check_sources(info: FileInfo,
             with open_input(source) as src:
                 for fld, dset in items:
                     ds = src.get(dset)
-                    want = (info.n_points,) + fld.row_shape
+                    want = (info.n_points, ) + fld.row_shape
                     if not isinstance(ds, h5py.Dataset):
                         raise VtkhdfError(f"step {step}: {source} has no "
                                           f"dataset {dset!r}")
@@ -523,7 +518,8 @@ def check_sources(info: FileInfo,
     return result
 
 
-def find_step(info: FileInfo, step: int | None = None,
+def find_step(info: FileInfo,
+              step: int | None = None,
               time: float | None = None) -> int:
     """Resolve --step (negative counts from the end) or --time (nearest
     step; a tie is an error naming the candidates)."""
@@ -547,10 +543,8 @@ def find_step(info: FileInfo, step: int | None = None,
     best = int(np.argmin(dist))
     # A tie is two steps equally far away up to float noise, measured
     # against their own spacing; equal times (restarts) always tie.
-    # Non-finite times are never candidates.
-    with np.errstate(invalid="ignore"):
-        ties = np.flatnonzero(finite & (dist - dist[best] <= TIME_EPS
-                                        * np.abs(times - times[best])))
+    ties = np.flatnonzero(dist - dist[best] <= TIME_EPS *
+                          np.abs(times - times[best]))
     if len(ties) > 1:
         cands = ", ".join(f"{s} (t = {times[s]:g})" for s in ties)
         raise VtkhdfError(f"time {time:g} is equally close to steps "
@@ -707,7 +701,9 @@ def chunk_stem(info: FileInfo, steps: range) -> str:
     return f"{info.path.stem}_steps_{first}-{last}"
 
 
-def prepare_split(f: h5py.File, info: FileInfo, *,
+def prepare_split(f: h5py.File,
+                  info: FileInfo,
+                  *,
                   steps_per_chunk: int | None = None,
                   time_window: float | None = None,
                   max_size: int | None = None,
@@ -735,7 +731,11 @@ def prepare_split(f: h5py.File, info: FileInfo, *,
     checked = check_sources(info, range(info.n_steps))
     sizes = {p: p.stat().st_size for _, files, _ in checked for p in files}
     rel = {p: source_relpath(info, p) for p in sizes}
-    fixed, per_step = size_model(f, info, sizes)
+    step_cost = [
+        sum(sizes[p] for p in files) + MAPPING_OVERHEAD * len(info.fields)
+        for _, files, _ in checked
+    ]
+    fixed = mesh_bytes(f) + CHUNK_OVERHEAD
     if steps_per_chunk is not None:
         plan = plan_by_count(info.n_steps, steps_per_chunk)
     elif time_window is not None:
@@ -752,10 +752,10 @@ def prepare_split(f: h5py.File, info: FileInfo, *,
         for out in (path, manifest):
             check_output(out, overwrite, protected)
         files = list(dict.fromkeys(p for s in steps for p in checked[s][1]))
-        chunks.append(Chunk(steps, path, manifest,
-                            tuple(rel[p] for p in files),
-                            sum(sizes[p] for p in files),
-                            chunk_estimate(fixed, per_step, steps)))
+        chunks.append(
+            Chunk(steps, path, manifest, tuple(rel[p] for p in files),
+                  sum(sizes[p] for p in files),
+                  fixed + sum(step_cost[s] for s in steps)))
     return chunks, warnings
 
 
@@ -851,7 +851,8 @@ def atomic_output(path: Path, overwrite: bool) -> Iterator[Path]:
         raise
 
 
-def copy_attrs(src: h5py.HLObject, dst: h5py.HLObject,
+def copy_attrs(src: h5py.HLObject,
+               dst: h5py.HLObject,
                skip: tuple[str, ...] = ()) -> None:
     """Copy attributes byte-exactly, keeping each one's stored type.
 
@@ -872,14 +873,17 @@ def copy_attrs(src: h5py.HLObject, dst: h5py.HLObject,
         h5a.create(dst.id, key, ftype, space).write(buf, mtype=ftype)
 
 
-def copy_rows(src: h5py.Dataset, row0: int, nrows: int, dst: h5py.Dataset,
+def copy_rows(src: h5py.Dataset,
+              row0: int,
+              nrows: int,
+              dst: h5py.Dataset,
               dst_row0: int = 0) -> None:
     """Copy rows [row0, row0 + nrows) of src to dst from row dst_row0,
     through one reused buffer of at most BLOCK_BYTES."""
     row_shape = dst.shape[1:]
     row_bytes = dst.dtype.itemsize * math.prod(row_shape)
     block = max(1, BLOCK_BYTES // row_bytes)
-    buf = np.empty((min(block, nrows),) + row_shape, dtype=dst.dtype)
+    buf = np.empty((min(block, nrows), ) + row_shape, dtype=dst.dtype)
     for done in range(0, nrows, block):
         n = min(block, nrows - done)
         src.read_direct(buf, np.s_[row0 + done:row0 + done + n], np.s_[:n])
@@ -902,7 +906,7 @@ def write_part_counts(info: FileInfo, dst_vtkhdf: h5py.Group,
     repeat (VTK counts pieces as entries / steps)."""
     p = info.n_parts
     for name, counts in info.part_counts.items():
-        dst = dst_vtkhdf.create_dataset(name, (repeats * p,),
+        dst = dst_vtkhdf.create_dataset(name, (repeats * p, ),
                                         dtype=counts.dtype)
         for r in range(repeats):
             dst[r * p:(r + 1) * p] = counts
@@ -934,8 +938,9 @@ def write_steps(info: FileInfo, steps: range, dst_vtkhdf: h5py.Group) -> None:
         group.create_dataset(name, data=np.zeros(k, dtype=np.int64))
     offsets = group.create_group("PointDataOffsets")
     for fld in info.fields:
-        offsets.create_dataset(
-            fld.name, data=np.arange(k, dtype=np.int64) * info.n_points)
+        offsets.create_dataset(fld.name,
+                               data=np.arange(k, dtype=np.int64) *
+                               info.n_points)
 
 
 def write_vds(info: FileInfo, field: FieldInfo, steps: range,
@@ -944,7 +949,7 @@ def write_vds(info: FileInfo, field: FieldInfo, steps: range,
     selects all of the source of step steps[j]; mappings are added in
     ascending j because Neko's reader uses mapping index == step."""
     n, rows = info.n_points, field.row_shape
-    shape = (len(steps) * n,) + rows
+    shape = (len(steps) * n, ) + rows
     dcpl = h5p.create(h5p.DATASET_CREATE)
     # No timestamps in the object header, as h5py's create_dataset does,
     # so that outputs are reproducible.
@@ -953,19 +958,27 @@ def write_vds(info: FileInfo, field: FieldInfo, steps: range,
     if fill is not None:
         dcpl.set_fill_value(np.array(fill, dtype=field.dtype))
     vspace = h5s.create_simple(shape)
-    src_space = h5s.create_simple((n,) + rows)
+    src_space = h5s.create_simple((n, ) + rows)
     for j, step in enumerate(steps):
         source, dset, _ = step_source(info, field, step)
-        vspace.select_hyperslab((j * n,) + (0,) * len(rows),
-                                (1,) * len(shape), block=(n,) + rows)
-        dcpl.set_virtual(vspace, source_relpath(info, source).encode(),
-                         dset.encode(), src_space)
-    dsid = h5d.create(dst_group.id, field.name.encode(), src.id.get_type(),
-                      h5s.create_simple(shape), dcpl=dcpl)
+        vspace.select_hyperslab((j * n, ) + (0, ) * len(rows),
+                                (1, ) * len(shape),
+                                block=(n, ) + rows)
+        dcpl.set_virtual(vspace,
+                         source_relpath(info, source).encode(), dset.encode(),
+                         src_space)
+    dsid = h5d.create(dst_group.id,
+                      field.name.encode(),
+                      src.id.get_type(),
+                      h5s.create_simple(shape),
+                      dcpl=dcpl)
     copy_attrs(src, h5py.Dataset(dsid))
 
 
-def write_chunk(f: h5py.File, info: FileInfo, steps: range, out: Path,
+def write_chunk(f: h5py.File,
+                info: FileInfo,
+                steps: range,
+                out: Path,
                 overwrite: bool,
                 protected: Protected | None = None) -> list[Path]:
     """Write one split chunk: the mesh, Steps for its k steps and point
@@ -976,8 +989,8 @@ def write_chunk(f: h5py.File, info: FileInfo, steps: range, out: Path,
     if any(fld.kind == "inline" for fld in info.fields):
         raise VtkhdfError(f"{info.path}: inline point data cannot be "
                           "referenced by a chunk")
-    check_output(out, overwrite, protected if protected is not None
-                 else protected_paths(info))
+    check_output(out, overwrite,
+                 protected if protected is not None else protected_paths(info))
     src_root = f["VTKHDF"]
     with atomic_output(out, overwrite) as tmp, h5py.File(tmp, "w") as dst:
         root = dst.create_group("VTKHDF")
@@ -1006,8 +1019,8 @@ def write_manifest(path: Path, entries: list[str], overwrite: bool) -> None:
                               for entry in entries)
 
 
-def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
-                  overwrite: bool) -> None:
+def write_extract(f: h5py.File, info: FileInfo, step: int, fields: list[str],
+                  out: Path, overwrite: bool) -> None:
     """Write one step as a standalone non-temporal VTKHDF file: no Steps
     group, no VDS, the step's time kept as FieldData/Time."""
     if not info.temporal:
@@ -1023,8 +1036,11 @@ def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
         write_part_counts(info, root, 1)
         point_data = root.create_group("PointData")
         for fld in info.fields:
-            out_ds = point_data.create_dataset(
-                fld.name, (info.n_points,) + fld.row_shape, dtype=fld.dtype)
+            if fld.name not in fields:
+                continue
+            out_ds = point_data.create_dataset(fld.name, (info.n_points, ) +
+                                               fld.row_shape,
+                                               dtype=fld.dtype)
             copy_attrs(src_root["PointData"][fld.name], out_ds)
             source, dset, row0 = step_source(info, fld, step)
             if fld.kind == "inline":
@@ -1033,9 +1049,11 @@ def write_extract(f: h5py.File, info: FileInfo, step: int, out: Path,
                 with open_input(source) as src:
                     copy_rows(src[dset], row0, info.n_points, out_ds)
         # A scalar dataspace is rejected by VTK, so Time has shape (1,).
-        root.create_group("FieldData").create_dataset(
-            "Time", data=np.array([info.times[step]], dtype=np.float64))
-        dst.attrs["source_file"] = np.bytes_(os.fsencode(info.path.name))
+        root.create_group("FieldData").create_dataset("Time",
+                                                      data=np.array(
+                                                          [info.times[step]],
+                                                          dtype=np.float64))
+        dst.attrs["source_file"] = info.path.name
         dst.attrs["source_step"] = np.int64(step)
 
 

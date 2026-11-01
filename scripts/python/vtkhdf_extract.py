@@ -8,10 +8,13 @@ This tool works on such output with bounded memory and never modifies it.
 Usage:
     python3 vtkhdf_extract.py info FILE
     python3 vtkhdf_extract.py extract FILE (--step S | --time T)
-                                      [-o OUT] [--overwrite]
+                                      [-f FIELD [FIELD ...]] [-o OUT] [--overwrite]
     python3 vtkhdf_extract.py split FILE (--steps-per-chunk N
                                     | --time-window W | --max-size SIZE)
                                     [--dry-run] [--overwrite]
+
+For every command, FILE is the first argument after the command name. This is
+enforced so that a list supplied to --fields cannot be mistaken for FILE.
 
 info
     Print the type and version, the steps and their time range, the mesh
@@ -105,7 +108,7 @@ class Terminated(BaseException):
         self.signum = signum
 
 
-def parse_args() -> Namespace:
+def parse_args(argv: list[str] | None = None) -> Namespace:
     parser = ArgumentParser(
         description="Inspect, extract steps from and split Neko's temporal "
         "VTKHDF output.")
@@ -125,6 +128,10 @@ def parse_args() -> Namespace:
     which.add_argument("--time",
                        type=float,
                        help="pick the step nearest to this time")
+    extract.add_argument("-f",
+                         "--fields",
+                         nargs="+",
+                         help="field names to extract (FILE must come first)")
     extract.add_argument(
         "-o",
         "--output",
@@ -158,7 +165,12 @@ def parse_args() -> Namespace:
     split.add_argument("--overwrite",
                        action="store_true",
                        help="replace existing chunks and manifests")
-    return parser.parse_args()
+    arguments = sys.argv[1:] if argv is None else argv
+    if (len(arguments) >= 2 and arguments[0] in {"info", "extract", "split"}
+            and arguments[1] not in {"-h", "--help"}
+            and arguments[1].startswith("-")):
+        parser.error(f"{arguments[0]} requires FILE as its first argument")
+    return parser.parse_args(arguments)
 
 
 def print_warnings(info: FileInfo) -> None:
@@ -279,11 +291,12 @@ def run_extract(args: Namespace) -> None:
         info = inspect(f, args.file)
         print_warnings(info)
         step = find_step(info, args.step, args.time)
+        fields = args.fields or [fld.name for fld in info.fields]
         out = args.output
         if out is None:
             label = step_label(info.n_steps, step)
             out = info.path.parent / f"{info.path.stem}_step_{label}.vtkhdf"
-        write_extract(f, info, step, out, args.overwrite)
+        write_extract(f, info, step, fields, out, args.overwrite)
     print(f"extracted step {step} (t = {info.times[step]:g}) of "
           f"{info.path} -> {out} ({format_size(out.stat().st_size)})")
 
