@@ -41,6 +41,7 @@
 module problem
   use num_types, only: rp, dp
   use design, only: design_t
+  use base_functional, only: base_functional_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
@@ -563,7 +564,7 @@ contains
        if (this%objective_list(i)%objective%value_weight .gt. 0.0_rp) cycle
 
        write (log_buf, '(A,A,A)') "Objective '", &
-            trim(this%objective_list(i)%objective%name), &
+            this%objective_list(i)%objective%get_name(), &
             "' was never sampled; its time window misses the run."
        call neko_log%warning(trim(log_buf))
     end do
@@ -949,50 +950,66 @@ contains
   function problem_get_log_header(this, include_constraints) result(buff)
     class(problem_t), intent(in) :: this
     logical, intent(in), optional :: include_constraints
-    character(len=4096) :: buff
-    character(len=128) :: mini_buff
-    character(len=128), allocatable :: headers(:)
-    integer :: i, j, n
+    character(len=:), allocatable :: buff
+    integer :: i
     logical :: do_constraints
 
     buff = "Total objective function"
     if (present(include_constraints)) then
        do_constraints = include_constraints
     else
-       do_constraints = .true.
+       do_constraints = this%get_n_constraints() .gt. 0
     end if
 
     do i = 1, this%get_n_objectives()
-       n = this%objective_list(i)%objective%get_log_size()
-       if (n .gt. 0) then
-          allocate(headers(n))
-          call this%objective_list(i)%objective%get_log_headers(headers)
-          do j = 1, n
-             mini_buff = ""
-             write(mini_buff, '(", ", A)') trim(headers(j))
-             buff = trim(buff) // trim(mini_buff)
-          end do
-          deallocate(headers)
-       end if
+       call problem_append_log_headers(buff, this%objective_list(i)%objective)
     end do
 
     if (do_constraints) then
        do i = 1, this%get_n_constraints()
-          n = this%constraint_list(i)%constraint%get_log_size()
-          if (n .gt. 0) then
-             allocate(headers(n))
-             call this%constraint_list(i)%constraint%get_log_headers(headers)
-             do j = 1, n
-                mini_buff = ""
-                write(mini_buff, '(", ", A)') trim(headers(j))
-                buff = trim(buff) // trim(mini_buff)
-             end do
-             deallocate(headers)
-          end if
+          call problem_append_log_headers(buff, &
+               this%constraint_list(i)%constraint)
        end do
     end if
 
   end function problem_get_log_header
+
+  !> Append the log headers of a functional to a comma-separated header.
+  !!
+  !! The headers are the functional's name plus a suffix of its own choosing,
+  !! such as `.weight`. Their buffer holds at least `min_width` characters,
+  !! the room every header has always had, and grows with the name to leave
+  !! `suffix_len` characters after it. A name of any length therefore
+  !! arrives in full, and a short name still leaves room for a long suffix.
+  !! Only a header longer than both can be cut, and that cut is made inside
+  !! `get_log_headers`, which fills a buffer of fixed length. A header that
+  !! fills its buffer is reported, since it may have been cut. A cut that
+  !! leaves a blank as the last character kept looks like padding, and
+  !! cannot be detected through this interface.
+  !! @param[inout] buff The header to append to.
+  !! @param[in] functional The functional whose headers are appended.
+  subroutine problem_append_log_headers(buff, functional)
+    character(len=:), allocatable, intent(inout) :: buff
+    class(base_functional_t), intent(in) :: functional
+    integer, parameter :: width = 256
+    character(len=width), allocatable :: headers(:)
+    integer :: j, n
+
+    n = functional%get_log_size()
+    if (n .lt. 1) return
+
+    allocate(headers(n))
+    call functional%get_log_headers(headers)
+
+    do j = 1, n
+       if (len_trim(headers(j)) .eq. width) then
+          call neko_log%warning("Log header may be truncated: " // headers(j))
+       end if
+       buff = buff // ", " // trim(headers(j))
+    end do
+
+    deallocate(headers)
+  end subroutine problem_append_log_headers
 
   !> Return the base log size (excluding iter and optimizer extras).
   !! @param[in] this The problem object.

@@ -1083,7 +1083,7 @@ __global__ void norm_kernel(const T*  __restrict__ a, T*  __restrict__ buf_h,
   T sum = 0;
   for (int i = idx; i < n; i += str)
   {
-    sum += pow(a[i], 2);
+    sum += a[i] * a[i];
   }
 
   sum = reduce_warp<T>(sum);

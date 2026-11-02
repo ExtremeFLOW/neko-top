@@ -1,17 +1,18 @@
 module user
   use user_intf, only: user_t
   use field, only: field_t
-  use field_registry, only: neko_field_registry
-  use scratch_registry, only: neko_scratch_registry
+  use field_list, only: field_list_t
+  use registry, only: neko_registry
+  use user_access_singleton, only: neko_user_access
+  use time_state, only: time_state_t
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: mpi_allreduce, mpi_sum
   use num_types, only: rp
   use coefs, only: coef_t
-  use json_module, only: json_file
-  use field_math, only: field_col3
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
   use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
-  use math, only: cfill_mask, glsc2
+  use math, only: cfill_mask, glsc3
   implicit none
 
   ! Global user variables
@@ -22,27 +23,34 @@ contains
   ! Register user-defined functions (see user_intf.f90)
   subroutine user_setup(user)
     type(user_t), intent(inout) :: user
-    user%user_check => user_calc_quantities
-    user%fluid_user_ic => user_ic
+    user%compute => user_calc_quantities
+    user%initial_conditions => user_ic
   end subroutine user_setup
 
   ! User-defined routine called at the end of every time step
-  subroutine user_calc_quantities(t, tstep, u, v, w, p, coef, params)
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-    type(coef_t), intent(inout) :: coef
-    type(json_file), intent(inout) :: params
-    type(field_t), intent(inout) :: u, v, w, p
+  subroutine user_calc_quantities(time)
+    type(time_state_t), intent(in) :: time
+    type(coef_t), pointer :: coef
+    type(field_t), pointer :: u, v, w
     type(field_t), pointer :: brinkman, mapped_brinkman
-    type(field_t), pointer :: work
-    integer :: temp_indices(2)
 
     integer :: ntot
     real(kind=rp) :: leakage, lift, drag
 
-    if (neko_field_registry%field_exists("brinkman_indicator")) then
-       brinkman => neko_field_registry%get_field("brinkman_indicator")
-       mapped_brinkman => neko_field_registry%get_field("brinkman")
+    if (neko_registry%field_exists("brinkman_indicator")) then
+       coef => neko_user_access%case%fluid%c_Xh
+       u => neko_registry%get_field("u")
+       v => neko_registry%get_field("v")
+       w => neko_registry%get_field("w")
+       brinkman => neko_registry%get_field("brinkman_indicator")
+       mapped_brinkman => neko_registry%get_field("brinkman_permeability")
+
+       ! The quantities below are computed on the host
+       call u%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call v%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call w%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call brinkman%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call mapped_brinkman%copy_from(DEVICE_TO_HOST, sync = .true.)
 
        ! Another good metric inspired by
        ! A. Ghasemi & A. Elham (2019)
@@ -56,19 +64,15 @@ contains
        ! I think that's quite clever!
 
        ntot = u%dof%size()
-       call neko_scratch_registry%request_field(work, temp_indices(1))
-       call field_col3(work, mapped_brinkman, u)
-       drag = glsc2(work%x, coef%B, ntot)
-       call field_col3(work, mapped_brinkman, v)
-       lift = glsc2(work%x, coef%B, ntot)
-       call neko_scratch_registry%relinquish_field(temp_indices)
+       drag = glsc3(mapped_brinkman%x, u%x, coef%B, ntot)
+       lift = glsc3(mapped_brinkman%x, v%x, coef%B, ntot)
 
        ! calculate the leakage
-       leakage = leak(brinkman%x, u%x, v%x, w%x, coef%b, ntot)
+       leakage = leak(brinkman%x, u%x, v%x, w%x, coef%B, ntot)
        if (pe_rank .eq. 0) then
-          print *, 'Leakage = ', leakage, ',  ', t
-          print *, 'Lift = ', lift, ',  ', t
-          print *, 'Drag = ', drag, ',  ', t
+          print *, 'Leakage = ', leakage, ',  ', time%t
+          print *, 'Lift = ', lift, ',  ', time%t
+          print *, 'Drag = ', drag, ',  ', time%t
        end if
     end if
 
@@ -95,14 +99,19 @@ contains
   end function leak
 
   ! User-defined initial condition
-  subroutine user_ic(u, v, w, p, params)
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
-    type(field_t), intent(inout) :: p
-    type(json_file), intent(inout) :: params
+  subroutine user_ic(scheme_name, fields)
+    character(len=*), intent(in) :: scheme_name
+    type(field_list_t), intent(inout) :: fields
+    type(field_t), pointer :: u, v, w, p
     class(point_zone_t), pointer :: zone
     integer :: i, ntot
+
+    if (trim(scheme_name) .ne. 'fluid') return
+
+    u => fields%get("u")
+    v => fields%get("v")
+    w => fields%get("w")
+    p => fields%get("p")
 
     ntot = u%dof%size()
     do i = 1, ntot
@@ -110,24 +119,30 @@ contains
        w%x(i,1,1,1) = 0.0_rp
 
        ! just to break the symmetry and induce shedding quicker
-       if (abs(u%dof%y(i,1,1,1)) .lt. 4.0_rp) then
+       if (abs(u%dof%y%x(i,1,1,1)) .lt. 4.0_rp) then
           v%x(i,1,1,1) = 0.1_rp
        else
           v%x(i,1,1,1) = 0.0_rp
        end if
 
     end do
-    p = 0.0_rp
+    p%x = 0.0_rp
 
     ! Get the cylinder mask
     if (neko_point_zone_registry%point_zone_exists("cylinder")) then
        zone => neko_point_zone_registry%get_point_zone("cylinder")
 
        ! Set the velocity to zero inside the cylinder
-       call cfill_mask(u%x, 0.0_rp, u%size(), zone%mask, zone%size)
-       call cfill_mask(v%x, 0.0_rp, v%size(), zone%mask, zone%size)
-       call cfill_mask(w%x, 0.0_rp, w%size(), zone%mask, zone%size)
+       call cfill_mask(u%x, 0.0_rp, u%size(), zone%mask%get(), zone%size)
+       call cfill_mask(v%x, 0.0_rp, v%size(), zone%mask%get(), zone%size)
+       call cfill_mask(w%x, 0.0_rp, w%size(), zone%mask%get(), zone%size)
     end if
+
+    ! Neko does not copy user initial conditions to the device
+    call u%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call v%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call w%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call p%copy_from(HOST_TO_DEVICE, sync = .true.)
   end subroutine user_ic
 
 
