@@ -8,7 +8,8 @@ This tool works on such output with bounded memory and never modifies it.
 Usage:
     python3 vtkhdf_extract.py info FILE
     python3 vtkhdf_extract.py extract FILE (--step S | --time T)
-                                      [-f FIELD [FIELD ...]] [-o OUT] [--overwrite]
+                                      [-f FIELD [FIELD ...]] [-o OUT]
+                                      [--overwrite]
     python3 vtkhdf_extract.py split FILE (--steps-per-chunk N
                                     | --time-window W | --max-size SIZE)
                                     [--dry-run] [--overwrite]
@@ -108,6 +109,15 @@ class Terminated(BaseException):
         self.signum = signum
 
 
+def file_first_usage(command: ArgumentParser, *lines: str) -> str:
+    """A command's usage with FILE right after the command name, as the tool
+    requires; argparse's own lists positional arguments last. Each line
+    after the first is aligned under FILE."""
+    indent = " " * len(f"usage: {command.prog} ")
+    head = " ".join(["%(prog)s FILE", *lines[:1]])
+    return f"\n{indent}".join([head, *lines[1:]])
+
+
 def parse_args(argv: list[str] | None = None) -> Namespace:
     parser = ArgumentParser(
         description="Inspect, extract steps from and split Neko's temporal "
@@ -116,27 +126,41 @@ def parse_args(argv: list[str] | None = None) -> Namespace:
 
     info = commands.add_parser(
         "info", help="describe a VTKHDF file and its per-step files")
-    info.add_argument("file", type=Path, help="main .vtkhdf file")
+    info.usage = file_first_usage(info)
+    info.add_argument("file",
+                      type=Path,
+                      metavar="FILE",
+                      help="main .vtkhdf file")
 
     extract = commands.add_parser(
         "extract", help="write one step as a static VTKHDF file")
-    extract.add_argument("file", type=Path, help="main .vtkhdf file")
+    extract.usage = file_first_usage(extract, "(--step S | --time T)",
+                                     "[-f FIELD [FIELD ...]] [-o OUT]",
+                                     "[--overwrite]")
+    extract.add_argument("file",
+                         type=Path,
+                         metavar="FILE",
+                         help="main .vtkhdf file")
     which = extract.add_mutually_exclusive_group(required=True)
     which.add_argument("--step",
                        type=int,
+                       metavar="S",
                        help="step index; negative counts from the end")
     which.add_argument("--time",
                        type=float,
+                       metavar="T",
                        help="pick the step nearest to this time")
     extract.add_argument("-f",
                          "--fields",
                          nargs="+",
+                         metavar="FIELD",
                          help="field names to extract (FILE must come first)")
     extract.add_argument(
         "-o",
         "--output",
         type=Path,
         default=None,
+        metavar="OUT",
         help="output file (default <input_dir>/<stem>_step_<s>.vtkhdf)")
     extract.add_argument("--overwrite",
                          action="store_true",
@@ -144,7 +168,13 @@ def parse_args(argv: list[str] | None = None) -> Namespace:
 
     split = commands.add_parser(
         "split", help="write chunks of steps that reference the originals")
-    split.add_argument("file", type=Path, help="main .vtkhdf file")
+    split.usage = file_first_usage(split, "(--steps-per-chunk N",
+                                   "| --time-window W | --max-size SIZE)",
+                                   "[--dry-run] [--overwrite]")
+    split.add_argument("file",
+                       type=Path,
+                       metavar="FILE",
+                       help="main .vtkhdf file")
     mode = split.add_mutually_exclusive_group(required=True)
     mode.add_argument("--steps-per-chunk",
                       type=int,

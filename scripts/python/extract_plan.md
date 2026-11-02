@@ -77,17 +77,27 @@ These were verified against Neko's writer and reader (`external/neko/src/io/vtkh
 
 ```
 vtkhdf_extract.py info    FILE
-vtkhdf_extract.py extract FILE (--step S | --time T) [-o OUT] [--overwrite]
+vtkhdf_extract.py extract FILE (--step S | --time T) [-f FIELD [FIELD ...]]
+                          [-o OUT] [--overwrite]
 vtkhdf_extract.py split   FILE (--steps-per-chunk N | --time-window W | --max-size SIZE)
                           [--dry-run] [--overwrite]
 ```
+
+FILE must be the first argument after the command name; anything else is a usage error. This stops a `-f/--fields` list from swallowing FILE.
 
 **`info`:**
 - Prints the type and version, and whether the file is temporal.
 - Prints NSteps, the time range and whether time is strictly increasing.
 - Prints the mesh sizes: N, cells, P and cell types.
 - Prints each field with its dtype, components and storage (printf VDS, explicit VDS or inline).
-- Prints the main file size, the per-step and total size of the referenced files, and any missing per-step files (`stat` only).
+- Prints the sizes, from `stat` only (per-step files are never opened), each as e.g. `233.5 MiB (244842496 B)`:
+  - `main file`;
+  - `step files`: the total of the referenced files, their number, and how many of the NSteps steps are complete;
+  - `total`: the main file plus the step files;
+  - `per step`: the size of one complete step's files, or the min, mean and max if they differ;
+  - `missing`: `none`, or the number of missing or unreadable per-step files, which are excluded from the sizes above, listing the first 10 by step;
+  - `minimum split`: a single line with the smallest valid `--max-size`, rounded up as printed, then in bytes.
+- With all point data inline, `step files` is `none` and `minimum split` is "not possible". A non-temporal file has no `minimum split` line.
 
 **`extract`:**
 - `--step` accepts negative values (`-1` is the last step).
@@ -97,7 +107,7 @@ vtkhdf_extract.py split   FILE (--steps-per-chunk N | --time-window W | --max-si
 **`split`:**
 - Writes next to the input. For each chunk it prints the file name, the steps, the time range and the footprint, then the `rsync` command.
 - `--time-window W` uses absolute windows `[mW, (m+1)W)`, with index `floor(t/W + 1e-9)`; the epsilon absorbs float noise. Empty windows are skipped, and strictly increasing times are required.
-- `--max-size` takes bytes with an optional `K/M/G/T` suffix (powers of 1024).
+- `--max-size` takes bytes, optionally with a `K/M/G/T` or `KiB`…`TiB` suffix (all powers of 1024, in any case). Decimals are allowed, e.g. `40G` or `233.5 MiB`, and a fraction of a byte is dropped. `KB/MB/GB/TB` are refused as ambiguous.
 - `--dry-run` validates and prints the plan but writes nothing.
 
 ## Backend design (`vtkhdf_backend.py`)
@@ -124,7 +134,7 @@ vtkhdf_extract.py split   FILE (--steps-per-chunk N | --time-window W | --max-si
   - collects the unique files and their on-disk bytes.
 - `find_step(info, step=None, time=None) -> int`.
 - `plan_by_count(n_steps, k)`, `plan_by_time(times, width)` and `plan_by_size(step_bytes, fixed_bytes, limit)`, each returning `list[range]`.
-- `write_extract(f, info, step, out, overwrite)`.
+- `write_extract(f, info, step, fields, out, overwrite)`.
 - `write_chunk(f, info, steps, out, overwrite) -> list[Path]` (the referenced files).
 - `write_manifest(path, entries, overwrite)`.
 - Helpers:
@@ -168,7 +178,7 @@ The file is non-temporal and contains no VDS.
 | `/VTKHDF` attrs                              | Byte-exact copies of the input `/VTKHDF` attributes (`Type`, `Version`)                                               |
 | `Points`, `Connectivity`, `Offsets`, `Types` | `copy_rows` streams of the input (same dtype, contiguous)                                                             |
 | `NumberOfPoints/Cells/ConnectivityIds`       | The P per-part entries, exactly P (VTK counts pieces by length)                                                       |
-| `PointData/<f>`                              | Shape `(N,)+row_shape` with the input dtype, streamed from `step_source(f, s)`. Attributes copied per the tag policy. |
+| `PointData/<f>`                              | Shape `(N,)+row_shape` with the input dtype, streamed from `step_source(f, s)`. Attributes copied byte-exactly as-is. |
 | `FieldData/Time`                             | f64 of shape `(1,)` holding `times[s]`. It must not be scalar, because VTK rejects scalar dataspaces.                 |
 | `/` attrs                                    | Provenance: the source file name and step index. Readers ignore these.                                                |
 
@@ -220,9 +230,15 @@ The file is non-temporal and contains no VDS.
 - Chunk files are readable by VTK 9.3–9.7 (the same temporal semantics) and by Neko's own reader.
 - Extracts can be read by Neko's Brinkman `file` source term, e.g. to start a run from a design.
 
-### `Attribute` tag policy (pending the user's answer)
+### Decisions
 
-Recommendation: in outputs, drop `Attribute="Scalars"` and keep the other tags (`Vectors`). Every array is then visible in ParaView 6.2. Older VTK ignores the tags, and Neko never reads them. The originals are untouched either way.
+Further decisions confirmed with the user:
+- **`Attribute` tags** are copied byte-exactly, as they are in the input; outputs neither drop nor rewrite them. The Neko writer's tagging is being fixed upstream (see "Neko writer tags" below).
+- **`split --dry-run`** fails, and does not just warn, when a planned output already exists and `--overwrite` is not given, as the real run would.
+- **Splitting a chunk** is allowed but not special-cased. The chunks of a chunk are named by step index within the input chunk, and nothing maps them back to the original step numbers.
+- **Validation before writing:** every per-step file is opened and validated before anything is written. That costs O(NSteps) file opens, which is accepted.
+- **Sizes** accept plain bytes, `K/M/G/T` and `KiB`…`TiB`, all powers of 1024. `KB/MB/GB/TB` are refused as ambiguous.
+- **`info`** reports a single "minimum split" line: the smallest valid `--max-size`.
 
 ## Verification (during implementation)
 
