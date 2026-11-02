@@ -38,7 +38,7 @@ cmake_minimum_required(VERSION 3.21)
 
 # Define the list of available build types and default to Release
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
-set(CMAKE_BUILD_TYPE_LIST
+set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
     Debug
     Release
     Testing
@@ -52,7 +52,11 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
 set(CMAKE_Fortran_PREPROCESS ON)
+
+# ............................................................................ #
+# Include the utility functions
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(NekoTopUtilities)
 
 # ............................................................................ #
 # Options
@@ -123,9 +127,11 @@ else()
 endif()
 
 set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
+prepend_pkg_config_path("${JSON_FORTRAN_DIR}")
 
 # Find the JSON-Fortran library
 pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
+restore_pkg_config_path()
 
 # ............................................................................ #
 # Setup of the Neko library
@@ -143,10 +149,12 @@ else()
 endif()
 
 set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
+prepend_pkg_config_path("${NEKO_DIR}")
 
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
+restore_pkg_config_path()
 
 # ............................................................................ #
 # HDF5 Support
@@ -192,7 +200,8 @@ endif()
 # ============================================================================ #
 
 # Set the compiler flags
-include(${CMAKE_Fortran_COMPILER_ID} OPTIONAL RESULT_VARIABLE compiler_flags_found)
+include(NekoTopCompiler${CMAKE_Fortran_COMPILER_ID} OPTIONAL
+    RESULT_VARIABLE compiler_flags_found)
 if (NOT compiler_flags_found)
     message(WARNING "No specific compiler flags found for "
         "${CMAKE_Fortran_COMPILER_ID}.")

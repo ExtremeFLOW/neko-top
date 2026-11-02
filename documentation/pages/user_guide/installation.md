@@ -79,6 +79,15 @@ custom install locations for the given dependencies.
 | `NEKO_FCFLAGS`     | Override Fortran flags `configure` builds Neko with.                 | -                       |
 | `NEKO_CFLAGS`      | Override C flags `configure` builds Neko with.                       | -                       |
 
+When Neko-TOP is configured with CMake directly rather than through `setup.sh`,
+an installation found under `NEKO_DIR` or `JSON_FORTRAN_DIR`, including their
+`external/` defaults, takes precedence over any matching package on
+`PKG_CONFIG_PATH`. Passing `-DNEKO_DIR=` or `-DJSON_FORTRAN_DIR=` (an empty
+value) hands that lookup back to `PKG_CONFIG_PATH`. CMake caches the result of
+the lookup, so changing either variable in an existing build directory requires
+reconfiguring with `cmake --fresh` (CMake 3.24 or newer) or starting from an
+empty build directory.
+
 `CMAKE_BUILD_TYPE` only selects the optimisation/debug-symbol flags
 (`-O3 -funroll-loops` for `Release`, `-g -Og` for `Debug`, `-g -O2` for
 `Testing`, on GNU); it does not turn compiler warnings into errors. Warnings

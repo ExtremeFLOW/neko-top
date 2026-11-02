@@ -75,9 +75,15 @@ contains
     character(len=512) :: failure_message
     real(kind=dp) :: start_time, end_time, dt, n_steps_exact, final_time
     integer :: n_expected, n_taken, i
-    logical :: failed, output_at_end, joblimit_written
+    logical :: failed, output_at_end, joblimit_written, found
 
     parameters = json_read_file(case_file)
+
+    ! Keep the state recovery files apart from `time_window_run_length`, which
+    ! reads the same case file, and from the other tests in this directory.
+    call parameters%update('state_recovery.path', &
+         'end_time_step_count_checkpoints/', found)
+
     call json_get(parameters, 'optimization.design', design_parameters)
 
     ! Register the user-defined inflow before the case is built.
