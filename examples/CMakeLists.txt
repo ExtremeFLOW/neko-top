@@ -16,7 +16,7 @@
 
 # ============================================================================ #
 # Include the build_example function
-include(build_example)
+include(NekoTopBuildExamples)
 
 # Set the examples directory
 set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory")
