@@ -172,6 +172,8 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
+    call this%free()
+
     ! Initialize the base class
     call this%init_base(name, design%size(), mask_name)
 
@@ -220,8 +222,13 @@ contains
   end subroutine volume_constraint_init_from_components
 
   !> Destructor.
+  !! @param this the constraint.
   subroutine volume_constraint_free(this)
     class(volume_constraint_t), intent(inout) :: this
+
+    call this%mapping%free()
+    this%if_mapping = .false.
+    nullify(this%c_Xh)
 
     call this%free_base()
   end subroutine volume_constraint_free
@@ -375,13 +382,13 @@ contains
   subroutine volume_constraint_get_log_headers(this, headers)
     class(volume_constraint_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
-    character(len=64) :: prefix
+    character(len=:), allocatable :: prefix
 
     if (size(headers) .lt. 1) return
-    prefix = trim(this%name)
+    prefix = this%get_name()
     headers(1) = prefix
     if (size(headers) .lt. 2) return
-    headers(2) = trim(prefix) // '.volume'
+    headers(2) = prefix // '.volume'
 
   end subroutine volume_constraint_get_log_headers
 

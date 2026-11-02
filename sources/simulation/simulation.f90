@@ -60,6 +60,7 @@ module simulation_m
        simulation_restart
   use state_recover, only: state_recover_t, state_recover_factory
   use runtime_stats, only: neko_rt_stats
+  use utils, only: neko_error
   implicit none
   private
 
@@ -100,6 +101,13 @@ module simulation_m
 
      logical :: have_scalar = .false.
      integer :: n_timesteps = 0
+     !> The forward time step as initialised from the case file. A variable
+     !! timestep changes `neko_case%time%dt` during a run, and `reset` starts
+     !! the next run's time-step history from it, so it is restored first.
+     real(kind=dp) :: forward_init_dt = 0.0_dp
+     !> The adjoint time step as initialised from the case file, restored on
+     !! `reset` for the same reason as `forward_init_dt`.
+     real(kind=dp) :: adjoint_init_dt = 0.0_dp
 
      ! ----------------------------------------------------------------------- !
      ! State recovery system
@@ -143,7 +151,7 @@ contains
     integer :: i, n_scalars
     character(len=:), allocatable :: output_directory, precision_s, file_format
     integer :: precision
-    logical :: unsteady, subdivide
+    logical :: unsteady, subdivide, variable_dt, found
 
     ! initialize the primal Neko objects
     call this%neko_case%init(parameters)
@@ -161,6 +169,10 @@ contains
          trim(this%neko_case%f_out%file_%get_base_fname())
     this%adjoint_field_base_fname = &
          trim(this%adjoint_case%f_out%file_%get_base_fname())
+
+    ! Record the initial time steps, which `reset` restores.
+    this%forward_init_dt = this%neko_case%time%dt
+    this%adjoint_init_dt = this%adjoint_case%time%dt
 
     ! Start the profiler
     call profiler_start
@@ -261,6 +273,17 @@ contains
 
     ! State recovery is only needed for unsteady runs.
     if (this%unsteady) then
+       ! The unsteady adjoint restores the forward states one step at a
+       ! time and assumes every step had the same dt. The flag is read
+       ! directly: a time-step controller would first reject a missing
+       ! `timestep`, which is beside the point here.
+       variable_dt = .false.
+       call parameters%get('case.time.variable_timestep', variable_dt, found)
+       if (found .and. variable_dt) then
+          call neko_error("case.time.variable_timestep is not supported " // &
+               "for unsteady problems")
+       end if
+
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_factory(this%state_recover, this%neko_case, &
             state_recovery_params)
@@ -297,6 +320,8 @@ contains
     this%unsteady = .false.
     this%have_scalar = .false.
     this%n_timesteps = 0
+    this%forward_init_dt = 0.0_dp
+    this%adjoint_init_dt = 0.0_dp
     this%current_design_iteration = 0
     if (allocated(this%forward_field_base_fname)) then
        deallocate(this%forward_field_base_fname)
@@ -368,7 +393,10 @@ contains
     end do
     call profiler_end_region("Adjoint simulation")
 
-    call simulation_adjoint_finalize(this%adjoint_case)
+    ! The steady adjoint takes as many steps as the forward run did, with
+    ! time steps of its own, so its time need not reach the end time. It is
+    ! complete once it has taken them all.
+    call simulation_adjoint_finalize(this%adjoint_case, this%n_timesteps)
 
   end subroutine simulation_run_backward
 
@@ -376,6 +404,10 @@ contains
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
 
+    ! Start every run from the same time-step history. Otherwise a variable
+    ! timestep carries the previous run's last dt into this run's first steps.
+    this%neko_case%time%dt = this%forward_init_dt
+    this%adjoint_case%time%dt = this%adjoint_init_dt
     call reset(this%neko_case, this%current_design_iteration, &
          this%forward_field_base_fname)
     call reset_adjoint(this%adjoint_case, this%neko_case, &

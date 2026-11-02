@@ -1,0 +1,249 @@
+!> Unit tests for the name of a functional, as it reaches the logs.
+!!
+!! The name of an objective or constraint comes from the case file and has no
+!! length limit there. It must therefore reach every log line in full: two
+!! objectives whose names share a long prefix, such as the same quantity over
+!! two time windows, must never become indistinguishable in the output.
+module functional_name
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use neko, only: neko_init
+  use design, only: design_t
+  use objective, only: objective_t
+  use constraint, only: constraint_t
+  use volume_constraint, only: volume_constraint_t
+  use problem, only: problem_t
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_functional_name_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_functional_name_case
+
+  !> A minimal concrete objective. Only its name and log headers are used.
+  type, extends(objective_t) :: stub_objective_t
+   contains
+     procedure, pass(this) :: free => stub_objective_free
+     procedure, pass(this) :: update_value => stub_objective_update_value
+     procedure, pass(this) :: update_sensitivity => &
+          stub_objective_update_sensitivity
+  end type stub_objective_t
+
+  !> A stub objective that, like a user-defined one may, labels its second
+  !! log entry with a suffix of its own choosing instead of `.weight`.
+  type, extends(stub_objective_t) :: long_suffix_objective_t
+   contains
+     procedure, pass(this) :: get_log_headers => &
+          long_suffix_objective_get_log_headers
+  end type long_suffix_objective_t
+
+  !> A name well past any fixed field width the logs have used so far.
+  character(len=*), parameter :: LONG_NAME = &
+       "an_objective_name_at_least_thirty_characters_long_on_purpose"
+
+  !> A name short enough to fit any field width the logs have used.
+  character(len=*), parameter :: SHORT_NAME = "drag"
+
+  !> A log header suffix far longer than the name it follows. After
+  !! `SHORT_NAME` it makes a header of exactly 126 characters: the longest
+  !! that arrived whole when each header was written, after a ", ", into a
+  !! fixed 128-character buffer. With a shorter header this test would pass
+  !! on a smaller buffer, which cuts headers that used to arrive whole.
+  !! Staying below 128 also keeps the header from filling its buffer, which
+  !! would raise the truncation warning.
+  character(len=*), parameter :: LONG_SUFFIX = &
+       ".time_averaged_streamwise_velocity_component_over_the_downstream_" // &
+       "window_from_t_19_to_t_20_normalised_by_the_inlet_velocity"
+
+  logical :: initialized = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_functional_name_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_functional_name_case), intent(inout) :: this
+
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! The stub objective: nothing is ever evaluated.
+
+  subroutine stub_objective_free(this)
+    class(stub_objective_t), intent(inout) :: this
+
+    call this%free_base()
+  end subroutine stub_objective_free
+
+  subroutine stub_objective_update_value(this, design)
+    class(stub_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+  end subroutine stub_objective_update_value
+
+  subroutine stub_objective_update_sensitivity(this, design)
+    class(stub_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+  end subroutine stub_objective_update_sensitivity
+
+  subroutine long_suffix_objective_get_log_headers(this, headers)
+    class(long_suffix_objective_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+
+    if (size(headers) .lt. 1) return
+    headers(1) = this%get_name()
+    if (size(headers) .lt. 2) return
+    headers(2) = this%get_name() // LONG_SUFFIX
+  end subroutine long_suffix_objective_get_log_headers
+
+  ! ========================================================================== !
+  ! Tests
+
+  !> An objective keeps its full name, and so do both of its log headers.
+  @test(npes=[1])
+  subroutine objective_keeps_full_name(this)
+    class(test_functional_name_case), intent(inout) :: this
+    type(stub_objective_t) :: obj
+    character(len=256) :: headers(2)
+
+    call obj%init_base(LONG_NAME, 1, 1.0_rp)
+    @assertEqual(LONG_NAME, obj%name)
+
+    call obj%get_log_headers(headers)
+    @assertEqual(LONG_NAME, headers(1))
+    @assertEqual(LONG_NAME // '.weight', headers(2))
+
+    call obj%free()
+  end subroutine objective_keeps_full_name
+
+  !> A blank-padded name, as user code passing a fixed-length variable does,
+  !! must not leave blanks inside the derived headers.
+  @test(npes=[1])
+  subroutine padded_name_is_trimmed(this)
+    class(test_functional_name_case), intent(inout) :: this
+    type(stub_objective_t) :: obj
+    character(len=256) :: padded_name
+    character(len=512) :: headers(2)
+
+    padded_name = LONG_NAME
+    call obj%init_base(padded_name, 1, 1.0_rp)
+
+    call obj%get_log_headers(headers)
+    @assertEqual(LONG_NAME, headers(1))
+    @assertEqual(LONG_NAME // '.weight', headers(2))
+
+    call obj%free()
+  end subroutine padded_name_is_trimmed
+
+  !> A constraint keeps its full name, and so do both of its log headers.
+  @test(npes=[1])
+  subroutine constraint_keeps_full_name(this)
+    class(test_functional_name_case), intent(inout) :: this
+    type(volume_constraint_t) :: con
+    character(len=256) :: headers(2)
+
+    call con%init_base(LONG_NAME, 1)
+    @assertEqual(LONG_NAME, con%name)
+
+    call con%get_log_headers(headers)
+    @assertEqual(LONG_NAME, headers(1))
+    @assertEqual(LONG_NAME // '.volume', headers(2))
+
+    call con%free()
+  end subroutine constraint_keeps_full_name
+
+  !> The optimisation log header assembled by the problem carries the full
+  !! names of its objectives and constraints.
+  @test(npes=[1])
+  subroutine problem_header_keeps_full_name(this)
+    class(test_functional_name_case), intent(inout) :: this
+    character(len=:), allocatable :: header, expected
+
+    expected = expected_header(LONG_NAME)
+    header = problem_header(LONG_NAME)
+    @assertEqual(expected, header)
+  end subroutine problem_header_keeps_full_name
+
+  !> A name longer than every fixed-width buffer the header path has used,
+  !! 64 characters per name and 128 per header, still arrives in full.
+  @test(npes=[1])
+  subroutine header_outgrows_old_buffers(this)
+    class(test_functional_name_case), intent(inout) :: this
+    character(len=*), parameter :: name = LONG_NAME // LONG_NAME // LONG_NAME
+    character(len=:), allocatable :: header, expected
+
+    expected = expected_header(name)
+    header = problem_header(name)
+    @assertEqual(expected, header)
+  end subroutine header_outgrows_old_buffers
+
+  !> A short name leaves at least the room every header had before names
+  !! were unbounded, 128 characters, so a long suffix chosen by a
+  !! user-defined objective still arrives in full.
+  @test(npes=[1])
+  subroutine short_name_keeps_long_suffix(this)
+    class(test_functional_name_case), intent(inout) :: this
+    type(problem_t) :: prob
+    class(objective_t), allocatable :: obj
+    character(len=:), allocatable :: header, expected
+
+    allocate(long_suffix_objective_t :: obj)
+    call obj%init_base(SHORT_NAME, 1, 1.0_rp)
+    call prob%add_objective(obj)
+
+    expected = "Total objective function" // &
+         ", " // SHORT_NAME // ", " // SHORT_NAME // LONG_SUFFIX
+    header = prob%get_log_header()
+    call prob%free()
+    @assertEqual(expected, header)
+  end subroutine short_name_keeps_long_suffix
+
+  ! ========================================================================== !
+  ! Helpers
+
+  !> The optimisation log header of a problem holding one objective and one
+  !! constraint, both carrying the same name.
+  !! @param name Name of the objective and of the constraint.
+  !! @return The header, as the problem assembles it.
+  function problem_header(name) result(header)
+    character(len=*), intent(in) :: name
+    character(len=:), allocatable :: header
+    type(problem_t) :: prob
+    class(objective_t), allocatable :: obj
+    class(constraint_t), allocatable :: con
+
+    allocate(stub_objective_t :: obj)
+    call obj%init_base(name, 1, 1.0_rp)
+    call prob%add_objective(obj)
+
+    allocate(volume_constraint_t :: con)
+    call con%init_base(name, 1)
+    call prob%add_constraint(con)
+
+    header = prob%get_log_header()
+    call prob%free()
+  end function problem_header
+
+  !> The header `problem_header` should produce, with nothing cut.
+  !! @param name Name of the objective and of the constraint.
+  !! @return The expected header.
+  function expected_header(name) result(header)
+    character(len=*), intent(in) :: name
+    character(len=:), allocatable :: header
+
+    header = "Total objective function" // &
+         ", " // name // ", " // name // ".weight" // &
+         ", " // name // ", " // name // ".volume"
+  end function expected_header
+
+end module functional_name

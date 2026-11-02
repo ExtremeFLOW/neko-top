@@ -120,7 +120,7 @@ contains
 
     call this%free_base()
 
-    this%name = name
+    this%name = trim(name)
     call this%sensitivity%init(design_size)
 
     this%weight = weight
@@ -150,7 +150,7 @@ contains
   subroutine objective_free_base(this)
     class(objective_t), target, intent(inout) :: this
 
-    this%name = ""
+    if (allocated(this%name)) deallocate(this%name)
     this%weight = 1.0_rp
 
     this%value = 0.0_rp
@@ -181,13 +181,13 @@ contains
   subroutine objective_get_log_headers(this, headers)
     class(objective_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
-    character(len=64) :: prefix
+    character(len=:), allocatable :: prefix
 
     if (size(headers) .lt. 1) return
-    prefix = trim(this%name)
+    prefix = this%get_name()
     headers(1) = prefix
     if (size(headers) .lt. 2) return
-    headers(2) = trim(prefix) // '.weight'
+    headers(2) = prefix // '.weight'
   end subroutine objective_get_log_headers
 
   !> Populate log values for this objective.
