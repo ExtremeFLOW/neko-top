@@ -24,7 +24,7 @@
                 "type": "gmres",
                 "preconditioner": {
                     "type": "phmg",
-                    "pcoarsening_schedule": [ 3, 2, 1 ],
+                    "pcoarsening_schedule": [ 2, 1 ],
                     "coarse_grid": {
                         "solver": "tamg"
                     }
