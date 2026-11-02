@@ -60,8 +60,9 @@ module base_functional
   !! All of which should be prepared in the `init` method.
   type, abstract, public :: base_functional_t
 
-     !> Name of object in the logfile
-     character(len=25) :: name = ""
+     !> Name of object in the logfile. Unallocated until the object is
+     !! initialised; read it through `get_name`.
+     character(len=:), allocatable :: name
 
      !> Value of the base_functional
      real(kind=rp) :: value = 0.0_dp
@@ -108,6 +109,8 @@ module base_functional
      procedure(functional_update_sensitivity), pass(this), deferred :: &
           update_sensitivity
 
+     !> Get the name of the function
+     procedure, pass(this) :: get_name => functional_get_name
      !> Get the value of the function
      procedure, pass(this) :: get_value => functional_get_value
      !> Get the sensitivity of the function
@@ -187,6 +190,20 @@ contains
          "' does not support initialization with simulation")
   end subroutine functional_init_json_sim
 
+  !> Get the name of the function.
+  !! @param this The functional.
+  !! @return The full name, or an empty string if none has been set.
+  function functional_get_name(this) result(name)
+    class(base_functional_t), intent(in) :: this
+    character(len=:), allocatable :: name
+
+    if (allocated(this%name)) then
+       name = this%name
+    else
+       name = ""
+    end if
+  end function functional_get_name
+
   !> Get the value of the function
   function functional_get_value(this) result(v)
     class(base_functional_t), intent(in) :: this
@@ -221,7 +238,7 @@ contains
     character(len=*), intent(out) :: headers(:)
 
     if (size(headers) .eq. 0) return
-    headers(1) = trim(this%name)
+    headers(1) = this%get_name()
   end subroutine functional_get_log_headers
 
   !> Populate log values for this functional.

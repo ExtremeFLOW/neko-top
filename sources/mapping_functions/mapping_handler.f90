@@ -66,7 +66,7 @@ module mapping_handler
      !! sequence.
      class(mapping_wrapper_t), allocatable :: mapping_cascade(:)
      !> The coefficients of the (space, mesh) pair.
-     type(coef_t), pointer :: coef
+     type(coef_t), pointer :: coef => null()
      !> Output for design and intermediate forward-mapping stages.
      type(field_output_t) :: design_output
      !> Output for sensitivity and intermediate backward-mapping stages.

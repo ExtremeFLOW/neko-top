@@ -88,16 +88,27 @@ contains
   end subroutine simulation_adjoint_init
 
   !> Finalize a simulation of a case
-  subroutine simulation_adjoint_finalize(C)
+  !! @param C The adjoint case.
+  !! @param n_steps The number of steps the adjoint was to take. If given,
+  !! the run is complete once it has taken them all; otherwise once its time
+  !! has reached the end time.
+  subroutine simulation_adjoint_finalize(C, n_steps)
     type(adjoint_case_t), intent(inout) :: C
-    logical :: output_at_end
+    integer, intent(in), optional :: n_steps
+    logical :: output_at_end, stopped_short
 
     ! Run a final output if specified in the json
     call json_get_or_default(C%case%params, 'case.output_at_end', &
          output_at_end, .true.)
     call C%output_controller%execute(C%time, output_at_end)
 
-    if (.not. (output_at_end) .and. .not. C%time%is_done()) then
+    if (present(n_steps)) then
+       stopped_short = C%time%tstep .lt. n_steps
+    else
+       stopped_short = .not. C%time%is_done()
+    end if
+
+    if (.not. (output_at_end) .and. stopped_short) then
        call simulation_adjoint_joblimit_chkp(C, C%time%t)
     end if
 
@@ -126,9 +137,8 @@ contains
     start_time = MPI_WTIME()
     tstep_start_time = start_time
 
-    ! Compute the next time step
-    ! NOTE. we should be wary here since CFL is based on the convective velocity
-    ! not the adjoint velocity
+    ! Compute the next time step, from the CFL of the convecting primal
+    ! velocity (see adjoint_compute_cfl)
     cfl = C%fluid_adj%compute_cfl(C%time%dt)
     call dt_controller%set_dt(C%time, cfl)
     if (dt_controller%is_variable_dt) cfl = C%fluid_adj%compute_cfl(C%time%dt)
@@ -152,11 +162,14 @@ contains
 
     ! Scalar step
     ! (Note that for the adjoint we should the adjoint_scalars first)
+    ! The scalar shares the adjoint fluid's time scheme, which was just set
+    ! from the adjoint's own time-step history. The primal one is frozen at
+    ! the end of the forward run.
     if (allocated(C%adjoint_scalars)) then
        start_time = MPI_WTIME()
        call neko_log%section('Adjoint scalar')
        call C%adjoint_scalars%step(C%time, &
-            C%case%fluid%ext_bdf, dt_controller)
+            C%fluid_adj%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7)') &
             'Scalar step time:      ', end_time-start_time
