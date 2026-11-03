@@ -41,12 +41,16 @@ Currently, we have added tests for the following components:
 - `viscous_dissipation_objective_t` and `brinkman_dissipation_objective_t`
   after a weight continuation step (`viscous_dissipation_continuation.case`,
   `brinkman_dissipation_continuation.case`) — the same cases with the weight
-  given as `[10.0, 1.0]`. The optional key
-  `optimization.fd_test_continuation_iteration` makes the driver advance the
-  continuation scheduler to that iteration before differentiating. The
-  adjoint forcing must follow the weight: with it frozen at 10 the error at
-  the smallest perturbation was `-8.99e-1` (viscous) and `-5.16e-1`
-  (Brinkman). Following it, both reproduce the plain cases exactly.
+  given as `[10.0, 1.0]` (viscous) and `[1.0, 10.0]` (Brinkman). The
+  optional key `optimization.fd_test_continuation_iteration` makes the driver
+  advance the continuation scheduler to that iteration before
+  differentiating. The adjoint forcing must follow the weight: with it frozen
+  at the first value the error at the smallest perturbation was `-8.99e-1`
+  (viscous) and `-2.47e-2` (Brinkman). Following it, the viscous case
+  reproduces the plain case exactly, and the Brinkman case, at ten times the
+  weight, has the plain case's error of `4.26e-3`. The Brinkman case ends at
+  a weight other than 1, so it also fails if the forcing drops the weight
+  altogether.
 - `viscous_dissipation_variable_dt.case` — the same objective with
   `case.time.variable_timestep`, a regression gate for backlog #55. It fails
   if the driver ignores the `case.time` settings (the run then marches at a

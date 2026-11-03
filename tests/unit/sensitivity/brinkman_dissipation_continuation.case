@@ -128,7 +128,7 @@
         "objectives": [
             {
                 "type": "brinkman_dissipation",
-                "weight": [ 10.0, 1.0 ],
+                "weight": [ 1.0, 10.0 ],
                 "weight_iterations": 1
             }
         ]
