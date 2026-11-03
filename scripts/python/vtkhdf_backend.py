@@ -46,8 +46,7 @@ STEP_OFFSETS = ("PartOffsets", "PointOffsets", "CellOffsets",
                 "ConnectivityIdOffsets")
 SIZE_UNITS = "KMGT"
 SIZE_PATTERN = re.compile(
-    r"\s*(\d+(?:\.\d*)?|\.\d+)\s*(?:([KMGT])(i?)B?|(B))?\s*",
-    re.IGNORECASE)
+    r"\s*(\d+(?:\.\d*)?|\.\d+)\s*(?:([KMGT])(i?)B?|(B))?\s*", re.IGNORECASE)
 CHUNK_OVERHEAD = 1024**2
 """Fixed allowance for a chunk's HDF5 metadata in size estimates."""
 MAPPING_OVERHEAD = 256
@@ -139,8 +138,8 @@ def stat_problem(path: Path) -> str | None:
     try:
         st = os.stat(path)
     except OSError as err:
-        return ("no such file" if err.errno == errno.ENOENT
-                else err.strerror or str(err))
+        return ("no such file"
+                if err.errno == errno.ENOENT else err.strerror or str(err))
     if not stat.S_ISREG(st.st_mode):
         return "not a regular file"
     if not os.access(path, os.R_OK):
@@ -244,8 +243,13 @@ def inspect(f: h5py.File, path: Path) -> FileInfo:
                         "relative VDS sources against it first, this tool "
                         "against the input's directory")
 
+    origin = f.attrs.get("source_file")
+    derived_from = None
+    if isinstance(origin, (bytes, str)) and origin:
+        derived_from = path.parent / os.fsdecode(origin)
     return FileInfo(path, vtk_type, version, temporal, n_steps, times, n_parts,
-                    n_points, n_cells, n_conn, part_counts, fields, warnings)
+                    n_points, n_cells, n_conn, part_counts, fields, warnings,
+                    derived_from)
 
 
 def inspect_field(point_data: h5py.Group, name: str,
@@ -456,8 +460,8 @@ def step_files(info: FileInfo, step: int) -> list[Path]:
     return list(files)
 
 
-def stat_sources(info: FileInfo) -> tuple[dict[Path, int],
-                                          list[tuple[int, Path, str]]]:
+def stat_sources(
+        info: FileInfo) -> tuple[dict[Path, int], list[tuple[int, Path, str]]]:
     """Sizes of the present per-step files, and (step, file, reason) for
     each one that is missing or unreadable. Uses stat only; no source file
     is opened."""
@@ -543,13 +547,31 @@ def find_step(info: FileInfo,
     best = int(np.argmin(dist))
     # A tie is two steps equally far away up to float noise, measured
     # against their own spacing; equal times (restarts) always tie.
-    ties = np.flatnonzero(dist - dist[best] <= TIME_EPS *
-                          np.abs(times - times[best]))
+    # Non-finite times are never candidates.
+    with np.errstate(invalid="ignore"):
+        ties = np.flatnonzero(finite & (dist - dist[best] <= TIME_EPS *
+                                        np.abs(times - times[best])))
     if len(ties) > 1:
         cands = ", ".join(f"{s} (t = {times[s]:g})" for s in ties)
         raise VtkhdfError(f"time {time:g} is equally close to steps "
                           f"{cands}; choose one with --step")
     return best
+
+
+def select_fields(info: FileInfo, names: list[str]) -> list[str]:
+    """Resolve --fields: the names without duplicates, in the order given;
+    an unknown name is an error listing the fields there are."""
+    names = list(dict.fromkeys(names))
+    known = [fld.name for fld in info.fields]
+    unknown = [name for name in names if name not in known]
+    if unknown:
+        many = "s" if len(unknown) > 1 else ""
+        have = (f"has fields {', '.join(map(repr, known))}"
+                if known else "has no point data fields")
+        raise VtkhdfError(f"unknown field{many} "
+                          f"{', '.join(map(repr, unknown))}: {info.path} "
+                          f"{have}")
+    return names
 
 
 def step_label(n_steps: int, step: int) -> str:
@@ -603,8 +625,7 @@ def plan_by_time(times: np.ndarray, width: float) -> list[range]:
                           "or --max-size")
     with np.errstate(over="ignore"):
         scaled = times / width + TIME_EPS
-    if not (np.all(np.isfinite(scaled))
-            and np.max(np.abs(scaled)) < 2.0**62):
+    if not (np.all(np.isfinite(scaled)) and np.max(np.abs(scaled)) < 2.0**62):
         raise VtkhdfError(f"--time-window {width:g} is too small for times "
                           f"up to {np.max(np.abs(times)):g}")
     index = np.floor(scaled).astype(np.int64)
@@ -641,8 +662,8 @@ def mesh_bytes(f: h5py.File) -> int:
 
 def size_model(f: h5py.File, info: FileInfo,
                sizes: dict[Path, int]) -> tuple[int, list[int]]:
-    """The footprint estimate behind split --max-size, also reported by
-    info: (fixed, per_step).
+    """The footprint estimate behind split --max-size and info's minimum
+    split: (fixed, per_step).
 
     A chunk of steps S is estimated as fixed + sum(per_step[s] for s in
     S): fixed is the mesh payload the chunk copies plus CHUNK_OVERHEAD,
@@ -651,8 +672,10 @@ def size_model(f: h5py.File, info: FileInfo,
     """
     fixed = mesh_bytes(f) + CHUNK_OVERHEAD
     mappings = MAPPING_OVERHEAD * len(info.fields)
-    per_step = [sum(sizes.get(p, 0) for p in step_files(info, s)) + mappings
-                for s in range(info.n_steps)]
+    per_step = [
+        sum(sizes.get(p, 0) for p in step_files(info, s)) + mappings
+        for s in range(info.n_steps)
+    ]
     return fixed, per_step
 
 
@@ -675,8 +698,7 @@ def source_relpath(info: FileInfo, source: Path) -> str:
     mapping back and HDF5 would printf-parse.
     """
     input_dir = info.path.parent
-    rel = os.path.relpath(os.path.abspath(source),
-                          os.path.abspath(input_dir))
+    rel = os.path.relpath(os.path.abspath(source), os.path.abspath(input_dir))
     if ".." in Path(rel).parts:
         raise VtkhdfError(f"per-step file {source} is outside the input's "
                           "directory, so a chunk manifest cannot ship it")
@@ -731,11 +753,7 @@ def prepare_split(f: h5py.File,
     checked = check_sources(info, range(info.n_steps))
     sizes = {p: p.stat().st_size for _, files, _ in checked for p in files}
     rel = {p: source_relpath(info, p) for p in sizes}
-    step_cost = [
-        sum(sizes[p] for p in files) + MAPPING_OVERHEAD * len(info.fields)
-        for _, files, _ in checked
-    ]
-    fixed = mesh_bytes(f) + CHUNK_OVERHEAD
+    fixed, per_step = size_model(f, info, sizes)
     if steps_per_chunk is not None:
         plan = plan_by_count(info.n_steps, steps_per_chunk)
     elif time_window is not None:
@@ -755,7 +773,7 @@ def prepare_split(f: h5py.File,
         chunks.append(
             Chunk(steps, path, manifest, tuple(rel[p] for p in files),
                   sum(sizes[p] for p in files),
-                  fixed + sum(step_cost[s] for s in steps)))
+                  chunk_estimate(fixed, per_step, steps)))
     return chunks, warnings
 
 
@@ -800,8 +818,7 @@ def protected_paths(info: FileInfo) -> Protected:
     input_dir_id = file_id(input_dir)
     return Protected(
         frozenset(os.path.realpath(p) for p in files),
-        frozenset(filter(None, map(file_id, files))),
-        frozenset(real_dirs),
+        frozenset(filter(None, map(file_id, files))), frozenset(real_dirs),
         frozenset(i for i in map(file_id, real_dirs)
                   if i is not None and i != input_dir_id))
 
@@ -1015,8 +1032,7 @@ def write_manifest(path: Path, entries: list[str], overwrite: bool) -> None:
     """Write one path per line, atomically, as the file system's bytes."""
     with atomic_output(path, overwrite) as tmp:
         with open(tmp, "wb") as handle:
-            handle.writelines(os.fsencode(entry) + b"\n"
-                              for entry in entries)
+            handle.writelines(os.fsencode(entry) + b"\n" for entry in entries)
 
 
 def write_extract(f: h5py.File, info: FileInfo, step: int, fields: list[str],
@@ -1026,6 +1042,7 @@ def write_extract(f: h5py.File, info: FileInfo, step: int, fields: list[str],
     if not info.temporal:
         raise VtkhdfError(f"{info.path} is not temporal: nothing to "
                           "extract")
+    fields = select_fields(info, fields)
     check_sources(info, [step])
     check_output(out, overwrite, protected_paths(info))
     src_root = f["VTKHDF"]
@@ -1053,7 +1070,7 @@ def write_extract(f: h5py.File, info: FileInfo, step: int, fields: list[str],
                                                       data=np.array(
                                                           [info.times[step]],
                                                           dtype=np.float64))
-        dst.attrs["source_file"] = info.path.name
+        dst.attrs["source_file"] = np.bytes_(os.fsencode(info.path.name))
         dst.attrs["source_step"] = np.int64(step)
 
 
@@ -1093,6 +1110,6 @@ def format_size(nbytes: int, round_up: bool = False) -> str:
     while power < len(SIZE_UNITS) and nbytes >= 1024**(power + 1):
         power += 1
     scale = 1024**power
-    tenths = (-(-10 * nbytes // scale) if round_up
-              else round(Fraction(10 * nbytes, scale)))
+    tenths = (-(-10 * nbytes // scale) if round_up else round(
+        Fraction(10 * nbytes, scale)))
     return f"{tenths // 10}.{tenths % 10} {SIZE_UNITS[power - 1]}iB"

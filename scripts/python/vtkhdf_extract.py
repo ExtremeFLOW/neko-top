@@ -23,8 +23,8 @@ info
     storage (printf VDS, explicit VDS or inline). Then the sizes: main
     file, per-step files and total, the size of one step's files (min,
     mean and max if they differ), any missing or unreadable per-step
-    files (excluded from the sizes), and the footprint model split
-    --max-size uses, with the smallest --max-size it accepts. The
+    files (excluded from the sizes), and the minimum split: the smallest
+    --max-size split accepts, rounded up as printed, then in bytes. The
     per-step files are only stat'ed, never opened.
 
 extract
@@ -32,8 +32,10 @@ extract
     step's point data with all data materialised (no virtual datasets) and
     the step's time as FieldData/Time. --step accepts negative values (-1
     is the last step); --time picks the nearest step and refuses a tie.
-    The default output is <input_dir>/<stem>_step_<s>.vtkhdf, with <s>
-    zero-padded to the width of the last step index.
+    --fields writes only the named fields (default all); a name repeated
+    is written once, and an unknown one is an error. The default output
+    is <input_dir>/<stem>_step_<s>.vtkhdf, with <s> zero-padded to the
+    width of the last step index.
 
 split
     Write chunks <stem>_steps_<a>-<b>.vtkhdf next to the input, each a
@@ -46,8 +48,9 @@ split
     ships exactly one self-contained chunk. Chunks hold N consecutive steps
     (--steps-per-chunk), the steps of each absolute time window
     [m W, (m+1) W) (--time-window, needs strictly increasing times), or as
-    many steps as fit within SIZE bytes of footprint, chunk file plus its
-    per-step files (--max-size, as estimated by the model info prints).
+    many steps as fit within SIZE bytes of estimated footprint, chunk file
+    plus its per-step files (--max-size; info prints the smallest SIZE
+    accepted as its minimum split).
     SIZE is bytes, optionally with K, M, G, T or KiB, MiB, GiB, TiB (all
     powers of 1024, any case, e.g. 40G or "233.5 MiB"); every size the
     tool prints is accepted. KB, MB, GB, TB are refused as ambiguous.
@@ -78,12 +81,12 @@ from pathlib import Path
 
 import numpy as np
 
-from vtkhdf_backend import (
-    CHUNK_OVERHEAD, MAPPING_OVERHEAD, Chunk, FileInfo, VtkhdfError, cell_types,
-    chunk_estimate, find_step, format_size, inspect, mesh_bytes, open_input,
-    parse_size, plan_by_count, prepare_split, protected_paths, size_model,
-    smallest_max_size, stat_sources, step_files, step_label,
-    strictly_increasing, write_chunk, write_extract, write_manifest)
+from vtkhdf_backend import (Chunk, FileInfo, VtkhdfError, cell_types,
+                            find_step, format_size, inspect, open_input,
+                            parse_size, prepare_split, protected_paths,
+                            size_model, smallest_max_size, stat_sources,
+                            step_files, step_label, strictly_increasing,
+                            write_chunk, write_extract, write_manifest)
 
 VTK_CELL_NAMES = {
     9: "VTK_QUAD",
@@ -97,7 +100,8 @@ STORAGE_NAMES = {
     "inline": "inline",
 }
 MAX_MISSING_LISTED = 10
-EXAMPLE_STEPS = (10, 100, 1000, 10000)
+LABEL_WIDTH = len("minimum split") + 2
+"""Column where info's values start: its longest label and two spaces."""
 
 
 class Terminated(BaseException):
@@ -234,15 +238,21 @@ def sized(nbytes: int) -> str:
     return f"{format_size(nbytes)} ({nbytes} B)"
 
 
+def row(label: str, text: str) -> None:
+    """One line of info: the label, then text from column LABEL_WIDTH; an
+    empty label continues the line above."""
+    print(f"{label:<{LABEL_WIDTH}}{text}")
+
+
 def print_sizes(f, info: FileInfo) -> None:
-    """Sizes from stat only, and the split footprint model (the same
-    size_model split --max-size plans with)."""
+    """Sizes from stat only, and the minimum split: the smallest --max-size
+    split accepts, from the same size_model split plans with."""
     main = info.path.stat().st_size
-    print(f"main file   {sized(main)}")
+    row("main file", sized(main))
     if not any(fld.kind != "inline" for fld in info.fields):
-        print("step files  none (all point data inline)")
-        print(f"total       {sized(main)}")
-        print("split size  not possible: no per-step files to reference")
+        row("step files", "none (all point data inline)")
+        row("total", sized(main))
+        row("minimum split", "not possible: no per-step files to reference")
         return
     sizes, problems = stat_sources(info)
     bad = {path for _, path, _ in problems}
@@ -250,43 +260,31 @@ def print_sizes(f, info: FileInfo) -> None:
         s for s in range(info.n_steps)
         if not bad.intersection(step_files(info, s))
     ]
-    print(f"step files  {sized(sum(sizes.values()))} in {len(sizes)} "
-          f"files, {len(complete)} of {info.n_steps} steps complete")
-    print(f"total       {sized(main + sum(sizes.values()))}")
+    row("step files", (f"{sized(sum(sizes.values()))} in {len(sizes)} "
+                       f"files, {len(complete)} of {info.n_steps} steps "
+                       "complete"))
+    row("total", sized(main + sum(sizes.values())))
     per = [sum(sizes[p] for p in step_files(info, s)) for s in complete]
     if per and min(per) == max(per):
-        print(f"per step    {sized(per[0])}")
+        row("per step", sized(per[0]))
     elif per:
-        print(f"per step    min {sized(min(per))}, mean "
-              f"{format_size(round(sum(per) / len(per)))},")
-        print(f"            max {sized(max(per))}")
+        row("per step", (f"min {sized(min(per))}, mean "
+                         f"{format_size(round(sum(per) / len(per)))},"))
+        row("", f"max {sized(max(per))}")
     if problems:
-        print(f"missing     {len(problems)} file(s), excluded from the "
-              "sizes above:")
+        row("missing", (f"{len(problems)} file(s), excluded from the sizes "
+                        "above:"))
         for step, path, why in problems[:MAX_MISSING_LISTED]:
             print(f"  step {step}: {path} ({why})")
         if len(problems) > MAX_MISSING_LISTED:
             print(f"  ... and {len(problems) - MAX_MISSING_LISTED} more")
     else:
-        print("missing     none")
+        row("missing", "none")
     if not info.temporal:
         return
-    fixed, per_step = size_model(f, info, sizes)
-    smallest = smallest_max_size(fixed, per_step)
-    print(f"split size  per chunk: mesh {sized(mesh_bytes(f))}")
-    print(f"            + overhead {sized(CHUNK_OVERHEAD)}")
-    print(f"            per step: its files + {MAPPING_OVERHEAD} B per "
-          f"field ({MAPPING_OVERHEAD * len(info.fields)} B)")
-    print(f"            smallest --max-size "
-          f"{format_size(smallest, round_up=True)} (exactly {smallest} B)")
-    n = info.n_steps
-    for k in [k for k in EXAMPLE_STEPS if k < n] + [n]:
-        worst = max(
-            chunk_estimate(fixed, per_step, steps)
-            for steps in plan_by_count(n, k))
-        label = (f"all {n} steps in one chunk"
-                 if k == n else f"{k} steps per chunk")
-        print(f"            {label}: about {format_size(worst)}")
+    smallest = smallest_max_size(*size_model(f, info, sizes))
+    row("minimum split",
+        f"{format_size(smallest, round_up=True)} ({smallest} B)")
 
 
 def run_info(args: Namespace) -> None:
@@ -297,13 +295,14 @@ def run_info(args: Namespace) -> None:
         version = ".".join(str(v) for v in info.version) or "?"
         type_names = ", ".join(f"{t} ({VTK_CELL_NAMES.get(t, 'unknown')})"
                                for t in types)
-        print(f"file        {info.path}")
-        print(f"type        {info.vtk_type}, VTKHDF version {version}")
-        print(f"temporal    {describe_time(info)}")
-        print(f"mesh        {info.n_points} points, {info.n_cells} cells, "
-              f"{info.n_conn} connectivity ids, {info.n_parts} part(s)")
-        print(f"cell types  {type_names or 'none'}")
-        print(f"fields      {len(info.fields)}")
+        row("file", str(info.path))
+        row("type", f"{info.vtk_type}, VTKHDF version {version}")
+        row("temporal", describe_time(info))
+        row("mesh",
+            (f"{info.n_points} points, {info.n_cells} cells, "
+             f"{info.n_conn} connectivity ids, {info.n_parts} part(s)"))
+        row("cell types", type_names or "none")
+        row("fields", str(len(info.fields)))
         width = max((len(fld.name) for fld in info.fields), default=0)
         for fld in info.fields:
             storage = STORAGE_NAMES[fld.kind]
