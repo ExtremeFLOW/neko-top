@@ -133,7 +133,7 @@ contains
     ! one and is retained only as a deprecated alias. Until this was fixed
     ! the code read *only* the alias, so every case file in the repository
     ! -- all of which write `phi_ref` -- silently fell back to the default
-    ! 0.5 (known-bugs #40).
+    ! 0.5.
     !
     ! This is load bearing rather than cosmetic. \f$\phi_{ref}\f$ is the
     ! only knob that varies the cancellation inside this objective: at 0.5
@@ -143,8 +143,9 @@ contains
     ! cancel by roughly 85%, so while the documented key was ignored the
     ! whole suite only ever exercised this objective in its most
     ! self-cancelling configuration -- which is exactly why a gradient
-    ! error in this path (known-bugs #6) went unnoticed for months. Do not
-    ! "simplify" this back to a single key without moving the case files.
+    ! error in this path went unnoticed for months (an inexact adjoint
+    ! curl-curl transpose, since fixed in #535). Do not "simplify" this
+    ! back to a single key without moving the case files.
     has_phi_ref = json%valid_path("phi_ref")
     has_legacy_key = json%valid_path("target_concentration")
 

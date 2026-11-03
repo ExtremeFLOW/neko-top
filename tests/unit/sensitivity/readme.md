@@ -135,9 +135,10 @@ whose output you intend to compare.
 ## The strict criterion (`fd_test_strict`)
 
 The assertion on the smallest perturbation is a **false green whenever the
-signed error crosses zero inside the sweep**. Bug #43 is the worked example:
-its four measured rows read `2.3e-6` at the smallest perturbation, while the
-bias of that gradient is `1.46e-5` — the sweep happened to sample near the
+signed error crosses zero inside the sweep**. The
+`unsteady_brinkman_dissipation` sweep is the worked example: its four
+measured rows read `2.3e-6` at the smallest perturbation, while the bias of
+that gradient is `1.46e-5` — the sweep happened to sample near the
 crossing. The error at one point of a sweep is not the bias.
 
 `"fd_test_strict": true` under `optimization` swaps that assertion for one
@@ -163,13 +164,14 @@ wrong, because conflating the two is how a bad sweep gets read as a bad
 adjoint. The same applies to `TOLERANCE_UNREACHABLE`: the harness measures
 the smallest tolerance the functional's own reproducibility permits,
 `sqrt(40*N*|A|)`, and a tolerance below it cannot be decided by any sweep of
-any depth. Measured: `#43` 9.9e-6, `brinkman_dissipation` 1.1e-4,
-`viscous_dissipation` 1.4e-4, `volume` 4.2e-9, `volume_filtered` 1.8e-7 —
-note that the unit driver's default `fd_test_tolerance` of 1e-5 is
-unreachable for any case with a real truncation slope, which is why every
-case here sets its own. Measured on the two dissipation cases: 1e-5 gives
-`status = TOLERANCE_UNREACHABLE` and exit 1, saying explicitly that this is
-not evidence of a wrong gradient. **Never fall back on that default.**
+any depth. Measured: `unsteady_brinkman_dissipation` 9.9e-6,
+`brinkman_dissipation` 1.1e-4, `viscous_dissipation` 1.4e-4, `volume`
+4.2e-9, `volume_filtered` 1.8e-7 — note that the unit driver's default
+`fd_test_tolerance` of 1e-5 is unreachable for any case with a real
+truncation slope, which is why every case here sets its own. Measured on
+the two dissipation cases: 1e-5 gives `status = TOLERANCE_UNREACHABLE` and
+exit 1, saying explicitly that this is not evidence of a wrong gradient.
+**Never fall back on that default.**
 
 ### Tolerances of the four unit cases
 
@@ -205,16 +207,15 @@ The two branches are priced differently on purpose:
   terms *because the bias is that large*; they are ~2x it, which is as tight
   as this criterion can be set. Tightening either to 1e-3 fails with
   `FLOOR_EXCEEDED`, which is the correct reading of the measurement and is
-  what these tolerances would have to be reduced to once that bias is fixed
-  (it is adjacent to known-bugs #6). Do not read `5e-3` as "this gradient is
-  accurate to 0.5%" — read it as "this gradient has a measured 0.26% bias
-  that nobody has explained yet".
+  what these tolerances would have to be reduced to once that bias is fixed.
+  Do not read `5e-3` as "this gradient is accurate to 0.5%" — read it as
+  "this gradient has a measured 0.26% bias that nobody has explained yet".
 
 Whether the sweep brackets the round-off upturn is **reported and never gated
-on**. Requiring an upturn rejects bug #43's own sweep and lifts the false-red
-rate from 0.012 to 0.73, with no value of the bracketing factor recovering
-it. Sign crossings are counted for the same reason and never used to exclude
-points.
+on**. Requiring an upturn rejects the `unsteady_brinkman_dissipation` sweep
+itself and lifts the false-red rate from 0.012 to 0.73, with no value of the
+bracketing factor recovering it. Sign crossings are counted for the same
+reason and never used to exclude points.
 
 Three further optional keys, all under `optimization`:
 
@@ -462,7 +463,7 @@ scalar nowhere near equilibrated). It now lives in the regression tier
 instead, at a resolution that can actually certify it — see
 `tests/regression/sensitivity/cases/scalar_mixing.case`, alongside
 `tests/regression/sensitivity/cases/passive_scalar.case` (which needed a
-Neko-core scalar-scheme fix first — see `known-bugs-backlog.md` #9). The
+Neko-core scalar-scheme fix first). The
 heavier, realistic (~1000-timestep) versions of these and other cases
 (`dissipation`, `dissipation_weights`, unsteady variants) live in
 `tests/regression/sensitivity/` instead — that suite is opt-in

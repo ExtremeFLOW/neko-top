@@ -6,10 +6,10 @@
 ! Covered here, entirely through fd_evaluate returning a verdict:
 !
 !  * The five real sweeps (Neko sha a7fdcd7f3) that motivated the strict
-!    criterion, with the exact bias/order pinned. #43
-!    (unsteady_brinkman_dissipation) is the case that exposed the false
+!    criterion, with the exact bias/order pinned. The
+!    unsteady_brinkman_dissipation sweep is the case that exposed the false
 !    green in the historical rule and a false red in a previously-drafted
-!    replacement; see test_sweep_43_fit.
+!    replacement; see test_sweep_ubd_fit.
 !  * The four guards that report a verdict rather than aborting: fewer than
 !    4 points, an all-noise sweep with no truncation branch and no plateau,
 !    a degenerate analytic sensitivity, and a tolerance below what the
@@ -47,15 +47,15 @@ module fd_criterion_test
   ! sweep has a NEGATIVE perturbation and SIGNED relative errors -- see that
   ! script's header for the sign convention.
 
-  ! #43, unsteady_brinkman_dissipation: 4-point sweep, r = 10.
-  real(kind=rp), parameter :: pert_43(4) = &
+  ! unsteady_brinkman_dissipation (ubd): 4-point sweep, r = 10.
+  real(kind=rp), parameter :: pert_ubd(4) = &
        [-1.0e-1_rp, -1.0e-2_rp, -1.0e-3_rp, -1.0e-4_rp]
-  real(kind=rp), parameter :: err_43(4) = &
+  real(kind=rp), parameter :: err_ubd(4) = &
        [-0.11926740394713609e-1_rp, -0.12022146350578529e-2_rp, &
        -0.10733324016689514e-3_rp, 0.23047656070843778e-5_rp]
-  real(kind=rp), parameter :: tol_43 = 1.0e-3_rp
-  real(kind=rp), parameter :: c_hat_43 = 1.463711e-05_rp
-  real(kind=rp), parameter :: p_hat_43 = 0.995208_rp
+  real(kind=rp), parameter :: tol_ubd = 1.0e-3_rp
+  real(kind=rp), parameter :: c_hat_ubd = 1.463711e-05_rp
+  real(kind=rp), parameter :: p_hat_ubd = 0.995208_rp
 
   ! The 8-point sweep shared by the four develop unit-tier baselines.
   real(kind=rp), parameter :: pert_8(8) = &
@@ -118,28 +118,28 @@ contains
   ! ========================================================================== !
   ! The five real sweeps.
 
-  !> #43 is the case that motivated this whole rework: today's old rule
-  !! reads its sign-crossing artefact 2.30e-6 (the smallest-perturbation
-  !! error, err_43(4)) and gives a false green; a previously-drafted
-  !! replacement reads 1.054e-3 and gives a false red. The strict criterion
-  !! must return +1.46e-5, correctly green -- pinning all three numbers
-  !! documents the bug better than prose.
+  !> The unsteady_brinkman_dissipation sweep is the case that motivated this
+  !! whole rework: today's old rule reads its sign-crossing artefact 2.30e-6
+  !! (the smallest-perturbation error, err_ubd(4)) and gives a false green;
+  !! a previously-drafted replacement reads 1.054e-3 and gives a false red.
+  !! The strict criterion must return +1.46e-5, correctly green -- pinning
+  !! all three numbers documents the bug better than prose.
   @test(npes=[1])
-  subroutine test_sweep_43_fit(this)
+  subroutine test_sweep_ubd_fit(this)
     class(test_fd_criterion), intent(inout) :: this
     type(fd_strict_options_t) :: opts
     type(fd_verdict_t) :: v
 
-    call fd_evaluate(pert_43, err_43, tol_43, opts, v)
+    call fd_evaluate(pert_ubd, err_ubd, tol_ubd, opts, v)
 
     @assertEqual(FD_BRANCH_FIT, v%branch)
     @assertEqual(FD_STATUS_OK, v%status)
     @assertTrue(v%passed)
     @assertTrue(v%has_c_hat)
-    @assertRelativelyEqual(c_hat_43, v%c_hat, ref_rtol)
+    @assertRelativelyEqual(c_hat_ubd, v%c_hat, ref_rtol)
     @assertTrue(v%has_p_hat)
-    @assertRelativelyEqual(p_hat_43, v%p_hat, ref_rtol)
-  end subroutine test_sweep_43_fit
+    @assertRelativelyEqual(p_hat_ubd, v%p_hat, ref_rtol)
+  end subroutine test_sweep_ubd_fit
 
   @test(npes=[1])
   subroutine test_sweep_brinkman_fit(this)
@@ -263,7 +263,7 @@ contains
     type(fd_strict_options_t) :: opts
     type(fd_verdict_t) :: v
 
-    call fd_evaluate(pert_43, err_43, tol_43, opts, v, degenerate=.true.)
+    call fd_evaluate(pert_ubd, err_ubd, tol_ubd, opts, v, degenerate=.true.)
 
     @assertEqual(FD_STATUS_DEGENERATE, v%status)
     @assertFalse(v%passed)
@@ -272,9 +272,10 @@ contains
 
   !> A tolerance far below what this sweep's own noise permits must fail as
   !! TOLERANCE_UNREACHABLE, distinguishing "the sweep cannot decide this"
-  !! from "the gradient is wrong" -- the #43 sweep's bias (1.46e-5) is
-  !! actually well inside a normal tolerance, so a bare FLOOR_EXCEEDED here
-  !! would be reporting the wrong reason for the same red.
+  !! from "the gradient is wrong" -- the unsteady_brinkman_dissipation
+  !! sweep's bias (1.46e-5) is actually well inside a normal tolerance, so a
+  !! bare FLOOR_EXCEEDED here would be reporting the wrong reason for the
+  !! same red.
   @test(npes=[1])
   subroutine test_tolerance_unreachable(this)
     class(test_fd_criterion), intent(inout) :: this
@@ -283,7 +284,7 @@ contains
     logical :: reported
     integer :: k
 
-    call fd_evaluate(pert_43, err_43, 1.0e-12_rp, opts, v)
+    call fd_evaluate(pert_ubd, err_ubd, 1.0e-12_rp, opts, v)
 
     reported = .false.
     do k = 1, v%n_messages
@@ -413,11 +414,12 @@ contains
     @assertRelativelyEqual(1.00004e-4_rp, v%c_hat, 1.0e-4_rp)
   end subroutine test_clean_bounded_sweep
 
-  !> A genuinely biased gradient must fail. Every #43 error is shifted by
-  !! the same constant so that the converged bias becomes 100x its true
-  !! value (1.4637e-3 against a 1e-3 tolerance) while the truncation shape
-  !! -- and so the order run and p_hat -- is untouched, since a constant
-  !! shift does not change any difference e(k) - e(k+1).
+  !> A genuinely biased gradient must fail. Every error of the
+  !! unsteady_brinkman_dissipation sweep is shifted by the same constant so
+  !! that the converged bias becomes 100x its true value (1.4637e-3 against
+  !! a 1e-3 tolerance) while the truncation shape -- and so the order run
+  !! and p_hat -- is untouched, since a constant shift does not change any
+  !! difference e(k) - e(k+1).
   @test(npes=[1])
   subroutine test_biased_gradient_100x(this)
     class(test_fd_criterion), intent(inout) :: this
@@ -425,21 +427,22 @@ contains
     type(fd_verdict_t) :: v
     real(kind=rp) :: e(4), shift
 
-    shift = 99.0_rp * c_hat_43
-    e = err_43 + shift
+    shift = 99.0_rp * c_hat_ubd
+    e = err_ubd + shift
 
-    call fd_evaluate(pert_43, e, tol_43, opts, v)
+    call fd_evaluate(pert_ubd, e, tol_ubd, opts, v)
 
     @assertEqual(FD_STATUS_FLOOR_EXCEEDED, v%status)
     @assertFalse(v%passed)
     @assertTrue(v%has_c_hat)
-    @assertRelativelyEqual(100.0_rp * c_hat_43, v%c_hat, 1.0e-3_rp)
+    @assertRelativelyEqual(100.0_rp * c_hat_ubd, v%c_hat, 1.0e-3_rp)
   end subroutine test_biased_gradient_100x
 
   !> A sign-flipped gradient must also fail. The classic symptom of using
   !! the negative of the true analytic sensitivity in a relative-error
   !! finite-difference check is a bias converging to -2, not to zero: the
-  !! #43 errors are shifted so their bias becomes exactly that.
+  !! unsteady_brinkman_dissipation errors are shifted so their bias becomes
+  !! exactly that.
   @test(npes=[1])
   subroutine test_sign_flipped_gradient(this)
     class(test_fd_criterion), intent(inout) :: this
@@ -447,10 +450,10 @@ contains
     type(fd_verdict_t) :: v
     real(kind=rp) :: e(4), shift
 
-    shift = -2.0_rp - c_hat_43
-    e = err_43 + shift
+    shift = -2.0_rp - c_hat_ubd
+    e = err_ubd + shift
 
-    call fd_evaluate(pert_43, e, tol_43, opts, v)
+    call fd_evaluate(pert_ubd, e, tol_ubd, opts, v)
 
     @assertEqual(FD_STATUS_FLOOR_EXCEEDED, v%status)
     @assertFalse(v%passed)

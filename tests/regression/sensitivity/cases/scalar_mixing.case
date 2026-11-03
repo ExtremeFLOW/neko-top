@@ -60,11 +60,11 @@
     // stability.
     //
     // phi_ref of 0 and 1 are maximally off-centre, so this case leans hard
-    // on the backlog-#40 fix (b37ec1e on this branch) that made "phi_ref"
-    // readable at all -- on any commit before that fix every one of these
-    // three objectives would have silently run at the phi_ref=0.5 default,
-    // making objectives 1 and 2 identical to 3. This case is the only
-    // committed regression test for that fix.
+    // on the fix that made "phi_ref" readable at all -- on any commit
+    // before that fix every one of these three objectives would have
+    // silently run at the phi_ref=0.5 default, making objectives 1 and 2
+    // identical to 3. This case is the only committed regression test for
+    // that fix.
     //
     // Mesh: non-periodic in y (unlike the other nine cases in this
     // directory, which share a periodic-y box) so the outlet actually has
@@ -181,7 +181,7 @@
     // so every variable-timestep key is looked up at the wrong JSON scope
     // and silently falls back to its Fortran default (huge()) -- confirmed
     // by the printed dt jumping to a nonsensical 1.0 rather than honouring
-    // max_timestep. That is a Neko-TOP bug worth its own backlog entry,
+    // max_timestep. That was a Neko-TOP driver bug (since fixed by #558),
     // not something to work around inside this case file.
     //
     // end_time = 5.0: MEASURED LADDER, not extrapolated. Forward-only,
@@ -423,7 +423,7 @@
         // dissipation siblings sit at 4.5e-3 and 5.0e-3 over biases of
         // 2.2e-3 and 2.6e-3, the same order as this one, which is itself
         // evidence the residue is shared across the suite rather than
-        // specific to scalar_mixing (adjacent to known-bugs #6).
+        // specific to scalar_mixing.
         //
         // The single sign crossing inside the sweep is exactly why
         // fd_test_strict is on: the historical assertion reads the error
