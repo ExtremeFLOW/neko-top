@@ -200,8 +200,9 @@ against 33 ms unfrozen. Two runs of 2000 steps cost 35 s. Leaving
 `scalar_coupled` on would keep re-solving an already-converged fluid for
 another 18 time units at four times the cost, for the same answer.
 
-That is the one place this case departs from the advice in item 24 of the
-workspace bug backlog, and deliberately: it does not use the freeze to
+That is the one place this case departs from the usual advice not to trust a
+`steady` freeze for a scalar objective (the fluid can freeze while the scalar
+is still evolving), and deliberately: it does not use the freeze to
 certify that the scalar has settled. The comparison itself does that, far more
 strictly than a residual threshold would.
 
