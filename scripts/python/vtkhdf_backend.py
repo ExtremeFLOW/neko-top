@@ -1,4 +1,4 @@
-"""HDF5 backend for vtkhdf_extract.py.
+"""HDF5 backend for vtkhdf_tools.py.
 
 Neko writes temporal VTKHDF output as a main file ``<stem>.vtkhdf`` (mesh
 and step metadata) whose PointData are virtual datasets (VDS) over one HDF5

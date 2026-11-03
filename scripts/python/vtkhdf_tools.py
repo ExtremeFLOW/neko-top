@@ -1,4 +1,5 @@
-"""Inspect, extract steps from and split Neko's temporal VTKHDF output.
+"""Tools for Inspection, extraction from and splitting of Neko's temporal VTKHDF
+output.
 
 Neko and Neko-TOP write temporal VTKHDF output as a small main file,
 <stem>.vtkhdf, holding the mesh and the step metadata, plus one HDF5 file
@@ -6,11 +7,11 @@ per output step, <stem>.data/<step>.h5, joined through virtual datasets.
 This tool works on such output with bounded memory and never modifies it.
 
 Usage:
-    python3 vtkhdf_extract.py info FILE
-    python3 vtkhdf_extract.py extract FILE (--step S | --time T)
+    python3 vtkhdf_tools.py info FILE
+    python3 vtkhdf_tools.py extract FILE (--step S | --time T)
                                       [-f FIELD [FIELD ...]] [-o OUT]
                                       [--overwrite]
-    python3 vtkhdf_extract.py split FILE (--steps-per-chunk N
+    python3 vtkhdf_tools.py split FILE (--steps-per-chunk N
                                     | --time-window W | --max-size SIZE)
                                     [--dry-run] [--overwrite]
 
@@ -67,7 +68,7 @@ file behind.
 
 Errors are reported as a single line on stderr with exit status 1;
 SIGTERM, SIGHUP and Ctrl-C remove any partial output and exit with
-128 + the signal number. Set VTKHDF_EXTRACT_TRACEBACK=1 to see the
+128 + the signal number. Set VTKHDF_TOOLS_TRACEBACK=1 to see the
 traceback of an unexpected (internal) error.
 Requires h5py and numpy (see requirements.txt).
 """
@@ -402,7 +403,7 @@ def main() -> None:
         print("error: interrupted", file=sys.stderr)
         sys.exit(130)
     except Exception as error:  # last resort: no traceback for users
-        if os.environ.get("VTKHDF_EXTRACT_TRACEBACK"):
+        if os.environ.get("VTKHDF_TOOLS_TRACEBACK"):
             raise
         print(f"error: internal error: {type(error).__name__}: {error}",
               file=sys.stderr)
