@@ -343,7 +343,7 @@ copy left by an earlier failure is deleted before the adjoint runs.
 
 ## `steady_scalar_unconverged` and `steady_scalar_unconverged_simtime`
 
-The trap item 24 of the workspace bug backlog describes, run on purpose.
+The `steady` freeze trap, run on purpose.
 `steady` freezes only the fluid, and with `scalar_coupled` off it freezes it on
 the fluid's residuals alone, so a scalar objective can be evaluated on a scalar
 that is still evolving. Nothing used to say so.
