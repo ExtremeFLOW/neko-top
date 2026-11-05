@@ -219,11 +219,14 @@ contains
                'case.adjoint_scalar.dealias_coupling_term', &
                dealias_adjoint_scalar_convection, dealias_primal)
           if (dealias_adjoint_scalar_convection .neqv. dealias_primal) then
-             call neko_log%warning("case.adjoint_scalar." // &
-                  "dealias_coupling_term differs from case.numerics." // &
-                  "dealias: the adjoint scalar coupling term is then not " // &
-                  "the transpose of the primal scalar advection, and the " // &
-                  "sensitivity is not the gradient of the objective.")
+             ! The warning itself names both keys: NEKO_LOG_LEVEL can
+             ! suppress the messages explaining it, but not the warning.
+             call neko_log%warning("dealias_coupling_term differs from " // &
+                  "numerics.dealias")
+             call neko_log%message("The adjoint scalar coupling term is " // &
+                  "then not the transpose of the primal")
+             call neko_log%message("scalar advection, and the sensitivity " // &
+                  "is not the gradient of the objective.")
           end if
           ! initialize the coupling term
           call this%adjoint_convection_term%init_from_components( &
