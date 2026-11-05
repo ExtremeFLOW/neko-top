@@ -115,6 +115,43 @@ foreach(case_file ${test_list})
 endforeach()
 
 # ============================================================================ #
+# The cases above run on a single rank, where the whole design sits on one
+# rank and the probe cannot be nominated more than once. Run one of them on two
+# ranks as well, so that the probe selection and the cross-rank reductions of
+# the sweep are checked under MPI too. The case is copied under its own name
+# so that its CSV logs do not overwrite those of the single-rank run.
+set(case_name "viscous_dissipation_variable_dt")
+set(mpi_case_name "${case_name}_np2")
+add_custom_target(
+    ${mpi_case_name}_case_file
+    COMMENT "Copying case file ${case_name}.case to ${mpi_case_name}.case"
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${mpi_case_name}.case
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+        ${CMAKE_CURRENT_BINARY_DIR}/${mpi_case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+add_dependencies(sensitivity_test_prepare ${mpi_case_name}_case_file)
+
+add_test(NAME ${mpi_case_name}_sensitivity
+    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+        $<TARGET_FILE:problem_tester_sensitivity_bin> ${MPIEXEC_POSTFLAGS}
+        ${mpi_case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+set_tests_properties(${mpi_case_name}_sensitivity
+    PROPERTIES
+        DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
+        LABELS "sensitivity;unit"
+        ENVIRONMENT "NEKO_LOG_FILE=${mpi_case_name}.log"
+        PROCESSORS 2
+        SKIP_RETURN_CODE 78
+        TIMEOUT ${sensitivity_case_timeout}
+)
+
+# ============================================================================ #
 # A steady adjoint takes as many steps as the forward run, with time steps of
 # its own, so its clock can stop short of end_time. It must still count as
 # complete, and write no job-limit checkpoint.

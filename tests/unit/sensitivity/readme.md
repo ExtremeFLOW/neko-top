@@ -33,7 +33,10 @@ The test is done through a few common files:
   to the bias the discretisation and unconverged steady state leave
   (determine this empirically per case, don't guess).
 - `CMakeLists.txt`: Defines the build process and, via the `test_list`
-  variable, registers one CTest per case file.
+  variable, registers one CTest per case file. Each runs on one rank;
+  `viscous_dissipation_variable_dt` also runs on two ranks
+  (`viscous_dissipation_variable_dt_np2_sensitivity`), so that the probe
+  selection is exercised under MPI.
 
 ## Configuring the sweep
 
