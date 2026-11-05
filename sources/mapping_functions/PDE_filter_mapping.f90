@@ -1,6 +1,6 @@
 !> @file PDE_filter_mapping.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -431,6 +431,8 @@ contains
     else
        call neko_log%warning(msg)
     end if
+
+    deallocate(msg)
 
   end subroutine PDE_filter_check_convergence
 
