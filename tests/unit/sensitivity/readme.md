@@ -103,6 +103,21 @@ Currently, we have added tests for the following components:
   mixed setting has no value its sensitivity is the gradient of, so the
   objective must raise `neko_error`; pFUnit consumes that expected exception
   as a successful test.
+- `viscous_dissipation_objective_t`, masked (`viscous_dissipation_masked.case`
+  and `unsteady_viscous_dissipation_masked.case`) — `viscous_dissipation.case`
+  and `unsteady_brinkman_dissipation_masked.case` with a viscous dissipation
+  objective masked to the box `1.0 <= x <= 1.5`. The box includes the nodes
+  on its boundary, so it takes one face of nodes from each element next to
+  it: it cuts those elements, although it is aligned with their faces. The
+  value integrates over the box only, so its gradient carries the flux
+  through the box boundary on the cut elements, which an adjoint forcing that
+  masks the full weak Laplacian drops. With that forcing the error was
+  `+1.62` (steady) and `+74.7` (unsteady, where the probed sensitivity even
+  had the wrong sign); with the gradient of the value it is `+4.5e-4` and
+  `-2.8e-5`, the latter first-order truncation. The tolerances, `1e-2` (as
+  for `viscous_dissipation.case`) and `1e-3`, lie between the two. Whenever
+  the cases or the driver's probe selection change, confirm again that both
+  fail with the masked full weak Laplacian as the forcing.
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
