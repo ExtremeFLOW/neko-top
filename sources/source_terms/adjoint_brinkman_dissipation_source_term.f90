@@ -162,14 +162,13 @@ contains
   !! @param dealias weather this term should be overintegrated.
   !! @param volume volume of the objective domain.
   !! @param scratch_GL A scratch registry on the GL space.
-  !! @param gdim physical dimension.
   !! @param start_time when to start applying the source term.
   !! @param end_time when to stop applying the source term.
   !! @param scale scale of the forcing, owned by the objective.
   subroutine adjoint_brinkman_dissipation_source_term_init_from_components( &
        this, f_x, f_y, f_z, design, K, u, v, w, mask, if_mask, &
-       coef, c_Xh_GL, GLL_to_GL, dealias, volume, scratch_GL, gdim, &
-       start_time, end_time, scale)
+       coef, c_Xh_GL, GLL_to_GL, dealias, volume, scratch_GL, start_time, &
+       end_time, scale)
     class(adjoint_brinkman_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     class(design_t), intent(in), target :: design
@@ -183,7 +182,6 @@ contains
     logical, intent(in) :: dealias
     real(kind=rp), intent(in) :: volume
     type(scratch_registry_t), intent(in), target :: scratch_GL
-    integer, intent(in) :: gdim
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
     real(kind=rp), pointer, intent(in) :: scale
@@ -212,7 +210,7 @@ contains
     this%u => u
     this%v => v
     this%w => w
-    this%gdim = gdim
+    this%gdim = coef%msh%gdim
 
     this%volume = volume
 

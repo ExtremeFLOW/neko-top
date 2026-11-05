@@ -1,6 +1,6 @@
 !> @file objective.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -56,7 +56,7 @@ module objective
      !> Scale of the objective's adjoint forcing. The forcing source term
      !! is a copy held by the adjoint, and the objective is moved after
      !! building it, so the two share this scale through an allocated
-     !! pointer. It is one, except on the unsteady path, where
+     !! pointer. It is one outside an unsteady adjoint run, during which
      !! `update_forcing_scale` sets it before every adjoint step.
      real(kind=rp), pointer :: forcing_scale => null()
 
@@ -74,6 +74,9 @@ module objective
      !> Set the adjoint forcing scale for one unsteady adjoint step
      procedure, pass(this) :: update_forcing_scale => &
           objective_update_forcing_scale
+     !> Reset the adjoint forcing scale to one
+     procedure, pass(this) :: reset_forcing_scale => &
+          objective_reset_forcing_scale
      !> Get number of log entries for this objective
      procedure, pass(this) :: get_log_size => objective_get_log_size
      !> Get header labels for this objective's log entries
@@ -287,6 +290,18 @@ contains
        this%forcing_scale = 0.0_rp
     end if
   end subroutine objective_update_forcing_scale
+
+  !> Reset the adjoint forcing scale to one.
+  !!
+  !! The unsteady path calls this after its last adjoint step, so that the
+  !! scale set for that step does not outlive the run. Everywhere else, as
+  !! on the steady path, the forcing is applied unscaled.
+  !! @param this The objective.
+  subroutine objective_reset_forcing_scale(this)
+    class(objective_t), intent(inout) :: this
+
+    this%forcing_scale = 1.0_rp
+  end subroutine objective_reset_forcing_scale
 
 end module objective
 

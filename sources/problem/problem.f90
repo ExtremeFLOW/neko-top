@@ -628,6 +628,11 @@ contains
             cfl, loop_start, total_time)
     end do
 
+    ! Leave every forcing scale at one, as the steady path assumes
+    do j = 1, this%n_objectives
+       call this%objective_list(j)%objective%reset_forcing_scale()
+    end do
+
     call profiler_end_region("Adjoint simulation")
 
     call simulation_adjoint_finalize(simulation%adjoint_case)
