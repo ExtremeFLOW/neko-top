@@ -280,12 +280,16 @@ a window at zero spread and certify a bound from a single point.
 
 ### `dof` mode, and why the probed index is now always printed
 
-The default sweep perturbs one design degree of freedom — the driver's
-`maxloc(abs(sensitivities%x))`. That argmax **moves** whenever the sensitivity
-field moves, so two runs of the same case can silently differentiate with
-respect to two *different* design variables, which makes every cross-run
-comparison unsound. Measured on this suite: at one timestep on one problem the
-relative error spanned 0.42% to 23% purely by which dof the lottery selected.
+The default sweep perturbs one design degree of freedom — the one with the
+largest |sensitivity|, `maxloc(abs(sensitivities%x))` on a single rank. Under
+MPI, `fd_argmax_probe_index` nominates it on the one rank holding it (the
+highest such rank on a tie) and every other rank passes `-1`: were each rank
+to nominate its own maximum, the sweep would perturb one dof per rank. That
+argmax **moves** whenever the sensitivity field moves, so two runs of the same
+case can silently differentiate with respect to two *different* design
+variables, which makes every cross-run comparison unsound. Measured on this
+suite: at one timestep on one problem the relative error spanned 0.42% to 23%
+purely by which dof the lottery selected.
 
 Every run therefore now prints the dof it actually probed, in every mode:
 

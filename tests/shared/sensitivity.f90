@@ -807,6 +807,56 @@ contains
 
   end subroutine fd_resolve_probe_index
 
+  !> Nominate the default single-dof probe -- the design dof with the largest
+  !! |analytic sensitivity| across every rank -- on exactly one rank.
+  !!
+  !! Each rank finds its own largest entry and only the rank holding the
+  !! global maximum keeps it. When several ranks hold an entry within
+  !! `abscmp` of that maximum, the highest-numbered one wins. Every other rank
+  !! gets -1. If each rank nominated its own maximum instead, the sweep would
+  !! perturb one dof per rank while comparing against the sum of their
+  !! derivatives.
+  !!
+  !! On a single rank this is exactly `maxloc` of the absolute sensitivities.
+  !!
+  !! Collective: every rank must call this.
+  !!
+  !! @param target_sensitivities The analytic sensitivities, already
+  !!        synchronised to the host.
+  !! @param n Number of design degrees of freedom held locally.
+  !! @param i Local index of the probe on the owning rank, -1 on every other
+  !!        rank.
+  subroutine fd_argmax_probe_index(target_sensitivities, n, i)
+    type(vector_t), intent(in) :: target_sensitivities
+    integer, intent(in) :: n
+    integer, intent(out) :: i
+
+    real(kind=rp) :: local_max(1), global_max
+    integer :: i_local, owner(1)
+
+    ! A rank holding no design never nominates the probe: `maxloc` of an
+    ! empty array returns 0, which is not an index.
+    i_local = -1
+    local_max(1) = 0.0_rp
+    if (n .gt. 0) then
+       i_local = maxloc(abs(target_sensitivities%x(1:n)), dim = 1)
+       local_max(1) = abs(target_sensitivities%x(i_local))
+    end if
+    global_max = glmax(local_max, 1)
+
+    ! The tie is broken on the rank number itself, reduced as an integer: a
+    ! real-valued key such as 1 + 1e-12*rank rounds to 1 in single precision
+    ! and would let every tied rank claim the probe.
+    owner(1) = -1
+    if (n .gt. 0) then
+       if (abscmp(local_max(1), global_max)) owner(1) = pe_rank
+    end if
+
+    i = -1
+    if (glimax(owner, 1) .eq. pe_rank) i = i_local
+
+  end subroutine fd_argmax_probe_index
+
   !> Fold a string to lower case, in place.
   !! @param string The string to fold.
   subroutine fd_lowercase(string)
@@ -1068,7 +1118,8 @@ contains
     if (recv(4) .ne. 1_i8) then
        call neko_error('The finite-difference probe must be owned by ' // &
             'exactly one rank; the caller nominated it on none or on ' // &
-            'several. Use the rank tie-break the drivers already apply.')
+            'several. Nominate it with fd_argmax_probe_index or ' // &
+            'fd_resolve_probe_index.')
     end if
 
     global_index = recv(1)

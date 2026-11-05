@@ -19,12 +19,11 @@ program problem_tester
   use num_types, only: rp, i8
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp, glmax
   use comm, only: pe_rank
   use sensitivity, only: compute_sensitivity, &
        compute_sensitivity_directional, fd_read_perturbations, &
        fd_read_central_difference, fd_read_mode, fd_read_probe_index, &
-       fd_resolve_probe_index, fd_read_strict_options, &
+       fd_resolve_probe_index, fd_argmax_probe_index, fd_read_strict_options, &
        fd_assertion_skipped, FD_SKIP_EXIT_CODE, fd_read_targets, fd_target_t
   use fd_criterion, only: fd_strict_options_t
   use user, only: user_setup
@@ -76,9 +75,6 @@ program problem_tester
   type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
-  integer :: i_local
-  real(kind=rp) :: local_abs_max, global_abs_max
-  real(kind=rp) :: key_local, key_global, key_arr(1)
 
   !> What this run checks: the weighted objective total, individual
   !! constraints, or any mixture of the two. Defaults to the historical
@@ -219,27 +215,9 @@ program problem_tester
              DEVICE_TO_HOST, .true.)
      end if
 
-     i_local = maxloc(abs(target_sensitivities(it)%x), dim=1)
-     local_abs_max = abs(target_sensitivities(it)%x(i_local))
-     global_abs_max = glmax(abs(target_sensitivities(it)%x), &
-          target_sensitivities(it)%size()) ! DEVICE?
-
-     ! rank-based tie-breaker: only those within eps of the global max get
-     ! key=1
-     if (abscmp(local_abs_max, global_abs_max)) then
-        key_local = 1.0_rp + 1.0e-12_rp*real(pe_rank, rp)
-     else
-        key_local = 0.0_rp
-     end if
-
-     ! reduce the key to pick a single owner
-     key_arr(1) = key_local
-     key_global = glmax(key_arr, 1)
-     if (abscmp(key_local, key_global)) then
-        i_max = i_local
-     else
-        i_max = -1 ! to indicate that this proc doesn't participate
-     end if
+     ! Probe the largest |sensitivity|, nominated on the one rank that holds
+     ! it; every other rank gets -1.
+     call fd_argmax_probe_index(target_sensitivities(it), des%size(), i_max)
 
      ! Override the argmax probe with an explicitly named design dof, if one
      ! was requested. This is what makes two runs comparable: the argmax

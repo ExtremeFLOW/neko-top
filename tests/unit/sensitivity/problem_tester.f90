@@ -22,7 +22,7 @@ program problem_tester
   use math, only: abscmp
   use sensitivity, only: compute_sensitivity, fd_read_strict_options, &
        fd_read_perturbations, fd_assertion_skipped, FD_SKIP_EXIT_CODE, &
-       fd_read_targets, fd_target_t
+       fd_read_targets, fd_target_t, fd_argmax_probe_index
   use fd_criterion, only: fd_strict_options_t
   use logger, only: neko_log, LOG_SIZE
   implicit none
@@ -199,7 +199,9 @@ program problem_tester
              DEVICE_TO_HOST, .true.)
      end if
 
-     i_max = maxloc(abs(target_sensitivities(it)%x), dim=1)
+     ! Probe the largest |sensitivity|, nominated on the one rank that holds
+     ! it; every other rank gets -1.
+     call fd_argmax_probe_index(target_sensitivities(it), des%size(), i_max)
 
      call compute_sensitivity(prob, sim, des, target_sensitivities(it), &
           i_max, perturbations, tolerance, trim(parameter_file), &
