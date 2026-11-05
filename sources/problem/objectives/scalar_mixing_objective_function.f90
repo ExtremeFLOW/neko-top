@@ -162,6 +162,7 @@ contains
     real(kind=rp), intent(in) :: end_time
 
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
+    real(kind=rp) :: forcing_start, forcing_end
     integer :: i_scalar, i_adjoint_scalar
     character(len=:), allocatable :: scalar_name_copy
 
@@ -206,9 +207,10 @@ contains
       this%phi => simulation%scalars%scalar_fields(i_scalar)%scalar%s
 
       ! Initialize the scalar mixing adjoint source term
+      call this%get_forcing_window(simulation, forcing_start, forcing_end)
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
            this%get_weight(), this%phi_ref, this%mask, this%has_mask, &
-           this%coef, this%start_time, this%end_time)
+           this%coef, forcing_start, forcing_end, this%forcing_scale)
 
     end associate
 

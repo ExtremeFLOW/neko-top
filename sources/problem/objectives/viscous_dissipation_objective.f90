@@ -185,6 +185,7 @@ contains
     real(kind=rp), intent(in) :: end_time
 
     type(adjoint_viscous_dissipation_source_term_t) :: adjoint_forcing
+    real(kind=rp) :: forcing_start, forcing_end
 
     call this%free()
 
@@ -211,13 +212,15 @@ contains
     ! you will need to init this!
     ! append a source term based on the viscous dissipation
     ! init the adjoint forcing term for the adjoint
+    call this%get_forcing_window(simulation, forcing_start, forcing_end)
     call adjoint_forcing%init_from_components( &
          simulation%adjoint_fluid%f_adj_x, &
          simulation%adjoint_fluid%f_adj_y, &
          simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight * this%viscosity, &
          this%mask, this%has_mask, &
-         this%c_Xh, this%volume, this%start_time, this%end_time)
+         this%c_Xh, this%volume, forcing_start, forcing_end, &
+         this%forcing_scale)
 
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)

@@ -57,7 +57,7 @@ module adjoint_brinkman_dissipation_source_term
   use registry, only : neko_registry
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: col2, invcol2
+  use math, only: col2, invcol2, abscmp
   use device_math, only: device_col2, device_invcol2
   implicit none
   private
@@ -78,6 +78,9 @@ module adjoint_brinkman_dissipation_source_term
      type(field_t), pointer :: chi => null()
      !> a scale for this term
      real(kind=rp) :: K
+     !> Scale of the forcing, owned by the objective. Zero switches the
+     !! forcing off.
+     real(kind=rp), pointer :: scale => null()
      !> A mask for where the source term is evaluated
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
@@ -162,10 +165,11 @@ contains
   !! @param gdim physical dimension.
   !! @param start_time when to start applying the source term.
   !! @param end_time when to stop applying the source term.
+  !! @param scale scale of the forcing, owned by the objective.
   subroutine adjoint_brinkman_dissipation_source_term_init_from_components( &
        this, f_x, f_y, f_z, design, K, u, v, w, mask, if_mask, &
        coef, c_Xh_GL, GLL_to_GL, dealias, volume, scratch_GL, gdim, &
-       start_time, end_time)
+       start_time, end_time, scale)
     class(adjoint_brinkman_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     class(design_t), intent(in), target :: design
@@ -182,6 +186,7 @@ contains
     integer, intent(in) :: gdim
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
+    real(kind=rp), pointer, intent(in) :: scale
 
     type(field_list_t) :: fields
 
@@ -219,6 +224,7 @@ contains
     end select
 
     this%K = K
+    this%scale => scale
     this%if_mask = if_mask
     if (this%if_mask) then
        this%mask => mask
@@ -240,6 +246,7 @@ contains
     nullify(this%GLL_to_GL)
     nullify(this%mask)
     nullify(this%scratch_GL)
+    nullify(this%scale)
 
   end subroutine adjoint_brinkman_dissipation_source_term_free
 
@@ -256,6 +263,9 @@ contains
     integer :: temp_indices_GL(3)
     integer :: n_GL, nel
 
+    ! Off outside the objective's time window
+    if (abscmp(this%scale, 0.0_rp)) return
+
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
     fw => this%fields%get_by_index(3)
@@ -268,7 +278,7 @@ contains
     call field_copy(work, this%chi)
 
     ! scale by K and volume
-    call field_cmult(work, this%K / this%volume)
+    call field_cmult(work, this%scale * this%K / this%volume)
 
     ! mask
     if (this%if_mask) then
