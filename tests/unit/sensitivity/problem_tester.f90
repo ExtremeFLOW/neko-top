@@ -19,7 +19,6 @@ program problem_tester
   use num_types, only: rp
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp
   use sensitivity, only: compute_sensitivity, fd_read_strict_options, &
        fd_read_perturbations, fd_assertion_skipped, FD_SKIP_EXIT_CODE, &
        fd_read_targets, fd_target_t, fd_argmax_probe_index

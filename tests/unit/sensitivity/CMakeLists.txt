@@ -72,7 +72,9 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules CACHE PATH
     "Fortran module directory" FORCE)
 
 # ============================================================================ #
-# Loop over all case files and create tests
+# Loop over all case files and create tests. The time limit is set outside the
+# loop because the two-rank test after it uses the same one.
+set(sensitivity_case_timeout 300)
 foreach(case_file ${test_list})
     # Get the case name without extension
     get_filename_component(case_name ${case_file} NAME_WE)
@@ -103,7 +105,6 @@ foreach(case_file ${test_list})
     # this the driver exits 0 and CTest reports a green gradient check that
     # checked nothing. 77 is deliberately avoided: the regression lane uses
     # it for its opt-in gate, and the two reasons must stay distinguishable.
-    set(sensitivity_case_timeout 300)
     set_tests_properties(${case_name}_sensitivity
         PROPERTIES
             DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
@@ -119,7 +120,8 @@ endforeach()
 # rank and the probe cannot be nominated more than once. Run one of them on two
 # ranks as well, so that the probe selection and the cross-rank reductions of
 # the sweep are checked under MPI too. The case is copied under its own name
-# so that its CSV logs do not overwrite those of the single-rank run.
+# because the CSV logs are appended to, not overwritten: this keeps the
+# two-rank rows from being mixed into the single-rank run's CSVs.
 set(case_name "viscous_dissipation_variable_dt")
 set(mpi_case_name "${case_name}_np2")
 add_custom_target(
@@ -135,18 +137,21 @@ add_custom_target(
 )
 add_dependencies(sensitivity_test_prepare ${mpi_case_name}_case_file)
 
+# Like the multi-rank pFUnit tests in tests/unit/CMakeLists.txt, a device
+# backend runs it on one rank only.
+set(mpi_case_ranks $<IF:$<NOT:$<STREQUAL:${DEVICE_TYPE},CPU>>,1,2>)
 add_test(NAME ${mpi_case_name}_sensitivity
-    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} 2 ${MPIEXEC_PREFLAGS}
+    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${mpi_case_ranks}
+        ${MPIEXEC_PREFLAGS}
         $<TARGET_FILE:problem_tester_sensitivity_bin> ${MPIEXEC_POSTFLAGS}
         ${mpi_case_name}.case
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 set_tests_properties(${mpi_case_name}_sensitivity
     PROPERTIES
-        DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
         LABELS "sensitivity;unit"
         ENVIRONMENT "NEKO_LOG_FILE=${mpi_case_name}.log"
-        PROCESSORS 2
+        PROCESSORS ${mpi_case_ranks}
         SKIP_RETURN_CODE 78
         TIMEOUT ${sensitivity_case_timeout}
 )

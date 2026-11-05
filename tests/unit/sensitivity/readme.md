@@ -35,8 +35,8 @@ The test is done through a few common files:
 - `CMakeLists.txt`: Defines the build process and, via the `test_list`
   variable, registers one CTest per case file. Each runs on one rank;
   `viscous_dissipation_variable_dt` also runs on two ranks
-  (`viscous_dissipation_variable_dt_np2_sensitivity`), so that the probe
-  selection is exercised under MPI.
+  (`viscous_dissipation_variable_dt_np2_sensitivity`; one on a device
+  backend), so that the probe selection is exercised under MPI.
 
 ## Configuring the sweep
 
@@ -287,7 +287,7 @@ The default sweep perturbs one design degree of freedom — the one with the
 largest |sensitivity|, `maxloc(abs(sensitivities%x))` on a single rank. Under
 MPI, `fd_argmax_probe_index` nominates it on the one rank holding it (the
 highest such rank on a tie) and every other rank passes `-1`: were each rank
-to nominate its own maximum, the sweep would perturb one dof per rank. That
+to nominate its own maximum, `fd_report_probe` would reject the probe. That
 argmax **moves** whenever the sensitivity field moves, so two runs of the same
 case can silently differentiate with respect to two *different* design
 variables, which makes every cross-run comparison unsound. Measured on this

@@ -813,9 +813,8 @@ contains
   !! Each rank finds its own largest entry and only the rank holding the
   !! global maximum keeps it. When several ranks hold an entry within
   !! `abscmp` of that maximum, the highest-numbered one wins. Every other rank
-  !! gets -1. If each rank nominated its own maximum instead, the sweep would
-  !! perturb one dof per rank while comparing against the sum of their
-  !! derivatives.
+  !! gets -1. If each rank nominated its own maximum instead,
+  !! `fd_report_probe` would reject the probe as owned by several ranks.
   !!
   !! On a single rank this is exactly `maxloc` of the absolute sensitivities.
   !!
