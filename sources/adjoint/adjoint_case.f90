@@ -125,7 +125,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
-    logical :: dealias_adjoint_scalar_convection
+    logical :: dealias_adjoint_scalar_convection, dealias_primal
 
     !
     ! Setup adjoint fluid
@@ -211,10 +211,21 @@ contains
                neko_case%fluid%rho)
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
-          ! initialize the coupling term
+          ! The coupling term is the transpose of the linearised primal
+          ! scalar advection, so by default it is dealiased exactly when that
+          ! advection is, read from the same key.
+          call json_get(numerics_params, 'dealias', dealias_primal)
           call json_get_or_default(neko_case%params, &
                'case.adjoint_scalar.dealias_coupling_term', &
-               dealias_adjoint_scalar_convection, .true.)
+               dealias_adjoint_scalar_convection, dealias_primal)
+          if (dealias_adjoint_scalar_convection .neqv. dealias_primal) then
+             call neko_log%warning("case.adjoint_scalar." // &
+                  "dealias_coupling_term differs from case.numerics." // &
+                  "dealias: the adjoint scalar coupling term is then not " // &
+                  "the transpose of the primal scalar advection, and the " // &
+                  "sensitivity is not the gradient of the objective.")
+          end if
+          ! initialize the coupling term
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
                this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%scalar%s, &

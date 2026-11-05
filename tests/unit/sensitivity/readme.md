@@ -98,16 +98,26 @@ Currently, we have added tests for the following components:
   the mask only while its probe stays that close to the boundary. Whenever the
   case or the driver's probe selection changes, confirm again that the test
   fails with the mask removed from `update_sensitivity`.
+- `scalar_mixing_objective_t`, unsteady and unmasked, with `numerics.dealias`
+  set to `false` (`unsteady_scalar_mixing_no_dealias.case`) — 80 time steps at
+  polynomial order 3, with a block of scalar advected past the Brinkman design.
+  It checks that the term the adjoint scalar adds to the adjoint momentum
+  equation is integrated as the primal scalar advection is, here on the GLL
+  points. Over the whole domain the objective's gradient nearly cancels, so a
+  mismatch dominates it: with the coupling term over-integrated, as it was by
+  default before, the error at the smallest perturbation was `+2.72`; on the
+  GLL points it is `+2.63e-2`. That remainder is a bias, not truncation, which
+  is about `5e-5` at the smallest perturbation. It shrinks with the number of
+  time steps rather than with their size: `+1.24e-1` with 20 steps of `1e-3`,
+  `+1.36e-1` with 20 steps of `2.5e-4` and `+5.66e-2` with 40 steps of `5e-4`.
+  Hence the 80 steps; the tolerance of `5e-2` lies between the two errors.
 - `brinkman_dissipation_rejection` — checks the invalid mixed-dealias
   configuration directly through Neko's pFUnit error-redirection fixture. A
   mixed setting has no value its sensitivity is the gradient of, so the
   objective must raise `neko_error`; pFUnit consumes that expected exception
   as a successful test.
 
-`scalar_mixing_objective_t` is not yet covered here (its only existing case,
-`tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
-scalar-scheme fix first — see `known-bugs-backlog.md` #9). The heavier,
-realistic (~1000-timestep) versions of these and other cases
+The heavier, realistic (~1000-timestep) versions of these and other cases
 (`dissipation`, `dissipation_weights`, unsteady variants) live in
 `tests/regression/sensitivity/` instead — that suite is opt-in
 (`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`) and not part of the default/PR-blocking
