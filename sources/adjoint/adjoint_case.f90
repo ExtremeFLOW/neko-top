@@ -216,6 +216,11 @@ contains
           call json_get(numerics_params, 'dealias', &
                dealias_adjoint_scalar_convection)
           ! initialize the coupling term
+          ! The over-integration stack is only needed if this term dealiases
+          if (dealias_adjoint_scalar_convection) then
+             call this%fluid_adj%require_gauss_stack()
+          end if
+
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
                this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%scalar%s, &
