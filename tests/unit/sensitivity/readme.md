@@ -39,16 +39,16 @@ Currently, we have added tests for the following components:
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
 - `viscous_dissipation_variable_dt.case` — the same objective with
-  `case.time.variable_timestep`, a regression gate for backlog #55. It fails
-  if the driver ignores the `case.time` settings (the run then marches at a
-  placeholder `dt = 1.0`), or if one run's last `dt` leaks into the next
-  run's time-step history. Its time steps do not depend on the design, by
-  construction: the CFL stays far below `target_cfl`, so every run ramps
-  from `timestep` by the controller's largest factor, 1.2 per step, until
-  `max_timestep` caps it. The finite differences therefore compare runs with
-  identical steps. The flow starts from the inflow velocity rather than from
-  rest, because Neko's controller divides by the CFL of the first step, and
-  a zero CFL stops a Debug build on a floating-point trap (backlog #103).
+  `case.time.variable_timestep`, a regression gate for variable time stepping
+  (#558). It fails if the driver ignores the `case.time` settings (the run
+  then marches at a placeholder `dt = 1.0`), or if one run's last `dt` leaks
+  into the next run's time-step history. Its time steps do not depend on the
+  design, by construction: the CFL stays far below `target_cfl`, so every run
+  ramps from `timestep` by the controller's largest factor, 1.2 per step,
+  until `max_timestep` caps it. The finite differences therefore compare runs
+  with identical steps. The flow starts from the inflow velocity rather than
+  from rest, because Neko's controller divides by the CFL of the first step,
+  and a zero CFL stops a Debug build on a floating-point trap.
   The finite-difference estimate converges at first order to a limit about
   0.6% above the adjoint sensitivity. That limit is a bias, not a floor:
   the forward run has not reached a steady state at `end_time`, while the
@@ -106,7 +106,7 @@ Currently, we have added tests for the following components:
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
-scalar-scheme fix first — see `known-bugs-backlog.md` #9). The heavier,
+scalar-scheme fix first). The heavier,
 realistic (~1000-timestep) versions of these and other cases
 (`dissipation`, `dissipation_weights`, unsteady variants) live in
 `tests/regression/sensitivity/` instead — that suite is opt-in
