@@ -135,7 +135,7 @@ Currently, we have added tests for the following components:
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
-scalar-scheme fix first — see `known-bugs-backlog.md` #9). The heavier,
+scalar-scheme fix first). The heavier,
 realistic (~1000-timestep) versions of these and other cases
 (`dissipation`, `dissipation_weights`, unsteady variants) live in
 `tests/regression/sensitivity/` instead — that suite is opt-in
