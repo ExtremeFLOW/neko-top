@@ -125,7 +125,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
-    logical :: dealias_adjoint_scalar_convection, dealias_primal
+    logical :: dealias_adjoint_scalar_convection
 
     !
     ! Setup adjoint fluid
@@ -212,22 +212,9 @@ contains
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
           ! The coupling term is the transpose of the linearised primal
-          ! scalar advection, so by default it is dealiased exactly when that
-          ! advection is, read from the same key.
-          call json_get(numerics_params, 'dealias', dealias_primal)
-          call json_get_or_default(neko_case%params, &
-               'case.adjoint_scalar.dealias_coupling_term', &
-               dealias_adjoint_scalar_convection, dealias_primal)
-          if (dealias_adjoint_scalar_convection .neqv. dealias_primal) then
-             ! The warning itself names both keys: NEKO_LOG_LEVEL can
-             ! suppress the messages explaining it, but not the warning.
-             call neko_log%warning("dealias_coupling_term differs from " // &
-                  "numerics.dealias")
-             call neko_log%message("The adjoint scalar coupling term is " // &
-                  "then not the transpose of the primal")
-             call neko_log%message("scalar advection, and the sensitivity " // &
-                  "is not the gradient of the objective.")
-          end if
+          ! scalar advection, so it is dealiased when that advection is.
+          call json_get(numerics_params, 'dealias', &
+               dealias_adjoint_scalar_convection)
           ! initialize the coupling term
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
