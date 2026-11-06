@@ -147,13 +147,13 @@ The objective can be selected by prescribing `"type": "viscous_dissipation"`
 and has the following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `weight`| The weight used in the objective. | Real | `1.0` |
-| `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
-| `name`| The name that will appear in `objective_data.csv` | String | `Dissipation`|
-| `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
-| `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
+| Name         | Description                                                      | Admissible values | Default value |
+| ------------ | ---------------------------------------------------------------- | ----------------- | ------------- |
+| `weight`     | The weight used in the objective.                                | Real              | `1.0`         |
+| `mask_name`  | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String            | `""`          |
+| `name`       | The name that will appear in `objective_data.csv`                | String            | `Dissipation` |
+| `start_time` | Start of the active time window for unsteady accumulation.       | Real              | `0.0`         |
+| `end_time`   | End of the active time window for unsteady accumulation.         | Real              | `+\infty`     |
 
 ### Brinkman dissipation {#objective_velocity_penalty}
 In the works of [A. Gersborg-Hansen et al. (2005)](https://link.springer.com/article/10.1007/s00158-004-0508-7)
@@ -193,13 +193,13 @@ and has the following input parameters:
 based on lubrication theory written by Gersborg-Hansen et al.
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `weight`| The weight used in the objective. | Real | `1.0` |
-| `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
-| `name`| The name that will appear in `objective_data.csv` | String | `Out of plane stresses`|
-| `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
-| `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
+| Name         | Description                                                      | Admissible values | Default value           |
+| ------------ | ---------------------------------------------------------------- | ----------------- | ----------------------- |
+| `weight`     | The weight used in the objective.                                | Real              | `1.0`                   |
+| `mask_name`  | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String            | `""`                    |
+| `name`       | The name that will appear in `objective_data.csv`                | String            | `Out of plane stresses` |
+| `start_time` | Start of the active time window for unsteady accumulation.       | Real              | `0.0`                   |
+| `end_time`   | End of the active time window for unsteady accumulation.         | Real              | `+\infty`               |
 
 The objective uses `case.numerics.dealias` to select one quadrature for its
 value, its adjoint forcing, and its sensitivity. This ensures the sensitivity
@@ -225,14 +225,14 @@ The objective can be selected by prescribing `"type": "scalar_mixing"`
 and has the following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `weight`| The weight used in the objective. | Real | `1.0` |
-| `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
-| `target_concentration` | \f$\phi_\text{ref}\f$ in the above equation. | Real | `0.5`|
-| `name`| The name that will appear in `objective_data.csv` | String | `Scalar Mixing`|
-| `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
-| `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
+| Name                   | Description                                                      | Admissible values | Default value   |
+| ---------------------- | ---------------------------------------------------------------- | ----------------- | --------------- |
+| `weight`               | The weight used in the objective.                                | Real              | `1.0`           |
+| `mask_name`            | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String            | `""`            |
+| `target_concentration` | \f$\phi_\text{ref}\f$ in the above equation.                     | Real              | `0.5`           |
+| `name`                 | The name that will appear in `objective_data.csv`                | String            | `Scalar Mixing` |
+| `start_time`           | Start of the active time window for unsteady accumulation.       | Real              | `0.0`           |
+| `end_time`             | End of the active time window for unsteady accumulation.         | Real              | `+\infty`       |
 
 ## Constraints {#constraints}
 
@@ -260,10 +260,10 @@ The constraint can be selected by prescribing `"type": "volume"`
 and has the following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `limit` | \f$ \mathcal{C}_\text{min} \f$ or \f$ \mathcal{C}_\text{max} \f$  in the above equation | Real | - |
-| `is_max` | Indicate whether a minimum or maximum volume constraint should be applied. | `.true.` or `.false.` | `.false.` |
-| `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
-| `name`| The name that will appear in `objective_data.csv` | String | `Volume constraint`|
-| `mapping`| A potential to, for instance, compute the volume based on a filtered design. For more information please refer to @ref mixer_mapping| Json | `""`|
+| Name        | Description                                                                                                                          | Admissible values     | Default value       |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ | --------------------- | ------------------- |
+| `limit`     | \f$ \mathcal{C}_\text{min} \f$ or \f$ \mathcal{C}_\text{max} \f$  in the above equation                                              | Real                  | -                   |
+| `is_max`    | Indicate whether a minimum or maximum volume constraint should be applied.                                                           | `.true.` or `.false.` | `.false.`           |
+| `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$.                                                                     | String                | `""`                |
+| `name`      | The name that will appear in `objective_data.csv`                                                                                    | String                | `Volume constraint` |
+| `mapping`   | A potential to, for instance, compute the volume based on a filtered design. For more information please refer to @ref mixer_mapping | Json                  | `""`                |

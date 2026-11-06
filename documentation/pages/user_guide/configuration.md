@@ -35,13 +35,13 @@ their own options in a nested object named after the type.
 
 ### Common solver settings {#configuration-solver-common}
 
-| Json entry            | Description                                                             | Admissible Values                 | Default value      |
-| ---------------------- | ------------------------------------------------------------------------ | ------------------------------------ | --------------------- |
-| `type`                | Selects the optimizer.                                                  | `"mma"` or `"steepest_descent"`   | *(required)*        |
-| `max_iterations`      | Maximum number of outer optimization iterations.                       | Integer, `> 0`                     | `100`               |
-| `enable_output`       | Write the convergence log (`optimization_data.csv`) and the simulation output at every iteration. | `.true.` or `.false.` | `.true.`            |
-| `stop_design_change`  | Stop once the maximum design change drops strictly below this value.   | Real, `> 0`                        | machine epsilon     |
-| `max_runtime`         | Maximum wall-clock runtime, as a duration string (e.g. `1-12:00:00` for one day and twelve hours). Empty disables the limit. | String                | `""` (disabled)     |
+| Json entry           | Description                                                                                                                  | Admissible Values               | Default value   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | --------------- |
+| `type`               | Selects the optimizer.                                                                                                       | `"mma"` or `"steepest_descent"` | *(required)*    |
+| `max_iterations`     | Maximum number of outer optimization iterations.                                                                             | Integer, `> 0`                  | `100`           |
+| `enable_output`      | Write the convergence log (`optimization_data.csv`) and the simulation output at every iteration.                            | `.true.` or `.false.`           | `.true.`        |
+| `stop_design_change` | Stop once the maximum design change drops strictly below this value.                                                         | Real, `> 0`                     | machine epsilon |
+| `max_runtime`        | Maximum wall-clock runtime, as a duration string (e.g. `1-12:00:00` for one day and twelve hours). Empty disables the limit. | String                          | `""` (disabled) |
 
 Restart and checkpoint keys (`restart_file`, `checkpoint.*`) are likewise read
 the same way by every optimizer; see
@@ -141,16 +141,16 @@ optimization with hundreds of millions of local stress constraints", IJNME 122
 }
 ```
 
-| Json entry               | Description                                                                    | Admissible Values | Default value |
-| -------------------------- | --------------------------------------------------------------------------------- | -------------------- | ---------------- |
-| `xmin`                   | Lower bound of the design variables.                                           | Real               | `0.0`          |
-| `xmax`                   | Upper bound of the design variables. Must be larger than `xmin`.               | Real               | `1.0`          |
-| `step_length`            | Step length \f$\Psi\f$ applied to the normalised direction.                    | Real, `> 0`        | `1.0`          |
-| `move_limit.initial`     | Initial per-variable move limit. Must not be smaller than `move_limit.min`.    | Real               | `0.1`          |
-| `move_limit.min`         | Smallest allowed move limit.                                                   | Real, `> 0`        | `0.001`        |
-| `move_limit.max`         | Largest allowed move limit. Must not be smaller than `move_limit.initial`.     | Real               | `0.1`          |
-| `move_limit.decrease`    | Factor applied to a variable's move limit when it oscillates.                 | Real, `(0, 1]`     | `0.7`          |
-| `move_limit.increase`    | Factor applied to a variable's move limit when it moves monotonically.        | Real, `>= 1`       | `1.1`          |
+| Json entry            | Description                                                                 | Admissible Values | Default value |
+| --------------------- | --------------------------------------------------------------------------- | ----------------- | ------------- |
+| `xmin`                | Lower bound of the design variables.                                        | Real              | `0.0`         |
+| `xmax`                | Upper bound of the design variables. Must be larger than `xmin`.            | Real              | `1.0`         |
+| `step_length`         | Step length \f$\Psi\f$ applied to the normalised direction.                 | Real, `> 0`       | `1.0`         |
+| `move_limit.initial`  | Initial per-variable move limit. Must not be smaller than `move_limit.min`. | Real              | `0.1`         |
+| `move_limit.min`      | Smallest allowed move limit.                                                | Real, `> 0`       | `0.001`       |
+| `move_limit.max`      | Largest allowed move limit. Must not be smaller than `move_limit.initial`.  | Real              | `0.1`         |
+| `move_limit.decrease` | Factor applied to a variable's move limit when it oscillates.               | Real, `(0, 1]`    | `0.7`         |
+| `move_limit.increase` | Factor applied to a variable's move limit when it moves monotonically.      | Real, `>= 1`      | `1.1`         |
 
 Violating any of the relations in the "Admissible Values" column above stops
 the run with an error naming the offending key.
@@ -296,13 +296,13 @@ gradient matches the one from the original run.
 Parameters related to checkpointing can be set under the `optimization.solver`
 section of the case file.
 
-| Parameter             | Type    | Default                | Description                                                                                                                                                                                               |
-| --------------------- | ------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `restart_file`        | string  | `""`                   | Filename of a checkpoint file to restart from. If this parameter is set, the optimization will be restarted from the specified checkpoint file.                                                           |
-| `checkpoint.interval` | integer | -1                     | Interval (in iterations) at which checkpoints are emitted. If set to a positive value, a checkpoint will be emitted every `checkpoint.interval` iterations. If set to -1, no checkpoints will be emitted. |
-| `checkpoint.path`     | string  | `"./checkpoints/"`     | Path where checkpoint files will be saved.                                                                                                                                                                 |
-| `checkpoint.base`     | string  | `"optimizer_checkpoint"` | Base name for checkpoint files.                                                                                                                                                                          |
-| `checkpoint.format`   | string  | `"hdf5"`               | Format for checkpoint files. Accepted spellings are `"h5"`, `"hdf5"`, `"hf5"` and `"hdf"`, all of which write an HDF5 file.                                                                                |
+| Parameter             | Type    | Default                  | Description                                                                                                                                                                                               |
+| --------------------- | ------- | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `restart_file`        | string  | `""`                     | Filename of a checkpoint file to restart from. If this parameter is set, the optimization will be restarted from the specified checkpoint file.                                                           |
+| `checkpoint.interval` | integer | -1                       | Interval (in iterations) at which checkpoints are emitted. If set to a positive value, a checkpoint will be emitted every `checkpoint.interval` iterations. If set to -1, no checkpoints will be emitted. |
+| `checkpoint.path`     | string  | `"./checkpoints/"`       | Path where checkpoint files will be saved.                                                                                                                                                                |
+| `checkpoint.base`     | string  | `"optimizer_checkpoint"` | Base name for checkpoint files.                                                                                                                                                                           |
+| `checkpoint.format`   | string  | `"hdf5"`                 | Format for checkpoint files. Accepted spellings are `"h5"`, `"hdf5"`, `"hf5"` and `"hdf"`, all of which write an HDF5 file.                                                                               |
 
 ## Adjoint over-integration (dealiasing) {#configuration-adjoint-dealias}
 

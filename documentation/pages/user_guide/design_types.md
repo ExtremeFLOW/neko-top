@@ -28,18 +28,18 @@ Brinkman source-term coupling.
 
 ### JSON keys {#design_types-brinkman-keys}
 
-| Key | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `type` | string | Yes | - | Must be `"brinkman"` |
-| `name` | string | No | `"Brinkman Design"` | Design name |
-| `domain.type` | string | No | `"full"` | `"full"` or `"point_zone"` |
-| `domain.zone_name` | string | Cond. | - | Required when `domain.type = "point_zone"` |
-| `verbose_design` | bool | No | `false` | Write all forward mapping stages |
-| `verbose_sensitivity` | bool | No | `false` | Write all backward sensitivity stages |
-| `output_precision` | string | No | `"sp"` | `"sp"` or `"dp"` for design/sensitivity field output |
-| `output_format` | string | No | `"fld"` | Field-output format, e.g. `"fld"`, `"vtkhdf"`, or `"adios2"` |
-| `mapping` | array | No | omitted | Mapping cascade definition, see [Mapping cascade](@ref mapping_cascade) |
-| `initial_distribution` | object | No | omitted | Initial design field setup (details below) |
+| Key                    | Type   | Required | Default             | Notes                                                                   |
+| ---------------------- | ------ | -------- | ------------------- | ----------------------------------------------------------------------- |
+| `type`                 | string | Yes      | -                   | Must be `"brinkman"`                                                    |
+| `name`                 | string | No       | `"Brinkman Design"` | Design name                                                             |
+| `domain.type`          | string | No       | `"full"`            | `"full"` or `"point_zone"`                                              |
+| `domain.zone_name`     | string | Cond.    | -                   | Required when `domain.type = "point_zone"`                              |
+| `verbose_design`       | bool   | No       | `false`             | Write all forward mapping stages                                        |
+| `verbose_sensitivity`  | bool   | No       | `false`             | Write all backward sensitivity stages                                   |
+| `output_precision`     | string | No       | `"sp"`              | `"sp"` or `"dp"` for design/sensitivity field output                    |
+| `output_format`        | string | No       | `"fld"`             | Field-output format, e.g. `"fld"`, `"vtkhdf"`, or `"adios2"`            |
+| `mapping`              | array  | No       | omitted             | Mapping cascade definition, see [Mapping cascade](@ref mapping_cascade) |
+| `initial_distribution` | object | No       | omitted             | Initial design field setup (details below)                              |
 
 The `verbose_*`, `output_precision`, and `output_format` options control the
 intermediate forward and backward fields written by the mapping cascade.
@@ -57,10 +57,10 @@ If omitted, the design is initialized to zero.
 }
 ```
 
-| Key | Type | Required | Default |
-|---|---|---|---|
-| `type` | string | Yes | - |
-| `value` | real | Yes | - |
+| Key     | Type   | Required | Default |
+| ------- | ------ | -------- | ------- |
+| `type`  | string | Yes      | -       |
+| `value` | real   | Yes      | -       |
 
 #### Point zone
 
@@ -73,12 +73,12 @@ If omitted, the design is initialized to zero.
 }
 ```
 
-| Key | Type | Required | Default |
-|---|---|---|---|
-| `type` | string | Yes | - |
-| `base_value` | real | Yes | - |
-| `zone_name` | string | Yes | - |
-| `zone_value` | real | Yes | - |
+| Key          | Type   | Required | Default |
+| ------------ | ------ | -------- | ------- |
+| `type`       | string | Yes      | -       |
+| `base_value` | real   | Yes      | -       |
+| `zone_name`  | string | Yes      | -       |
+| `zone_value` | real   | Yes      | -       |
 
 #### Field file
 
@@ -92,13 +92,13 @@ If omitted, the design is initialized to zero.
 }
 ```
 
-| Key | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `type` | string | Yes | - | Must be `"field"` |
-| `file_name` | string | Yes | - | Field sample file (e.g. `design0.f00001`) |
-| `interpolate` | bool | No | `false` | Enable interpolation from another mesh |
-| `tolerance` | real | No | `1.0e-6` | Interpolation tolerance |
-| `mesh_file_name` | string | No | `"none"` | Optional mesh/source field file for interpolation |
+| Key              | Type   | Required | Default  | Notes                                             |
+| ---------------- | ------ | -------- | -------- | ------------------------------------------------- |
+| `type`           | string | Yes      | -        | Must be `"field"`                                 |
+| `file_name`      | string | Yes      | -        | Field sample file (e.g. `design0.f00001`)         |
+| `interpolate`    | bool   | No       | `false`  | Enable interpolation from another mesh            |
+| `tolerance`      | real   | No       | `1.0e-6` | Interpolation tolerance                           |
+| `mesh_file_name` | string | No       | `"none"` | Optional mesh/source field file for interpolation |
 
 ## Simple Design {#design_types-simple}
 
@@ -110,15 +110,15 @@ fully-qualified paths `optimization.design.domain.nx/ny/nz/limits`.
 
 ### JSON keys {#design_types-simple-keys}
 
-| Key | Type | Required | Default | Notes |
-|---|---|---|---|---|
-| `type` | string | Yes | - | Must be `"simple"` |
-| `name` | string | No | `"Simple Design"` | Design name |
-| `domain.type` | string | Yes | - | Currently supports `"box"` |
-| `domain.nx` | integer | Yes | - | Number of cells in x-direction |
-| `domain.ny` | integer | Yes | - | Number of cells in y-direction |
-| `domain.nz` | integer | Yes | - | Number of cells in z-direction |
-| `domain.limits` | real[6] | Yes | - | `[xmin, xmax, ymin, ymax, zmin, zmax]` |
+| Key             | Type    | Required | Default           | Notes                                  |
+| --------------- | ------- | -------- | ----------------- | -------------------------------------- |
+| `type`          | string  | Yes      | -                 | Must be `"simple"`                     |
+| `name`          | string  | No       | `"Simple Design"` | Design name                            |
+| `domain.type`   | string  | Yes      | -                 | Currently supports `"box"`             |
+| `domain.nx`     | integer | Yes      | -                 | Number of cells in x-direction         |
+| `domain.ny`     | integer | Yes      | -                 | Number of cells in y-direction         |
+| `domain.nz`     | integer | Yes      | -                 | Number of cells in z-direction         |
+| `domain.limits` | real[6] | Yes      | -                 | `[xmin, xmax, ymin, ymax, zmin, zmax]` |
 
 Example:
 
