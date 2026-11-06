@@ -45,6 +45,8 @@ add_subdirectory(checkpointing)
 add_subdirectory(optimizer)
 add_subdirectory(mapping)
 add_subdirectory(adjoint)
+add_subdirectory(fd_criterion)
+add_subdirectory(fd_argmax_probe)
 add_subdirectory(mma)
 add_subdirectory(constraints)
 

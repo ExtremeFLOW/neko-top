@@ -1,0 +1,263 @@
+!> Unit tests for `fd_argmax_probe_index` (tests/shared/sensitivity.f90) --
+!! which rank nominates the default finite-difference probe, the design
+!! degree of freedom with the largest |analytic sensitivity|, when the
+!! design is distributed over several MPI ranks.
+!!
+!! Ported from the reviewer's self-checking MPI probe program
+!! (probe_argmax.F90, cases T1, T2, T4 and T6; see that program's own doc
+!! comment for the routine's full contract): candidates are ranks whose
+!! local |max| is within `abscmp` of the global |max|; the highest-ranked
+!! candidate wins, the tie broken on the rank number reduced as an
+!! *integer* (`glimax`) rather than a real-valued key that can round away
+!! in single precision; a rank with no design (`n = 0`) never nominates but
+!! must still take part in both collectives, so it cannot hang the others.
+!!
+!! Tests mix `npes=[2]` (needed to say anything about a cross-rank
+!! tie-break) with one `npes=[1]` test (the single-rank reduction to a
+!! plain `maxloc`). Because `npes` differs across tests sharing one
+!! MAX_PES = 2 executable, `setUp`/`tearDown` rebind Neko's communicator
+!! state to the sub-communicator pFUnit actually scheduled *this* test
+!! under, via `comm_init_test`/`comm_free_test`
+!! (`src/comm/pfunit_comm_utils.F90`, installed by Neko and exported
+!! through its pkg-config file) -- the same mechanism Neko's own
+!! `test_math_glsc3` (`tests/unit/math/test_math_parallel.pf`) uses for its
+!! `@test(npes=[1,2])`. Deliberately not `neko_init()`: it binds Neko's
+!! communicator state to the full launched world exactly once, on
+!! whichever test first calls it, and with mixed `npes` that first call
+!! happens at a different, uncoordinated moment on each rank's own
+!! process; a collective call inside it would then hang rather than simply
+!! fail.
+!!
+!! Named `fd_argmax_probe_test`, not `sensitivity`, because the pFUnit
+!! module name must equal the .pf basename and this file `use`s the
+!! production module `sensitivity` -- naming both the same would make the
+!! test module use itself (see `fd_criterion_test.pf`'s header for the same
+!! reasoning).
+module fd_argmax_probe_test
+  use pfunit
+  use num_types, only: rp
+  use comm, only: pe_rank, pe_size
+  use pfunit_comm_utils, only: comm_init_test, comm_free_test
+  use vector, only: vector_t
+  use device, only: HOST_TO_DEVICE
+  use sensitivity, only: fd_argmax_probe_index
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: fd_argmax_probe_case
+     type(vector_t) :: v
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type fd_argmax_probe_case
+
+contains
+
+  subroutine setUp(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+
+    call comm_init_test(this%getMpiCommunicator())
+
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+
+    call this%v%free()
+    call comm_free_test()
+
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! Helper
+
+  !> Give `v` the local values `xr` when `active`, synced to the device;
+  !! leave it uninitialised -- unallocated `%x` -- otherwise. That is what a
+  !! rank holding no design dofs looks like to the routine under test, and
+  !! the only honest way to exercise its `n .gt. 0` guard: a zero-sized
+  !! `vector_t%init(0)` would allocate `%x(0)` instead of leaving it
+  !! unallocated.
+  !! @param v The vector to set up.
+  !! @param xr The local values this rank holds, when active.
+  !! @param active True to actually hold a (non-empty) slice of the design.
+  !! @param n The local size, 0 when inactive.
+  subroutine set_local(v, xr, active, n)
+    type(vector_t), intent(inout) :: v
+    real(kind=rp), intent(in) :: xr(:)
+    logical, intent(in) :: active
+    integer, intent(out) :: n
+
+    n = 0
+    if (.not. active) return
+
+    n = size(xr)
+    call v%init(n)
+    v%x = xr
+    call v%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+  end subroutine set_local
+
+  ! ========================================================================== !
+  ! Tests requiring two ranks (probe_argmax.F90 T1, T2, T4, T6)
+
+  !> T1: an exact tie on every rank -- inside a rank, |-0.7| ties |0.7|. The
+  !! highest-numbered rank must be the sole owner, with `i` its own local
+  !! `maxloc`; every other rank must get -1.
+  @test(npes=[2])
+  subroutine exact_tie_all_ranks(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+    integer :: n, i, expect_i, top
+    character(len=64) :: msg
+
+    call set_local(this%v, [0.1_rp, -0.7_rp, 0.7_rp, 0.2_rp, 0.0_rp], &
+         .true., n)
+    call fd_argmax_probe_index(this%v, n, i)
+
+    top = pe_size - 1
+    expect_i = merge(2, -1, pe_rank .eq. top)
+    write(msg, '(A,I0)') 'rank ', pe_rank
+    @assertEqual(5, n, message = 'n on ' // trim(msg))
+    @assertEqual(expect_i, i, message = 'i on ' // trim(msg))
+
+  end subroutine exact_tie_all_ranks
+
+  !> T2: rank 0 holds no design (`n = 0`) and must not nominate; rank 1
+  !! holds the maximum and must own the probe.
+  @test(npes=[2])
+  subroutine rank0_empty_rank1_owns(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+    integer :: n, i, expect_i, expect_n
+    character(len=64) :: msg
+
+    if (pe_rank .eq. 1) then
+       call set_local(this%v, [0.1_rp, 0.9_rp], .true., n)
+       expect_n = 2
+    else
+       call set_local(this%v, [0.0_rp], .false., n)
+       expect_n = 0
+    end if
+    call fd_argmax_probe_index(this%v, n, i)
+
+    expect_i = merge(2, -1, pe_rank .eq. 1)
+    write(msg, '(A,I0)') 'rank ', pe_rank
+    @assertEqual(expect_n, n, message = 'n on ' // trim(msg))
+    @assertEqual(expect_i, i, message = 'i on ' // trim(msg))
+
+  end subroutine rank0_empty_rank1_owns
+
+  !> T4: rank 0 holds the strictly larger raw value, 1e-16 above rank 1's --
+  !! inside `abscmp`'s `NEKO_EPS` tolerance for a double-precision `rp`.
+  !! Both ranks are then candidates, and the highest-numbered one must
+  !! still win, not the one with the strictly larger value.
+  @test(npes=[2])
+  subroutine near_tie_within_abscmp(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+    integer :: n, i, expect_i, top
+    character(len=64) :: msg
+
+    if (pe_rank .eq. 0) then
+       call set_local(this%v, [0.01_rp + 1.0e-16_rp], .true., n)
+    else
+       call set_local(this%v, [0.01_rp], .true., n)
+    end if
+    call fd_argmax_probe_index(this%v, n, i)
+
+    top = pe_size - 1
+    expect_i = merge(1, -1, pe_rank .eq. top)
+    write(msg, '(A,I0)') 'rank ', pe_rank
+    @assertEqual(1, n, message = 'n on ' // trim(msg))
+    @assertEqual(expect_i, i, message = 'i on ' // trim(msg))
+
+  end subroutine near_tie_within_abscmp
+
+  !> T6: no rank holds any design. Every rank must get -1, and the test
+  !! completing at all (inside its CTest TIMEOUT) is itself evidence that
+  !! the `n = 0` ranks still took part in the routine's collectives rather
+  !! than skipping them and leaving the others waiting.
+  @test(npes=[2])
+  subroutine all_ranks_empty_no_owner(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+    integer :: n, i
+    character(len=64) :: msg
+
+    call set_local(this%v, [0.0_rp], .false., n)
+    call fd_argmax_probe_index(this%v, n, i)
+
+    write(msg, '(A,I0)') 'rank ', pe_rank
+    @assertEqual(0, n, message = 'n on ' // trim(msg))
+    @assertEqual(-1, i, message = 'i on ' // trim(msg))
+
+  end subroutine all_ranks_empty_no_owner
+
+  !> The ordinary case: a strict, well-separated maximum on rank 0, so no
+  !! tie-break is even exercised -- rank 0 owns because it is the only
+  !! candidate, with `i` its own local `maxloc`.
+  @test(npes=[2])
+  subroutine distinct_maxima_owner_is_max(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+    integer :: n, i, expect_i, expect_n
+    character(len=64) :: msg
+
+    if (pe_rank .eq. 0) then
+       call set_local(this%v, [0.9_rp, 0.2_rp], .true., n)
+       expect_n = 2
+    else
+       call set_local(this%v, [0.5_rp, 0.5_rp, 0.5_rp], .true., n)
+       expect_n = 3
+    end if
+    call fd_argmax_probe_index(this%v, n, i)
+
+    expect_i = merge(1, -1, pe_rank .eq. 0)
+    write(msg, '(A,I0)') 'rank ', pe_rank
+    @assertEqual(expect_n, n, message = 'n on ' // trim(msg))
+    @assertEqual(expect_i, i, message = 'i on ' // trim(msg))
+
+  end subroutine distinct_maxima_owner_is_max
+
+  ! ========================================================================== !
+  ! Single-rank case
+
+  !> On one rank the routine must reduce to exactly `maxloc(abs(x), dim=1)`,
+  !! with no reduction able to change the answer. Checked on several
+  !! arrays, including ones whose maximum-magnitude entry is negative,
+  !! where a sign bug in the comparison (e.g. comparing `x` instead of
+  !! `abs(x)`) would show up.
+  @test(npes=[1])
+  subroutine matches_maxloc_on_one_rank(this)
+    class(fd_argmax_probe_case), intent(inout) :: this
+    integer :: n, i, expect_i
+    character(len=64) :: msg
+
+    ! A lone negative maximum.
+    call set_local(this%v, [-0.9_rp, 0.1_rp, 0.3_rp], .true., n)
+    call fd_argmax_probe_index(this%v, n, i)
+    expect_i = maxloc(abs([-0.9_rp, 0.1_rp, 0.3_rp]), dim = 1)
+    write(msg, '(A,I0)') 'case A, rank ', pe_rank
+    @assertEqual(expect_i, i, message = trim(msg))
+
+    ! A negative entry tied with a later positive one; maxloc must still
+    ! pick the first occurrence of the tied |max|, as the intrinsic does.
+    call set_local(this%v, [0.2_rp, -0.5_rp, 0.5_rp], .true., n)
+    call fd_argmax_probe_index(this%v, n, i)
+    expect_i = maxloc(abs([0.2_rp, -0.5_rp, 0.5_rp]), dim = 1)
+    write(msg, '(A,I0)') 'case B, rank ', pe_rank
+    @assertEqual(expect_i, i, message = trim(msg))
+
+    ! A single negative entry.
+    call set_local(this%v, [-0.1_rp], .true., n)
+    call fd_argmax_probe_index(this%v, n, i)
+    expect_i = maxloc(abs([-0.1_rp]), dim = 1)
+    write(msg, '(A,I0)') 'case C, rank ', pe_rank
+    @assertEqual(expect_i, i, message = trim(msg))
+
+    ! An interior, negative maximum away from both ends.
+    call set_local(this%v, [0.3_rp, 0.1_rp, -0.4_rp, 0.2_rp], .true., n)
+    call fd_argmax_probe_index(this%v, n, i)
+    expect_i = maxloc(abs([0.3_rp, 0.1_rp, -0.4_rp, 0.2_rp]), dim = 1)
+    write(msg, '(A,I0)') 'case D, rank ', pe_rank
+    @assertEqual(expect_i, i, message = trim(msg))
+
+  end subroutine matches_maxloc_on_one_rank
+
+end module fd_argmax_probe_test

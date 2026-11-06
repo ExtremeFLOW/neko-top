@@ -126,7 +126,7 @@ contains
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
-    call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
+    call json_get(json, "phi_ref", phi_ref)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
     call json_get_or_default(json, "scalar_name", scalar_name, "s")
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)

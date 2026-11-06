@@ -55,6 +55,9 @@ add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
 # ============================================================================ #
 # Build the single driver executable
 add_executable(problem_tester_sensitivity_bin EXCLUDE_FROM_ALL
+    # fd_criterion is listed first: sensitivity uses it, and the Fortran
+    # module it defines has to exist by then.
+    ${SHARED_TEST_SOURCES}/fd_criterion.f90
     ${SHARED_TEST_SOURCES}/sensitivity.f90
     ${SENSITIVITY_DRIVER}
 )
@@ -69,7 +72,9 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules CACHE PATH
     "Fortran module directory" FORCE)
 
 # ============================================================================ #
-# Loop over all case files and create tests
+# Loop over all case files and create tests. The time limit is set outside the
+# loop because the two-rank test after it uses the same one.
+set(sensitivity_case_timeout 300)
 foreach(case_file ${test_list})
     # Get the case name without extension
     get_filename_component(case_name ${case_file} NAME_WE)
@@ -93,14 +98,63 @@ foreach(case_file ${test_list})
         COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_file}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
+    # 78 is the driver's "the assertion was skipped, not made" exit code
+    # (FD_SKIP_EXIT_CODE in tests/shared/sensitivity.f90), returned by a
+    # single-precision build, where the functional is not reproducible
+    # enough for any finite-difference verdict to mean anything. Without
+    # this the driver exits 0 and CTest reports a green gradient check that
+    # checked nothing. 77 is deliberately avoided: the regression lane uses
+    # it for its opt-in gate, and the two reasons must stay distinguishable.
     set_tests_properties(${case_name}_sensitivity
         PROPERTIES
             DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
-            TIMEOUT 300
+            SKIP_RETURN_CODE 78
+            TIMEOUT ${sensitivity_case_timeout}
     )
 endforeach()
+
+# ============================================================================ #
+# The cases above run on a single rank, where the whole design sits on one
+# rank and the probe cannot be nominated more than once. Run one of them on two
+# ranks as well, so that the probe selection and the cross-rank reductions of
+# the sweep are checked under MPI too. The case is copied under its own name
+# because the CSV logs are appended to, not overwritten: this keeps the
+# two-rank rows from being mixed into the single-rank run's CSVs.
+set(case_name "viscous_dissipation_variable_dt")
+set(mpi_case_name "${case_name}_np2")
+add_custom_target(
+    ${mpi_case_name}_case_file
+    COMMENT "Copying case file ${case_name}.case to ${mpi_case_name}.case"
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${mpi_case_name}.case
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+        ${CMAKE_CURRENT_BINARY_DIR}/${mpi_case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+add_dependencies(sensitivity_test_prepare ${mpi_case_name}_case_file)
+
+# Like the multi-rank pFUnit tests in tests/unit/CMakeLists.txt, a device
+# backend runs it on one rank only.
+set(mpi_case_ranks $<IF:$<NOT:$<STREQUAL:${DEVICE_TYPE},CPU>>,1,2>)
+add_test(NAME ${mpi_case_name}_sensitivity
+    COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${mpi_case_ranks}
+        ${MPIEXEC_PREFLAGS}
+        $<TARGET_FILE:problem_tester_sensitivity_bin> ${MPIEXEC_POSTFLAGS}
+        ${mpi_case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+set_tests_properties(${mpi_case_name}_sensitivity
+    PROPERTIES
+        LABELS "sensitivity;unit"
+        ENVIRONMENT "NEKO_LOG_FILE=${mpi_case_name}.log"
+        PROCESSORS ${mpi_case_ranks}
+        SKIP_RETURN_CODE 78
+        TIMEOUT ${sensitivity_case_timeout}
+)
 
 # ============================================================================ #
 # A steady adjoint takes as many steps as the forward run, with time steps of
