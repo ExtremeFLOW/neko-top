@@ -97,7 +97,6 @@ foreach(case_file ${test_list})
     )
     set_tests_properties(${case_name}_sensitivity
         PROPERTIES
-            DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
             TIMEOUT 300
@@ -136,7 +135,6 @@ add_test(NAME ${case_name}
 )
 set_tests_properties(${case_name}
     PROPERTIES
-        DEPENDS "adjoint_joblimit_tester_bin;sensitivity_test_prepare"
         LABELS "sensitivity;unit"
         ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
         TIMEOUT 300
