@@ -1,6 +1,6 @@
 !> @file base_functional.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -132,7 +132,7 @@ module base_functional
           functional_accumulate_sensitivity
 
      !> Check if a time is within the functional's time window
-     procedure, private, pass(this) :: in_window => functional_in_window
+     procedure, pass(this) :: in_window => functional_in_window
   end type base_functional_t
 
   ! -------------------------------------------------------------------------- !
@@ -348,7 +348,7 @@ contains
   end subroutine functional_accumulate_sensitivity
 
   ! -------------------------------------------------------------------------- !
-  ! Private helper methods
+  ! Helper methods
 
   !> Whether a sample at the current time contributes to the average.
   !!

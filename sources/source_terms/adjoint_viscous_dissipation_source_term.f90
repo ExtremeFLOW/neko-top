@@ -57,7 +57,7 @@ module adjoint_viscous_dissipation_source_term
   use num_types, only: rp
   use field, only: field_t
   use registry, only: neko_registry
-  use math, only: rzero, copy, chsign, cfill, invcol2
+  use math, only: rzero, copy, chsign, cfill, invcol2, abscmp
   use device_math, only: device_copy, device_cmult, device_cfill, device_invcol2
   use neko_config, only: NEKO_BCKND_DEVICE
   use scratch_registry, only: neko_scratch_registry
@@ -81,6 +81,9 @@ module adjoint_viscous_dissipation_source_term
      type(field_t), pointer :: w => null()
      !> a scale for the source term
      real(kind=rp) :: obj_scale
+     !> Scale of the forcing, owned by the objective. Zero switches the
+     !! forcing off.
+     real(kind=rp), pointer :: scale => null()
      !> A mask for where the source term is evaluated
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
@@ -144,9 +147,10 @@ contains
   !! @param volume volume of the objective domain.
   !! @param start_time when to start applying the source term.
   !! @param end_time when to stop applying the source term.
+  !! @param scale scale of the forcing, owned by the objective.
   subroutine adjoint_viscous_dissipation_source_term_init_from_components( &
        this, f_x, f_y, f_z, u, v, w, obj_scale, mask, if_mask, coef, &
-       volume, start_time, end_time)
+       volume, start_time, end_time, scale)
     class(adjoint_viscous_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_t), intent(in), target :: u, v, w
@@ -157,6 +161,7 @@ contains
     real(kind=rp), intent(in) :: volume
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
+    real(kind=rp), pointer, intent(in) :: scale
 
     type(field_list_t) :: fields
 
@@ -178,6 +183,7 @@ contains
     this%w => w
 
     this%obj_scale = obj_scale
+    this%scale => scale
     this%volume = volume
 
     this%if_mask = if_mask
@@ -199,6 +205,7 @@ contains
     nullify(this%v)
     nullify(this%w)
     nullify(this%mask)
+    nullify(this%scale)
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
@@ -216,6 +223,9 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
     integer n
+
+    ! Off outside the objective's time window
+    if (abscmp(this%scale, 0.0_rp)) return
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
@@ -260,7 +270,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fu, work, this%obj_scale / this%volume)
+      call field_add2s2(fu, work, &
+           this%scale * this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! v
@@ -280,7 +291,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fv, work, this%obj_scale / this%volume)
+      call field_add2s2(fv, work, &
+           this%scale * this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! w
@@ -300,7 +312,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fw, work, this%obj_scale / this%volume)
+      call field_add2s2(fw, work, &
+           this%scale * this%obj_scale / this%volume)
 
       call neko_scratch_registry%relinquish_field(temp_indices)
 
