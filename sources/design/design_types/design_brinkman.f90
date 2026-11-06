@@ -272,7 +272,7 @@ contains
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
-    call json_get(simulation%neko_case%params, 'case.fluid.dealias', &
+    call json_get(simulation%neko_case%params, 'case.numerics.dealias', &
          dealias_fallback)
     call json_get_or_default(parameters, 'dealias', dealias, dealias_fallback)
     call json_get_or_default(parameters, 'verbose_design', verbose_design, &

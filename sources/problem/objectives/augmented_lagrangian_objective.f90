@@ -135,7 +135,8 @@ contains
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Augmented Lagrangian")
-    call json_get(simulation%neko_case%params, 'case.fluid.dealias', dealias_fallback)
+    call json_get(simulation%neko_case%params, 'case.numerics.dealias', &
+         dealias_fallback)
     call json_get_or_default(json, "dealias_sensitivity", dealias, &
          dealias_fallback)
 

@@ -350,7 +350,7 @@ contains
        allocate(augmented_lagrangian_objective_t::objective)
        select type (ALO => objective)
        class is (augmented_lagrangian_objective_t)
-          call json_get(parameters, 'case.fluid.dealias', dealias_fallback)
+          call json_get(parameters, 'case.numerics.dealias', dealias_fallback)
           call json_get_or_default(parameters, &
                "optimization.augmented_lagrangian.dealias_sensitivity", &
                dealias, dealias_fallback)

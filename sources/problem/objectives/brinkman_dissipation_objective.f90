@@ -147,7 +147,8 @@ contains
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Brinkman dissipation")
-    call json_get(simulation%neko_case%params, 'case.fluid.dealias', dealias_fallback)
+    call json_get(simulation%neko_case%params, 'case.numerics.dealias', &
+         dealias_fallback)
     call json_get_or_default(json, "dealias_sensitivity", &
          dealias_sensitivity, dealias_fallback)
     call json_get_or_default(json, "dealias_forcing", &
