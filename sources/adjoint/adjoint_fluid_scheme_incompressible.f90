@@ -421,18 +421,17 @@ contains
 
     call this%source_term%free()
 
-    if (this%gauss_initialised) call this%GLL_to_GL%free()
+    call this%GLL_to_GL%free()
 
     call this%gs_Xh%free()
 
-    if (this%gauss_initialised) call this%gs_Xh_GL%free()
+    call this%gs_Xh_GL%free()
 
     call this%c_Xh%free()
 
-    if (this%gauss_initialised) then
-       call this%c_Xh_GL%free()
-       call this%scratch_GL%free()
-    end if
+    call this%c_Xh_GL%free()
+
+    call this%scratch_GL%free()
 
     nullify(this%u_adj)
     nullify(this%v_adj)
@@ -446,7 +445,6 @@ contains
     call this%ulag%free()
     call this%vlag%free()
     call this%wlag%free()
-
 
     if (associated(this%f_adj_x)) then
        call this%f_adj_x%free()
@@ -470,13 +468,11 @@ contains
     call this%rho%free()
     call this%mu%free()
     call this%dm_Xh%free()
-    if (this%gauss_initialised) call this%dm_Xh_GL%free()
+    call this%dm_Xh_GL%free()
     call this%Xh%free()
-    if (this%gauss_initialised) then
-       call this%Xh_GL%free()
-       this%gauss_initialised = .false.
-    end if
+    call this%Xh_GL%free()
 
+    this%gauss_initialised = .false.
     nullify(this%msh)
     nullify(bc)
 
