@@ -215,7 +215,7 @@ contains
          simulation%adjoint_fluid%f_adj_x, &
          simulation%adjoint_fluid%f_adj_y, &
          simulation%adjoint_fluid%f_adj_z, &
-         this%u, this%v, this%w, this%weight * this%viscosity, &
+         this%u, this%v, this%w, this%weight, this%viscosity, &
          this%mask, this%has_mask, &
          this%c_Xh, this%volume, this%start_time, this%end_time)
 

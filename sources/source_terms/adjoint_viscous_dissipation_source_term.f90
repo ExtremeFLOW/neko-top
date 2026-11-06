@@ -79,7 +79,10 @@ module adjoint_viscous_dissipation_source_term
      type(field_t), pointer :: v => null()
      !> w of the primal
      type(field_t), pointer :: w => null()
-     !> a scale for the source term
+     !> the weight of the objective. Pointed to, so that continuation
+     !! updates of the weight reach the forcing.
+     real(kind=rp), pointer :: weight => null()
+     !> a further, constant scale for the source term
      real(kind=rp) :: obj_scale
      !> A mask for where the source term is evaluated
      class(point_zone_t), pointer :: mask => null()
@@ -137,7 +140,8 @@ contains
   !! @param this The source term.
   !! @param f_x, f_y, f_z the RHS of the adjoint equations
   !! @param u, v, w the flow fields of the primal
-  !! @param obj_scale a scaling factor
+  !! @param weight the weight of the objective. Must outlive the term.
+  !! @param obj_scale a further, constant scaling factor
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
@@ -145,11 +149,12 @@ contains
   !! @param start_time when to start applying the source term.
   !! @param end_time when to stop applying the source term.
   subroutine adjoint_viscous_dissipation_source_term_init_from_components( &
-       this, f_x, f_y, f_z, u, v, w, obj_scale, mask, if_mask, coef, &
-       volume, start_time, end_time)
+       this, f_x, f_y, f_z, u, v, w, weight, obj_scale, mask, if_mask, &
+       coef, volume, start_time, end_time)
     class(adjoint_viscous_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_t), intent(in), target :: u, v, w
+    real(kind=rp), intent(in), target :: weight
     real(kind=rp), intent(in) :: obj_scale
     class(point_zone_t), intent(in), pointer :: mask
     logical, intent(in) :: if_mask
@@ -177,6 +182,7 @@ contains
     this%v => v
     this%w => w
 
+    this%weight => weight
     this%obj_scale = obj_scale
     this%volume = volume
 
@@ -199,6 +205,7 @@ contains
     nullify(this%v)
     nullify(this%w)
     nullify(this%mask)
+    nullify(this%weight)
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
@@ -260,7 +267,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fu, work, this%obj_scale / this%volume)
+      call field_add2s2(fu, work, &
+           this%weight * this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! v
@@ -280,7 +288,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fv, work, this%obj_scale / this%volume)
+      call field_add2s2(fv, work, &
+           this%weight * this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! w
@@ -300,7 +309,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fw, work, this%obj_scale / this%volume)
+      call field_add2s2(fw, work, &
+           this%weight * this%obj_scale / this%volume)
 
       call neko_scratch_registry%relinquish_field(temp_indices)
 
