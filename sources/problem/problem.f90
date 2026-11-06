@@ -39,7 +39,7 @@
 !! constraints that are evaluated based on the design variables. The problem
 !! also handles the output of the problem and the simulation.
 module problem
-  use num_types, only: rp, dp
+  use num_types, only: rp, dp, xp
   use design, only: design_t
   use base_functional, only: base_functional_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
@@ -75,6 +75,10 @@ module problem
      integer :: n_objectives = 0
      !> Number of constraints in the problem.
      integer :: n_constraints = 0
+     !> Length of the last unsteady forward run. It is summed step by step
+     !! as the functionals sum `value_weight`, so that it equals that of a
+     !! functional without a time window bit for bit.
+     real(kind=xp) :: run_time = 0.0_xp
 
      !> The objective of the problem.
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
@@ -236,6 +240,7 @@ contains
     this%n_design = 0
     this%n_objectives = 0
     this%n_constraints = 0
+    this%run_time = 0.0_xp
 
     ! Free the objective list
     if (allocated(this%objective_list)) then
@@ -533,10 +538,13 @@ contains
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
     simulation%n_timesteps = 0
+    this%run_time = 0.0_xp
     do while (.not. simulation%neko_case%time%is_done())
        simulation%n_timesteps = simulation%n_timesteps + 1
        ! step forward
        call simulation_step(simulation%neko_case, dt_controller, loop_start)
+       this%run_time = this%run_time + &
+            real(simulation%neko_case%time%dt, kind=xp)
        ! accumulate objective value
        call this%accumulate_objectives(design, simulation%neko_case%time)
        ! save a checkpoint
@@ -579,7 +587,7 @@ contains
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
     real(kind=rp) :: total_time
-    integer :: i
+    integer :: i, j
     type(time_state_t) :: accumulation_time
 
     call dt_controller%init(simulation%neko_case%params)
@@ -609,9 +617,20 @@ contains
        accumulation_time = simulation%adjoint_case%time
        accumulation_time%t = total_time - simulation%adjoint_case%time%t
        call this%accumulate_objective_sensitivities(design, accumulation_time)
+       ! The step's forcings consume the same primal sample, so each
+       ! objective gates and scales its forcing by its own window there.
+       do j = 1, this%n_objectives
+          call this%objective_list(j)%objective%update_forcing_scale( &
+               accumulation_time, this%run_time)
+       end do
        ! step the adjoint backwards
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
             cfl, loop_start, total_time)
+    end do
+
+    ! Leave every forcing scale at one, as the steady path assumes
+    do j = 1, this%n_objectives
+       call this%objective_list(j)%objective%reset_forcing_scale()
     end do
 
     call profiler_end_region("Adjoint simulation")

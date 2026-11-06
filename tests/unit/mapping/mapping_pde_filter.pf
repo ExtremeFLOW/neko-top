@@ -185,7 +185,7 @@ contains
 
     map%coef => coef
     call map%init_from_attributes(coef, filter_r, filter_tol, &
-         filter_max_iter, "cg", "jacobi")
+         filter_max_iter, "cg", "jacobi", .false.)
 
   end subroutine build_map
 

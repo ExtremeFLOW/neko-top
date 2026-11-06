@@ -1,6 +1,6 @@
 !> @file brinkman_dissipation_objective.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -189,6 +189,7 @@ contains
     real(kind=rp), intent(in) :: end_time
 
     type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
+    real(kind=rp) :: forcing_start, forcing_end
 
     call this%free()
 
@@ -236,6 +237,7 @@ contains
     end if
 
     ! if we have the Brinkman dissipation we initialize and append it too
+    call this%get_forcing_window(simulation, forcing_start, forcing_end)
 
     associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
          f_adj_y => simulation%adjoint_fluid%f_adj_y, &
@@ -244,8 +246,8 @@ contains
       call brinkman_dissipation%init_from_components(f_adj_x, f_adj_y, &
            f_adj_z, design, this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
-           this%dealias, this%volume, this%scratch_GL, this%gdim, &
-           this%start_time, this%end_time)
+           this%dealias, this%volume, this%scratch_GL, forcing_start, &
+           forcing_end, this%forcing_scale)
 
     end associate
 

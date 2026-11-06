@@ -1,6 +1,6 @@
 !> @file objective.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -37,9 +37,10 @@ module objective
   use base_functional, only: base_functional_t
   use simulation_m, only: simulation_t
   use design, only: design_t
-  use num_types, only: rp
+  use num_types, only: rp, xp
   use point_zone_registry, only: neko_point_zone_registry
   use json_module, only: json_file
+  use time_state, only: time_state_t
   implicit none
   private
 
@@ -52,6 +53,12 @@ module objective
   type, abstract, extends(base_functional_t) :: objective_t
      !> Weight of the objective in the overall cost function
      real(kind=rp) :: weight = 1.0_rp
+     !> Scale of the objective's adjoint forcing. The forcing source term
+     !! is a copy held by the adjoint, and the objective is moved after
+     !! building it, so the two share this scale through an allocated
+     !! pointer. It is one outside an unsteady adjoint run, during which
+     !! `update_forcing_scale` sets it before every adjoint step.
+     real(kind=rp), pointer :: forcing_scale => null()
 
    contains
 
@@ -61,6 +68,15 @@ module objective
      procedure, pass(this) :: free_base => objective_free_base
      !> Get the weight of the objective
      procedure, pass(this) :: get_weight => objective_get_weight
+     !> Get the time window to give the adjoint forcing source term
+     procedure, pass(this) :: get_forcing_window => &
+          objective_get_forcing_window
+     !> Set the adjoint forcing scale for one unsteady adjoint step
+     procedure, pass(this) :: update_forcing_scale => &
+          objective_update_forcing_scale
+     !> Reset the adjoint forcing scale to one
+     procedure, pass(this) :: reset_forcing_scale => &
+          objective_reset_forcing_scale
      !> Get number of log entries for this objective
      procedure, pass(this) :: get_log_size => objective_get_log_size
      !> Get header labels for this objective's log entries
@@ -125,6 +141,9 @@ contains
 
     this%weight = weight
 
+    allocate(this%forcing_scale)
+    this%forcing_scale = 1.0_rp
+
     if (present(mask_name)) then
        if (mask_name .ne. "") then
           this%has_mask = .true.
@@ -152,6 +171,7 @@ contains
 
     if (allocated(this%name)) deallocate(this%name)
     this%weight = 1.0_rp
+    if (associated(this%forcing_scale)) deallocate(this%forcing_scale)
 
     this%value = 0.0_rp
     this%value_weight = 0.0_rp
@@ -221,6 +241,67 @@ contains
     real(kind=rp) :: w
     w = this%weight
   end function objective_get_weight
+
+  !> Get the time window to give the adjoint forcing source term.
+  !!
+  !! A source term compares its window with the adjoint clock, which on the
+  !! unsteady path runs one step behind the primal state the forcing
+  !! consumes. There `update_forcing_scale` gates the forcing instead, and
+  !! the source term gets an open window.
+  !! @param this The objective.
+  !! @param simulation The simulation.
+  !! @param start_time Start of the source term's window.
+  !! @param end_time End of the source term's window.
+  subroutine objective_get_forcing_window(this, simulation, start_time, &
+       end_time)
+    class(objective_t), intent(in) :: this
+    type(simulation_t), intent(in) :: simulation
+    real(kind=rp), intent(out) :: start_time
+    real(kind=rp), intent(out) :: end_time
+
+    if (simulation%unsteady) then
+       start_time = 0.0_rp
+       end_time = huge(0.0_rp)
+    else
+       start_time = real(this%start_time, kind=rp)
+       end_time = real(this%end_time, kind=rp)
+    end if
+  end subroutine objective_get_forcing_window
+
+  !> Set the adjoint forcing scale for one unsteady adjoint step.
+  !!
+  !! The objective is the mean over its window, of length `value_weight`,
+  !! and its forcing is the plain derivative of the integrand. The design
+  !! coupling term is the mean over the whole run instead. The forcing is
+  !! therefore scaled by the run length over the window length, and is off
+  !! when the primal sample the step consumes lies outside the window. For
+  !! an objective without a window the scale is exactly one.
+  !! @param this The objective.
+  !! @param time The time state of the primal sample the step consumes.
+  !! @param run_time Length of the forward run, summed as `value_weight`.
+  subroutine objective_update_forcing_scale(this, time, run_time)
+    class(objective_t), intent(inout) :: this
+    type(time_state_t), intent(in) :: time
+    real(kind=xp), intent(in) :: run_time
+
+    if (this%in_window(time) .and. this%value_weight .gt. 0.0_xp) then
+       this%forcing_scale = real(run_time / this%value_weight, kind=rp)
+    else
+       this%forcing_scale = 0.0_rp
+    end if
+  end subroutine objective_update_forcing_scale
+
+  !> Reset the adjoint forcing scale to one.
+  !!
+  !! The unsteady path calls this after its last adjoint step, so that the
+  !! scale set for that step does not outlive the run. Everywhere else, as
+  !! on the steady path, the forcing is applied unscaled.
+  !! @param this The objective.
+  subroutine objective_reset_forcing_scale(this)
+    class(objective_t), intent(inout) :: this
+
+    this%forcing_scale = 1.0_rp
+  end subroutine objective_reset_forcing_scale
 
 end module objective
 

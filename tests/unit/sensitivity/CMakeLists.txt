@@ -13,6 +13,8 @@ set(test_list
     "unsteady_brinkman_dissipation_masked.case"
     "viscous_dissipation_masked.case"
     "unsteady_viscous_dissipation_masked.case"
+    "unsteady_brinkman_dissipation_window.case"
+    "unsteady_brinkman_dissipation_window_end.case"
 )
 
 # Path to the common driver source
