@@ -125,7 +125,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
-    logical :: dealias_adjoint_scalar_convection
+    logical :: dealias
 
     !
     ! Setup adjoint fluid
@@ -213,11 +213,10 @@ contains
           allocate(this%adjoint_convection_term)
           ! The coupling term is the transpose of the linearised primal
           ! scalar advection, so it is dealiased when that advection is.
-          call json_get(numerics_params, 'dealias', &
-               dealias_adjoint_scalar_convection)
+          call json_get(numerics_params, 'dealias', dealias)
           ! initialize the coupling term
           ! The over-integration stack is only needed if this term dealiases
-          if (dealias_adjoint_scalar_convection) then
+          if (dealias) then
              call this%fluid_adj%require_gauss_stack()
           end if
 
@@ -227,7 +226,7 @@ contains
                this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
                this%fluid_adj%c_Xh, this%fluid_adj%c_Xh_GL, &
                this%fluid_adj%GLL_to_GL, &
-               dealias_adjoint_scalar_convection, this%fluid_adj%scratch_GL)
+               dealias, this%fluid_adj%scratch_GL)
 
           select type (f => this%fluid_adj)
           type is (adjoint_fluid_pnpn_t)
