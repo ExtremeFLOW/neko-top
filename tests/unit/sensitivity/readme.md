@@ -133,12 +133,9 @@ Currently, we have added tests for the following components:
   the cases or the driver's probe selection change, confirm again that both
   fail with the masked full weak Laplacian as the forcing.
 
-`scalar_mixing_objective_t` is not yet covered here (its only existing case,
-`tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
-scalar-scheme fix first). The heavier,
-realistic (~1000-timestep) versions of these and other cases
-(`dissipation`, `dissipation_weights`, unsteady variants) live in
-`tests/regression/sensitivity/` instead — that suite is opt-in
+The heavier, realistic (~1000-timestep) versions of these and other cases
+(`dissipation`, `dissipation_weights`, `passive_scalar`, unsteady variants)
+live in `tests/regression/sensitivity/` instead — that suite is opt-in
 (`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`) and not part of the default/PR-blocking
 test budget, since it's too slow to gate every PR.
 

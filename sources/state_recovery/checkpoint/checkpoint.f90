@@ -199,7 +199,7 @@ contains
     type(field_t), pointer :: si
     character(len=LOG_SIZE) :: msg
     integer :: i, j, n_states
-    logical :: exists
+    logical :: exists, keep_scalar_lag
 
     call this%free()
     this%neko_case => neko_case
@@ -233,9 +233,23 @@ contains
     call this%chkp_output%init(neko_case%chkp, this%filename, &
          fmt = this%fmt, path = this%path, overwrite = .true.)
 
+    ! A scalar step advects the scalar from before the step, which is the
+    ! first lag after it, with the new velocity. With first-order advection
+    ! the adjoint of that advection reads that lag, so it is kept with each
+    ! state (see `problem_run_backward_unsteady`). Higher orders extrapolate
+    ! the term and use the restored scalar instead.
+    keep_scalar_lag = .false.
+    if (allocated(neko_case%scalars)) then
+       keep_scalar_lag = &
+            neko_case%fluid%ext_bdf%advection_time_order .eq. 1
+    end if
+
     n_states = 4
     if (allocated(neko_case%scalars)) then
        n_states = n_states + size(neko_case%scalars%scalar_fields)
+       if (keep_scalar_lag) then
+          n_states = n_states + size(neko_case%scalars%scalar_fields)
+       end if
     end if
     if (present(extra_fields)) then
        n_states = n_states + extra_fields%size()
@@ -257,6 +271,14 @@ contains
           call this%state_list%assign(n_states + i, si)
        end do
        n_states = n_states + size(neko_case%scalars%scalar_fields)
+
+       if (keep_scalar_lag) then
+          do i = 1, size(neko_case%scalars%scalar_fields)
+             si => neko_case%scalars%scalar_fields(i)%scalar%slag%lf(1)
+             call this%state_list%assign(n_states + i, si)
+          end do
+          n_states = n_states + size(neko_case%scalars%scalar_fields)
+       end if
     end if
 
     ! Assign any extra fields specified by the user
