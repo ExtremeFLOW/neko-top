@@ -198,8 +198,8 @@ based on lubrication theory written by Gersborg-Hansen et al.
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Out of plane stresses`|
-| `dealias_forcing`| If the objective is integrated on the over-integration (Gauss-Legendre) points rather than the GLL points. Must equal `dealias_sensitivity`. | logical | `.true.`|
-| `dealias_sensitivity`| Must equal `dealias_forcing`. | logical | `.true.`|
+| `dealias_forcing`| If the objective is integrated on the over-integration (Gauss-Legendre) points rather than the GLL points. Must equal `dealias_sensitivity`. See [Adjoint over-integration](@ref configuration-adjoint-dealias) | logical | `case.numerics.dealias`|
+| `dealias_sensitivity`| Must equal `dealias_forcing`. See [Adjoint over-integration](@ref configuration-adjoint-dealias) | logical | `case.numerics.dealias`|
 | `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
 | `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
 
@@ -207,8 +207,9 @@ based on lubrication theory written by Gersborg-Hansen et al.
 the objective's value, its adjoint forcing and its sensitivity. The
 sensitivity is the gradient of the reported value only when all three use the
 same one, so a case that sets the two keys differently is rejected. The
-over-integration space is the one the adjoint solver always builds, so these
-keys act whether or not `numerics.dealias` is set.
+adjoint solver builds its over-integration space on demand and this objective
+requests it when the keys are `true`, so they act whether or not
+`numerics.dealias` is set.
 
 ### Scalar mixing {#objective_scalar_mixing}
 
