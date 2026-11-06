@@ -112,14 +112,25 @@ add_pfunit_ctest(checkpoint_end_of_run_gating
     MAX_PES 2
 )
 
+add_pfunit_ctest(checkpoint_long_path
+    TEST_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_long_path.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
+    MAX_PES 2
+)
+
 set(CHECKPOINT_RESTORE_ENV
     "NEKO_LOG_FILE=checkpoint_restore_consistency.log;OMP_NUM_THREADS=1")
 set(CHECKPOINT_GATING_ENV
     "NEKO_LOG_FILE=checkpoint_end_of_run_gating.log;OMP_NUM_THREADS=1")
+set(CHECKPOINT_LONG_PATH_ENV
+    "NEKO_LOG_FILE=checkpoint_long_path.log;OMP_NUM_THREADS=1")
 
 set_tests_properties(checkpoint_restore_consistency PROPERTIES
     LABELS "unit;checkpointing"
     ENVIRONMENT "${CHECKPOINT_RESTORE_ENV}"
+    RESOURCE_LOCK "checkpointing_workspace"
     TIMEOUT 300
 )
 
@@ -127,11 +138,20 @@ set_tests_properties(checkpoint_restore_consistency PROPERTIES
 set_tests_properties(checkpoint_end_of_run_gating PROPERTIES
     LABELS "unit;checkpointing"
     ENVIRONMENT "${CHECKPOINT_GATING_ENV}"
+    RESOURCE_LOCK "checkpointing_workspace"
+    TIMEOUT 300
+)
+
+set_tests_properties(checkpoint_long_path PROPERTIES
+    LABELS "unit;checkpointing"
+    ENVIRONMENT "${CHECKPOINT_LONG_PATH_ENV}"
+    RESOURCE_LOCK "checkpointing_workspace"
     TIMEOUT 300
 )
 
 add_dependencies(Unit checkpoint_restore_consistency)
 add_dependencies(Unit checkpoint_end_of_run_gating)
+add_dependencies(Unit checkpoint_long_path)
 
 add_dependencies(checkpoint_restore_consistency
     checkpointing_case
@@ -139,10 +159,14 @@ add_dependencies(checkpoint_restore_consistency
 add_dependencies(checkpoint_end_of_run_gating
     checkpointing_case
 )
+add_dependencies(checkpoint_long_path
+    checkpointing_case
+)
 
 if (TARGET checkpointing_prepare)
     add_dependencies(checkpoint_restore_consistency checkpointing_prepare)
     add_dependencies(checkpoint_end_of_run_gating checkpointing_prepare)
+    add_dependencies(checkpoint_long_path checkpointing_prepare)
 endif()
 
 # Disable treating unused-variable as error for pfunit tests
@@ -151,6 +175,9 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
     target_compile_options(checkpoint_end_of_run_gating PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+    target_compile_options(checkpoint_long_path PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
 endif()
@@ -171,6 +198,7 @@ if (HAVE_HDF5)
     set_tests_properties(checkpoint_restore_consistency_hdf5 PROPERTIES
         LABELS "unit;checkpointing;hdf5"
         ENVIRONMENT "${CHECKPOINT_RESTORE_HDF5_ENV}"
+        RESOURCE_LOCK "checkpointing_workspace"
         TIMEOUT 300
     )
     add_dependencies(Unit checkpoint_restore_consistency_hdf5)

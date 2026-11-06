@@ -51,7 +51,7 @@ module problem
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
-  use logger, only: neko_log, LOG_SIZE
+  use logger, only: neko_log
   use math, only: copy
   use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
@@ -565,16 +565,14 @@ contains
   !! @param this The problem.
   subroutine problem_check_objective_windows(this)
     class(problem_t), intent(inout) :: this
-    character(len=LOG_SIZE) :: log_buf
     integer :: i
 
     do i = 1, this%n_objectives
        if (this%objective_list(i)%objective%value_weight .gt. 0.0_rp) cycle
 
-       write (log_buf, '(A,A,A)') "Objective '", &
-            this%objective_list(i)%objective%get_name(), &
-            "' was never sampled; its time window misses the run."
-       call neko_log%warning(trim(log_buf))
+       call neko_log%warning("Objective '" // &
+            this%objective_list(i)%objective%get_name() // &
+            "' was never sampled; its time window misses the run.")
     end do
   end subroutine problem_check_objective_windows
 
