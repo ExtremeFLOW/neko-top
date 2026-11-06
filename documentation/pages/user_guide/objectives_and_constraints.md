@@ -69,14 +69,14 @@ value whether the simulation stops at \f$t = 6\f$ or continues to \f$t = 20\f$.
 A window that never overlaps the simulated interval accumulates nothing. The
 objective then reports zero and a warning is written to the log.
 
-\warning Setting `end_time` to exactly the simulation's own `end_time` is not
-the same as leaving it at its `+\infty` default. The adjoint forcing terms that
-objectives register are gated by `source_term_t`'s time window, which compares
-against the simulation time without a tolerance. The accumulated time of the
-final step lands within a few ULP of the prescribed `end_time`, on either side
-of it, so whether that step keeps its forcing is decided by round-off rather
-than by the case file, and when it loses it the sensitivity is wrong. Leave
-`end_time` unset unless a genuinely shorter window is wanted.
+The unsteady adjoint applies an objective's forcing at exactly the timesteps
+its average samples, decided by the same test. A window boundary placed on a
+timestep therefore needs no special care, and an `end_time` equal to the
+simulation's own behaves as the `+\infty` default. The forcing is also scaled
+by the length of the run over \f$|W|\f$. The term that couples the adjoint to
+the design is averaged over the whole run, and the scaling keeps the
+sensitivity that of the window average. The adjoint fields of a windowed
+objective are larger by the same factor.
 
 The window only applies to unsteady problems. A steady problem evaluates its
 objectives once, on the converged field, so `start_time` and `end_time` have no

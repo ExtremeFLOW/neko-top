@@ -12,6 +12,8 @@ set(test_list
     "unsteady_brinkman_dissipation.case"
     "unsteady_brinkman_dissipation_masked.case"
     "unsteady_scalar_mixing_no_dealias.case"
+    "unsteady_brinkman_dissipation_window.case"
+    "unsteady_brinkman_dissipation_window_end.case"
 )
 
 # Path to the common driver source
