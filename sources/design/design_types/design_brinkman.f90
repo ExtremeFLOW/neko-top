@@ -267,14 +267,13 @@ contains
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
     character(len=:), allocatable :: output_format_str, output_precision_str
-    logical :: dealias, dealias_fallback, verbose_design, verbose_sensitivity
+    logical :: dealias, verbose_design, verbose_sensitivity
     integer :: output_precision
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
     call json_get(simulation%neko_case%params, 'case.numerics.dealias', &
-         dealias_fallback)
-    call json_get_or_default(parameters, 'dealias', dealias, dealias_fallback)
+         dealias)
     call json_get_or_default(parameters, 'verbose_design', verbose_design, &
          .false.)
     call json_get_or_default(parameters, 'verbose_sensitivity', &

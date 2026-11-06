@@ -140,7 +140,7 @@ contains
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
     real(kind=rp) :: weight
-    logical :: dealias_sensitivity, dealias_forcing, dealias_fallback
+    logical :: dealias
     real(kind=rp) :: start_time, end_time
 
     call nekotop_continuation%json_get_or_register(json, 'weight', &
@@ -148,23 +148,12 @@ contains
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Brinkman dissipation")
     call json_get(simulation%neko_case%params, 'case.numerics.dealias', &
-         dealias_fallback)
-    call json_get_or_default(json, "dealias_sensitivity", &
-         dealias_sensitivity, dealias_fallback)
-    call json_get_or_default(json, "dealias_forcing", &
-         dealias_forcing, dealias_fallback)
+         dealias)
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
-    ! The two keys select one quadrature. Set differently, the sensitivity
-    ! is not the gradient of any value this objective could report.
-    if (dealias_sensitivity .neqv. dealias_forcing) then
-       call neko_error("brinkman_dissipation: dealias_sensitivity and " // &
-            "dealias_forcing must be equal")
-    end if
-
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, dealias_forcing, start_time, end_time)
+         mask_name, dealias, start_time, end_time)
   end subroutine brinkman_dissipation_init_json_sim
 
   !> The actual constructor.

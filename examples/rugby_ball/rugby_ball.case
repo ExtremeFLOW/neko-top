@@ -135,9 +135,7 @@
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 1.0,
-                "dealias_sensitivity": false,
-                "dealias_forcing": false
+                "weight": 1.0
             }
         ],
         "constraints": [

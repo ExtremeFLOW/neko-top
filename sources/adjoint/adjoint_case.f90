@@ -197,6 +197,8 @@ contains
        allocate(this%adjoint_scalars)
        call json_get(neko_case%params, 'case.numerics', &
             numerics_params)
+       call json_get(neko_case%params, 'case.numerics.dealias', &
+            dealias_adjoint_scalar_convection)
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
           ! For backward compatibility
           call json_get(neko_case%params, 'case.adjoint_scalar', &
@@ -205,19 +207,14 @@ contains
                scalar_params_primal)
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
                neko_case%fluid%gs_Xh, scalar_params_adjoint, &
-               scalar_params_primal, numerics_params, neko_case%user, &
+               scalar_params_primal, numerics_params, &
+               dealias_adjoint_scalar_convection, neko_case%user, &
                this%chkp, neko_case%fluid%ulag, neko_case%fluid%vlag, &
                neko_case%fluid%wlag, neko_case%fluid%ext_bdf, &
                neko_case%fluid%rho)
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
           ! initialize the coupling term
-          json_key = json_key_fallback(neko_case%params, &
-               'case.adjoint_scalar.dealias_coupling_term', &
-               'case.numerics.dealias')
-          call json_get_or_default(neko_case%params, json_key, &
-               dealias_adjoint_scalar_convection, .true.)
-
           ! The over-integration stack is only needed if this term dealiases
           if (dealias_adjoint_scalar_convection) then
              call this%fluid_adj%require_gauss_stack()
@@ -246,7 +243,8 @@ contains
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
                scalar_params_adjoint, scalar_params_primal, numerics_params, &
-               neko_case%user, this%chkp, neko_case%fluid%ulag, &
+               dealias_adjoint_scalar_convection, neko_case%user, this%chkp, &
+               neko_case%fluid%ulag, &
                neko_case%fluid%vlag, neko_case%fluid%wlag, &
                neko_case%fluid%ext_bdf, neko_case%fluid%rho)
           call neko_error('The adjoint scaling coupling term have not yet' // &

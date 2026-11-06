@@ -307,52 +307,15 @@ section of the case file.
 ## Adjoint over-integration (dealiasing) {#configuration-adjoint-dealias}
 
 Several adjoint contributions are evaluated on a higher-order Gauss-Legendre
-space in order to remove the aliasing error of their nonlinear products. Each
-of them is switched independently:
+space in order to remove the aliasing error of their nonlinear products.
+`case.numerics.dealias` is the single switch for this over-integration in both
+the forward and adjoint computations. It controls the Brinkman source terms,
+the adjoint scalar-velocity coupling term, the objective value, forcing, and
+sensitivity contributions, and the augmented Lagrangian sensitivity.
 
-| Key                                                    | Controls                                                                       |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `optimization.design.dealias`                          | The Brinkman source term, in **both** the forward and the adjoint solve.       |
-| `case.adjoint_scalar.dealias_coupling_term`            | The adjoint scalar-velocity coupling term.                                     |
-| `optimization.objectives[i].dealias_forcing`           | The adjoint forcing of a `brinkman_dissipation` objective.                     |
-| `optimization.objectives[i].dealias_sensitivity`       | The sensitivity contribution of a `brinkman_dissipation` objective.            |
-| `optimization.augmented_lagrangian.dealias_sensitivity` | The sensitivity of the augmented Lagrangian objective.                        |
-
-### Default behaviour {#configuration-adjoint-dealias-default}
-
-**All five keys default to `case.numerics.dealias`**, i.e. the adjoint follows
-whatever the forward problem does. Setting any of the keys explicitly overrides
-that default for that contribution alone. If `case.numerics.dealias` is itself
-absent, the fallback is `true`; on every supported Neko-TOP configuration this
-branch is not expected to be exercised, since
-`adjoint_fluid_scheme_incompressible.f90` reads `case.numerics.dealias`
-unconditionally and its `init` runs before the design or the objectives are
-constructed.
-
-\note **This is a behavioural change, and it is not limited to the adjoint.**
-These keys previously defaulted to `true` in isolation, regardless of
-`case.numerics.dealias`. A case file which sets `"dealias": false` under
-`case.numerics` and does **not** set any of the five keys above will now
-evaluate the Brinkman source term, the scalar coupling term, the adjoint
-forcing and the sensitivity **without** over-integration, where it previously
-over-integrated all four. `optimization.design.dealias` is read once and
-passed to both the forward and the adjoint Brinkman source terms
-(`design_brinkman.f90`), so this also changes the **forward velocity and
-pressure solution**, every field output, and any checkpoint or restart
-byte-comparison for such a case -- not only its objective and sensitivity
-values, which change too. The change is intentional: the previous defaults
-made it impossible to disable over-integration from the case file alone, and
-forced the adjoint solver to allocate its full Gauss over-integration stack on
-every run. To recover the previous results exactly, set the relevant keys to
-`true` explicitly. Case files which set `case.numerics.dealias` to `true`, or
-which already set the five keys explicitly, are unaffected.
-
-\note The key controlling the augmented Lagrangian sensitivity was previously
-read from the root-level path `adjoint_fluid.dealias_sensitivity`, a sibling of
-`case` and `optimization`. Nothing set that path, so it always fell back to its
-default. It is now read from
-`optimization.augmented_lagrangian.dealias_sensitivity`. The old path is no
-longer consulted.
+Set `case.numerics.dealias` to `true` to use the Gauss-Legendre
+over-integration space or to `false` to use the GLL space throughout. No
+design-, objective-, or adjoint-specific dealiasing overrides are supported.
 
 ## Additional reading {#configuration-additional}
 

@@ -325,7 +325,7 @@ contains
     character(len=:), allocatable :: path, type
     type(json_file) :: objective_json
     integer :: n_objectives, i
-    logical :: dealias, dealias_fallback
+    logical :: dealias
 
     call neko_log%section("Reading objectives")
 
@@ -350,10 +350,7 @@ contains
        allocate(augmented_lagrangian_objective_t::objective)
        select type (ALO => objective)
        class is (augmented_lagrangian_objective_t)
-          call json_get(parameters, 'case.numerics.dealias', dealias_fallback)
-          call json_get_or_default(parameters, &
-               "optimization.augmented_lagrangian.dealias_sensitivity", &
-               dealias, dealias_fallback)
+          call json_get(parameters, 'case.numerics.dealias', dealias)
           call ALO%init_from_attributes(design, simulation, weight = 1.0_rp, &
                name = "Augmented Lagrangian", mask_name = "", &
                dealias = dealias)

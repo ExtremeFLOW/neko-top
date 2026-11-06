@@ -98,12 +98,6 @@ Currently, we have added tests for the following components:
   the mask only while its probe stays that close to the boundary. Whenever the
   case or the driver's probe selection changes, confirm again that the test
   fails with the mask removed from `update_sensitivity`.
-- `brinkman_dissipation_rejection` — checks the invalid mixed-dealias
-  configuration directly through Neko's pFUnit error-redirection fixture. A
-  mixed setting has no value its sensitivity is the gradient of, so the
-  objective must raise `neko_error`; pFUnit consumes that expected exception
-  as a successful test.
-
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
 scalar-scheme fix first — see `known-bugs-backlog.md` #9). The heavier,

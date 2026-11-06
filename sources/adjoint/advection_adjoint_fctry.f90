@@ -46,7 +46,7 @@ contains
   !> A factory for \ref advection_t decendants. Both creates and initializes
   !! the object.
   !! @param object The object allocated by the factory.
-  !! @param json The parameter file.
+  !! @param numerics_param The parameter file.
   !! @param coef The coefficients of the (space, mesh) pair.
   !! @param ulag, vlag, wlag The lagged velocity fields.
   !! @param dtlag The lagged time steps.
@@ -56,10 +56,11 @@ contains
   !! @param slag The lagged scalar field. Optional.
   !! This can be used to kill the advection term.
   !! @note The factory both allocates and initializes `object`.
-  module subroutine advection_adjoint_factory(object, json, coef, ulag, vlag, wlag, &
+  module subroutine advection_adjoint_factory(object, numerics_param, coef, &
+       ulag, vlag, wlag, &
        dtlag, tlag, time_scheme, use_dummy, slag)
     class(advection_adjoint_t), allocatable, intent(inout) :: object
-    type(json_file), intent(inout) :: json
+    type(json_file), intent(inout) :: numerics_param
     type(coef_t), intent(inout), target :: coef
     type(field_series_t), intent(in), target :: ulag, vlag, wlag
     real(kind=rp), intent(in), target :: dtlag(10)
@@ -68,7 +69,7 @@ contains
     logical, optional, intent(in) :: use_dummy
     type(field_series_t), target, optional, intent(in) :: slag
 
-    logical :: dealias, oifs
+    logical :: oifs
     real(kind=rp) :: ctarget
     integer :: lxd, order
 
@@ -85,14 +86,14 @@ contains
        end if
     end if
 
-    call json_get(json, 'dealias', dealias)
-    call json_get(json, 'polynomial_order', order)
-    call json_get_or_default(json, 'oifs', oifs, .false.)
+    call json_get(numerics_param, 'dealias', dealias)
+    call json_get(numerics_param, 'polynomial_order', order)
+    call json_get_or_default(numerics_param, 'oifs', oifs, .false.)
 
-    call json_get_or_default(json, 'dealiased_polynomial_order', &
+    call json_get_or_default(numerics_param, 'dealiased_polynomial_order', &
          lxd, (3 * (order + 1)) / 2)
 
-    call json_get_or_default(json, 'target_cfl', ctarget, 1.9_rp)
+    call json_get_or_default(numerics_param, 'target_cfl', ctarget, 1.9_rp)
 
     if (oifs) then
        call neko_error("OIFS advection is not supported in the adjoint module.")

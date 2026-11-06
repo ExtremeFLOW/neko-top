@@ -27,8 +27,8 @@ Tolerances (both relative, per row):
   <= 5.6e-7, the latter on ``viscous_dissipation`` whose reference was
   generated at a different rank count from the one the ctest lane uses.
   5e-6 sits near the geometric middle of that 5.6e-7 offset and the 7.9e-5
-  shift a flipped ``case.numerics.dealias`` / ``optimization.design.dealias``
-  produces: ~9x of headroom above the known offset, ~16x of margin below
+  shift a flipped ``case.numerics.dealias`` produces: ~9x of headroom above
+  the known offset, ~16x of margin below
   the smallest regression it must catch.
 
 * ``ERROR_TOL`` -- the ``error`` column, which the comparison used to
@@ -38,12 +38,9 @@ Tolerances (both relative, per row):
   against references generated under a different configuration, where
   ``F`` was bit-identical. Repeat runs of one case under one configuration
   are bit-identical in every column, so the residual risk is a
-  configuration change, not jitter. 1e-2 clears the worst observed offset
-  by ~6x while still catching a flipped ``dealias_forcing`` (-3.79e-5 ->
-  -6.04e-5, 59%) or ``dealias_sensitivity`` (-> -4.23e-5, 12%) by 12x or
-  better -- and those two flags move **only** this column, leaving ``F``
-  and ``dFdx`` bit-identical, so without this check they are invisible to
-  both this comparison and the driver's own assertion.
+    configuration change, not jitter. 1e-2 clears the worst observed offset
+    by ~6x while retaining a useful margin for detecting a changed numerical
+    configuration.
 """
 
 import argparse
@@ -93,8 +90,10 @@ def read_csv(path):
 
     block = rows[starts[-1] + 1:]
     try:
-        return {name: [float(row[i]) for row in block]
-                for i, name in enumerate(COLUMNS)}
+        return {
+            name: [float(row[i]) for row in block]
+            for i, name in enumerate(COLUMNS)
+        }
     except (ValueError, IndexError) as error:
         raise SystemExit(f"{path}: malformed data row ({error}).")
 
@@ -119,13 +118,11 @@ def compare(csv_file, data, reference_data):
             abs((cur - ref) / (ref + 1e-30))
             for cur, ref in zip(current, reference))
         if max_rel_error > tol:
-            failures.append(
-                f"{csv_file}: {column} does not match reference "
-                f"(max relative error: {max_rel_error:.6e}, "
-                f"tolerance: {tol:.1e})\n"
-                f"  current:   {current}\n"
-                f"  reference: {reference}"
-            )
+            failures.append(f"{csv_file}: {column} does not match reference "
+                            f"(max relative error: {max_rel_error:.6e}, "
+                            f"tolerance: {tol:.1e})\n"
+                            f"  current:   {current}\n"
+                            f"  reference: {reference}")
 
     return failures
 
@@ -247,8 +244,8 @@ def main(argv=None):
             continue
 
         references[csv_file] = read_csv(ref_file)
-        failures.extend(compare(csv_file, frames[csv_file],
-                                references[csv_file]))
+        failures.extend(
+            compare(csv_file, frames[csv_file], references[csv_file]))
 
     if not args.no_plot:
         plot(csv_files, frames, references)

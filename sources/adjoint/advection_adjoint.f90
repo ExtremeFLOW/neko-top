@@ -58,7 +58,8 @@ module advection_adjoint
      !> A factory for \ref advection_adjoint_t descendants. Both creates and
      !! initializes the object.
      !! @param object The object allocated by the factory.
-     !! @param json The parameter file.
+     !! @param numerics_param The parameter file.
+     !! @param dealias Whether to use over-integration.
      !! @param coef The coefficients of the (space, mesh) pair.
      !! @param ulag, vlag, wlag The lagged velocity fields.
      !! @param dtlag The lagged time steps.
@@ -68,10 +69,11 @@ module advection_adjoint
      !! @param slag The lagged scalar field.
      !! allocated. This can be used to kill the advection term.
      !! @note The factory both allocates and initializes `object`.
-     module subroutine advection_adjoint_factory(object, json, coef, &
+     module subroutine advection_adjoint_factory(object, numerics_param, coef, &
           ulag, vlag, wlag, dtlag, tlag, time_scheme, use_dummy, slag)
        class(advection_adjoint_t), allocatable, intent(inout) :: object
-       type(json_file), intent(inout) :: json
+       type(json_file), intent(inout) :: numerics_param
+       logical, intent(in) :: dealias
        type(coef_t), intent(inout), target :: coef
        type(field_series_t), intent(in), target :: ulag, vlag, wlag
        real(kind=rp), intent(in), target :: dtlag(10)
