@@ -125,7 +125,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
-    logical :: dealias_adjoint_scalar_convection
+    logical :: dealias
 
     !
     ! Setup adjoint fluid
@@ -211,25 +211,32 @@ contains
                neko_case%fluid%rho)
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
-          ! initialize the coupling term
-          json_key = json_key_fallback(neko_case%params, &
-               'case.adjoint_scalar.dealias_coupling_term', &
-               'case.numerics.dealias')
-          call json_get_or_default(neko_case%params, json_key, &
-               dealias_adjoint_scalar_convection, .true.)
+          ! The coupling term is the transpose of the linearised primal
+          ! scalar advection, so it is dealiased exactly when that advection
+          ! is. Any other choice makes the sensitivity something other than
+          ! the gradient, so the key that used to allow one is rejected
+          ! rather than silently ignored.
+          if (neko_case%params%valid_path( &
+               'case.adjoint_scalar.dealias_coupling_term')) then
+             call neko_error("case.adjoint_scalar.dealias_coupling_term " // &
+                  "has been removed: the adjoint scalar coupling term " // &
+                  "follows case.numerics.dealias.")
+          end if
+          call json_get(numerics_params, 'dealias', dealias)
 
           ! The over-integration stack is only needed if this term dealiases
-          if (dealias_adjoint_scalar_convection) then
+          if (dealias) then
              call this%fluid_adj%require_gauss_stack()
           end if
 
+          ! initialize the coupling term
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
                this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%scalar%s, &
                this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
                this%fluid_adj%c_Xh, this%fluid_adj%c_Xh_GL, &
                this%fluid_adj%GLL_to_GL, &
-               dealias_adjoint_scalar_convection, this%fluid_adj%scratch_GL)
+               dealias, this%fluid_adj%scratch_GL)
 
           select type (f => this%fluid_adj)
           type is (adjoint_fluid_pnpn_t)

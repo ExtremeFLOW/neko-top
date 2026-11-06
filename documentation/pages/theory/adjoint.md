@@ -132,6 +132,20 @@ adjoint the opposite occurs as the equation for \f$\mathbf{u}^\dagger\f$ depends
 on \f$\phi^\dagger\f$, hence in `neko-top` we first solve for the adjoint scalar
 and then solve for the adjoint velocity.
 
+The underlined coupling term is the transpose of the linearised advection term
+of the primal scalar, so it is dealiased exactly when that advection is: it is
+integrated on the over-integration (Gauss-Legendre) points when
+`case.numerics.dealias` is `true`, and on the GLL points otherwise. Any other
+choice would make the computed sensitivity something other than the gradient of
+the objective, so there is no separate switch for this term: the key
+`case.adjoint_scalar.dealias_coupling_term`, which used to provide one, has been
+removed, and a case file that still sets it is rejected. With
+dealiasing on, the coupling term uses the adjoint fluid's own over-integration
+points, \f$\lfloor 3(N+2)/2 \rfloor\f$ per direction for polynomial order
+\f$N\f$, and ignores `case.numerics.dealiased_polynomial_order`; it is the
+exact transpose only where both quadratures are exact, for example on affine
+elements with `dealiased_polynomial_order` at its default.
+
 ### Multiple scalars
 In the case of using multiple scalar transport equations involving multiple
 scalar fields \f$\phi_i(\mathbf{x},t)\f$, the assumption is made that
