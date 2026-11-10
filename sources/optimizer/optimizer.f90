@@ -358,16 +358,16 @@ contains
     ! If no restart file have been specified, look for the latest checkpoint
     ! file in the path. This helps us recover from a crash and automatic restart
     if (len_trim(this%restart_file) .eq. 0) then
-        do i = this%max_iterations, 1, -1
-            exists = .false.
-             file_name = checkpoint_filename(this,  iteration = i)
-             if (pe_rank .eq. 0) inquire(file = file_name, exist = exists)
-             call MPI_Bcast(exists, 1, MPI_LOGICAL, 0, NEKO_COMM)
-             if (exists) then
-                this%restart_file = file_name
-                exit
-             end if
-          end do
+       do i = this%max_iterations, 1, -1
+          exists = .false.
+          file_name = checkpoint_filename(this, iteration = i)
+          if (pe_rank .eq. 0) inquire(file = file_name, exist = exists)
+          call MPI_Bcast(exists, 1, MPI_LOGICAL, 0, NEKO_COMM)
+          if (exists) then
+             this%restart_file = file_name
+             exit
+          end if
+       end do
     end if
 
     this%initialized = .true.
