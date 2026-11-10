@@ -30,6 +30,11 @@ env:
   NEKO_TOP_VERSION: ${{ inputs.neko-top-version }}
   HDF5_VERSION: ${{ inputs.hdf5-version }}
   HDF5_ROOT: hdf5
+  # The runners have no UCX-capable network devices. Disable the UCX one-sided
+  # (osc) component so OpenMPI does not write
+  # "OSC UCX component priority set inside component query failed" to stderr,
+  # which run.sh would treat as a failed case.
+  OMPI_MCA_osc: "^ucx"
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a

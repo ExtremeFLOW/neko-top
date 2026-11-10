@@ -75,6 +75,11 @@ jobs:
     runs-on: ubuntu-latest
     env:
       JOB_NAME: ${{ matrix.backend }}-${{ matrix.compiler }}-${{ matrix.precision }}
+      # The runners have no UCX-capable network devices. Disable the UCX
+      # one-sided (osc) component so OpenMPI does not write
+      # "OSC UCX component priority set inside component query failed" to
+      # stderr, which run.sh would treat as a failed case.
+      OMPI_MCA_osc: "^ucx"
     steps:
       # ---------------------------------------------------------------------- #
       # Checkout the repository and setup the environment
