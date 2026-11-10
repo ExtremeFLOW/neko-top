@@ -116,7 +116,7 @@ runs:
         VERSION: ${{ inputs.version }}
       run: |
         cd $WORKING_DIR/parmetis-$VERSION/metis
-        make config prefix=${PARMETIS_DIR} -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        make config prefix=${PARMETIS_DIR}
         make -j && make install
 
     - name: Build ParMETIS
@@ -129,7 +129,7 @@ runs:
         VERSION: ${{ inputs.version }}
       run: |
         cd $WORKING_DIR/parmetis-$VERSION
-        make config prefix=${PARMETIS_DIR} -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+        make config prefix=${PARMETIS_DIR}
         make -j && make install
 
     - name: Cleanup
