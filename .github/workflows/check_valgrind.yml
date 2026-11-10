@@ -46,12 +46,6 @@ jobs:
           version: ${{ inputs.json-fortran-version }}
           compiler: gfortran
 
-      - name: Get ParMETIS
-        id: get-parmetis
-        uses: ./.github/actions/setup_parmetis
-        with:
-          compiler: gfortran
-
       - name: Get HDF5
         id: get-hdf5
         uses: ./.github/actions/setup_hdf5
