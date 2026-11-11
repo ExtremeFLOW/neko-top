@@ -650,17 +650,6 @@ contains
             this%v_next, this%w_next)
     end if
 
-    ! Primal step i advects the scalar from before the step with the new
-    ! velocity of step i, at every time order. The coupling term of the
-    ! adjoint step after restoring step i transposes that advection, so it
-    ! reads the scalar from before the step, which the state recovery
-    ! restores as the scalar's first lag. The adjoint fluid extrapolates the
-    ! term over the adjoint steps, which transposes the extrapolation of the
-    ! advection over the primal steps rather than shifting its level, so
-    ! this holds at every order. At the constant time step of unsteady runs
-    ! the transpose is exact.
-    call simulation%adjoint_case%set_coupling_scalar(.true.)
-
     ! Reset the sensitivity value to zero
     call this%reset_objective_sensitivities()
 
@@ -725,10 +714,6 @@ contains
                count_time = .false.)
        end select
     end do
-
-    ! Couple the adjoint scalar to the restored scalar again, as the steady
-    ! path assumes
-    call simulation%adjoint_case%set_coupling_scalar(.false.)
 
     ! Advect the adjoint scalar with the primal velocity again, as the steady
     ! path assumes

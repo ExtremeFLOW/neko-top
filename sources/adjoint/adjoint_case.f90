@@ -75,9 +75,10 @@ module adjoint_case
      !> Adjoint scalar
      type(adjoint_scalars_t), allocatable :: adjoint_scalars
      !> Source term coupling the adjoint scalar to the adjoint fluid. The
-     !! source-term handler of the adjoint fluid adds a copy of it, which is
-     !! the one computed; this one is stale once added, and changing it,
-     !! as `set_coupling_scalar` does to the copy, has no effect.
+     !! source-term handler of the adjoint fluid computes a copy of it, added
+     !! at initialisation; this one is never computed, and
+     !! `set_coupling_scalar` changes it only to keep it the same as the
+     !! copy.
      type(adjoint_scalar_convection_source_term_t), allocatable :: &
           adjoint_convection_term
      type(case_t), pointer :: case
@@ -563,17 +564,18 @@ contains
   !! @details Forward scalar step \f$ m \f$ advects the scalar of state
   !! \f$ m - 1 \f$ with the velocity of state \f$ m \f$, at every time
   !! order. The coupling term of the adjoint of state \f$ m \f$ to the
-  !! adjoint fluid transposes that advection, so the unsteady adjoint has it
-  !! read the scalar of state \f$ m - 1 \f$, which the state recovery
-  !! restores as the first lag of the primal scalar. The adjoint fluid
-  !! extrapolates the term over the adjoint steps, which transposes the
-  !! extrapolation of the advection over the forward steps rather than
-  !! shifting its level, so the lag is the right level at every order, and
-  !! at a constant time step the transpose is exact. The steady adjoint
-  !! reads the primal scalar itself. The source-term handler of the adjoint
-  !! fluid holds a copy of the term, added at initialisation, so that copy
-  !! is the one changed here; this one is changed with it only to keep the
-  !! two the same. Anything but exactly one such term stops the run.
+  !! adjoint fluid transposes that advection, so an unsteady simulation has
+  !! it read, from initialisation on, the scalar of state \f$ m - 1 \f$,
+  !! which the state recovery restores as the first lag of the primal
+  !! scalar. The adjoint fluid extrapolates the term over the adjoint steps,
+  !! which transposes the extrapolation of the advection over the forward
+  !! steps rather than shifting its level, so the lag is the right level at
+  !! every order, and at a constant time step the transpose is exact. The
+  !! steady adjoint reads the primal scalar itself. The source-term handler
+  !! of the adjoint fluid holds a copy of the term, added at
+  !! initialisation, so that copy is the one changed here; this one is
+  !! changed with it only to keep the two the same. Anything but exactly
+  !! one such term stops the run.
   !! @param this The adjoint case.
   !! @param lagged Whether the term reads the first lag of the primal
   !! scalar rather than the primal scalar.
@@ -604,6 +606,9 @@ contains
              end select
           end do
        end if
+    class default
+       call neko_error("The adjoint scalar coupling term needs " // &
+            "adjoint_fluid_pnpn_t")
     end select
     nullify(s)
 
