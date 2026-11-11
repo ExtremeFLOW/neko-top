@@ -624,7 +624,7 @@ contains
     real(kind=rp) :: total_time
     integer :: i, j
     type(time_state_t) :: accumulation_time
-    logical :: have_scalar, lagged_coupling
+    logical :: have_scalar
 
     if (.not. allocated(this%u_initial%x)) then
        call neko_error("The unsteady adjoint needs the initial velocity " // &
@@ -651,21 +651,15 @@ contains
     end if
 
     ! Primal step i advects the scalar from before the step with the new
-    ! velocity of step i. With first-order advection, the coupling term of
-    ! the adjoint step after restoring step i transposes exactly that, so it
+    ! velocity of step i, at every time order. The coupling term of the
+    ! adjoint step after restoring step i transposes that advection, so it
     ! reads the scalar from before the step, which the state recovery
-    ! restores as the scalar's first lag. Higher orders extrapolate the
-    ! coupling term over the adjoint steps, which already moves it to that
-    ! level up to second order, so they keep the restored scalar.
-    lagged_coupling = .false.
-    if (allocated(simulation%adjoint_case%adjoint_convection_term)) then
-       lagged_coupling = &
-            simulation%fluid%ext_bdf%advection_time_order .eq. 1
-    end if
-    if (lagged_coupling) then
-       simulation%adjoint_case%adjoint_convection_term%s => &
-            simulation%scalars%scalar_fields(1)%scalar%slag%lf(1)
-    end if
+    ! restores as the scalar's first lag. The adjoint fluid extrapolates the
+    ! term over the adjoint steps, which transposes the extrapolation of the
+    ! advection over the primal steps rather than shifting its level, so
+    ! this holds at every order. At the constant time step of unsteady runs
+    ! the transpose is exact.
+    call simulation%adjoint_case%set_coupling_scalar(.true.)
 
     ! Reset the sensitivity value to zero
     call this%reset_objective_sensitivities()
@@ -734,10 +728,7 @@ contains
 
     ! Couple the adjoint scalar to the restored scalar again, as the steady
     ! path assumes
-    if (lagged_coupling) then
-       simulation%adjoint_case%adjoint_convection_term%s => &
-            simulation%scalars%scalar_fields(1)%scalar%s
-    end if
+    call simulation%adjoint_case%set_coupling_scalar(.false.)
 
     ! Advect the adjoint scalar with the primal velocity again, as the steady
     ! path assumes
