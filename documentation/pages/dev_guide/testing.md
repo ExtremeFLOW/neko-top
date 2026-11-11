@@ -34,3 +34,21 @@ setting `OFF` disables all runtime checks.
 - Several tests currently fail with it enabled, due to collapsed-index loops in
 the sources (for example `x(i,1,1,1)` with `i` running over the whole array,
 which `-fcheck=bounds` rejects).
+
+## Validation tests {#testing-validation}
+
+Validation tests reproduce published results and run for hours, so they are
+not registered by default. Configure with `-DNEKO_TOP_VALIDATION_TESTS=ON` to
+register them, and select them with `ctest -L validation`. They do not carry
+the `regression` label, so `ctest -L regression` never runs them.
+
+- `borrvall_rugby_ball_validation_0p8` runs the Borrvall & Petersson (2003)
+  rugby ball with a fluid volume fraction of 0.8 (about 80 minutes on eight
+  MPI ranks; set `NEKO_TOP_RUGBY_BALL_RANKS` to use another count). It checks
+  that the final objective is within 2% of the paper's 31.75, that the final
+  design is feasible, and that the paper's stopping rule is met before the
+  last iteration.
+
+The fast `borrvall_rugby_ball_regression` test runs the same physics on a
+small mesh for a few iterations and compares the whole optimization history
+with a stored reference. It is part of the default suite.
