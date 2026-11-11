@@ -291,12 +291,23 @@ With these adjoint variables, the discrete gradient contribution associated
 with an explicit linear operator \f$\chi\f$ is
 \f[
   \mathrm{d}F(\chi,\delta \chi)
-  = -\sum_{n=1}^{N} \int_\Omega \delta \chi\,
-  \mathbf{u}_{n+1}^{\dagger} \mathbf{u}_n \, \mathrm{d}\Omega.
+  = -\sum_{n=0}^{N} \int_\Omega \delta \chi\,
+  \mathbf{u}_{n+1}^{\dagger} \mathbf{u}_n \, \mathrm{d}\Omega,
 \f]
-The order above matches the implementation: solve the implicit adjoint step,
-then the adjoint pressure correction, then form the projection to obtain the
-adjoint velocity used in the sensitivity accumulation.
+where \f$\mathbf{u}_0\f$ is the velocity the forward run started from and
+\f$\mathbf{u}_{N+1}^{\dagger} = \mathbf{0}\f$ is the adjoint's zero terminal
+condition, so the \f$n = N\f$ term is always zero.
+
+The backward loop that solves the implicit adjoint step, then the adjoint
+pressure correction, then forms the projection to recover
+\f$\mathbf{u}_n^{\dagger}\f$, runs for \f$n = N, \ldots, 1\f$ and samples
+the \f$n\f$ term there, pairing the velocity it has just restored,
+\f$\mathbf{u}_n\f$, with the adjoint velocity left over from the previous
+iteration, \f$\mathbf{u}_{n+1}^{\dagger}\f$ (the zero terminal condition on
+the loop's first iteration). That accounts for \f$n = 1, \ldots, N\f$. The
+\f$n = 0\f$ term is sampled once the loop ends, pairing the velocity the
+forward run started from, \f$\mathbf{u}_0\f$, with the adjoint velocity the
+loop has just produced, \f$\mathbf{u}_1^{\dagger}\f$.
 
 ### The curl--curl term {#adjoint-curl-curl}
 The forward pressure equation above contains the curl--curl term
