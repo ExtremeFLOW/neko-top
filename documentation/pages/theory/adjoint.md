@@ -161,11 +161,14 @@ adjoint fluid extrapolates the coupling term over adjoint steps the same way
 the forward solver extrapolates the advection over forward steps, rather than
 shifting its level, so the lag is correct at every time order and the term is
 the exact transpose of the forward one at a constant time step; Neko-TOP
-rejects a variable time step on the unsteady path. A companion fix to the
-sensitivity accumulation -- sampling the design term at the run's initial
-velocity -- is needed for the rest of the accumulated sensitivity to be exact
-under the same condition. The steady adjoint has no state recovery and reads
-the scalar field itself rather than a lag.
+rejects a variable time step on the unsteady path. The rest of the
+accumulated sensitivity is exact under the same condition because of the
+\f$n = 0\f$ term of the discrete sensitivity formula in
+\ref adjoint-time-integration "Time integration" -- the sample pairing
+the run's initial velocity with the adjoint velocity of the first adjoint
+step, \f$\mathbf{u}_1^{\dagger}\f$, which is added once the backward loop
+ends. The steady adjoint has no state recovery and reads the scalar field
+itself rather than a lag.
 
 ### Multiple scalars
 In the case of using multiple scalar transport equations involving multiple
@@ -223,7 +226,7 @@ of the theory guide. This will tie together all aspects from the mapping, to
 how these terms arise etc. For now we are simply documenting the equations
 being solved.
 
-## Time integration
+## Time integration {#adjoint-time-integration}
 This section summarizes the discrete adjoint for the pressure-correction
 time integration used in `Neko-TOP`. We start from a right-handed Riemann sum
 for the objective,

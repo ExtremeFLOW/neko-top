@@ -50,10 +50,12 @@ fields to be included as well. The lag is stored whenever the case has any
 scalar, whether or not an adjoint scalar runs, because the unsteady adjoint's
 scalar-velocity coupling term reads the scalar from the step before the one
 state recovery has just restored, which the lag holds (see \ref
-adjoint-scalar-time-levels "Time levels in the unsteady adjoint"). Each scalar
-field therefore costs two stored fields rather than one: on top of the four
-fixed fields for pressure and velocity, a case with n scalars stores 2n extra
-fields per saved state.
+adjoint-scalar-time-levels "Time levels in the unsteady adjoint"). For the
+memory checkpoints, each scalar field therefore costs two stored fields rather
+than one: on top of the four fixed fields for pressure and velocity, a case
+with n scalars stores 2n extra fields per memory checkpoint. Neko's own disc
+checkpoint format already stored every scalar's first lag before this change,
+so a disc checkpoint's size is unaffected.
 
 ### Parameters
 
