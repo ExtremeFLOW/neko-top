@@ -146,6 +146,27 @@ points, \f$\lfloor 3(N+2)/2 \rfloor\f$ per direction for polynomial order
 exact transpose only where both quadratures are exact, for example on affine
 elements with `dealiased_polynomial_order` at its default.
 
+### Time levels in the unsteady adjoint {#adjoint-scalar-time-levels}
+
+Restoring primal step \f$i\f$ does not give the adjoint step everything at
+level \f$i\f$: the forward solver advects the scalar of step \f$i-1\f$ with the
+velocity of step \f$i\f$, and advects the scalar of step \f$i\f$ with the
+velocity of step \f$i+1\f$, at every advection time order. Transposing both,
+the adjoint step after restoring step \f$i\f$ advects the adjoint scalar with
+the velocity of step \f$i+1\f$ (kept from before the restore, not the velocity
+just restored), and the underlined coupling term above reads the scalar of step
+\f$i-1\f$, which the checkpoint keeps as the scalar's first time lag for
+exactly this reason (see \ref unsteady_simulation "Unsteady simulations"). The
+adjoint fluid extrapolates the coupling term over adjoint steps the same way
+the forward solver extrapolates the advection over forward steps, rather than
+shifting its level, so the lag is correct at every time order and the term is
+the exact transpose of the forward one at a constant time step; Neko-TOP
+rejects a variable time step on the unsteady path. A companion fix to the
+sensitivity accumulation -- sampling the design term at the run's initial
+velocity -- is needed for the rest of the accumulated sensitivity to be exact
+under the same condition. The steady adjoint has no state recovery and reads
+the scalar field itself rather than a lag.
+
 ### Multiple scalars
 In the case of using multiple scalar transport equations involving multiple
 scalar fields \f$\phi_i(\mathbf{x},t)\f$, the assumption is made that

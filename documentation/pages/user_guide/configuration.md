@@ -348,7 +348,10 @@ every run. To recover the previous results exactly, set the relevant keys to
 `true` explicitly; the scalar coupling term can no longer be over-integrated on
 its own (see \ref configuration-adjoint-dealias-coupling "Scalar coupling term"
 below). Case files which set `case.numerics.dealias` to `true`, or which
-already set the four keys explicitly, are unaffected.
+already set the four keys explicitly, are unaffected by this default change.
+A case file that still sets the now-removed
+`case.adjoint_scalar.dealias_coupling_term` key is not covered by that: it
+stops with an error instead of running with its old behaviour.
 
 \note The key controlling the augmented Lagrangian sensitivity was previously
 read from the root-level path `adjoint_fluid.dealias_sensitivity`, a sibling of
