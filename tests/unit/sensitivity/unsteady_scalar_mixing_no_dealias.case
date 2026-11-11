@@ -140,7 +140,7 @@
         "path": "checkpoints_unsteady_scalar_mixing_no_dealias/"
     },
     "optimization": {
-        "fd_test_tolerance": 5.0e-2,
+        "fd_test_tolerance": 1.0e-3,
         "design": {
             "type": "brinkman",
             "mapping": [
