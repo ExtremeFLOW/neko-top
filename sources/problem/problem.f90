@@ -715,8 +715,9 @@ contains
        end select
     end do
 
-    ! Advect the adjoint scalar with the primal velocity again, as the steady
-    ! path assumes
+    ! Point the adjoint scalars back at the primal velocity, so that they do
+    ! not keep pointing at the velocity fields of this problem, which the
+    ! drivers free before the simulation
     if (have_scalar) then
        call set_adjoint_scalar_velocity(simulation, simulation%fluid%u, &
             simulation%fluid%v, simulation%fluid%w)

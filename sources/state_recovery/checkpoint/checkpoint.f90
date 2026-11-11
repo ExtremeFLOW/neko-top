@@ -236,7 +236,7 @@ contains
     ! A scalar step advects the scalar from before the step, its first lag
     ! after the step, with the new velocity, at every time order. The
     ! adjoint of that advection reads the lag, so it is kept with every
-    ! state (see `problem_run_backward_unsteady`). It is kept whether or
+    ! state (see `adjoint_case_set_coupling_scalar`). It is kept whether or
     ! not there is an adjoint scalar, which the state recovery does not
     ! know.
     n_states = 4

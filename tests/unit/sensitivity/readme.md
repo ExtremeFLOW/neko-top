@@ -113,12 +113,12 @@ Currently, we have added tests for the following components:
   `m + 1`. The sensitivity also takes the sample of the initial velocity, which
   the Brinkman force of the first step acts on. The error at the smallest
   perturbation is `-3.56e-5`, which is first-order truncation (`-3.57e-4` at
-  `1e-3`), and the tolerance is `1e-3`; `1e-4` would leave less than a factor
-  of 3 over the truncation. With the coupling term on the restored scalar of
-  state `m` the error was `-6.52e-3`, and without the initial-velocity sample
-  `+3.68e-2`. With the adjoint scalar advected with the restored velocity of
-  state `m` it was `-1.37e-3`, only just above the tolerance;
-  `unsteady_scalar_mixing_levels.case` is the guard for that level.
+  `1e-3`). The tolerance of `1e-3` lies between that and the errors with a
+  level or the initial-velocity sample wrong: with the coupling term on the
+  restored scalar of state `m` the error was `-6.52e-3`, and without the
+  initial-velocity sample `+3.68e-2`. With the adjoint scalar advected with the
+  restored velocity of state `m` it was `-1.37e-3`, only just above the
+  tolerance; `unsteady_scalar_mixing_levels.case` is the guard for that level.
 - `scalar_mixing_objective_t`, unsteady at time order 3
   (`unsteady_scalar_mixing_no_dealias_order3.case`) — the same case at time
   order 3. A scalar step advects the scalar from before the step at every
