@@ -11,12 +11,12 @@ inputs:
   install-dir:
     description: "The directory to install the ParMetis library."
     required: false
-    default: "/home/runner/pkg/parmetis"
+    default: "${{ runner.temp }}/pkg/parmetis"
 
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "/home/runner/tmp/parmetis"
+    default: "${{ runner.temp }}/build/parmetis"
 
   os:
     description: "The operating system to use."
@@ -52,6 +52,9 @@ outputs:
   install-dir:
     description: "The directory where the ParMETIS library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
+  version:
+    description: "The version of the ParMETIS library that was installed."
+    value: ${{ steps.set-output.outputs.version }}
 
 # ---------------------------------------------------------------------------- #
 # Define the steps that will be run in this action.
@@ -71,6 +74,7 @@ runs:
         COMPILER: ${{ inputs.compiler }}
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
       run: |
+        OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
         key="parmetis-$VERSION-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
@@ -87,7 +91,7 @@ runs:
     - name: Install dependencies
       shell: bash
       run: |
-        sudo apt install openmpi-bin libopenmpi-dev
+        sudo apt-get install -y openmpi-bin libopenmpi-dev
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the ParMETIS library.
@@ -106,12 +110,15 @@ runs:
         tar xzf parmetis-$VERSION.tar.gz
         cd parmetis-$VERSION
 
+    # ParMETIS 4.0.3 requires CMake 2.8, which CMake 4 no longer accepts
+    # without an explicit policy minimum.
     - name: Build METIS
       if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         CMAKE_GENERATOR: "Unix Makefiles"
+        CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         WORKING_DIR: ${{ inputs.working-dir }}
         VERSION: ${{ inputs.version }}
       run: |
@@ -125,6 +132,7 @@ runs:
       env:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         CMAKE_GENERATOR: "Unix Makefiles"
+        CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         WORKING_DIR: ${{ inputs.working-dir }}
         VERSION: ${{ inputs.version }}
       run: |
@@ -132,21 +140,21 @@ runs:
         make config prefix=${PARMETIS_DIR}
         make -j && make install
 
+    # ------------------------------------------------------------------------ #
+    # Cleanup the working directory and set the output.
+
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner.
     - name: Cleanup
       if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
-        VERSION: ${{ inputs.version }}
-      run: |
-        cd $WORKING_DIR
-        rm -rf parmetis-$VERSION parmetis-$VERSION.tar.gz
-
-    # ------------------------------------------------------------------------ #
-    # Cleanup the working directory if necessary and set the output.
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       shell: bash
       id: set-output
       run: |
         echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
+        echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT

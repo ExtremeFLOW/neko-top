@@ -10,6 +10,10 @@ on:
   merge_group:
     types: [checks_requested]
 
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
 
@@ -21,6 +25,16 @@ jobs:
   execute-scripts:
     name: Execute setup and examples
     runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      # Build HDF5 (setup.sh only does so when HDF5_ROOT is set); neko needs
+      # it for the HDF5 and VTKHDF output the examples write.
+      HDF5_ROOT: hdf5
+      # The runners have no UCX-capable network devices. Disable the UCX
+      # one-sided (osc) component so OpenMPI does not write
+      # "OSC UCX component priority set inside component query failed" to
+      # stderr, which run.sh would treat as a failed case.
+      OMPI_MCA_osc: "^ucx"
 
     steps:
       # ---------------------------------------------------------------------- #
@@ -28,18 +42,13 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Get system cache
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: openmpi-bin pkg-config liblapack-dev ninja-build
-          version: 1.0
-
-      - name: Setup non-cache dependencies
+      - name: Setup system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y liblapack-dev libblas-dev libopenmpi-dev pkg-config ninja-build
+          sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
+            ninja-build libblas-dev libopenmpi-dev
 
       # ---------------------------------------------------------------------- #
       # Run the setup and example execution scripts
@@ -49,14 +58,12 @@ jobs:
         run: |
           ./setup.sh
 
-      - name: Adjust end time and timestep for examples
+      # Run each example for a few of its own timesteps and a few optimization
+      # iterations, so the job checks that every example runs end to end.
+      - name: Shorten the examples
         run: |
-          find examples/ -type f -name "*.case" -exec \
-            sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' \
-            {} \;
-          find examples/ -type f -name "*.case" -exec \
-            sed -i -r 's/"timestep": [[0-9]+.*[0-9]*|1e-\d+],/"timestep": 1e-4,/g' \
-            {} \;
+          python3 .github/workflows/extra/shorten_cases.py \
+            --steps 10 --iterations 2 examples/
 
       - name: Run all gauntlet of examples
         run: |

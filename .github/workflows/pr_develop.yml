@@ -52,6 +52,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
 # sequence, where the Prepare job is run first. The Linting, Formatting, and
@@ -61,6 +65,7 @@ jobs:
   prepare:
     name: Prepare the environment
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     outputs:
       pfunit-version: ${{ steps.store.outputs.pfunit-version }}
       json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
@@ -161,6 +166,7 @@ jobs:
       - check_valgrind
 
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     env:
       draft_status: ${{ needs.prepare.result }}
       lint_status: ${{ needs.check_lint.result }}
@@ -237,4 +243,6 @@ jobs:
     if: ${{ github.event_name == 'merge_group' && always() }}
     name: Cleanup merge group caches
     needs: check_complete
+    permissions:
+      actions: write # To delete the merge group's caches
     uses: ./.github/workflows/cleanup.yml

@@ -22,6 +22,11 @@ on:
         description: "The version of Neko-TOP to use."
         required: true
         type: string
+      runner-images:
+        description: "JSON list of GitHub-hosted runner images to test on."
+        required: false
+        type: string
+        default: '["ubuntu-24.04", "ubuntu-latest"]'
 
 env:
   # Set the default versions of the dependencies
@@ -30,6 +35,15 @@ env:
   NEKO_TOP_VERSION: ${{ inputs.neko-top-version }}
   HDF5_VERSION: ${{ inputs.hdf5-version }}
   HDF5_ROOT: hdf5
+  # The runners have no UCX-capable network devices. Disable the UCX one-sided
+  # (osc) component so OpenMPI does not write
+  # "OSC UCX component priority set inside component query failed" to stderr,
+  # which run.sh would treat as a failed case.
+  OMPI_MCA_osc: "^ucx"
+
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
@@ -40,8 +54,14 @@ jobs:
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
 
   setup-script:
-    name: Check setup script
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.runner-images) }}
+
+    name: Check setup script - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
 
     steps:
       # ---------------------------------------------------------------------- #
@@ -49,16 +69,13 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
-      - name: Get system cache
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: openmpi-bin pkg-config liblapack-dev ninja-build
-          version: 1.0
-
-      - name: Setup non-cache dependencies
-        run: sudo apt-get update && sudo apt-get install -y libopenblas-dev libopenmpi-dev
+      - name: Setup system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
+            ninja-build libopenblas-dev libopenmpi-dev
 
       - name: Setup python environment
         uses: actions/setup-python@v6
@@ -83,9 +100,9 @@ jobs:
 
       - name: Run Rugby Ball
         run: |
-          # Adjust the end time and max iterations for the rugby ball case
-          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
-          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
+          # Run 10 timesteps and 2 optimization iterations of the rugby ball
+          python3 .github/workflows/extra/shorten_cases.py \
+            --steps 10 --iterations 2 examples/rugby_ball/rugby_ball.case
 
           ./run.sh -rc rugby_ball
 
@@ -120,7 +137,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: setup-script-logs
+          name: setup-script-logs-${{ matrix.os }}
           path: tests/
           overwrite: true
           if-no-files-found: ignore

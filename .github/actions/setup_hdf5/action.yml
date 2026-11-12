@@ -11,11 +11,11 @@ inputs:
   install-dir:
     description: "The directory to install the HDF5 library."
     required: false
-    default: "${{ runner.workspace }}/pkg"
+    default: "${{ runner.temp }}/pkg/hdf5"
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "${{ runner.workspace }}/tmp"
+    default: "${{ runner.temp }}/build/hdf5"
   os:
     description: "The operating system to use."
     required: false
@@ -103,36 +103,48 @@ runs:
           exit 1
         fi
 
-    - name: Set up environment
-      id: setup-env
+    # ------------------------------------------------------------------------ #
+    # Setup the cache for the HDF5 library.
+    # All following steps should look if the cache was hit and skip if it was.
+
+    - name: Create cache key based on version, OS, and compiler
+      id: create-key
       shell: bash
       env:
-        WORKING_DIR: ${{ inputs.working-dir }}
-        INSTALL_DIR: ${{ inputs.install-dir }}
+        VERSION: ${{ inputs.version }}
+        OS: ${{ inputs.os }}
+        COMPILER: ${{ inputs.compiler }}
+        COMPILER_FLAGS: ${{ inputs.compiler-flags }}
+        C_COMPILER: ${{ inputs.c-compiler }}
+        C_COMPILER_FLAGS: ${{ inputs.c-compiler-flags }}
+        ARCH: ${{ inputs.arch }}
+        REPO: https://github.com/HDFGroup/hdf5.git
       run: |
-        TAG=${{ inputs.version }}-${{ inputs.os }}-${{ inputs.arch }}
-        TAG=${TAG}-${{ inputs.compiler }}-${{ inputs.c-compiler }}
-        WORKING_DIR=$WORKING_DIR/hdf5-$TAG
-        INSTALL_DIR=$INSTALL_DIR/hdf5-$TAG
-
-        mkdir -p $WORKING_DIR $INSTALL_DIR
-
-        echo "working-dir=$(echo $(realpath $WORKING_DIR))" >> $GITHUB_OUTPUT
-        echo "install-dir=$(echo $(realpath $INSTALL_DIR))" >> $GITHUB_OUTPUT
-        echo "tag=$(echo $TAG)" >> $GITHUB_OUTPUT
+        # Resolve the version (branch or tag) to a commit. The version keeps
+        # the key readable, the SHA invalidates the cache when the ref moves.
+        SHA=$(git ls-remote $REPO "refs/heads/$VERSION" "refs/tags/$VERSION" \
+          | awk 'NR==1 {print $1}')
+        if [ -z "$SHA" ]; then
+          echo "Could not resolve version '$VERSION' in $REPO" >&2
+          exit 1
+        fi
+        OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
+        key="hdf5-$VERSION-${SHA:0:7}-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="$key-$C_COMPILER-${C_COMPILER_FLAGS// /_}-$ARCH"
+        printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
       id: cache-hdf5
       uses: actions/cache@v5
       with:
-        path: ${{ steps.setup-env.outputs.install-dir }}
-        key: ${{ steps.setup-env.outputs.tag }}
+        path: ${{ inputs.install-dir }}
+        key: ${{ steps.create-key.outputs.key }}
 
     - name: Clone
       if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
-        WORKING_DIR: ${{ steps.setup-env.outputs.working-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
         REPO: https://github.com/HDFGroup/hdf5.git
         VERSION: ${{ inputs.version }}
       run: |
@@ -145,8 +157,8 @@ runs:
       if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
-        INSTALL_DIR: ${{ steps.setup-env.outputs.install-dir }}
-        WORKING_DIR: ${{ steps.setup-env.outputs.working-dir }}
+        INSTALL_DIR: ${{ inputs.install-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
         CC: mpicc
         FC: mpif90
         OMPI_FC: ${{ inputs.compiler }}
@@ -163,7 +175,7 @@ runs:
       if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
-        WORKING_DIR: ${{ steps.setup-env.outputs.working-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
       run: |
         cmake --build $WORKING_DIR/build --config Release
 
@@ -171,26 +183,27 @@ runs:
       if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
-        WORKING_DIR: ${{ steps.setup-env.outputs.working-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
       run: |
         cmake --install $WORKING_DIR/build --config Release
 
     # ------------------------------------------------------------------------ #
     # Cleanup and set the output.
 
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner.
     - name: Cleanup
       if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
-        WORKING_DIR: ${{ steps.setup-env.outputs.working-dir }}
-      run: |
-        rm -fr $WORKING_DIR/build
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       id: set-output
       shell: bash
       env:
-        INSTALL_DIR: ${{ steps.setup-env.outputs.install-dir }}
+        INSTALL_DIR: ${{ inputs.install-dir }}
       run: |
 
         if [ ! -d ${INSTALL_DIR}/lib ]; then
