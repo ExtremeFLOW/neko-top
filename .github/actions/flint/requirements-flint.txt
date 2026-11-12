@@ -1,3 +1,5 @@
-setuptools < 82.0.0
-nobvisual
-flinter
+# flinter needs pkg_resources, which setuptools no longer provides. Instead of
+# an old setuptools, compat/pkg_resources.py provides the part flinter uses;
+# put that directory on PYTHONPATH when running flint.
+nobvisual == 1.0.0
+flinter == 0.7.1
