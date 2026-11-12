@@ -120,6 +120,7 @@ contains
     integer :: i, j
     character(len=:), allocatable :: field_name
     character(len=256), allocatable :: field_names(:)
+    character(len=12) :: index_str, limit_str
     character(len=:), allocatable :: primal_name, trial_primal_name
     logical :: found_primal
 
@@ -151,17 +152,34 @@ contains
           end if
 
           ! If name is empty or not provided, generate a default one
+          ! Built by concatenation: an internal write into the
+          ! deferred-length field_name would be limited to its current length
           if (len_trim(field_name) == 0) then
-             write(field_name, '(A,I0,A)') 's_', i, '_adj'
+             write(index_str, '(I0)') i
+             field_name = 's_' // trim(index_str) // '_adj'
           end if
 
+          write(limit_str, '(I0)') len(field_names)
+          if (len_trim(field_name) .gt. len(field_names)) then
+             call neko_error("Adjoint scalar name longer than " // &
+                  trim(limit_str) // " characters: " // trim(field_name))
+          end if
           field_names(i) = trim(field_name)
 
           ! If there's a duplicate, append a number until unique
           j = 1
           do while (j < i)
              if (trim(field_names(i)) == trim(field_names(j))) then
-                write(field_name, '(A,I0)') trim(field_names(i))//'_', j
+                write(index_str, '(I0)') j
+                field_name = trim(field_names(i)) // '_' // trim(index_str)
+                ! A name cut back to the same length would never become
+                ! unique, so the loop would not end
+                if (len(field_name) .gt. len(field_names)) then
+                   call neko_error("Adjoint scalar name " // &
+                        trim(field_names(i)) // " is a duplicate, and " // &
+                        "its _" // trim(index_str) // " suffix would " // &
+                        "exceed " // trim(limit_str) // " characters.")
+                end if
                 field_names(i) = trim(field_name)
                 j = 1 ! Start over to check if new name is unique
              else
