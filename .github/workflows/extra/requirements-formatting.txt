@@ -1,5 +1,6 @@
 # Simple requirements file for pip
 # This file is used to install the required packages for the project formatting
-# and is only used in the CI/CD workflows.
+# and is only used in the CI/CD workflows. The version is pinned, as a new
+# findent release can change the formatting and fail unrelated pull requests.
 
-findent >= 4.2.6
+findent == 4.3.6

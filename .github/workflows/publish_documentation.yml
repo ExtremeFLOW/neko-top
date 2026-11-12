@@ -1,0 +1,151 @@
+# Publish the documentation to GitHub Pages.
+#
+# The site keeps one version of the documentation for develop and one for each
+# minor release (v1.0, v1.1, ...), with a dropdown to switch between them. A
+# deployment replaces the whole site, so all versions are stored in the
+# gh-pages branch:
+# - A push to develop updates the develop version.
+# - A push to main, i.e. a merged release, updates the version of that release.
+#   Patch releases replace the documentation of their minor release.
+# The documentation of an existing release can be published by running this
+# workflow manually with its tag, e.g. v1.0.1.
+
+name: Publish Documentation
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or release tag to publish, e.g. develop or v1.0.1"
+        required: true
+        default: develop
+
+# Every run rewrites the gh-pages branch, so runs must not overlap. Note that
+# GitHub keeps only the newest pending run in a group, so a burst of pushes
+# publishes the newest of them.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: write # To update the gh-pages branch
+  pages: write # To deploy to GitHub Pages
+  id-token: write # To verify the deployment
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      # The documentation is built from the requested ref, while the tools
+      # that assemble the site come from this workflow's own commit, as older
+      # releases do not have them.
+      - name: Checkout the documentation source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          path: source
+
+      - name: Checkout the site tools
+        uses: actions/checkout@v7
+        with:
+          path: tools
+          sparse-checkout: documentation/versioning
+
+      - name: Determine the version
+        id: version
+        env:
+          REF: ${{ inputs.ref || github.ref_name }}
+        run: |
+          # develop is published as develop. main and release tags are
+          # published as their minor release, read from the project version.
+          REF=${REF#refs/heads/}
+          REF=${REF#refs/tags/}
+          if [ "$REF" == "develop" ]; then
+            version=develop
+          elif [[ "$REF" == "main" || "$REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            version=$(sed -nE \
+              's/^project\(.*VERSION ([0-9]+)\.([0-9]+)\..*/v\1.\2/p' \
+              source/CMakeLists.txt)
+            if [ -z "$version" ]; then
+              echo "Could not read the project version of $REF." >&2
+              exit 1
+            fi
+          else
+            echo "Only develop, main and release tags (vX.Y.Z) are" \
+              "published, not '$REF'." >&2
+            exit 1
+          fi
+          echo "Publishing $REF as $version."
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the documentation
+        working-directory: source
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+          cmake -B build -S . -DONLY_DOCS=ON
+          cmake --build build --target Documentation
+
+      - name: Configure GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v6
+
+      - name: Update the site
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BASE_PATH: ${{ steps.pages.outputs.base_path }}
+        run: |
+          # Start from the published site in the gh-pages branch. Only start
+          # from an empty site if the branch does not exist (exit code 2), as
+          # publishing an empty site would remove all other versions.
+          status=0
+          git -C source ls-remote --exit-code --heads origin gh-pages \
+            > /dev/null || status=$?
+          if [ $status -eq 0 ]; then
+            git -C source fetch --depth 1 origin gh-pages
+            git -C source worktree add --detach "$PWD/site" FETCH_HEAD
+            git -C site checkout --orphan site-update
+          elif [ $status -eq 2 ]; then
+            echo "No gh-pages branch yet, starting a new site."
+            git -C source worktree add --orphan -b site-update "$PWD/site"
+          else
+            exit $status
+          fi
+
+          python3 tools/documentation/versioning/update_site.py \
+            --site site --version "$VERSION" --base-path "$BASE_PATH" \
+            --html source/documentation/html
+
+      # The branch is rewritten as a single commit, so it does not grow with
+      # every update.
+      - name: Store the site in the gh-pages branch
+        working-directory: site
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          source_sha=$(git -C ../source rev-parse --short HEAD)
+          git add --all
+          git -c user.name="github-actions[bot]" \
+            -c user.email="41898299+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet \
+            --message "Publish the $VERSION documentation from $source_sha"
+          git push --force origin HEAD:refs/heads/gh-pages
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

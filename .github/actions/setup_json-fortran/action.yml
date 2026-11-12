@@ -11,12 +11,12 @@ inputs:
   install-dir:
     description: "The directory to install the JSON-Fortran library."
     required: false
-    default: "/home/runner/pkg/json-fortran"
+    default: "${{ runner.temp }}/pkg/json-fortran"
 
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "/home/runner/tmp/json-fortran"
+    default: "${{ runner.temp }}/build/json-fortran"
 
   os:
     description: "The operating system to use."
@@ -74,9 +74,16 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         REPO: https://github.com/jacobwilliams/json-fortran.git
       run: |
-        # Get the GIT sha for the current commit
-        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="json-fortran-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        # Resolve the version (branch or tag) to a commit. The version keeps
+        # the key readable, the SHA invalidates the cache when the ref moves.
+        SHA=$(git ls-remote $REPO "refs/heads/$VERSION" "refs/tags/$VERSION" \
+          | awk 'NR==1 {print $1}')
+        if [ -z "$SHA" ]; then
+          echo "Could not resolve version '$VERSION' in $REPO" >&2
+          exit 1
+        fi
+        OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
+        key="json-fortran-$VERSION-${SHA:0:7}-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
@@ -103,7 +110,7 @@ runs:
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt install cmake ninja-build ${{ inputs.compiler }}
+        sudo apt-get install -y cmake ninja-build ${{ inputs.compiler }}
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the JSON-Fortran library.
@@ -143,6 +150,15 @@ runs:
 
     # ------------------------------------------------------------------------ #
     # Cleanup and set the output.
+
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner.
+    - name: Cleanup
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       id: set-output

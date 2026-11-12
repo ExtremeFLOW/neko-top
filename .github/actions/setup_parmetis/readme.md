@@ -9,15 +9,15 @@ mentioned by the Neko documentation.
 
 ## Inputs
 
-| Name             | Optional | Description                                    | Default                     |
-| ---------------- | -------- | ---------------------------------------------- | --------------------------- |
-| `install-dir`    | Yes      | The directory to install the ParMetis library. | `/home/runner/pkg/parmetis` |
-| `working-dir`    | Yes      | The directory to work in.                      | `/home/runner/tmp/parmetis` |
-| `os`             | Yes      | The operating system to use.                   | `${{ runner.os }}`          |
-| `compiler`       | Yes      | The compiler to use.                           | `mpif90`                    |
-| `compiler-flags` | Yes      | The compiler flag to use.                      | `-O3`                       |
-| `build-options`  | Yes      | The build option to use.                       | `--parallel $(nproc)`       |
-| `version`        | Yes      | The version of the ParMetis library to use.    | `4.0.3`                     |
+| Name             | Optional | Description                                    | Default                             |
+| ---------------- | -------- | ---------------------------------------------- | ----------------------------------- |
+| `install-dir`    | Yes      | The directory to install the ParMetis library. | `${{ runner.temp }}/pkg/parmetis`   |
+| `working-dir`    | Yes      | The directory to work in.                      | `${{ runner.temp }}/build/parmetis` |
+| `os`             | Yes      | The operating system to use.                   | `${{ runner.os }}`                  |
+| `compiler`       | Yes      | The compiler to use.                           | `mpif90`                            |
+| `compiler-flags` | Yes      | The compiler flag to use.                      | `-O3`                               |
+| `build-options`  | Yes      | The build option to use.                       | `--parallel $(nproc)`               |
+| `version`        | Yes      | The version of the ParMetis library to use.    | `4.0.3`                             |
 
 ## Outputs
 
