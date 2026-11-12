@@ -687,9 +687,15 @@ contains
           call this%objective_list(j)%objective%update_forcing_scale( &
                accumulation_time, this%run_time)
        end do
-       ! step the adjoint backwards
+       ! Step the adjoint backwards over forward step i, at the time that
+       ! step started from. The steps are all of the same length, so that
+       ! time is counted in steps from zero rather than taken off the length
+       ! of the run: the round-off of that difference can leave the last
+       ! step just before zero, outside the window of every source term
+       ! that starts there.
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
-            cfl, loop_start, total_time)
+            cfl, loop_start, &
+            real(i - 1, kind=dp) * simulation%adjoint_case%time%dt)
     end do
 
     ! Each sample above pairs the restored velocity of step i with the
