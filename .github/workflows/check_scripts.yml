@@ -41,6 +41,10 @@ env:
   # which run.sh would treat as a failed case.
   OMPI_MCA_osc: "^ucx"
 
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
 
@@ -57,6 +61,7 @@ jobs:
 
     name: Check setup script - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
 
     steps:
       # ---------------------------------------------------------------------- #
@@ -66,14 +71,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Get system cache
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: openmpi-bin pkg-config liblapack-dev ninja-build
-          version: 1.0
-
-      - name: Setup non-cache dependencies
-        run: sudo apt-get update && sudo apt-get install -y libopenblas-dev libopenmpi-dev
+      - name: Setup system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
+            ninja-build libopenblas-dev libopenmpi-dev
 
       - name: Setup python environment
         uses: actions/setup-python@v6

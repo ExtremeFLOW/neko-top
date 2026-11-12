@@ -7,6 +7,10 @@ on:
   workflow_call:
   workflow_dispatch:
 
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 jobs:
   # -------------------------------------------------------------------------- #
   # Build Documentation job
@@ -14,6 +18,7 @@ jobs:
   build-docs:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v6

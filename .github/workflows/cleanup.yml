@@ -17,6 +17,7 @@ jobs:
   cleanup:
     name: Cleanup Caches
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       # No checkout: only the gh CLI is needed, and pull_request_target jobs
       # should not check out code.

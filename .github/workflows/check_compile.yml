@@ -28,6 +28,10 @@ on:
         type: string
         default: '["ubuntu-24.04", "ubuntu-latest"]'
 
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
 
@@ -111,6 +115,7 @@ jobs:
     # ------------------------------------------------------------------------ #
     name: ${{ matrix.backend }} - ${{ matrix.compiler }} - ${{ matrix.precision }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     env:
       JOB_NAME: ${{ matrix.backend }}-${{ matrix.compiler }}-${{ matrix.precision }}-${{ matrix.os }}
       # The runners have no UCX-capable network devices. Disable the UCX

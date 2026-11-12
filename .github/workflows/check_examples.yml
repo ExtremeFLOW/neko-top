@@ -10,6 +10,10 @@ on:
   merge_group:
     types: [checks_requested]
 
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
 
@@ -21,6 +25,7 @@ jobs:
   execute-scripts:
     name: Execute setup and examples
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     env:
       # Build HDF5 (setup.sh only does so when HDF5_ROOT is set); neko needs
       # it for the HDF5 and VTKHDF output the examples write.
@@ -39,16 +44,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Get system cache
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: openmpi-bin pkg-config liblapack-dev ninja-build
-          version: 1.0
-
-      - name: Setup non-cache dependencies
+      - name: Setup system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y liblapack-dev libblas-dev libopenmpi-dev pkg-config ninja-build
+          sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
+            ninja-build libblas-dev libopenmpi-dev
 
       # ---------------------------------------------------------------------- #
       # Run the setup and example execution scripts

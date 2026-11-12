@@ -1,0 +1,53 @@
+name: Changed Fortran files
+description: |
+  Lists the Fortran source files (.f90 and .F90) added or modified by the
+  current pull request, merge group or push. The changes are taken relative to
+  the merge base with the event's base commit: the base of the pull request or
+  merge group, or the previous tip of the branch for a push. Events without a
+  base commit (e.g. schedule, workflow_dispatch) have no changed files.
+
+  The repository must be checked out with its full history (fetch-depth: 0).
+
+outputs:
+  files:
+    description: "Newline-separated list of changed Fortran files, if any."
+    value: ${{ steps.changed.outputs.files }}
+  base:
+    description: "The base commit the changes are compared to, if any."
+    value: ${{ steps.changed.outputs.base }}
+
+runs:
+  using: composite
+  steps:
+    - name: List changed Fortran files
+      id: changed
+      shell: bash
+      env:
+        BASE: >-
+          ${{ github.event.pull_request.base.sha
+          || github.event.merge_group.base_sha
+          || github.event.before }}
+      run: |
+        files=""
+        if [[ -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+          echo "No base commit for $GITHUB_EVENT_NAME events."
+          BASE=""
+        else
+          if [ "$(git rev-parse --is-shallow-repository)" == "true" ]; then
+            echo "The repository must be checked out with fetch-depth: 0." >&2
+            exit 1
+          fi
+          git cat-file -e "$BASE^{commit}" 2> /dev/null ||
+            git fetch --quiet --no-tags origin "$BASE"
+          files=$(git diff --name-only --diff-filter=d "$BASE...HEAD" \
+            -- '*.f90' '*.F90')
+        fi
+
+        echo "Changed Fortran files compared to ${BASE:-nothing}:"
+        echo "${files:-(none)}"
+        {
+          echo "base=$BASE"
+          echo "files<<EOF"
+          [ -z "$files" ] || echo "$files"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
