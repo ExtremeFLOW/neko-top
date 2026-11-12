@@ -1,0 +1,7 @@
+<map id="brinkman_dissipation_objective::brinkman_dissipation_objective_t" name="brinkman_dissipation_objective::brinkman_dissipation_objective_t">
+<area shape="rect" id="Node000001" title="An objective function corresponding to out of plane stresses ." alt="" coords="5,174,184,235"/>
+<area shape="rect" id="Node000002" href="$d3/d95/structobjective_1_1objective__t.html" title="The abstract objective type." alt="" coords="14,98,175,126"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="96,139,97,174,92,172,93,144"/>
+<area shape="rect" id="Node000003" href="$d0/da6/structbase__functional_1_1base__functional__t.html" title="The base functional type." alt="" coords="13,5,176,50"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="95,63,97,98,92,97,94,68"/>
+</map>

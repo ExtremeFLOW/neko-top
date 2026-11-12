@@ -1,0 +1,9 @@
+<map id="hip_sd_update_design" name="hip_sd_update_design">
+<area shape="rect" id="Node000001" title=" " alt="" coords="735,14,901,42"/>
+<area shape="rect" id="Node000002" href="$d4/dca/namespacedevice__steepest__descent.html#a8d390b028b7aa94577f0adc1ee9928ef" title="Move&#45;limited, box&#45;constrained design update on the device (Eq. D24)." alt="" coords="491,5,687,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="717,28,688,30,688,25,722,28"/>
+<area shape="rect" id="Node000003" href="$dc/db2/namespacesteepest__descent__math.html#a768b0076cdd15b468a553cf0ef7fd025" title="Move&#45;limited, box&#45;constrained design update (Eq. D24)." alt="" coords="267,5,443,50"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="473,28,444,30,444,25,478,28"/>
+<area shape="rect" id="Node000004" href="$d8/dc8/namespacesteepest__descent__optimizer.html#a671e84d7115b77290f9a363627a3c83c" title="Initialise the steepest descent optimizer from the case file." alt="" coords="5,5,219,50"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="248,28,219,30,219,25,254,28"/>
+</map>

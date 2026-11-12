@@ -1,0 +1,13 @@
+<map id="simulation_m::simulation_initialize" name="simulation_m::simulation_initialize">
+<area shape="rect" id="Node000001" title="Initialize the simulation." alt="" coords="5,118,193,163"/>
+<area shape="rect" id="Node000002" href="$d1/d89/namespaceneko__ext.html#a1b5a9f2c357bef64e2848a8e3bc65eb9" title="Reset the case data structure." alt="" coords="273,5,394,33"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="127,116,178,79,239,43,260,37,256,40,242,48,180,83,130,120"/>
+<area shape="rect" id="Node000003" href="$d1/d89/namespaceneko__ext.html#a498ba92b11f0cc75b8e6be49af65d169" title="Reset the adjoint case data structure." alt="" coords="247,57,420,85"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="174,115,240,95,270,88,266,91,241,100,177,120"/>
+<area shape="rect" id="Node000004" href="$d3/dff/namespacesimulation__adjoint.html#aabb1077fd0f9c11764d762ca8ab6b557" title="Finalize a simulation of a case." alt="" coords="258,110,408,171"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="193,138,245,139,240,142,194,143"/>
+<area shape="rect" id="Node000005" href="$d3/dff/namespacesimulation__adjoint.html#a0bb51f251be1c0dc20b1be068a108c70" title="Initialise a simulation_adjoint of a case." alt="" coords="244,196,422,240"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="169,161,252,189,247,191,169,166"/>
+<area shape="rect" id="Node000006" href="$d3/dff/namespacesimulation__adjoint.html#ad86e4209dc800ac0b8bd5b3e1b7b2c19" title="Compute a single time&#45;step of an adjoint case." alt="" coords="241,265,426,310"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="125,161,177,205,242,250,253,258,248,258,239,255,174,210,123,166"/>
+</map>

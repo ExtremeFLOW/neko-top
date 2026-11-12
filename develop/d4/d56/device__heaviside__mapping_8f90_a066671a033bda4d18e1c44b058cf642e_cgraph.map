@@ -1,0 +1,10 @@
+<map id="device_heaviside_mapping::device_heaviside_mapping_apply" name="device_heaviside_mapping::device_heaviside_mapping_apply">
+<area shape="rect" id="Node000001" title="Dispatch forward Heaviside mapping to active device backend." alt="" coords="5,40,255,85"/>
+<area shape="rect" id="Node000002" href="$d9/d1c/heaviside__mapping_8cu.html#ac6544008c06d6914c5b8ae1f2b332a5a" title=" " alt="" coords="303,5,489,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="255,43,290,41,285,42,256,49"/>
+<area shape="rect" id="Node000004" href="$d4/d1d/heaviside__mapping_8hip.html#ace37e3f830da4b07742dc3a04c65e6c2" title=" " alt="" coords="308,75,484,119"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="255,76,296,84,290,84,255,81"/>
+<area shape="rect" id="Node000003" href="$d1/d72/cuda_2heaviside__mapping__kernel_8h.html#ab60c7eecd79954c9564c5f97d8014e7f" title=" " alt="" coords="537,40,728,85"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="489,39,524,46,519,46,489,44"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="483,82,519,79,524,78,484,87"/>
+</map>

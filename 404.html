@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Page not found - Neko-TOP documentation</title>
+<script>
+// Served for every missing path, so all links here are absolute.
+(function () {
+  var base = "/neko-top/";
+  var versions = ["develop"];
+  var fallback = "develop";
+  var path = window.location.pathname;
+  if (path.indexOf(base) !== 0) return;
+  var rest = path.slice(base.length);
+  var version = rest.split("/")[0];
+  var target = null;
+  if (versions.indexOf(version) >= 0) {
+    // A page that does not exist in this version: go to its front page.
+    if (rest !== version + "/" && rest !== version + "/index.html") {
+      target = base + version + "/";
+    }
+  } else if (fallback) {
+    // A link from before the site was versioned: try the newest release.
+    target = base + fallback + "/" + rest;
+  }
+  if (target) window.location.replace(target + window.location.hash);
+})();
+</script>
+</head>
+<body>
+<h1>Page not found</h1>
+<p>Go to the <a href="/neko-top/">documentation front page</a>.</p>
+</body>
+</html>

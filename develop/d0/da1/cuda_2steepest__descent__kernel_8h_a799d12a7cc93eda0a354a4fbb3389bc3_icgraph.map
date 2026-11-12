@@ -1,0 +1,14 @@
+<map id="sd_update_design_kernel" name="sd_update_design_kernel">
+<area shape="rect" id="Node000001" title=" " alt="" coords="960,32,1145,60"/>
+<area shape="rect" id="Node000002" href="$da/d18/steepest__descent_8cu.html#ab3b5a81a88b39296e26d9d4158433b0b" title=" " alt="" coords="735,5,912,33"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="941,33,912,32,912,27,947,33"/>
+<area shape="rect" id="Node000006" href="$de/d19/steepest__descent_8hip.html#a835b2958552bd92fddadaa75941fdf4c" title=" " alt="" coords="741,57,906,85"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="946,58,907,65,906,59,941,58"/>
+<area shape="rect" id="Node000003" href="$d4/dca/namespacedevice__steepest__descent.html#a8d390b028b7aa94577f0adc1ee9928ef" title="Move&#45;limited, box&#45;constrained design update on the device (Eq. D24)." alt="" coords="491,24,687,68"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="723,31,688,37,687,32,717,31"/>
+<area shape="rect" id="Node000004" href="$dc/db2/namespacesteepest__descent__math.html#a768b0076cdd15b468a553cf0ef7fd025" title="Move&#45;limited, box&#45;constrained design update (Eq. D24)." alt="" coords="267,24,443,68"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="473,46,444,48,443,43,478,46"/>
+<area shape="rect" id="Node000005" href="$d8/dc8/namespacesteepest__descent__optimizer.html#a671e84d7115b77290f9a363627a3c83c" title="Initialise the steepest descent optimizer from the case file." alt="" coords="5,24,219,68"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="248,46,219,48,219,43,254,46"/>
+<area shape="poly" id="edge6_Node000006_Node000003" title=" " alt="" coords="723,61,688,59,688,54,728,61"/>
+</map>

@@ -1,0 +1,13 @@
+<map id="adjoint_case::adjoint_case_t" name="adjoint_case::adjoint_case_t">
+<area shape="rect" id="Node000001" title="Adjoint case type. Todo: This should Ideally be a subclass of case_t, however, that is not yet suppor..." alt="" coords="594,83,751,127"/>
+<area shape="rect" id="Node000002" href="$d4/d8e/structadjoint__scalars_1_1adjoint__scalars__t.html" title="Type to manage multiple adjoint scalar transport equations." alt="" coords="187,5,359,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="375,37,471,52,571,72,603,82,598,82,570,77,470,57,375,43"/>
+<area shape="rect" id="Node000003" href="$df/d96/structadjoint__scalar__convection__source__term_1_1adjoint__scalar__convection__source__term__t.html" title=" " alt="" coords="169,74,377,136"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="392,102,597,104,592,106,393,108"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="5,91,120,119"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="135,102,171,104,166,106,136,108"/>
+<area shape="rect" id="Node000005" href="$d4/d7d/structadjoint__output_1_1adjoint__output__t.html" title="adjoint output" alt="" coords="189,160,357,205"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="373,167,468,153,570,133,597,128,602,127,571,138,469,158,373,173"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="25,168,100,196"/>
+<area shape="poly" id="edge5_Node000005_Node000006" title=" " alt="" coords="116,180,191,182,186,183,116,185"/>
+</map>

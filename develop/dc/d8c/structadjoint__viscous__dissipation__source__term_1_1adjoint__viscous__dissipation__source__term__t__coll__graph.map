@@ -1,0 +1,5 @@
+<map id="adjoint_viscous_dissipation_source_term::adjoint_viscous_dissipation_source_term_t" name="adjoint_viscous_dissipation_source_term::adjoint_viscous_dissipation_source_term_t">
+<area shape="rect" id="Node000001" title="An adjoint source term for objectives of viscous dissipation." alt="" coords="5,81,224,143"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="57,5,172,33"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="116,47,117,81,112,80,113,51"/>
+</map>

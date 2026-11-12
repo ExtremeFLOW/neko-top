@@ -1,0 +1,16 @@
+<map id="simulation_m::simulation_t" name="simulation_m::simulation_t">
+<area shape="rect" id="Node000001" title=" " alt="" coords="889,39,1088,67"/>
+<area shape="rect" id="Node000002" href="$dc/d5c/structadjoint__case_1_1adjoint__case__t.html" title="Adjoint case type. Todo: This should Ideally be a subclass of case_t, however, that is not yet suppor..." alt="" coords="594,81,751,126"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="766,86,900,67,895,68,767,91"/>
+<area shape="rect" id="Node000003" href="$d4/d8e/structadjoint__scalars_1_1adjoint__scalars__t.html" title="Type to manage multiple adjoint scalar transport equations." alt="" coords="187,5,359,50"/>
+<area shape="poly" id="edge7_Node000001_Node000003" title=" " alt="" coords="375,26,599,31,865,41,891,45,886,45,865,46,599,36,375,32"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="369,52,402,59,502,78,597,94,591,94,501,83,401,65,369,57"/>
+<area shape="rect" id="Node000004" href="$df/d96/structadjoint__scalar__convection__source__term_1_1adjoint__scalar__convection__source__term__t.html" title=" " alt="" coords="169,84,377,145"/>
+<area shape="poly" id="edge3_Node000002_Node000004" title=" " alt="" coords="393,118,480,119,570,115,597,115,592,116,571,121,480,124,394,123"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="5,100,120,128"/>
+<area shape="poly" id="edge4_Node000004_Node000005" title=" " alt="" coords="135,112,171,113,166,115,136,117"/>
+<area shape="rect" id="Node000006" href="$d4/d7d/structadjoint__output_1_1adjoint__output__t.html" title="adjoint output" alt="" coords="189,169,357,214"/>
+<area shape="poly" id="edge5_Node000002_Node000006" title=" " alt="" coords="372,183,469,171,570,149,628,127,633,126,571,154,470,176,373,188"/>
+<area shape="rect" id="Node000007" title=" " alt="" coords="25,178,100,206"/>
+<area shape="poly" id="edge6_Node000006_Node000007" title=" " alt="" coords="116,189,191,191,186,192,116,194"/>
+</map>

@@ -1,0 +1,17 @@
+<map id="/home/runner/work/neko&#45;top/neko&#45;top/source/sources/mapping_functions/bcknd/device/cuda/heaviside_mapping.cu" name="/home/runner/work/neko&#45;top/neko&#45;top/source/sources/mapping_functions/bcknd/device/cuda/heaviside_mapping.cu">
+<area shape="rect" id="Node000001" title=" " alt="" coords="220,5,459,84"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,140,71,168"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="218,86,84,134,80,136,77,132,82,130,220,81"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="95,140,165,168"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="262,86,170,135,168,131,266,83"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="189,140,311,168"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="309,83,272,130,269,126,305,86"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="336,140,524,168"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="373,82,412,129,406,128,371,87"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="549,132,695,177"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="442,82,553,126,548,126,441,87"/>
+<area shape="rect" id="Node000007" href="$d1/d72/cuda_2heaviside__mapping__kernel_8h.html" title=" " alt="" coords="720,140,927,168"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="460,70,752,136,747,138,459,75"/>
+<area shape="rect" id="Node000008" title=" " alt="" coords="790,225,857,252"/>
+<area shape="poly" id="edge7_Node000007_Node000008" title=" " alt="" coords="825,167,825,211,821,207,821,171"/>
+</map>

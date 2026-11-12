@@ -1,0 +1,8 @@
+<map id="mapping_handler::mapping_handler_setup_outputs" name="mapping_handler::mapping_handler_setup_outputs">
+<area shape="rect" id="Node000001" title="Setup output objects after mappings are known." alt="" coords="5,40,205,85"/>
+<area shape="poly" id="edge2_Node000001_Node000001" title=" " alt="" coords="62,39,61,30,68,21,83,15,105,13,129,16,145,24,140,25,128,21,105,19,84,21,71,25,66,31,68,40"/>
+<area shape="rect" id="Node000002" href="$d1/d89/namespaceneko__ext.html#a2add725bbf1ce06873e7fbb8f602ec6f" title="Field to vector." alt="" coords="259,5,396,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="205,44,247,40,241,41,206,49"/>
+<area shape="rect" id="Node000003" href="$d1/d89/namespaceneko__ext.html#aaf3b57e334eb5a4efc9576063c18302a" title="Vector to field." alt="" coords="253,75,402,119"/>
+<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="205,75,240,83,235,83,205,81"/>
+</map>

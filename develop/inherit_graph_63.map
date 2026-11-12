@@ -1,0 +1,11 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" href="$da/d3b/structdesign_1_1design__t.html" title="An abstract design type." alt="" coords="5,118,133,146"/>
+<area shape="rect" id="Node000001" href="$d5/dae/structbrinkman__design_1_1brinkman__design__t.html" title="A topology optimization design variable." alt="" coords="181,5,384,50"/>
+<area shape="poly" id="edge18_Node000000_Node000001" title=" " alt="" coords="101,107,138,83,180,60,211,49,206,52,182,65,141,87,104,111"/>
+<area shape="rect" id="Node000002" href="$d7/de5/structdesign__3dto1d_1_1design__3dto1d__t.html" title="A topology optimization design variable." alt="" coords="199,75,366,119"/>
+<area shape="poly" id="edge19_Node000000_Node000002" title=" " alt="" coords="147,116,201,109,196,112,149,121"/>
+<area shape="rect" id="Node000003" href="$dd/d85/structsimple__design_1_1simple__design__t.html" title="A topology optimization design variable." alt="" coords="199,144,366,189"/>
+<area shape="poly" id="edge20_Node000000_Node000003" title=" " alt="" coords="147,142,201,152,196,154,148,147"/>
+<area shape="rect" id="Node000004" href="$d9/d74/structsimplefield__design_1_1simplefield__design__t.html" title="A topology optimization design variable." alt="" coords="201,213,364,258"/>
+<area shape="poly" id="edge21_Node000000_Node000004" title=" " alt="" coords="103,152,141,176,182,199,211,213,206,213,180,203,138,181,102,157"/>
+</map>

@@ -1,0 +1,5 @@
+<map id="ramp_mapping::ramp_mapping_t" name="ramp_mapping::ramp_mapping_t">
+<area shape="rect" id="Node000001" title="A RAMP mapping of coefficients This is the standard RAMP described in https://doi...." alt="" coords="5,81,167,126"/>
+<area shape="rect" id="Node000002" href="$d2/db3/structmapping_1_1mapping__t.html" title="Base abstract class for mapping." alt="" coords="8,5,164,33"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="88,47,89,81,83,80,84,51"/>
+</map>

@@ -1,0 +1,26 @@
+var searchData=
+[
+  ['design_5fget_5fx_0',['design_get_x',['../da/d3b/structdesign_1_1design__t.html#a3782be268a4581080f49357a497b344b',1,'design::design_t::design_get_x()'],['../d5/dae/structbrinkman__design_1_1brinkman__design__t.html#a373ffe28b0500efd6735808a89b5d594',1,'brinkman_design::brinkman_design_t::design_get_x()'],['../dd/d85/structsimple__design_1_1simple__design__t.html#aa85a4d5a74ad75569c5b6af56aaf60eb',1,'simple_design::simple_design_t::design_get_x()']]],
+  ['design_5fget_5fx_5fi_1',['design_get_x_i',['../da/d3b/structdesign_1_1design__t.html#a9aa61640c6be011250def789475885ee',1,'design::design_t::design_get_x_i()'],['../d5/dae/structbrinkman__design_1_1brinkman__design__t.html#a642befac1836054a0c652ba1e2b908a8',1,'brinkman_design::brinkman_design_t::design_get_x_i()']]],
+  ['design_5fget_5fy_2',['design_get_y',['../da/d3b/structdesign_1_1design__t.html#abbf3377d68acb58a3cde1cd873429c10',1,'design::design_t::design_get_y()'],['../d5/dae/structbrinkman__design_1_1brinkman__design__t.html#a96b34e5272c407abd5015151f2dd780d',1,'brinkman_design::brinkman_design_t::design_get_y()'],['../dd/d85/structsimple__design_1_1simple__design__t.html#a4af8d727687ce89b18374f956b62a7d6',1,'simple_design::simple_design_t::design_get_y()']]],
+  ['design_5fget_5fy_5fi_3',['design_get_y_i',['../da/d3b/structdesign_1_1design__t.html#aac4e79cab5a9dfac52595ee913452bcf',1,'design::design_t::design_get_y_i()'],['../d5/dae/structbrinkman__design_1_1brinkman__design__t.html#addfb1f4327415a457ed18200e6003d5f',1,'brinkman_design::brinkman_design_t::design_get_y_i()']]],
+  ['design_5fget_5fz_4',['design_get_z',['../da/d3b/structdesign_1_1design__t.html#a7608bf2f8d7f4981d8e3c03a1ce16c3e',1,'design::design_t::design_get_z()'],['../d5/dae/structbrinkman__design_1_1brinkman__design__t.html#a7376d8757765e4b735c73c3e5812167d',1,'brinkman_design::brinkman_design_t::design_get_z()'],['../dd/d85/structsimple__design_1_1simple__design__t.html#a1f80babe68a6766c6d70473571857445',1,'simple_design::simple_design_t::design_get_z()']]],
+  ['design_5fget_5fz_5fi_5',['design_get_z_i',['../da/d3b/structdesign_1_1design__t.html#a2afd55e7fd8623bb541f7964ff980deb',1,'design::design_t::design_get_z_i()'],['../d5/dae/structbrinkman__design_1_1brinkman__design__t.html#a9d1114c1ec249d770c29dc348ab9f87b',1,'brinkman_design::brinkman_design_t::design_get_z_i()']]],
+  ['design_5fsimple_5finit_5ffrom_5fjson_6',['design_simple_init_from_json',['../de/d87/design__simple_8f90.html#a6e57bb9dc189f3253cd758bc0c7fa865',1,'simple_design']]],
+  ['device_5fdelta_5f1dbeam_7',['device_delta_1dbeam',['../db/da4/device__mma__math_8f90.html#aabea8e256f7558ad415ea3a93d358498',1,'device_mma_math']]],
+  ['device_5fheaviside_5fmapping_5fapply_8',['device_heaviside_mapping_apply',['../d4/d56/device__heaviside__mapping_8f90.html#a066671a033bda4d18e1c44b058cf642e',1,'device_heaviside_mapping']]],
+  ['device_5fheaviside_5fmapping_5fapply_5fbackward_9',['device_heaviside_mapping_apply_backward',['../d4/d56/device__heaviside__mapping_8f90.html#a9b39e013d0831da1033b1a5adeaa138f',1,'device_heaviside_mapping']]],
+  ['device_5fmattrans_5fv_5fmul_10',['device_mattrans_v_mul',['../db/da4/device__mma__math_8f90.html#a45e4180459f1242a07833eff6e9da00d',1,'device_mma_math']]],
+  ['device_5fmma_5fdip_5fkkt_11',['device_mma_dip_kkt',['../db/da4/device__mma__math_8f90.html#a353641ce04d23ffd14c6947eba352786',1,'device_mma_math']]],
+  ['device_5fmma_5fdipsolvesub1_12',['device_mma_dipsolvesub1',['../db/da4/device__mma__math_8f90.html#a67bd273aad8272b1f87817e0a5347174',1,'device_mma_math']]],
+  ['device_5fmma_5fgensub3_5fdip_13',['device_mma_gensub3_dip',['../db/da4/device__mma__math_8f90.html#a82f7931a5b35b3125128a25a8c2decf6',1,'device_mma_math']]],
+  ['device_5fmma_5fljjxinv_14',['device_mma_ljjxinv',['../db/da4/device__mma__math_8f90.html#a9bab637ac8fbdfa2a0e6d8d402813a3e',1,'device_mma_math']]],
+  ['device_5fprepare_5faa_5fmatrix_15',['device_prepare_aa_matrix',['../db/da4/device__mma__math_8f90.html#a0955725ec427ebbbac5afa2f145b3957',1,'device_mma_math']]],
+  ['device_5fprepare_5fhessian_16',['device_prepare_hessian',['../db/da4/device__mma__math_8f90.html#a7341a3fdbadf5796732fadd59a7ca5ac',1,'device_mma_math']]],
+  ['device_5fsd_5fdirection_17',['device_sd_direction',['../d4/dca/namespacedevice__steepest__descent.html#af1867a4ca26b6babcdc723767ded34c4',1,'device_steepest_descent']]],
+  ['device_5fsd_5fupdate_5fdesign_18',['device_sd_update_design',['../d4/dca/namespacedevice__steepest__descent.html#a8d390b028b7aa94577f0adc1ee9928ef',1,'device_steepest_descent']]],
+  ['device_5fsd_5fupdate_5fmove_5flimits_19',['device_sd_update_move_limits',['../d4/dca/namespacedevice__steepest__descent.html#a299b66b0cd4005b9321bb6bf621ba587',1,'device_steepest_descent']]],
+  ['device_5fupdate_5fhessian_5fz_20',['device_update_hessian_z',['../db/da4/device__mma__math_8f90.html#a1eadf07dc5282db9f0bdf87cedad4efe',1,'device_mma_math']]],
+  ['dot_21',['dot',['../d5/dc6/develop_8f90.html#a6a3929e9ce28d727c639a034ecf49279',1,'develop']]],
+  ['dummy_5fconstraint_5finit_5fjson_22',['dummy_constraint_init_json',['../d9/d63/namespacedummy__constraint.html#acc3c7df99311e1a469559b4c6ce1acd0',1,'dummy_constraint']]]
+];

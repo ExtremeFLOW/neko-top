@@ -1,0 +1,27 @@
+var structdesign_1_1design__t =
+[
+    [ "design_get_x", "da/d3b/structdesign_1_1design__t.html#a3782be268a4581080f49357a497b344b", null ],
+    [ "design_get_x_i", "da/d3b/structdesign_1_1design__t.html#a9aa61640c6be011250def789475885ee", null ],
+    [ "design_get_y", "da/d3b/structdesign_1_1design__t.html#abbf3377d68acb58a3cde1cd873429c10", null ],
+    [ "design_get_y_i", "da/d3b/structdesign_1_1design__t.html#aac4e79cab5a9dfac52595ee913452bcf", null ],
+    [ "design_get_z", "da/d3b/structdesign_1_1design__t.html#a7608bf2f8d7f4981d8e3c03a1ce16c3e", null ],
+    [ "design_get_z_i", "da/d3b/structdesign_1_1design__t.html#a2afd55e7fd8623bb541f7964ff980deb", null ],
+    [ "free", "da/d3b/structdesign_1_1design__t.html#ad0e299e828a818f55bad122c29231f72", null ],
+    [ "free_base", "da/d3b/structdesign_1_1design__t.html#ae2bcdb30b6269a50213ac6c80cdf8f13", null ],
+    [ "get_name", "da/d3b/structdesign_1_1design__t.html#a02c960a3b94854306b0699eb68af4515", null ],
+    [ "get_values", "da/d3b/structdesign_1_1design__t.html#a4594af5643c04297466b3f51ef1bcc75", null ],
+    [ "init_base", "da/d3b/structdesign_1_1design__t.html#ae67708d7b470530666c1943f146e6c80", null ],
+    [ "init_from_json", "da/d3b/structdesign_1_1design__t.html#ac3c937f5fd85ef41f0d12ea61e95738a", null ],
+    [ "init_from_json_sim", "da/d3b/structdesign_1_1design__t.html#aafbf05ef4e054620204aca8d0055e662", null ],
+    [ "load_checkpoint", "da/d3b/structdesign_1_1design__t.html#a2fe0e38b5472a33675565bca49a4f1b6", null ],
+    [ "map_backward", "da/d3b/structdesign_1_1design__t.html#a799789466fcb4eab450d28eb403a285b", null ],
+    [ "map_forward", "da/d3b/structdesign_1_1design__t.html#a3891866774a38e22eef710d57d7bccba", null ],
+    [ "save_checkpoint", "da/d3b/structdesign_1_1design__t.html#aa10f14e20d3a35dfe80b3053e8e87d4b", null ],
+    [ "set_output_counter", "da/d3b/structdesign_1_1design__t.html#a80ce033687a70b92cc1e0e05bee13128", null ],
+    [ "size", "da/d3b/structdesign_1_1design__t.html#a24d540f14cde85694c4c0cf51eb91838", null ],
+    [ "size_global", "da/d3b/structdesign_1_1design__t.html#aa20c2b0bb800c81e5ba7a1fc6cc775af", null ],
+    [ "update_design", "da/d3b/structdesign_1_1design__t.html#ab7548cf5209a11e4e5f364d1f1ed60aa", null ],
+    [ "write", "da/d3b/structdesign_1_1design__t.html#ab7a212802c2d1f434a747aa476eda35e", null ],
+    [ "n", "da/d3b/structdesign_1_1design__t.html#a4953642fd027e9247ba764023a99df3f", null ],
+    [ "n_global", "da/d3b/structdesign_1_1design__t.html#ab1db11957e914895642531b736b2e0c1", null ]
+];

@@ -1,0 +1,10 @@
+<map id="device_steepest_descent::device_sd_direction" name="device_steepest_descent::device_sd_direction">
+<area shape="rect" id="Node000001" title="Bound&#45;projected steepest&#45;descent direction on the device (Eq. D22)." alt="" coords="5,24,191,68"/>
+<area shape="rect" id="Node000002" href="$da/d18/steepest__descent_8cu.html#a4781196a8617f58950e2681f41fe984b" title=" " alt="" coords="239,5,377,33"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="190,31,226,29,221,30,191,37"/>
+<area shape="rect" id="Node000004" href="$de/d19/steepest__descent_8hip.html#aeda2b4459b057ad56bdf52f86990b2cb" title=" " alt="" coords="244,57,372,85"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="191,54,232,62,226,62,191,60"/>
+<area shape="rect" id="Node000003" href="$d0/da1/cuda_2steepest__descent__kernel_8h.html#aacfded64682cf885609ecaf771e9534d" title=" " alt="" coords="425,32,572,60"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="378,26,412,33,407,33,378,32"/>
+<area shape="poly" id="edge4_Node000004_Node000003" title=" " alt="" coords="372,60,407,58,412,57,372,65"/>
+</map>

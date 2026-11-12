@@ -1,0 +1,19 @@
+var searchData=
+[
+  ['n_0',['n',['../da/d3b/structdesign_1_1design__t.html#a4953642fd027e9247ba764023a99df3f',1,'design::design_t']]],
+  ['n_5fconstraints_1',['n_constraints',['../d3/d80/structproblem_1_1problem__t.html#ac5832c938e0a4ed867968ba2e3e359dd',1,'problem::problem_t']]],
+  ['n_5fglobal_2',['n_global',['../da/d3b/structdesign_1_1design__t.html#ab1db11957e914895642531b736b2e0c1',1,'design::design_t']]],
+  ['n_5fobjectives_3',['n_objectives',['../d3/d80/structproblem_1_1problem__t.html#aebe11eac56f8a851b2512a037d226e3c',1,'problem::problem_t']]],
+  ['n_5fsaves_5fmemory_4',['n_saves_memory',['../d6/da3/structstate__recover__checkpoint_1_1state__recover__checkpoint__t.html#a6893d1db5e8e87ca568da7f9a4de6fd7',1,'state_recover_checkpoint::state_recover_checkpoint_t']]],
+  ['n_5ftimesteps_5',['n_timesteps',['../df/d1b/structstate__recover_1_1state__recover__t.html#aa8abca564d9cf98c69fcc7dc1e464f28',1,'state_recover::state_recover_t']]],
+  ['name_6',['name',['../d8/d6b/structadjoint__fluid__scheme_1_1adjoint__fluid__scheme__t.html#ab43cff312e8773e6340fb6eb29e15b45',1,'adjoint_fluid_scheme::adjoint_fluid_scheme_t::name'],['../dc/dad/structadjoint__scalar__scheme_1_1adjoint__scalar__scheme__t.html#a957aa5892e51c07596ee3c4b26edb930',1,'adjoint_scalar_scheme::adjoint_scalar_scheme_t::name'],['../d0/da6/structbase__functional_1_1base__functional__t.html#a74ce6f4d8a60f086c1d91e88d784337f',1,'base_functional::base_functional_t::name']]],
+  ['neko_5fcase_7',['neko_case',['../d9/dc7/structsimulation__m_1_1simulation__t.html#ab7d9264ba5004c45d222294de47d084a',1,'simulation_m::simulation_t::neko_case'],['../df/d1b/structstate__recover_1_1state__recover__t.html#afb465313efa617307071bb72027aa74e',1,'state_recover::state_recover_t::neko_case']]],
+  ['norm2_5fdesign_5fchange_8',['norm2_design_change',['../d5/d77/structoptimizer_1_1optimizer__t.html#a670957eb2a4c81647b27cb29f4522a64',1,'optimizer::optimizer_t']]],
+  ['norm_5fl2_5fbase_9',['norm_l2_base',['../d6/dca/structadjoint__fluid__pnpn_1_1adjoint__fluid__pnpn__t.html#adc5f0bc1f03e7a9787d9fe4d995b7434',1,'adjoint_fluid_pnpn::adjoint_fluid_pnpn_t']]],
+  ['norm_5fl2_5flower_10',['norm_l2_lower',['../d6/dca/structadjoint__fluid__pnpn_1_1adjoint__fluid__pnpn__t.html#a0af4011c35d14b07fa98d3662de4b395',1,'adjoint_fluid_pnpn::adjoint_fluid_pnpn_t']]],
+  ['norm_5fl2_5fupper_11',['norm_l2_upper',['../d6/dca/structadjoint__fluid__pnpn_1_1adjoint__fluid__pnpn__t.html#af3d88394990ffefdae8993a82ced8816',1,'adjoint_fluid_pnpn::adjoint_fluid_pnpn_t']]],
+  ['norm_5fscaling_12',['norm_scaling',['../d6/dca/structadjoint__fluid__pnpn_1_1adjoint__fluid__pnpn__t.html#a602175f29de095ac359c51866ceca7d5',1,'adjoint_fluid_pnpn::adjoint_fluid_pnpn_t']]],
+  ['norm_5ftarget_13',['norm_target',['../d6/dca/structadjoint__fluid__pnpn_1_1adjoint__fluid__pnpn__t.html#a2452122a0e23a4ee685174e1a96108f4',1,'adjoint_fluid_pnpn::adjoint_fluid_pnpn_t']]],
+  ['norm_5ftolerance_14',['norm_tolerance',['../d6/dca/structadjoint__fluid__pnpn_1_1adjoint__fluid__pnpn__t.html#a51c474a85ce29c34ba077fdf40dc55cb',1,'adjoint_fluid_pnpn::adjoint_fluid_pnpn_t']]],
+  ['nut_5ffield_5fname_15',['nut_field_name',['../d7/dc1/structadjoint__fluid__scheme__incompressible_1_1adjoint__fluid__scheme__incompressible__t.html#af8cb007fd68f29547e08251a9e96a073',1,'adjoint_fluid_scheme_incompressible::adjoint_fluid_scheme_incompressible_t::nut_field_name'],['../dc/dad/structadjoint__scalar__scheme_1_1adjoint__scalar__scheme__t.html#a31f248de352a78ead00cdfdf26ff036c',1,'adjoint_scalar_scheme::adjoint_scalar_scheme_t::nut_field_name']]]
+];

@@ -1,0 +1,25 @@
+var searchData=
+[
+  ['dealiasing_0',['Adjoint over-integration (dealiasing)',['../de/dbe/configuration.html#configuration-adjoint-dealias',1,'']]],
+  ['default_20behaviour_1',['Default behaviour',['../de/dbe/configuration.html#configuration-adjoint-dealias-default',1,'']]],
+  ['defining_20the_20optimization_20problem_2',['Defining the optimization problem',['../de/d03/mixer.html#mixer_optimization_problem',1,'']]],
+  ['deflection_3',['Tip Deflection',['../df/db3/beam.html#autotoc_md102',1,'']]],
+  ['dependencies_4',['Dependencies',['../d5/dfc/installation.html#autotoc_md85',1,'']]],
+  ['dependencies_5',['System dependencies',['../d5/dfc/installation.html#autotoc_md86',1,'']]],
+  ['descent_20with_20move_20limits_6',['descent with move limits',['../d0/d04/optimizer.html#optimizer-concrete-steepest-descent',1,'Steepest descent with move limits'],['../de/dbe/configuration.html#configuration-solver-steepest-descent',1,'Steepest descent with move limits']]],
+  ['description_7',['Description',['../df/db3/beam.html#autotoc_md98',1,'Problem Description'],['../d5/d42/mma.html#autotoc_md111',1,'Problem Description']]],
+  ['design_8',['Design',['../d2/df0/design_types.html#design_types-brinkman',1,'Brinkman Design'],['../db/db9/design.html',1,'Design'],['../d2/df0/design_types.html#design_types-simple',1,'Simple Design']]],
+  ['design_20bounds_20and_20mma_20coefficients_9',['Design bounds and MMA coefficients',['../de/dbe/configuration.html#autotoc_md79',1,'']]],
+  ['design_20types_10',['Design Types',['../d2/df0/design_types.html',1,'configuration']]],
+  ['design_20variable_20mapping_11',['Design Variable Mapping',['../df/db3/beam.html#autotoc_md100',1,'']]],
+  ['details_12',['Implementation Details',['../d8/d1f/MMA.html#autotoc_md50',1,'']]],
+  ['developer_20guide_13',['Developer Guide',['../dd/d45/dev_guide.html',1,'index']]],
+  ['difference_20from_20the_20primal_20mma_20subproblem_14',['Key difference from the primal MMA subproblem',['../d8/d1f/MMA.html#autotoc_md54',1,'']]],
+  ['dip_20subsolver_20formulation_15',['Note on the DIP subsolver formulation',['../d8/d1f/MMA.html#autotoc_md53',1,'']]],
+  ['dissipation_16',['dissipation',['../d2/d27/simulation.html#source_lube',1,'Brinkman dissipation'],['../d2/d86/objectives_and_constraints.html#objective_velocity_penalty',1,'Brinkman dissipation'],['../d2/d27/simulation.html#source_dissipation',1,'Viscous dissipation'],['../d2/d86/objectives_and_constraints.html#objective_dissipation',1,'Viscous dissipation']]],
+  ['dissipation_20from_20a_20rod_17',['Thermal dissipation from a rod',['../db/d20/easy-E.html',1,'examples-list']]],
+  ['domain_20and_20mesh_18',['Domain and mesh',['../d4/dec/static-mixers.html#autotoc_md127',1,'']]],
+  ['domain_20specification_19',['Domain specification',['../de/d03/mixer.html#mixer_domains',1,'']]],
+  ['driver_20file_20',['The driver file',['../de/d03/mixer.html#autotoc_md71',1,'']]],
+  ['drivers_21',['Neko-top drivers',['../de/d03/mixer.html#mixer_driver',1,'']]]
+];
