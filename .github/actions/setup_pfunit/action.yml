@@ -79,6 +79,8 @@ runs:
           exit 1
         fi
         OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
+        # The OpenMPI wrappers (the default compiler) build with OMPI_FC.
+        [ -n "$OMPI_FC" ] && COMPILER="$COMPILER-$OMPI_FC"
         key="pfunit-$VERSION-${SHA:0:7}-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 

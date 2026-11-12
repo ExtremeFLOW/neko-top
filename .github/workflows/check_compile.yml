@@ -48,29 +48,51 @@ jobs:
         os: ${{ fromJSON(inputs.runner-images) }}
         precision: [dp]
         backend: [CPU, CUDA, HIP]
-        compiler: [GNU-13, GNU-14]
+        compiler: [GNU-13, GNU-14, GNU-15]
 
-        # ROCm is only published for Ubuntu 22.04 and 24.04. On newer images
-        # the 24.04 build of ROCm's lld fails to load (libxml2.so.2 is gone),
-        # so CMake cannot identify the HIP compiler. Re-enable once ROCm ships
-        # packages for the release behind ubuntu-latest.
         exclude:
+          # ROCm is only published for Ubuntu 22.04 and 24.04. On newer images
+          # the 24.04 build of ROCm's lld fails to load (libxml2.so.2 is gone),
+          # so CMake cannot identify the HIP compiler. Re-enable once ROCm
+          # ships packages for the release behind ubuntu-latest.
           - os: ubuntu-latest
             backend: HIP
 
-        # Define the setup jobs
+          # A compiler can only use the system OpenMPI's mpi_f08 module if it
+          # reads the module format of the gfortran that built OpenMPI. Ubuntu
+          # 24.04 builds OpenMPI with gfortran 13 (format shared by gfortran
+          # 8-14) and has no gfortran 15. Ubuntu 26.04 (ubuntu-latest) builds
+          # it with gfortran 15, whose format gfortran 13 and 14 cannot read.
+          # Revisit when ubuntu-latest moves to a new release.
+          - os: ubuntu-24.04
+            compiler: GNU-15
+          - os: ubuntu-latest
+            compiler: GNU-13
+          - os: ubuntu-latest
+            compiler: GNU-14
+
+        # Define the setup jobs.
         include:
           - compiler: GNU-13
             setup-compiler: |
               echo "FC=gfortran-13" >> $GITHUB_ENV
+              echo "OMPI_FC=gfortran-13" >> $GITHUB_ENV
               echo "c-compiler=gcc-13" >> $GITHUB_OUTPUT
               echo "f-compiler=gfortran-13" >> $GITHUB_OUTPUT
 
           - compiler: GNU-14
             setup-compiler: |
               echo "FC=gfortran-14" >> $GITHUB_ENV
+              echo "OMPI_FC=gfortran-14" >> $GITHUB_ENV
               echo "c-compiler=gcc-14" >> $GITHUB_OUTPUT
               echo "f-compiler=gfortran-14" >> $GITHUB_OUTPUT
+
+          - compiler: GNU-15
+            setup-compiler: |
+              echo "FC=gfortran-15" >> $GITHUB_ENV
+              echo "OMPI_FC=gfortran-15" >> $GITHUB_ENV
+              echo "c-compiler=gcc-15" >> $GITHUB_OUTPUT
+              echo "f-compiler=gfortran-15" >> $GITHUB_OUTPUT
 
           - backend: CUDA
             setup-backend: |
