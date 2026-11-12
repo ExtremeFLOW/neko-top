@@ -19,6 +19,11 @@ on:
   workflow_call:
   workflow_dispatch:
 
+# The directories scored on both branches. The check compares the two average
+# scores, so both jobs must score the same directories.
+env:
+  LINT_PATHS: sources/ examples/ tests/
+
 jobs:
   score-develop:
     name: Score develop branch
@@ -37,7 +42,7 @@ jobs:
         id: lint
         uses: ./.github/actions/flint
         with:
-          path: sources/ examples/ tests/
+          path: ${{ env.LINT_PATHS }}
           depth: 10
           rc-file: flinter_rc.yml
 
@@ -63,7 +68,7 @@ jobs:
         id: lint
         uses: ./.github/actions/flint
         with:
-          path: sources/ tests/
+          path: ${{ env.LINT_PATHS }}
           depth: 10
           rc-file: flinter_rc.yml
 
