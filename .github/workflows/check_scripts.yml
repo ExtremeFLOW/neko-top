@@ -98,9 +98,9 @@ jobs:
 
       - name: Run Rugby Ball
         run: |
-          # Adjust the end time and max iterations for the rugby ball case
-          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
-          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
+          # Run 10 timesteps and 2 optimization iterations of the rugby ball
+          python3 .github/workflows/extra/shorten_cases.py \
+            --steps 10 --iterations 2 examples/rugby_ball/rugby_ball.case
 
           ./run.sh -rc rugby_ball
 

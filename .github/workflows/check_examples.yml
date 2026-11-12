@@ -21,6 +21,15 @@ jobs:
   execute-scripts:
     name: Execute setup and examples
     runs-on: ubuntu-latest
+    env:
+      # Build HDF5 (setup.sh only does so when HDF5_ROOT is set); neko needs
+      # it for the HDF5 and VTKHDF output the examples write.
+      HDF5_ROOT: hdf5
+      # The runners have no UCX-capable network devices. Disable the UCX
+      # one-sided (osc) component so OpenMPI does not write
+      # "OSC UCX component priority set inside component query failed" to
+      # stderr, which run.sh would treat as a failed case.
+      OMPI_MCA_osc: "^ucx"
 
     steps:
       # ---------------------------------------------------------------------- #
@@ -49,14 +58,12 @@ jobs:
         run: |
           ./setup.sh
 
-      - name: Adjust end time and timestep for examples
+      # Run each example for a few of its own timesteps and a few optimization
+      # iterations, so the job checks that every example runs end to end.
+      - name: Shorten the examples
         run: |
-          find examples/ -type f -name "*.case" -exec \
-            sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' \
-            {} \;
-          find examples/ -type f -name "*.case" -exec \
-            sed -i -r 's/"timestep": [[0-9]+.*[0-9]*|1e-\d+],/"timestep": 1e-4,/g' \
-            {} \;
+          python3 .github/workflows/extra/shorten_cases.py \
+            --steps 10 --iterations 2 examples/
 
       - name: Run all gauntlet of examples
         run: |
