@@ -621,7 +621,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
-    real(kind=rp) :: total_time
+    real(kind=dp) :: total_time
     integer :: i, j
     type(time_state_t) :: accumulation_time
     logical :: have_scalar
@@ -694,7 +694,7 @@ contains
        ! step just before zero, outside the window of every source term
        ! that starts there.
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
-            cfl, loop_start, &
+            cfl, loop_start, forward_time = &
             real(i - 1, kind=dp) * simulation%adjoint_case%time%dt)
     end do
 

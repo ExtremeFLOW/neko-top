@@ -134,7 +134,7 @@ contains
     type(time_step_controller_t), intent(inout) :: dt_controller
     real(kind=dp), intent(in) :: tstep_loop_start_time
     real(kind=dp), optional, intent(in) :: forward_time
-    real(kind=rp) :: t_bkp
+    real(kind=dp) :: t_bkp
     real(kind=dp) :: start_time, end_time, tstep_start_time
     character(len=LOG_SIZE) :: log_buf
 
