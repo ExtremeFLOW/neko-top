@@ -11,12 +11,12 @@ inputs:
   install-dir:
     description: "The directory to install the ParMetis library."
     required: false
-    default: "/home/runner/pkg/parmetis"
+    default: "${{ runner.temp }}/pkg/parmetis"
 
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "/home/runner/tmp/parmetis"
+    default: "${{ runner.temp }}/build/parmetis"
 
   os:
     description: "The operating system to use."
@@ -140,18 +140,17 @@ runs:
         make config prefix=${PARMETIS_DIR}
         make -j && make install
 
+    # ------------------------------------------------------------------------ #
+    # Cleanup the working directory and set the output.
+
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner.
     - name: Cleanup
       if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
-        VERSION: ${{ inputs.version }}
-      run: |
-        cd $WORKING_DIR
-        rm -rf parmetis-$VERSION parmetis-$VERSION.tar.gz
-
-    # ------------------------------------------------------------------------ #
-    # Cleanup the working directory if necessary and set the output.
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       shell: bash

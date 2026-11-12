@@ -11,12 +11,12 @@ inputs:
   install-dir:
     description: "The directory to install the JSON-Fortran library."
     required: false
-    default: "/home/runner/pkg/json-fortran"
+    default: "${{ runner.temp }}/pkg/json-fortran"
 
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "/home/runner/tmp/json-fortran"
+    default: "${{ runner.temp }}/build/json-fortran"
 
   os:
     description: "The operating system to use."
@@ -150,6 +150,15 @@ runs:
 
     # ------------------------------------------------------------------------ #
     # Cleanup and set the output.
+
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner.
+    - name: Cleanup
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       id: set-output

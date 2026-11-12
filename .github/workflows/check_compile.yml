@@ -141,6 +141,8 @@ jobs:
         if: matrix.backend == 'cuda'
         run: |
           sudo apt-get install -y --no-install-recommends nvidia-cuda-toolkit
+          # Drop the downloaded packages to free disk space.
+          sudo apt-get clean
 
       # The HIP compiler and runtime plus hipblas/hipsolver (neko-top). The
       # kernel driver (amdgpu-dkms) is not needed to compile.
@@ -155,6 +157,9 @@ jobs:
           sudo apt install ./amdgpu-install_*.deb
           sudo apt update
           sudo apt install -y rocm-dev hipblas-dev hipsolver-dev
+          # Drop the downloaded packages to free disk space.
+          sudo apt-get clean
+          rm -f amdgpu-install_*.deb
 
       - name: Setup backend
         id: setup-backend

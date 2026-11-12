@@ -6,15 +6,15 @@ action will also cache the build to speed up future builds.
 
 ## Inputs
 
-| Name             | Optional | Description                                  | Default                   |
-| ---------------- | -------- | -------------------------------------------- | ------------------------- |
-| `install-dir`    | Yes      | The directory to install the pFUnit library. | `/home/runner/pkg/pfunit` |
-| `working-dir`    | Yes      | The directory to work in.                    | `/home/runner/tmp/pfunit` |
-| `os`             | Yes      | The operating system to use.                 | `${{ runner.os }}`        |
-| `compiler`       | Yes      | The compiler to use.                         | `mpif90`                  |
-| `compiler-flags` | Yes      | The compiler flag to use.                    | `-O3`                     |
-| `build-options`  | Yes      | The build option to use.                     | `--parallel $(nproc)`     |
-| `version`        | Yes      | The version of the pFUnit library to use.    | `v4.8.0`                  |
+| Name             | Optional | Description                                 | Default                          |
+| ---------------- | -------- | ------------------------------------------- | -------------------------------- |
+| `install-dir`    | Yes      | The directory to install the gslib library. | `${{ runner.temp }}/pkg/gslib`   |
+| `working-dir`    | Yes      | The directory to work in.                   | `${{ runner.temp }}/build/gslib` |
+| `os`             | Yes      | The operating system to use.                | `${{ runner.os }}`               |
+| `compiler`       | Yes      | The compiler to use.                        | `mpif90`                         |
+| `compiler-flags` | Yes      | The compiler flag to use.                   | `-O3`                            |
+| `build-options`  | Yes      | The build option to use.                    | `--parallel $(nproc)`            |
+| `version`        | Yes      | The version of the pFUnit library to use.   | `v4.8.0`                         |
 
 ## Outputs
 

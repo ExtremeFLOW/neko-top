@@ -11,11 +11,11 @@ inputs:
   install-dir:
     description: "The directory to install the HDF5 library."
     required: false
-    default: "/home/runner/pkg/hdf5"
+    default: "${{ runner.temp }}/pkg/hdf5"
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "/home/runner/tmp/hdf5"
+    default: "${{ runner.temp }}/build/hdf5"
   os:
     description: "The operating system to use."
     required: false
@@ -190,13 +190,14 @@ runs:
     # ------------------------------------------------------------------------ #
     # Cleanup and set the output.
 
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner.
     - name: Cleanup
       if: ${{ steps.cache-hdf5.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
-      run: |
-        rm -fr $WORKING_DIR/build
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       id: set-output
