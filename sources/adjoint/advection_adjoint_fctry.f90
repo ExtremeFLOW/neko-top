@@ -57,8 +57,8 @@ contains
   !! @param slag The lagged scalar field. Optional.
   !! This can be used to kill the advection term.
   !! @note The factory both allocates and initializes `object`.
-  module subroutine advection_adjoint_factory(object, json, coef, ulag, vlag, wlag, &
-       dtlag, tlag, time_scheme, use_dummy, slag)
+  module subroutine advection_adjoint_factory(object, json, coef, ulag, vlag, &
+       wlag, dtlag, tlag, time_scheme, use_dummy, slag)
     class(advection_adjoint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout), target :: coef
