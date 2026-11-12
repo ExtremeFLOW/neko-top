@@ -108,10 +108,6 @@ jobs:
               CMAKE_PREFIX_PATH="$ROCM_DIR/lib/cmake:$CMAKE_PREFIX_PATH"
               echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
               echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ROCM_DIR/lib" >> $GITHUB_ENV
-              # Put hipconfig on PATH so CMake's enable_language(HIP) finds the
-              # ROCm clang instead of the system clang++, which cannot compile
-              # HIP ("The HIP compiler identification is unknown").
-              echo "$ROCM_DIR/bin" >> $GITHUB_PATH
               echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
 
     # ------------------------------------------------------------------------ #
