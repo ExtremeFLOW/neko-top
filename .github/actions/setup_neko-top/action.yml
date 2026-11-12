@@ -11,27 +11,27 @@ inputs:
   install-dir:
     description: "The directory to install the Neko-TOP library."
     required: false
-    default: "/home/runner/pkg/neko-top"
+    default: "${{ runner.temp }}/pkg/neko-top"
 
   working-dir:
     description: "The directory to work in."
     required: false
-    default: "/home/runner/tmp/neko-top"
+    default: "${{ runner.temp }}/build/neko-top"
 
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
     required: false
-    default: "/home/runner/pkg/json-fortran"
+    default: "${{ runner.temp }}/pkg/json-fortran"
 
   hdf5-root:
     description: "The directory where the HDF5 library was installed."
     required: false
-    default: "/home/runner/pkg/hdf5"
+    default: "${{ runner.temp }}/pkg/hdf5"
 
   neko-dir:
     description: "The directory where the JSON-Fortran library was installed."
     required: false
-    default: "/home/runner/pkg/neko"
+    default: "${{ runner.temp }}/pkg/neko"
 
   os:
     description: "The operating system to use."
@@ -94,9 +94,18 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         REPO: https://github.com/ExtremeFLOW/neko-top.git
       run: |
-        # Get the GIT sha for the current commit
-        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="neko-top-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        # Resolve the version (branch or tag) to a commit. The version keeps
+        # the key readable, the SHA invalidates the cache when the ref moves.
+        SHA=$(git ls-remote $REPO "refs/heads/$VERSION" "refs/tags/$VERSION" \
+          | awk 'NR==1 {print $1}')
+        if [ -z "$SHA" ]; then
+          echo "Could not resolve version '$VERSION' in $REPO" >&2
+          exit 1
+        fi
+        # runner.os is only "Linux"; add the distribution release so a build
+        # from one runner image is never restored on another.
+        OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
+        key="neko-top-$VERSION-${SHA:0:7}-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
@@ -107,6 +116,7 @@ runs:
         key: ${{ steps.create-key.outputs.key }}
 
     - name: Clone
+      id: clone
       if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
       shell: bash
       env:
@@ -116,22 +126,21 @@ runs:
       run: |
         if [ -d $WORKING_DIR ]; then
           echo "Working directory already exists. Skipping clone."
+          echo "cloned=false" >> $GITHUB_OUTPUT
         else
           git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+          echo "cloned=true" >> $GITHUB_OUTPUT
         fi
 
     # ------------------------------------------------------------------------ #
     # Setup system dependencies for the Neko-TOP library.
 
-    - name: Get system cache
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: openmpi-bin pkg-config liblapack-dev ninja-build
-        version: 1.0
-
-    - name: Setup non-cache dependencies
+    - name: Setup system dependencies
       shell: bash
-      run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
+          ninja-build libopenblas-dev libopenmpi-dev
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the Neko-TOP library.
@@ -179,6 +188,16 @@ runs:
 
     # ------------------------------------------------------------------------ #
     # Cleanup and set the output.
+
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner. A working directory
+    # that existed before this action (e.g. the caller's checkout) is kept.
+    - name: Cleanup
+      if: ${{ steps.clone.outputs.cloned == 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       id: set-output

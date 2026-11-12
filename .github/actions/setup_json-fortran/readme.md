@@ -6,15 +6,15 @@ compiler. The action will also cache the build to speed up future builds.
 
 ## Inputs
 
-| Name               | Optional | Description                                                                                            | Default                         |
-| ------------------ | -------- | ------------------------------------------------------------------------------------------------------ | ------------------------------- |
-| `install-dir`      | Yes      | The directory to install JSON-Fortran to.                                                              | `/home/runner/pkg/json-fortran` |
-| `working-dir`      | Yes      | The directory to work in.                                                                              | `/home/runner/tmp/json-fortran` |
-| `os`               | Yes      | The operating system to use for building JSON-Fortran. Which should allow the use of matrix workflows. | `runner.os`                     |
-| `compiler`         | Yes      | The compiler to use for building JSON-Fortran. The compiler should be available in the PATH.           | `gfortran`.                     |
-| `compiler-options` | Yes      | The compiler options to use for building JSON-Fortran.                                                 | `-O3`                           |
-| `build-options`    | Yes      | The build options to use for building JSON-Fortran.                                                    | `--parallel=$(nproc)`.          |
-| `version`          | Yes      | The version of JSON-Fortran to build.                                                                  | `8.3.0`.                        |
+| Name               | Optional | Description                                                                                            | Default                                 |
+| ------------------ | -------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+| `install-dir`      | Yes      | The directory to install JSON-Fortran to.                                                              | `${{ runner.temp }}/pkg/json-fortran`   |
+| `working-dir`      | Yes      | The directory to work in.                                                                              | `${{ runner.temp }}/build/json-fortran` |
+| `os`               | Yes      | The operating system to use for building JSON-Fortran. Which should allow the use of matrix workflows. | `runner.os`                             |
+| `compiler`         | Yes      | The compiler to use for building JSON-Fortran. The compiler should be available in the PATH.           | `gfortran`.                             |
+| `compiler-options` | Yes      | The compiler options to use for building JSON-Fortran.                                                 | `-O3`                                   |
+| `build-options`    | Yes      | The build options to use for building JSON-Fortran.                                                    | `--parallel=$(nproc)`.                  |
+| `version`          | Yes      | The version of JSON-Fortran to build.                                                                  | `8.3.0`.                                |
 
 ## Outputs
 

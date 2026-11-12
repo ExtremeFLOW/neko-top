@@ -1,12 +1,10 @@
 ## List of examples {#examples-list}
 
 1. \subpage easy-E
-2. \subpage power-iterations
-3. \subpage rugby-ball
-4. \subpage rugby-verification
-5. \subpage brinkman-parameters
-6. \subpage passive-scalar
-7. \subpage beam
-8. \subpage mma
-9. \subpage static-mixers
-10. \subpage unsteady-rugby-ball
+2. \subpage rugby-ball
+3. \subpage brinkman-parameters
+4. \subpage passive-scalar
+5. \subpage beam
+6. \subpage mma
+7. \subpage static-mixers
+8. \subpage unsteady-rugby-ball
