@@ -74,9 +74,16 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         REPO: https://github.com/jacobwilliams/json-fortran.git
       run: |
-        # Get the GIT sha for the current commit
-        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="json-fortran-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        # Resolve the version (branch or tag) to a commit. The version keeps
+        # the key readable, the SHA invalidates the cache when the ref moves.
+        SHA=$(git ls-remote $REPO "refs/heads/$VERSION" "refs/tags/$VERSION" \
+          | awk 'NR==1 {print $1}')
+        if [ -z "$SHA" ]; then
+          echo "Could not resolve version '$VERSION' in $REPO" >&2
+          exit 1
+        fi
+        OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
+        key="json-fortran-$VERSION-${SHA:0:7}-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
