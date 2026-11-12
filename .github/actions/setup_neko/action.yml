@@ -11,12 +11,12 @@ inputs:
   install-dir:
     description: "The directory to install the Neko library."
     required: false
-    default: "/home/runner/pkg/neko"
+    default: "${{ runner.temp }}/pkg/neko"
 
   working-dir:
     description: "The directory to work in when compiling Neko."
     required: false
-    default: "/home/runner/tmp/neko"
+    default: "${{ runner.temp }}/build/neko"
 
   json-fortran-version:
     description: "The version of the JSON-Fortran library to use."
@@ -109,13 +109,24 @@ runs:
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
-        HDF5_ROOT: ${{ inputs.hdf5-root }}
+        JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
+        JSON_FORTRAN_VERSION: ${{ inputs.json-fortran-version }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
+        PARMETIS_VERSION: ${{ inputs.parmetis-version }}
+        HDF5_ROOT: ${{ inputs.hdf5-root }}
+        HDF5_VERSION: ${{ inputs.hdf5-version }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
-        # Get the GIT sha for the current commit
-        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key=neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}
+        # Resolve the version (branch or tag) to a commit. The version keeps
+        # the key readable, the SHA invalidates the cache when the ref moves.
+        SHA=$(git ls-remote $REPO "refs/heads/$VERSION" "refs/tags/$VERSION" \
+          | awk 'NR==1 {print $1}')
+        if [ -z "$SHA" ]; then
+          echo "Could not resolve version '$VERSION' in $REPO" >&2
+          exit 1
+        fi
+        OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
+        key="neko-$VERSION-${SHA:0:7}-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
         [ -n "$JSON_FORTRAN_DIR" ] && key="$key-json-fortran-$JSON_FORTRAN_VERSION"
@@ -137,7 +148,7 @@ runs:
       if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt install autotools-dev automake autoconf openmpi-bin \
+        sudo apt-get install -y autotools-dev automake autoconf openmpi-bin \
           pkg-config liblapack-dev libopenblas-dev libopenmpi-dev
 
     # ------------------------------------------------------------------------ #
@@ -195,6 +206,15 @@ runs:
     # Cleanup and outputs
     #
     # This step cleans up the working directory and sets the output.
+
+    # Only the installation is cached and used afterwards; remove the sources
+    # and build tree to free disk space on the runner.
+    - name: Cleanup
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: rm -rf "$WORKING_DIR"
 
     - name: Set output
       id: set-output

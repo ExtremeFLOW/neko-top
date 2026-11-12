@@ -39,6 +39,19 @@
    fun:__comm_MOD_comm_init
 }
 
+# OpenMPI 5 (e.g. Ubuntu 26.04) removed ORTE and calls the MCA frameworks,
+# PMIx and the UCX transports through ompi_mpi_instance_init, so the OpenMPI 4
+# entries above do not match. Everything allocated while MPI_Init runs is owned
+# by the MPI runtime. The entry ends at ompi_mpi_init (not comm_init) so stacks
+# truncated by --num-callers still match.
+{
+   openmpi5_mpi_init
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:ompi_mpi_init
+}
+
 {
    openmpi_mca_framework_open
    Memcheck:Leak

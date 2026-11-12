@@ -3,15 +3,17 @@
 # This workflow checks the linting of the Fortran source files in the
 # repository. It uses the `flint` linting tool.
 # The workflow is split into multiple jobs:
-# - Score develop branch: Computes a linting score for the develop branch.
+# - Score base: Computes a linting score for the base of the changes, i.e. the
+#   base branch of the pull request or merge group, the previous commit of a
+#   push, or develop for other events.
 # - Score current branch: Computes a linting score for the current branch.
-# - Check scores: Checks if the current branch has a lower score than the develop branch.
+# - Check scores: Checks if the current branch has a lower score than the base.
 # - Lint changes: Runs the flint linter on the changed Fortran files and
 #   provides suggestions for improvements.
 # - Create badge: Creates a badge for the flint score.
 #
 # The workflow will fail if the current branch has a lower score than the
-# develop branch.
+# base, when Fortran files have changed.
 
 name: Linting
 
@@ -19,43 +21,59 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+# The directories scored on both branches. The check compares the two average
+# scores, so both jobs must score the same directories.
+env:
+  LINT_PATHS: sources/ examples/ tests/
+
 jobs:
-  score-develop:
-    name: Score develop branch
+  score-base:
+    name: Score base
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       score: ${{ steps.save-score.outputs.score }}
 
     steps:
-      - name: Checkout develop branch
-        uses: actions/checkout@v6
+      - name: Checkout the base
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
-          ref: develop
+          ref: >-
+            ${{ github.event.pull_request.base.sha
+            || github.event.merge_group.base_sha
+            || github.event.before
+            || 'develop' }}
 
       - name: Run flint
         id: lint
         uses: ./.github/actions/flint
         with:
-          path: sources/ examples/ tests/
+          path: ${{ env.LINT_PATHS }}
           depth: 10
           rc-file: flinter_rc.yml
 
       - name: Save the score
         id: save-score
+        env:
+          SCORE: ${{ steps.lint.outputs.score }}
         run: |
-          echo "Develop score=${{ steps.lint.outputs.score }}"
-          echo "score=${{ steps.lint.outputs.score }}" >> $GITHUB_OUTPUT
+          echo "Base score=$SCORE"
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
 
   score-current:
     name: Score current branch
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     outputs:
       score: ${{ steps.save-score.outputs.score }}
 
     steps:
       - name: Checkout current branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -63,37 +81,48 @@ jobs:
         id: lint
         uses: ./.github/actions/flint
         with:
-          path: sources/ tests/
+          path: ${{ env.LINT_PATHS }}
           depth: 10
           rc-file: flinter_rc.yml
 
       - name: Save the score
         id: save-score
+        env:
+          SCORE: ${{ steps.lint.outputs.score }}
         run: |
-          echo "Current score=${{ steps.lint.outputs.score }}"
-          echo "score=${{ steps.lint.outputs.score }}" >> $GITHUB_OUTPUT
+          echo "Current score=$SCORE"
+          echo "score=$SCORE" >> "$GITHUB_OUTPUT"
 
   check-scores:
     name: Check scores
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     needs:
       - score-current
-      - score-develop
+      - score-base
 
     steps:
+      # The full history is needed to find the changes since the base commit.
       - name: Checkout current branch
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-      # Check if the current branch has a lower score than the develop branch.
-      # If the score is lower, the linting has failed and we require improvements.
+      - name: Get changed files
+        id: changed
+        uses: ./.github/actions/changed_fortran_files
+
+      # Check if the current branch has a lower score than its base. If the
+      # score is lower, the linting has failed and we require improvements.
       - name: Check the scores
         id: check-score
         env:
-          develop_score: ${{ needs.score-develop.outputs.score }}
+          base_score: ${{ needs.score-base.outputs.score }}
           current_score: ${{ needs.score-current.outputs.score }}
+          changed_files: ${{ steps.changed.outputs.files }}
         run: |
-          if [ -z "$develop_score" ]; then
-            echo "Develop score not set: '$develop_score'" >&2
+          if [ -z "$base_score" ]; then
+            echo "Base score not set: '$base_score'" >&2
             exit 1
           fi
           if [ -z "$current_score" ]; then
@@ -101,23 +130,14 @@ jobs:
             exit 1
           fi
 
-          # Check if any changes have been made to the Fortran files.
-          git fetch --unshallow origin develop
-          changes=($(git diff --name-only --diff-filter=d origin/develop))
-          fortran_changed=false
-          for file in ${changes[@]}; do
-            if [[ ${file: -4} == ".f90" || ${file: -4} == ".F90" ]]; then
-              fortran_changed=true
-            fi
-          done
-
-          if [ "$fortran_changed" == "false" ]; then
+          if [ -z "$changed_files" ]; then
             echo "No changes detected in Fortran files."
             exit 0
           fi
 
-          if (($(echo "$current_score < $develop_score" | bc -l))); then
-            echo "Linting failed, the score is lower than the develop branch."
+          if (($(echo "$current_score < $base_score" | bc -l))); then
+            echo "Linting failed, the score is lower than the base" \
+              "($current_score < $base_score)."
             echo "Please improve linting by applying suggestions."
             exit 2
           fi
@@ -127,43 +147,37 @@ jobs:
   lint-changes:
     name: Suggest improvements
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     needs:
       - score-current
-      - score-develop
+      - score-base
+    env:
+      # Provides pkg_resources for flinter, see requirements-flint.txt.
+      PYTHONPATH: ${{ github.workspace }}/.github/actions/flint/compat
 
     steps:
+      # The full history is needed to find the changes since the base commit.
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Setup env.
         run: |
           sudo apt-get update
           sudo apt-get install -yq bc python3-dev python3-pip python3-tk
-          pip install flinter nobvisual
+          pip install -r .github/actions/flint/requirements-flint.txt
 
-        # Get a list of the changed files and store them for later use.
       - name: Get changed files
-        id: get-changed-files
-        run: |
-          git fetch --unshallow origin develop
-          changes=($(git diff --name-only --diff-filter=d origin/develop))
+        id: changed
+        uses: ./.github/actions/changed_fortran_files
 
-          printf "Detected fortran changes:\n"
-          for file in ${changes[@]}; do
-            if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
-              continue
-            fi
-            printf "\t- $file\n"
-          done
-
-          echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
-
+      # File lists are passed through the environment, as file names come
+      # from the pull request and must not be interpreted as shell code.
       - name: Lint changed files
         id: lint-changes
         env:
-          changed_files: ${{ steps.get-changed-files.outputs.changed-files }}
+          changed_files: ${{ steps.changed.outputs.files }}
         run: |
           if [ -z "$changed_files" ]; then
             echo "No fortran files changed"
@@ -172,24 +186,24 @@ jobs:
 
           failed_files=()
           printf "Linting files:\n"
-          for file in $changed_files; do
-
-            # If the file is not a Fortran file, skip it.
-            if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
-              continue
-            fi
-
-            printf "\t- $file"
-            score=$(flint score -r flinter_rc.yml $(realpath $file) 2> /dev/null |
-                  grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
-            printf ": $score\n"
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            score=$(flint score -r flinter_rc.yml "$(realpath "$file")" \
+              2> /dev/null | grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
+            printf '\t- %s: %s\n' "$file" "$score"
 
             if (($(echo "$score < 10" | bc -l))); then
-                failed_files+=($file)
+              failed_files+=("$file")
             fi
-          done
+          done <<< "$changed_files"
 
-          echo "failed-files=${failed_files[@]}" >> $GITHUB_OUTPUT
+          {
+            echo "failed-files<<EOF"
+            if [ ${#failed_files[@]} -gt 0 ]; then
+              printf '%s\n' "${failed_files[@]}"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Print possible improvements
         if: ${{ steps.lint-changes.outputs.failed-files != '' }}
@@ -197,59 +211,26 @@ jobs:
           failed_files: ${{ steps.lint-changes.outputs.failed-files }}
         run: |
           printf "Files that can be improved:\n" | tee linter-report.txt
-          for file in ${failed_files[@]}; do
-            printf "\t- $file\n" | tee -a linter-report.txt
-          done
+          while IFS= read -r file; do
+            printf '\t- %s\n' "$file" | tee -a linter-report.txt
+          done <<< "$failed_files"
 
-          if [ ${#failed_files[@]} -gt 0 ]; then
-            for file in ${failed_files[@]}; do
-              report=$(flint lint -r flinter_rc.yml $file)
-              if [ -z "$report" ]; then
-                report=$(flint stats -r flinter_rc.yml $file)
-              fi
+          while IFS= read -r file; do
+            report=$(flint lint -r flinter_rc.yml "$file")
+            if [ -z "$report" ]; then
+              report=$(flint stats -r flinter_rc.yml "$file")
+            fi
 
-              printf "%.s-" {1..80} | tee -a linter-report.txt
-              printf "\n" | tee -a linter-report.txt
-              printf "Linting improvements for \n\t$file\n\n" | tee -a linter-report.txt
-              echo "$report" | tee -a linter-report.txt
-            done
-          fi
+            printf "%.s-" {1..80} | tee -a linter-report.txt
+            printf "\n" | tee -a linter-report.txt
+            printf 'Linting improvements for \n\t%s\n\n' "$file" |
+              tee -a linter-report.txt
+            echo "$report" | tee -a linter-report.txt
+          done <<< "$failed_files"
 
       - name: Save linter report
         uses: actions/upload-artifact@v7
         with:
           name: linter-report
           path: linter-report.txt
-          if-no-files-found: ignore
-
-  # Create a badge for the flint score
-  create-badge-lint:
-    name: Create badge
-    runs-on: ubuntu-latest
-    needs:
-      - score-current
-      - score-develop
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup env.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -yq python3-pip
-          pip install anybadge
-
-      - name: Create badge
-        env:
-          score: ${{ needs.score-current.outputs.score }}
-        run: |
-          mkdir -p doc/media
-          anybadge -l Flint -o --file=doc/media/lint-badge.svg -v $score 9.0=red 9.9=yellow 10=green
-
-      - name: Save artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: lint-badge
-          path: doc/media/lint-badge.svg
           if-no-files-found: ignore

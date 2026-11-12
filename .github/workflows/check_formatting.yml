@@ -10,19 +10,24 @@ on:
   workflow_call:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   check-formatting:
     name: Check formatting of changed files
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       # ---------------------------------------------------------------------- #
       # Checkout the repository and setup the environment
       # ---------------------------------------------------------------------- #
 
+      # The full history is needed to find the changes since the base commit.
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Python cache
         uses: actions/setup-python@v6
@@ -40,33 +45,33 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Get changed files
-        id: get-changed-files
-        run: |
-          git fetch --unshallow origin develop
-          changes=($(git diff --name-only --diff-filter=d origin/develop))
-          echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
+        id: changed
+        uses: ./.github/actions/changed_fortran_files
 
       # ---------------------------------------------------------------------- #
       # Format the changed source files and check for changes
       # ---------------------------------------------------------------------- #
 
+      # The file list is passed through the environment, as file names come
+      # from the pull request and must not be interpreted as shell code.
       - name: Format sources
+        env:
+          FILES: ${{ steps.changed.outputs.files }}
         run: |
-          for file in ${{ steps.get-changed-files.outputs.changed-files }}; do
-            if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
-              continue
-            fi
-            findent -Rr -i2 -d3 -f3 -s3 -c3 -w3 -t3 -j3 -k5 --ws_remred --openmp=0 < $file > $file.tmp
-            mv -f $file.tmp $file
-          done
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            findent -Rr -i2 -d3 -f3 -s3 -c3 -w3 -t3 -j3 -k5 --ws_remred \
+              --openmp=0 < "$file" > "$file.tmp"
+            mv -f "$file.tmp" "$file"
+          done <<< "$FILES"
 
       - name: Check format
         run: |
-          if [[ $(git diff --exit-code) ]]; then
+          if ! git diff --quiet; then
             echo "The formatting of the source files is incorrect." >&2
             echo "" >&2
             echo "Please run the following commands to fix the formatting:" >&2
-            echo "pip install findent" >&2
+            echo "pip install -r .github/workflows/extra/requirements-formatting.txt" >&2
             echo "findent -Rr -i2 -d3 -f3 -s3 -c3 -w3 -t3 -j3 -k5 --ws_remred --openmp=0 <file.f90 >file.f90.tmp" >&2
             echo "mv file.f90.tmp file.f90" >&2
             git diff >&2
