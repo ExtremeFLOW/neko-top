@@ -130,8 +130,6 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
 
       # ubuntu-latest moves between releases, so derive the actual release
       # for distribution-specific package repositories.
@@ -181,9 +179,9 @@ jobs:
           # Following the instructions from https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html
 
           wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/$CODENAME/
-          sudo apt install ./amdgpu-install_*.deb
-          sudo apt update
-          sudo apt install -y rocm-dev hipblas-dev hipsolver-dev
+          sudo apt-get install -y ./amdgpu-install_*.deb
+          sudo apt-get update
+          sudo apt-get install -y rocm-dev hipblas-dev hipsolver-dev
           # Drop the downloaded packages to free disk space.
           sudo apt-get clean
           rm -f amdgpu-install_*.deb

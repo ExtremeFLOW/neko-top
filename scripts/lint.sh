@@ -3,6 +3,10 @@
 MAIN_DIR=$(realpath -m "$(dirname "$0")/../")
 OPT=$MAIN_DIR/flinter_rc.yml
 
+# flinter needs pkg_resources, which setuptools no longer provides. Use the
+# stand-in from the CI setup (see .github/actions/flint/requirements-flint.txt).
+export PYTHONPATH="$MAIN_DIR/.github/actions/flint/compat${PYTHONPATH:+:$PYTHONPATH}"
+
 # Check if the flint command is available
 if ! command -v flint &>/dev/null; then
     echo "Flint could not be found. Please install it first."

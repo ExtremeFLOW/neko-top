@@ -98,7 +98,7 @@ runs:
       # if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt install openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
+        sudo apt-get install -y openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the GSLib library.
