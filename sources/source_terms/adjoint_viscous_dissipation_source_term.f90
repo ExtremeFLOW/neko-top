@@ -35,9 +35,10 @@
 !> Implements the `adjoint_viscous_dissipation_source_term_t` type.
 !
 !
-! If the objective function $\frac{\mu}{2} \int |\nabla u|^2$, the
+! If the objective function is $\frac{\mu}{2} \int_M |\nabla u|^2$, the
 ! corresponding adjoint forcing is
-! $ \mu \int \nabla v \cdot \nabla u $ in weak form.
+! $ \mu \int_M \nabla v \cdot \nabla u $ in weak form, where $M$ is the
+! masked region, or the whole domain if there is no mask.
 module adjoint_viscous_dissipation_source_term
   use num_types, only: rp
   use field_list, only: field_list_t
@@ -57,20 +58,21 @@ module adjoint_viscous_dissipation_source_term
   use num_types, only: rp
   use field, only: field_t
   use registry, only: neko_registry
-  use math, only: rzero, copy, chsign, cfill, invcol2
+  use math, only: rzero, copy, chsign, cfill, invcol2, abscmp
   use device_math, only: device_copy, device_cmult, device_cfill, device_invcol2
   use neko_config, only: NEKO_BCKND_DEVICE
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   use ax_product, only : ax_t, ax_helm_allocator
+  use operators, only: grad, cdtp
 
   implicit none
   private
   public :: adjoint_viscous_dissipation_source_term_allocate
 
   !> An adjoint source term for objectives of viscous dissipation
-  ! $\int \nabla v \cdot \nabla u $
+  ! $\int_M \nabla v \cdot \nabla u $
   type, public, extends(source_term_t) :: &
        adjoint_viscous_dissipation_source_term_t
      !> u of the primal
@@ -81,7 +83,10 @@ module adjoint_viscous_dissipation_source_term
      type(field_t), pointer :: w => null()
      !> a scale for the source term
      real(kind=rp) :: obj_scale
-     !> A mask for where the source term is evaluated
+     !> Scale of the forcing, owned by the objective. Zero switches the
+     !! forcing off.
+     real(kind=rp), pointer :: scale => null()
+     !> A mask for the region the objective is integrated over
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
@@ -144,9 +149,10 @@ contains
   !! @param volume volume of the objective domain.
   !! @param start_time when to start applying the source term.
   !! @param end_time when to stop applying the source term.
+  !! @param scale scale of the forcing, owned by the objective.
   subroutine adjoint_viscous_dissipation_source_term_init_from_components( &
        this, f_x, f_y, f_z, u, v, w, obj_scale, mask, if_mask, coef, &
-       volume, start_time, end_time)
+       volume, start_time, end_time, scale)
     class(adjoint_viscous_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_t), intent(in), target :: u, v, w
@@ -157,6 +163,7 @@ contains
     real(kind=rp), intent(in) :: volume
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
+    real(kind=rp), pointer, intent(in) :: scale
 
     type(field_list_t) :: fields
 
@@ -178,6 +185,7 @@ contains
     this%w => w
 
     this%obj_scale = obj_scale
+    this%scale => scale
     this%volume = volume
 
     this%if_mask = if_mask
@@ -199,6 +207,7 @@ contains
     nullify(this%v)
     nullify(this%w)
     nullify(this%mask)
+    nullify(this%scale)
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
@@ -216,6 +225,9 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
     integer n
+
+    ! Off outside the objective's time window
+    if (abscmp(this%scale, 0.0_rp)) return
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
@@ -242,10 +254,18 @@ contains
       end if
       coef%ifh2 = .false.
 
+      ! With a mask, the weak Laplacian must be integrated over the masked
+      ! region only. Masking the full weak Laplacian instead would drop the
+      ! flux through the mask boundary on the elements that boundary cuts.
+
       ! ------------------------------------------------------------------------
       ! u
 
-      call this%Ax%compute(work%x, u%x, coef, coef%msh, coef%xh)
+      if (this%if_mask) then
+         call masked_weak_laplacian(work, u, this%mask, coef)
+      else
+         call this%Ax%compute(work%x, u%x, coef, coef%msh, coef%xh)
+      end if
 
       ! pre-divide out the mass matrix to counteract it's multiplication
       if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -254,18 +274,18 @@ contains
          call invcol2(work%x, coef%B, work%size())
       end if
 
-      ! mask
-      if (this%if_mask) then
-         call mask_exterior_const(work, this%mask, 0.0_rp)
-      end if
-
       ! add to RHS
-      call field_add2s2(fu, work, this%obj_scale / this%volume)
+      call field_add2s2(fu, work, &
+           this%scale * this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! v
 
-      call this%Ax%compute(work%x, v%x, coef, coef%msh, coef%xh)
+      if (this%if_mask) then
+         call masked_weak_laplacian(work, v, this%mask, coef)
+      else
+         call this%Ax%compute(work%x, v%x, coef, coef%msh, coef%xh)
+      end if
 
       ! pre-divide out the mass matrix to counteract it's multiplication
       if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -274,18 +294,18 @@ contains
          call invcol2(work%x, coef%B, work%size())
       end if
 
-      ! mask
-      if (this%if_mask) then
-         call mask_exterior_const(work, this%mask, 0.0_rp)
-      end if
-
       ! add to RHS
-      call field_add2s2(fv, work, this%obj_scale / this%volume)
+      call field_add2s2(fv, work, &
+           this%scale * this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! w
 
-      call this%Ax%compute(work%x, w%x, coef, coef%msh, coef%xh)
+      if (this%if_mask) then
+         call masked_weak_laplacian(work, w, this%mask, coef)
+      else
+         call this%Ax%compute(work%x, w%x, coef, coef%msh, coef%xh)
+      end if
 
       ! pre-divide out the mass matrix to counteract it's multiplication
       if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -294,18 +314,59 @@ contains
          call invcol2(work%x, coef%B, work%size())
       end if
 
-      ! mask
-      if (this%if_mask) then
-         call mask_exterior_const(work, this%mask, 0.0_rp)
-      end if
-
       ! add to RHS
-      call field_add2s2(fw, work, this%obj_scale / this%volume)
+      call field_add2s2(fw, work, &
+           this%scale * this%obj_scale / this%volume)
 
       call neko_scratch_registry%relinquish_field(temp_indices)
 
     end associate
 
   end subroutine adjoint_viscous_dissipation_source_term_compute
+
+  !> Computes the weak Laplacian integrated over a masked region,
+  !! \f$ \sum_i D_i^T I_M B D_i c \f$, element by element and unassembled.
+  !! @details \f$ D_i \f$ is the derivative in direction \f$ i \f$, \f$ B \f$
+  !! the mass matrix and \f$ I_M \f$ zeroes the nodes outside the mask. This
+  !! is the gradient of \f$ \frac{1}{2} \sum_{k \in M} B_k |\nabla c|_k^2 \f$,
+  !! the masked integral the objective evaluates. On the elements the mask
+  !! boundary cuts, it differs from the masked full weak Laplacian
+  !! \f$ I_M \sum_i D_i^T B D_i c \f$ by the flux through that boundary.
+  !! @param res The result.
+  !! @param c The field the operator is applied to.
+  !! @param mask The masked region.
+  !! @param coef The SEM coefficients.
+  subroutine masked_weak_laplacian(res, c, mask, coef)
+    type(field_t), intent(inout) :: res
+    type(field_t), intent(in) :: c
+    class(point_zone_t), intent(inout) :: mask
+    type(coef_t), intent(in) :: coef
+    type(field_t), pointer :: dcdx, dcdy, dcdz, work
+    integer :: temp_indices(4)
+
+    call neko_scratch_registry%request_field(dcdx, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(dcdy, temp_indices(2), .false.)
+    call neko_scratch_registry%request_field(dcdz, temp_indices(3), .false.)
+    call neko_scratch_registry%request_field(work, temp_indices(4), .false.)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call grad(dcdx%x_d, dcdy%x_d, dcdz%x_d, c%x_d, coef)
+    else
+       call grad(dcdx%x, dcdy%x, dcdz%x, c%x, coef)
+    end if
+
+    call mask_exterior_const(dcdx, mask, 0.0_rp)
+    call mask_exterior_const(dcdy, mask, 0.0_rp)
+    call mask_exterior_const(dcdz, mask, 0.0_rp)
+
+    call cdtp(res%x, dcdx%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
+    call cdtp(work%x, dcdy%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
+    call field_add2(res, work)
+    call cdtp(work%x, dcdz%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
+    call field_add2(res, work)
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+  end subroutine masked_weak_laplacian
 
 end module adjoint_viscous_dissipation_source_term

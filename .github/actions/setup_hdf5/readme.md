@@ -6,20 +6,20 @@ compiler. The action will also cache the build to speed up future builds.
 
 ## Inputs
 
-| Name               | Optional | Description                                                                                    | Default                 |
-| ------------------ | -------- | ---------------------------------------------------------------------------------------------- | ----------------------- |
-| `install-dir`      | Yes      | The directory to install HDF5 to.                                                              | `/home/runner/pkg/hdf5` |
-| `working-dir`      | Yes      | The directory to work in.                                                                      | `/home/runner/tmp/hdf5` |
-| `os`               | Yes      | The operating system to use for building HDF5. Which should allow the use of matrix workflows. | `runner.os`             |
-| `compiler`         | Yes      | The compiler to use for building HDF5. The compiler should be available in the PATH.           | `gfortran`.             |
-| `compiler-options` | Yes      | The compiler options to use for building HDF5.                                                 | `-O3`                   |
-| `build-options`    | Yes      | The build options to use for building HDF5.                                                    | `--parallel=$(nproc)`.  |
-| `version`          | Yes      | The version of HDF5 to build.                                                                  | `8.3.0`.                |
+| Name               | Optional | Description                                                                                    | Default                         |
+| ------------------ | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------- |
+| `install-dir`      | Yes      | The directory to install HDF5 to.                                                              | `${{ runner.temp }}/pkg/hdf5`   |
+| `working-dir`      | Yes      | The directory to work in.                                                                      | `${{ runner.temp }}/build/hdf5` |
+| `os`               | Yes      | The operating system to use for building HDF5. Which should allow the use of matrix workflows. | `runner.os`                     |
+| `compiler`         | Yes      | The compiler to use for building HDF5. The compiler should be available in the PATH.           | `gfortran`.                     |
+| `compiler-options` | Yes      | The compiler options to use for building HDF5.                                                 | `-O3`                           |
+| `build-options`    | Yes      | The build options to use for building HDF5.                                                    | `--parallel=$(nproc)`.          |
+| `version`          | Yes      | The version of HDF5 to build.                                                                  | `8.3.0`.                        |
 
 ## Outputs
 
-| Name          | Description                                     |
-| ------------- | ----------------------------------------------- |
+| Name          | Description                             |
+| ------------- | --------------------------------------- |
 | `install-dir` | The directory where HDF5 was installed. |
 
 ## Example usage

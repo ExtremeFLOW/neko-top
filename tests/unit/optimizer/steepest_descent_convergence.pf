@@ -36,7 +36,8 @@ module steepest_descent_convergence
   logical :: initialized_lock = .false.
 
   ! ========================================================================== !
-  ! Inline helpers (kept per-file, not shared, per backlog #88).
+  ! Inline helpers (kept per-file: one helper module compiled into several
+  ! test targets races in parallel builds).
 
   !> Stub design that just stores its values; `update_design` applies an
   !! optional mask in place, the way `brinkman_design_t` applies the

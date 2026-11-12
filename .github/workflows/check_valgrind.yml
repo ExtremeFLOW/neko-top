@@ -21,15 +21,30 @@ on:
         description: "The version of HDF5 to use."
         required: true
         type: string
+      runner-images:
+        description: "JSON list of GitHub-hosted runner images to test on."
+        required: false
+        type: string
+        default: '["ubuntu-24.04", "ubuntu-latest"]'
+
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
 
 jobs:
   valgrind-regression:
-    name: Valgrind regression (CPU)
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(inputs.runner-images) }}
+
+    name: Valgrind regression (CPU) - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup system dependencies
         shell: bash
@@ -65,8 +80,11 @@ jobs:
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          json-fortran-version: ${{ inputs.json-fortran-version }}
           parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
+          parmetis-version: ${{ steps.get-parmetis.outputs.version }}
           hdf5-root: ${{ steps.get-hdf5.outputs.install-dir }}
+          hdf5-version: ${{ inputs.hdf5-version }}
           version: ${{ inputs.neko-version }}
           precision: dp
           compiler: gfortran
@@ -100,7 +118,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: valgrind-regression-logs
+          name: valgrind-regression-logs-${{ matrix.os }}
           path: |
             build/Testing/Temporary/
             build/tests/regression/valgrind/
