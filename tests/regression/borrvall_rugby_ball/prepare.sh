@@ -30,12 +30,19 @@ function help() {
     echo -e "       which is Q1-equivalent; with Neko's much higher-order SEM"
     echo -e "       basis a far coarser N is the expected starting point for"
     echo -e "       a mesh-convergence study."
+    echo -e "       Use a multiple of 10: the design domain's edges at 0.05 and"
+    echo -e "       0.95 then fall where the GLL-node mask gives an area of"
+    echo -e "       exactly 0.81 (measured at polynomial order 5). Other N"
+    echo -e "       (e.g. 14) shift the area, and with it the solid amount the"
+    echo -e "       volume limit allows, by a few percent."
     echo -e ""
     echo -e " Options:"
     echo -e "  -h, --help  Show this help message and exit."
     exit 0
 }
 
+# Default mesh. Keep N a multiple of 10 so that the design-domain mask covers
+# exactly the [0.05, 0.95]^2 area (see help).
 N=20
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then

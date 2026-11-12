@@ -17,6 +17,9 @@
     // the driver's final feasibility check passes. Switching q earlier,
     // while the design is still uniform, leaves the design infeasible for
     // many iterations. See the full case for the parameter mapping.
+    // N = 4 is not a multiple of 10, so the design-domain mask area is not
+    // exactly 0.81 (see prepare.sh); that is fine for a regression test
+    // against a reference made on the same mesh, but not for validation.
     // ======================================================================
     "version": 1.0,
     "case": {
