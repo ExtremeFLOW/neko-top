@@ -132,6 +132,44 @@ adjoint the opposite occurs as the equation for \f$\mathbf{u}^\dagger\f$ depends
 on \f$\phi^\dagger\f$, hence in `neko-top` we first solve for the adjoint scalar
 and then solve for the adjoint velocity.
 
+The underlined coupling term is the transpose of the linearised advection term
+of the primal scalar, so it is dealiased exactly when that advection is: it is
+integrated on the over-integration (Gauss-Legendre) points when
+`case.numerics.dealias` is `true`, and on the GLL points otherwise. Any other
+choice would make the computed sensitivity something other than the gradient of
+the objective, so there is no separate switch for this term: the key
+`case.adjoint_scalar.dealias_coupling_term`, which used to provide one, has been
+removed, and a case file that still sets it is rejected. With
+dealiasing on, the coupling term uses the adjoint fluid's own over-integration
+points, \f$\lfloor 3(N+2)/2 \rfloor\f$ per direction for polynomial order
+\f$N\f$, and ignores `case.numerics.dealiased_polynomial_order`; it is the
+exact transpose only where both quadratures are exact, for example on affine
+elements with `dealiased_polynomial_order` at its default.
+
+### Time levels in the unsteady adjoint {#adjoint-scalar-time-levels}
+
+Restoring primal step \f$i\f$ does not give the adjoint step everything at
+level \f$i\f$: the forward solver advects the scalar of step \f$i-1\f$ with the
+velocity of step \f$i\f$, and advects the scalar of step \f$i\f$ with the
+velocity of step \f$i+1\f$, at every advection time order. Transposing both,
+the adjoint step after restoring step \f$i\f$ advects the adjoint scalar with
+the velocity of step \f$i+1\f$ (kept from before the restore, not the velocity
+just restored), and the underlined coupling term above reads the scalar of step
+\f$i-1\f$, which the checkpoint keeps as the scalar's first time lag for
+exactly this reason (see \ref unsteady_simulation "Unsteady simulations"). The
+adjoint fluid extrapolates the coupling term over adjoint steps the same way
+the forward solver extrapolates the advection over forward steps, rather than
+shifting its level, so the lag is correct at every time order and the term is
+the exact transpose of the forward one at a constant time step; Neko-TOP
+rejects a variable time step on the unsteady path. The rest of the
+accumulated sensitivity is exact under the same condition because of the
+\f$n = 0\f$ term of the discrete sensitivity formula in
+\ref adjoint-time-integration "Time integration" -- the sample pairing
+the run's initial velocity with the adjoint velocity of the first adjoint
+step, \f$\mathbf{u}_1^{\dagger}\f$, which is added once the backward loop
+ends. The steady adjoint has no state recovery and reads the scalar field
+itself rather than a lag.
+
 ### Multiple scalars
 In the case of using multiple scalar transport equations involving multiple
 scalar fields \f$\phi_i(\mathbf{x},t)\f$, the assumption is made that
@@ -188,7 +226,7 @@ of the theory guide. This will tie together all aspects from the mapping, to
 how these terms arise etc. For now we are simply documenting the equations
 being solved.
 
-## Time integration
+## Time integration {#adjoint-time-integration}
 This section summarizes the discrete adjoint for the pressure-correction
 time integration used in `Neko-TOP`. We start from a right-handed Riemann sum
 for the objective,
@@ -256,12 +294,23 @@ With these adjoint variables, the discrete gradient contribution associated
 with an explicit linear operator \f$\chi\f$ is
 \f[
   \mathrm{d}F(\chi,\delta \chi)
-  = -\sum_{n=1}^{N} \int_\Omega \delta \chi\,
-  \mathbf{u}_{n+1}^{\dagger} \mathbf{u}_n \, \mathrm{d}\Omega.
+  = -\sum_{n=0}^{N} \int_\Omega \delta \chi\,
+  \mathbf{u}_{n+1}^{\dagger} \mathbf{u}_n \, \mathrm{d}\Omega,
 \f]
-The order above matches the implementation: solve the implicit adjoint step,
-then the adjoint pressure correction, then form the projection to obtain the
-adjoint velocity used in the sensitivity accumulation.
+where \f$\mathbf{u}_0\f$ is the velocity the forward run started from and
+\f$\mathbf{u}_{N+1}^{\dagger} = \mathbf{0}\f$ is the adjoint's zero terminal
+condition, so the \f$n = N\f$ term is always zero.
+
+The backward loop that solves the implicit adjoint step, then the adjoint
+pressure correction, then forms the projection to recover
+\f$\mathbf{u}_n^{\dagger}\f$, runs for \f$n = N, \ldots, 1\f$ and samples
+the \f$n\f$ term there, pairing the velocity it has just restored,
+\f$\mathbf{u}_n\f$, with the adjoint velocity left over from the previous
+iteration, \f$\mathbf{u}_{n+1}^{\dagger}\f$ (the zero terminal condition on
+the loop's first iteration). That accounts for \f$n = 1, \ldots, N\f$. The
+\f$n = 0\f$ term is sampled once the loop ends, pairing the velocity the
+forward run started from, \f$\mathbf{u}_0\f$, with the adjoint velocity the
+loop has just produced, \f$\mathbf{u}_1^{\dagger}\f$.
 
 ### The curl--curl term {#adjoint-curl-curl}
 The forward pressure equation above contains the curl--curl term

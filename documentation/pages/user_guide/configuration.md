@@ -307,20 +307,21 @@ section of the case file.
 ## Adjoint over-integration (dealiasing) {#configuration-adjoint-dealias}
 
 Several adjoint contributions are evaluated on a higher-order Gauss-Legendre
-space in order to remove the aliasing error of their nonlinear products. Each
-of them is switched independently:
+space in order to remove the aliasing error of their nonlinear products. Four
+of them are switched independently by the keys below. The adjoint
+scalar-velocity coupling term has no key of its own; see
+\ref configuration-adjoint-dealias-coupling "Scalar coupling term" below.
 
 | Key                                                    | Controls                                                                       |
 | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
 | `optimization.design.dealias`                          | The Brinkman source term, in **both** the forward and the adjoint solve.       |
-| `case.adjoint_scalar.dealias_coupling_term`            | The adjoint scalar-velocity coupling term.                                     |
 | `optimization.objectives[i].dealias_forcing`           | The adjoint forcing of a `brinkman_dissipation` objective.                     |
 | `optimization.objectives[i].dealias_sensitivity`       | The sensitivity contribution of a `brinkman_dissipation` objective.            |
 | `optimization.augmented_lagrangian.dealias_sensitivity` | The sensitivity of the augmented Lagrangian objective.                        |
 
 ### Default behaviour {#configuration-adjoint-dealias-default}
 
-**All five keys default to `case.numerics.dealias`**, i.e. the adjoint follows
+**All four keys default to `case.numerics.dealias`**, i.e. the adjoint follows
 whatever the forward problem does. Setting any of the keys explicitly overrides
 that default for that contribution alone. If `case.numerics.dealias` is itself
 absent, the fallback is `true`; on every supported Neko-TOP configuration this
@@ -332,7 +333,7 @@ constructed.
 \note **This is a behavioural change, and it is not limited to the adjoint.**
 These keys previously defaulted to `true` in isolation, regardless of
 `case.numerics.dealias`. A case file which sets `"dealias": false` under
-`case.numerics` and does **not** set any of the five keys above will now
+`case.numerics` and does **not** set any of the four keys above will now
 evaluate the Brinkman source term, the scalar coupling term, the adjoint
 forcing and the sensitivity **without** over-integration, where it previously
 over-integrated all four. `optimization.design.dealias` is read once and
@@ -344,8 +345,13 @@ values, which change too. The change is intentional: the previous defaults
 made it impossible to disable over-integration from the case file alone, and
 forced the adjoint solver to allocate its full Gauss over-integration stack on
 every run. To recover the previous results exactly, set the relevant keys to
-`true` explicitly. Case files which set `case.numerics.dealias` to `true`, or
-which already set the five keys explicitly, are unaffected.
+`true` explicitly; the scalar coupling term can no longer be over-integrated on
+its own (see \ref configuration-adjoint-dealias-coupling "Scalar coupling term"
+below). Case files which set `case.numerics.dealias` to `true`, or which
+already set the four keys explicitly, are unaffected by this default change.
+A case file that still sets the now-removed
+`case.adjoint_scalar.dealias_coupling_term` key is not covered by that: it
+stops with an error instead of running with its old behaviour.
 
 \note The key controlling the augmented Lagrangian sensitivity was previously
 read from the root-level path `adjoint_fluid.dealias_sensitivity`, a sibling of
@@ -353,6 +359,17 @@ read from the root-level path `adjoint_fluid.dealias_sensitivity`, a sibling of
 default. It is now read from
 `optimization.augmented_lagrangian.dealias_sensitivity`. The old path is no
 longer consulted.
+
+### Scalar coupling term {#configuration-adjoint-dealias-coupling}
+
+The term the adjoint scalar adds to the adjoint momentum equation is the
+transpose of the linearised advection of the primal scalar, so it is
+over-integrated exactly when that advection is, that is when
+`case.numerics.dealias` is `true`. Any other choice would make the computed
+sensitivity something other than the gradient of the objective. The key
+`case.adjoint_scalar.dealias_coupling_term`, which used to switch this term
+separately, has therefore been removed, and a case file that still sets it is
+rejected with an error. Delete the key from such a case file.
 
 ## Additional reading {#configuration-additional}
 

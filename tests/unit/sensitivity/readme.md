@@ -98,6 +98,52 @@ Currently, we have added tests for the following components:
   the mask only while its probe stays that close to the boundary. Whenever the
   case or the driver's probe selection changes, confirm again that the test
   fails with the mask removed from `update_sensitivity`.
+- `scalar_mixing_objective_t`, unsteady and unmasked, with `numerics.dealias`
+  set to `false` (`unsteady_scalar_mixing_no_dealias.case`) — 80 time steps of
+  `2.5e-4` at time order 1 and polynomial order 3, the flow starting at
+  `[1, 0, 0]` and a block of scalar starting mostly inside the Brinkman design.
+  The objective sees the design only through the scalar, and over the whole
+  domain its gradient nearly cancels, so any mismatch in the adjoint dominates
+  it. The term the adjoint scalar adds to the adjoint momentum equation is
+  integrated as the primal scalar advection is, here on the GLL points. Forward
+  step `n` advects the scalar of state `n - 1` with the new velocity of state
+  `n`, so the coupling term of the adjoint step after restoring state `m` reads
+  the scalar of state `m - 1`, which the state recovery keeps as the first lag
+  of the scalar, and the adjoint scalar is advected with the velocity of state
+  `m + 1`. The sensitivity also takes the sample of the initial velocity, which
+  the Brinkman force of the first step acts on. The error at the smallest
+  perturbation is `-3.56e-5`, which is first-order truncation (`-3.57e-4` at
+  `1e-3`). The tolerance of `1e-3` lies between that and the errors with a
+  level or the initial-velocity sample wrong: with the coupling term on the
+  restored scalar of state `m` the error was `-6.52e-3`, and without the
+  initial-velocity sample `+3.68e-2`. With the adjoint scalar advected with the
+  restored velocity of state `m` it was `-1.37e-3`, only just above the
+  tolerance; `unsteady_scalar_mixing_levels.case` is the guard for that level.
+- `scalar_mixing_objective_t`, unsteady at time order 3
+  (`unsteady_scalar_mixing_no_dealias_order3.case`) — the same case at time
+  order 3. A scalar step advects the scalar from before the step at every
+  order, and the adjoint's extrapolation of the coupling term is the transpose
+  of the forward extrapolation, not a shift of its level, so the coupling term
+  reads the first lag here too. The error at the smallest perturbation is
+  `-3.51e-5`, first-order truncation (`-3.53e-4` at `1e-3`), and the tolerance
+  is `1e-3`. With the coupling term on the restored scalar of state `m`, as
+  when the lag is read at time order 1 only, the error was `-6.97e-3`. With the
+  lag read but kept with the states at time order 1 only, so that restoring a
+  state leaves it stale, it was `-1.85e-1`. Keep its checkpoint `path` short:
+  one of over about 49 characters stops the run in the initialisation of the
+  state recovery.
+- `scalar_mixing_objective_t`, unsteady from rest
+  (`unsteady_scalar_mixing_levels.case`) — 20 steps of `1e-3` at time order 1
+  and polynomial order 3, without over-integration, the flow starting at rest
+  and the same block of scalar, with 4 states in RAM, so that the adjoint also
+  recomputes states from disk. The initial velocity is zero, so its sample adds
+  nothing, and the case isolates the time levels of the adjoint scalar: the
+  coupling term reads the scalar of state `m - 1` and the adjoint scalar is
+  advected with the velocity of state `m + 1`. The error at the smallest
+  perturbation is `-3.85e-5`, first-order truncation (`-3.83e-4` at `1e-3`),
+  and the tolerance is `1e-4`. With the coupling term on the restored scalar of
+  state `m` the error was `-1.71e-2`, and with the adjoint scalar advected with
+  the restored velocity of state `m` `-4.06e-3`.
 - `brinkman_dissipation_rejection` — checks the invalid mixed-dealias
   configuration directly through Neko's pFUnit error-redirection fixture. A
   mixed setting has no value its sensitivity is the gradient of, so the
@@ -119,12 +165,9 @@ Currently, we have added tests for the following components:
   the cases or the driver's probe selection change, confirm again that both
   fail with the masked full weak Laplacian as the forcing.
 
-`scalar_mixing_objective_t` is not yet covered here (its only existing case,
-`tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
-scalar-scheme fix first). The heavier,
-realistic (~1000-timestep) versions of these and other cases
-(`dissipation`, `dissipation_weights`, unsteady variants) live in
-`tests/regression/sensitivity/` instead — that suite is opt-in
+The heavier, realistic (~1000-timestep) versions of these and other cases
+(`dissipation`, `dissipation_weights`, `passive_scalar`, unsteady variants)
+live in `tests/regression/sensitivity/` instead — that suite is opt-in
 (`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`) and not part of the default/PR-blocking
 test budget, since it's too slow to gate every PR.
 

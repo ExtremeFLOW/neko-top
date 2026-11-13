@@ -284,6 +284,10 @@ contains
                "for unsteady problems")
        end if
 
+       ! The unsteady adjoint couples the adjoint scalar to the scalar from
+       ! before each step, see `adjoint_case_set_coupling_scalar`.
+       call this%adjoint_case%set_coupling_scalar(.true.)
+
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_factory(this%state_recover, this%neko_case, &
             state_recovery_params)
