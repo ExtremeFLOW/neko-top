@@ -40,6 +40,7 @@ submodule (advection_adjoint) advection_adjoint_fctry
   ! Advection and derivatives
   use adv_lin_dealias, only: adv_lin_dealias_t
   use adv_lin_no_dealias, only: adv_lin_no_dealias_t
+  use adv_adjoint_dummy, only: adv_adjoint_dummy_t
 
 contains
 
@@ -56,8 +57,8 @@ contains
   !! @param slag The lagged scalar field. Optional.
   !! This can be used to kill the advection term.
   !! @note The factory both allocates and initializes `object`.
-  module subroutine advection_adjoint_factory(object, json, coef, ulag, vlag, wlag, &
-       dtlag, tlag, time_scheme, use_dummy, slag)
+  module subroutine advection_adjoint_factory(object, json, coef, ulag, vlag, &
+       wlag, dtlag, tlag, time_scheme, use_dummy, slag)
     class(advection_adjoint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout), target :: coef
@@ -78,9 +79,15 @@ contains
        deallocate(object)
     end if
 
+    ! Without primal advection (Stokes flow) the linearised and adjoint
+    ! convection terms vanish, so a zero-valued advection is used.
     if (present(use_dummy)) then
-       if (use_dummy .eqv. .true.) then
-          call neko_error("Dummy advection is not supported in the adjoint module.")
+       if (use_dummy) then
+          allocate(adv_adjoint_dummy_t::object)
+          select type (adv => object)
+          type is (adv_adjoint_dummy_t)
+             call adv%init(coef)
+          end select
           return
        end if
     end if

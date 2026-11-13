@@ -1,0 +1,193 @@
+{
+    // ======================================================================
+    // Fast regression case for borrvall_rugby_ball_regression.
+    //
+    // borrvall_rugby_0p8.case (Borrvall & Petersson 2003, Sec. 4.4,
+    // gamma = 0.8) with only these changes, so that the whole
+    // optimization runs in about a minute on a 4x4 mesh (prepare.sh -N4):
+    //   numerics.polynomial_order  5   -> 3
+    //   RAMP q_iterations          50  -> 16
+    //   solver.max_iterations      100 -> 23
+    // This resolution is far too coarse to reproduce the paper's design;
+    // the case is a regression test of the full chain (Stokes forward and
+    // adjoint solves, Brinkman and viscous objectives, RAMP continuation
+    // from q = 100 to 10 at iteration 17, MMA with the volume constraint),
+    // not a validation. The iteration count is chosen so that the run ends
+    // on a design that satisfies the volume constraint (g = -2.7e-3), so
+    // the driver's final feasibility check passes. Switching q earlier,
+    // while the design is still uniform, leaves the design infeasible for
+    // many iterations. See the full case for the parameter mapping.
+    // N = 4 is not a multiple of 10, so the design-domain mask area is not
+    // exactly 0.81 (see prepare.sh); that is fine for a regression test
+    // against a reference made on the same mesh, but not for validation.
+    // ======================================================================
+    "version": 1.0,
+    "case": {
+        "mesh_file": "box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": true,
+        "time": {
+            // The Brinkman term is explicit: a fully solid design
+            // (chi = 2.5e4) is stable up to dt = 3e-5 and diverges at
+            // 4e-5, so 2e-5 keeps a margin.
+            // Forward solves start from rest and are all steady by t ~ 0.076.
+            // The adjoint always runs to end_time but meets the same rate by
+            // t ~ 0.03. Sensitivities match those with end_time = 0.3.
+            "end_time": 0.105,
+            "timestep": 2e-5
+        },
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 3,
+            "dealias": false
+        },
+        "adjoint_fluid": {
+            // Homogeneous counterpart of the forward velocity BC.
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2, 3, 4 ]
+                }
+            ]
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "mu": 1.0,
+            "rho": 1.0,
+            // Stokes flow, as in the paper; also applies to the adjoint.
+            "advection": false,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-8,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
+            "boundary_conditions": [
+                {
+                    // Unit upward velocity on all four walls (zones 1-4,
+                    // see prepare.sh).
+                    "type": "velocity_value",
+                    "value": [ 0.0, 1.0, 0.0 ],
+                    "zone_indices": [ 1, 2, 3, 4 ]
+                }
+            ],
+            "output_control": "never",
+            "output_value": 10
+        },
+        "simulation_components": [
+            {
+                // tol = 1e-4: tighter values are not reached because the
+                // pressure solver tolerance is 1e-6, and the objective
+                // differs from a tol = 1e-7 run by ~1e-11 (relative).
+                "type": "steady",
+                "tol": 1e-4,
+                "log_frequency": 50,
+                "compute_control": "tsteps",
+                "compute_value": 1
+            }
+        ],
+        "point_zones": [
+            {
+                // Design domain [0.05, 0.95]^2; the strip outside it is
+                // prescribed fluid (paper Fig. 8).
+                "name": "design_domain",
+                "geometry": "box",
+                "x_bounds": [ 0.05, 0.95 ],
+                "y_bounds": [ 0.05, 0.95 ],
+                "z_bounds": [ -10.0, 10.0 ]
+            }
+        ]
+    },
+    "optimization": {
+        "design": {
+            "type": "brinkman",
+            "dealias": false,
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "design_domain"
+            },
+            "mapping": [
+                {
+                    // No filter, as in the paper. q follows the paper's
+                    // continuation q_paper = 0.01 -> 0.1.
+                    "type": "RAMP",
+                    "q": [ 100.0, 10.0 ],
+                    "q_iterations": 16,
+                    "f_min": 2.5e-4,
+                    "f_max": 2.5e4
+                }
+            ],
+            "initial_distribution": {
+                // Start exactly on the volume limit: the strip outside the
+                // design domain is masked to fluid, so this value gives
+                // 1 - gamma absolute solid, i.e. the paper's uniform
+                // rho_paper = gamma.
+                "type": "uniform",
+                "value": 0.24691358024691357
+            }
+        },
+        "solver": {
+            "type": "mma",
+            "max_iterations": 23,
+            // tolerance bounds the MMA KKT residual; the paper's stopping
+            // rule (relative change in J < 1e-5 twice) has no equivalent.
+            "tolerance": 1.0e-6,
+            "mma": {
+                "max_iter": 100,
+                "asyinit": 0.5,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "scale": 1.0,
+                "auto_scale": false,
+                "xmin": 0.0,
+                "xmax": 1.0,
+                "a0": 1.0,
+                "a": 0.0,
+                "c": 1000.0,
+                "d": 10.0
+            }
+        },
+        "objectives": [
+            {
+                // The two terms sum to the paper's total dissipated power
+                // over the whole domain.
+                "type": "viscous_dissipation",
+                "weight": 1.0
+            },
+            {
+                "type": "brinkman_dissipation",
+                "weight": 1.0,
+                "dealias_forcing": false,
+                "dealias_sensitivity": false
+            }
+        ],
+        "constraints": [
+            {
+                // Solid fraction >= (1 - gamma) / 0.81, see the header.
+                "type": "volume",
+                "mask_name": "design_domain",
+                "is_max": false,
+                "limit": 0.24691358024691357
+            }
+        ]
+    }
+}

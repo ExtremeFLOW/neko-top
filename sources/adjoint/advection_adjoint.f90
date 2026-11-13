@@ -65,8 +65,8 @@ module advection_adjoint
      !! @param tlag The lagged times.
      !! @param time_scheme The bdf-ext time scheme used in the method.
      !! @param use_dummy If true, a dummy zero-valued advection type is
+     !! allocated. This is used when the primal has no advection term.
      !! @param slag The lagged scalar field.
-     !! allocated. This can be used to kill the advection term.
      !! @note The factory both allocates and initializes `object`.
      module subroutine advection_adjoint_factory(object, json, coef, &
           ulag, vlag, wlag, dtlag, tlag, time_scheme, use_dummy, slag)

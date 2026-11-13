@@ -67,6 +67,10 @@ option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTING "Build the tests" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 
+# Register the validation tests, which reproduce published results and take
+# hours (see tests/regression/borrvall_rugby_ball). Requires BUILD_TESTING.
+option(NEKO_TOP_VALIDATION_TESTS "Register the long validation tests" OFF)
+
 # Enable runtime checks: AUTO (default), ON, or OFF. AUTO enables runtime checks
 # during Debug builds.
 set(NEKO_TOP_RUNTIME_CHECKS "AUTO" CACHE STRING
@@ -255,6 +259,7 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- DEVICE_TYPE:      ${DEVICE_TYPE}")
     message(STATUS "- BUILD_DOCS:       ${BUILD_DOCS}")
     message(STATUS "- BUILD_TESTING:    ${BUILD_TESTING}")
+    message(STATUS "- VALIDATION_TESTS: ${NEKO_TOP_VALIDATION_TESTS}")
     message(STATUS "- BUILD_EXAMPLES:   ${BUILD_EXAMPLES}")
     message(STATUS "")
     message(STATUS "External dependencies:")
