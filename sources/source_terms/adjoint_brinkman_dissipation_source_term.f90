@@ -78,9 +78,6 @@ module adjoint_brinkman_dissipation_source_term
      type(field_t), pointer :: chi => null()
      !> a scale for this term
      real(kind=rp) :: K
-     !> Scale of the forcing, owned by the objective. Zero switches the
-     !! forcing off.
-     real(kind=rp), pointer :: scale => null()
      !> A mask for where the source term is evaluated
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
@@ -152,7 +149,7 @@ contains
   !! @param this The source term.
   !! @param f_x, f_y, f_z the RHS of the adjoint
   !! @param design the design
-  !! @param K a scale
+  !! @param K a scale, the weight of the objective. Must outlive the term.
   !! @param u, v, w the velocity fields of the primal
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
@@ -172,7 +169,7 @@ contains
     class(adjoint_brinkman_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     class(design_t), intent(in), target :: design
-    real(kind=rp), intent(in) :: K
+    real(kind=rp), intent(in), target :: K
     type(field_t), intent(in), target :: u, v, w
     class(point_zone_t), intent(in), pointer :: mask
     logical, intent(in) :: if_mask
@@ -222,7 +219,6 @@ contains
     end select
 
     this%K = K
-    this%scale => scale
     this%if_mask = if_mask
     if (this%if_mask) then
        this%mask => mask
@@ -244,7 +240,6 @@ contains
     nullify(this%GLL_to_GL)
     nullify(this%mask)
     nullify(this%scratch_GL)
-    nullify(this%scale)
 
   end subroutine adjoint_brinkman_dissipation_source_term_free
 

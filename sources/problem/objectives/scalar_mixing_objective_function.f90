@@ -209,7 +209,7 @@ contains
       ! Initialize the scalar mixing adjoint source term
       call this%get_forcing_window(simulation, forcing_start, forcing_end)
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
-           this%get_weight(), this%phi_ref, this%mask, this%has_mask, &
+           this%weight, this%phi_ref, this%mask, this%has_mask, &
            this%coef, forcing_start, forcing_end, this%forcing_scale)
 
     end associate
