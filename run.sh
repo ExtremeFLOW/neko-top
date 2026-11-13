@@ -32,7 +32,7 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
     printf "  -%-1s, --%-10s %-60s\n" "p" "procs" "Number of processors to use."
     printf "  -%-1s, --%-10s %-60s\n" " " "sequential" "Submit the examples sequentially."
-    printf "  -%-1s, --%-10s %-60s\n" " " "njobs" "Number of jobs to submit per example."
+    printf "  -%-1s, --%-10s %-60s\n" " " "nrestart" "Number of restarts for each job."
 
     printf "\n\e[4mEnvironment:\e[0m\n"
     printf "  -%-1s %-60s\n" "NEKO_DIR" "Path to the Neko installation."
@@ -64,10 +64,9 @@ CLUSTER=""
 SEQUENTIAL=false
 DRY=false
 RERUN=false
-N_JOBS=1
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:,njobs:
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:,nrestart:
 OPT=a,c,h,n,s:,d,r,p:
 
 # Parse the inputs for options
@@ -77,19 +76,19 @@ eval set -- "$PARSED"
 # Loop through the options and set the variables
 while true; do
     case "$1" in
-    "-a" | "--all") ALL=true && shift ;;          # Run all examples available
-    "-c" | "--clean") CLEAN=true && shift ;;      # Clean logs
-    "-h" | "--help") help && exit ;;              # Print help
-    "-n" | "--neko") NEKO=true && shift ;;        # Look for example in neko
-    "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
+    "-a" | "--all") ALL=true && shift ;;              # Run all examples available
+    "-c" | "--clean") CLEAN=true && shift ;;          # Clean logs
+    "-h" | "--help") help && exit ;;                  # Print help
+    "-n" | "--neko") NEKO=true && shift ;;            # Look for example in neko
+    "-d" | "--delete") DELETE=true && shift ;;        # Delete previous runs
     "-s" | "--submit") CLUSTER="${2^^}" && shift 2 ;; # Submit to the queue
-    "-r" | "--re-run") RERUN=true && shift ;;     # Re-run the examples
-    "-p" | "--procs") NPROCS="$2" && shift 2 ;;    # Number of processors to use
+    "-r" | "--re-run") RERUN=true && shift ;;         # Re-run the examples
+    "-p" | "--procs") NPROCS="$2" && shift 2 ;;       # Number of processors to use
 
     # Long option with no short option
-    "--dry-run") DRY=true && shift ;;             # Dry run
-    "--sequential") SEQUENTIAL=true && shift ;;   # Submit sequentially
-    "--njobs") N_JOBS="$2" && shift 2 ;;          # Number of jobs to submit per example
+    "--dry-run") DRY=true && shift ;;                       # Dry run
+    "--sequential") SEQUENTIAL=true && shift ;;             # Submit sequentially
+    "--nrestart") export MAX_JOB_REQUEUE="$2" && shift 2 ;; # Number of job restart
 
     # End of options
     "--") shift && break ;;
@@ -126,11 +125,11 @@ if [ -n "$CLUSTER" ]; then
     case "$CLUSTER" in
         "MN5")
             export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$MN5_ACCOUNT}
-            SCHEDULER="slurm"
+            export SCHEDULER="slurm"
             ;;
         "LUMI-C" | "LUMI-G")
             export SBATCH_ACCOUNT=${SBATCH_ACCOUNT:-$LUMI_ACCOUNT}
-            SCHEDULER="slurm"
+            export SCHEDULER="slurm"
             ;;
         *)
             echo "Unknown cluster: $CLUSTER"; exit 1;;
@@ -320,7 +319,7 @@ function Submit() {
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
 
-    case "$SCHEDULER" in
+    case "${SCHEDULER}" in
         "slurm") SubmitSlurm $1 ;;
         "lsf") SubmitLSF $1 ;;
         *) printf >&2 "Unknown submission system.\n" && exit 1 ;;
@@ -330,7 +329,7 @@ function Submit() {
     cd $CURRENT_DIR
 }
 function SubmitLSF() {
-    bsub -J $1 -env "all" <job_script.sh
+    bsub -J $1 -env "all" -Q "37" <job_script.sh
 }
 function SubmitSlurm() {
     if [ "$(squeue -h --name=$1 --account=$SBATCH_ACCOUNT --me | wc -l)" -gt 0 ]; then
@@ -341,20 +340,10 @@ function SubmitSlurm() {
 
     # Serialise duplicate jobs by name, then optionally wait for earlier
     # examples submitted with --sequential.
-    submitted_ids=""
-    DEP="--dependency=singleton"
-    if [[ -n "$SEQ_DEP" ]]; then
-        DEP="$DEP,afterany:$SEQ_DEP"
-    fi
+    id=$(sbatch --parsable $DEP -J "$1" job_script.sh)
 
-    for i in $(seq 1 "$N_JOBS"); do
-        id=$(sbatch --parsable -J "$1" "$DEP" job_script.sh)
-        if [ "$SEQUENTIAL" == true ]; then
-            submitted_ids="${submitted_ids:+$submitted_ids:}$id"
-        fi
-    done
-    if [[ "$SEQUENTIAL" == true && -n "$submitted_ids" ]]; then
-        SEQ_DEP="${SEQ_DEP:+$SEQ_DEP:}$submitted_ids"
+    if [[ "$SEQUENTIAL" == true ]]; then
+        DEP=${DEP:-"--dependency=afterany"}:$id
     fi
 }
 
@@ -462,7 +451,7 @@ for case in ${example_list[@]}; do
 
     # Create symbolic links to the mesh files to avoid copying massive files
     find "$EPATH/$case_dir" -type f -name "*.nmsh" \
-        -exec sh -c 'ln "$1" "$2" || cp "$1" "$2"' sh {} "$log" \;
+        -exec sh -c 'ln "$1" "$2" 2>/dev/null || ln -s "$1" "$2"' sh {} "$log" \;
 
     # Copy the job script to the log folder
     cp -f $SPATH/functions.sh $log/functions.sh

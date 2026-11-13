@@ -4,7 +4,6 @@
 # Define the run function
 
 function run {
-    set +e # Do not exit on error
 
     # Find the case file and define the log file
     casefile=($(find . -maxdepth 1 -name "*.case" -or -name "*.json"))
@@ -16,16 +15,6 @@ function run {
         logfile=$(basename -- ${casefile%.*}).log
     else
         logfile=$(basename -- $(dirname $(realpath $0))).log
-    fi
-
-    # Check for recoverable errors in the error log
-    if [ -s error.log ]; then
-        RECOVERABLE=$(grep "Optimizer stopped after reaching the maximum runtime" \
-            error.log && echo "true" || echo "")
-        if [ "$RECOVERABLE" != true ]; then
-            printf >&2 "ERROR: Previous run failed with unrecoverable errors.\n"
-            return 1
-        fi
     fi
 
     if [[ -f "$logfile" || -s error.log ]] || \
@@ -80,11 +69,11 @@ function run {
 
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
-        if [ ! -z "$NPROCS" ]; then
+        if [ -n "$NPROCS" ]; then
             ncores=$NPROCS
-        elif [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
+        elif [ -n "$CUDA_VISIBLE_DEVICES" ]; then
             ncores=$(echo $CUDA_VISIBLE_DEVICES | tr "," "\n" | wc -l)
-        elif [ ! -z "$LSB_DJOB_NUMPROC" ]; then
+        elif [ -n "$LSB_DJOB_NUMPROC" ]; then
             ncores=$LSB_DJOB_NUMPROC
         else
             nsockets="$(lscpu | grep "Socket(s)" | awk '{print $2}')"
@@ -92,28 +81,37 @@ function run {
             ncores=$((nsockets * ncores))
         fi
 
-        if [ -z "$ncores" ]; then
-            ncores=1
-        fi
-
-        mpirun --tag-output -n $ncores $neko $casefile 2>error.log
-
-        # Remove all lines printed from mpi rank > 0 and remove the mpi tag
-        sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
-        sed -i 's/\[1,0\]<stderr>://g' error.log
-
+        mpirun -n ${ncores:-1} $neko $casefile 2>error.log
     else
         $neko $casefile 2>error.log
-
     fi
     TIME_END=$(date +%s)
 
     # ------------------------------------------------------------------------ #
     # Check for errors and normal end
 
-    if [ -s ./error.log ]; then
-        printf "ERROR: An error occurred during execution.\n"
-        printf "See error.log for details.\n"
+    # Check for recoverable errors in the error log
+    if [[ -s error.log ]]; then
+        RECOVERABLE_LIST=(
+            "Optimizer stopped due to runtime limit"
+        )
+        for string in ${RECOVERABLE_LIST[@]}; do
+            grep -qm 1 "$string" error.log && RECOVERABLE=true
+        done
+
+        if [ "$RECOVERABLE" == true ]; then
+            printf "ERROR: Recoverable error found\n"
+            if [[ "$SCHEDULER" == "slurm" && \
+                  ${SLURM_RESTART_COUNT:-0} -lt ${MAX_JOB_REQUEUE:-0} ]]; then
+                scontrol requeue "$SLURM_JOB_ID"
+                echo "Job have been requeued: ${SLURM_RESTART_COUNT:-0}" \
+                     "/ ${MAX_JOB_REQUEUE:-0}"
+            fi
+            exit 37
+        else
+            printf "ERROR: An error occurred during execution.\n"
+            printf "See error.log for details.\n"
+        fi
         return 1
     fi
 
