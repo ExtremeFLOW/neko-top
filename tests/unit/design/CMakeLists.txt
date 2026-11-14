@@ -11,7 +11,7 @@ set(CMAKE_FOLDER "Tests/Unit/Design")
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/design_3dto1d_write)
 
 add_pfunit_ctest(design_3dto1d_write
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/design_3dto1d_write.pf
+    TEST_SOURCES design_3dto1d_write.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/design_3dto1d_write
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 2
