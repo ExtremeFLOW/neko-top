@@ -1,0 +1,238 @@
+!> Unit tests for an MMA solve with a rank that owns no design variables.
+!!
+!! The ranks of MMA only couple through global reductions, so a rank without
+!! design variables takes part in those and has nothing else to compute. It
+!! must not launch a device grid of zero blocks, and the cpu backend must not
+!! reference the unallocated host arrays of its empty vectors. The tests run
+!! a few MMA iterations of one problem with every design variable on rank 0,
+!! then on rank 1, and then spread over both ranks. The first two runs must
+!! agree exactly, since adding the zero contributions of an empty rank is
+!! exact, and both must agree with the third to round-off.
+module mma_empty_rank
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use neko, only: neko_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use comm, only: NEKO_COMM, pe_rank, MPI_REAL_PRECISION
+  use mma, only: mma_t
+  use vector, only: vector_t
+  use matrix, only: matrix_t
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_mma_empty_rank_case
+   contains
+     procedure :: setUp
+  end type test_mma_empty_rank_case
+
+  logical :: initialized = .false.
+
+  !> Number of design variables over both ranks.
+  integer, parameter :: n_global = 6
+  !> Number of constraints.
+  integer, parameter :: m = 2
+  !> Number of MMA iterations, enough to update the asymptotes from the
+  !! previous designs.
+  integer, parameter :: n_iter = 6
+  !> Tolerance for the agreement with the design spread over both ranks.
+  real(kind=rp), parameter :: tol = 1.0e-10_rp
+
+contains
+
+  subroutine setUp(this)
+    class(test_mma_empty_rank_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  ! ========================================================================== !
+  ! The tests
+
+  @test(npes=[2])
+  subroutine dip_empty_rank(this)
+    class(test_mma_empty_rank_case), intent(inout) :: this
+
+    call check_empty_rank('dip', 'cpu')
+
+  end subroutine dip_empty_rank
+
+  @test(npes=[2])
+  subroutine pdip_empty_rank(this)
+    class(test_mma_empty_rank_case), intent(inout) :: this
+
+    call check_empty_rank('pdip', 'cpu')
+
+  end subroutine pdip_empty_rank
+
+  ! The device backend exists in a device build only, so these two pass
+  ! without checking anything in a CPU build
+
+  @test(npes=[2])
+  subroutine dip_empty_rank_device(this)
+    class(test_mma_empty_rank_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    call check_empty_rank('dip', 'device')
+
+  end subroutine dip_empty_rank_device
+
+  @test(npes=[2])
+  subroutine pdip_empty_rank_device(this)
+    class(test_mma_empty_rank_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    call check_empty_rank('pdip', 'device')
+
+  end subroutine pdip_empty_rank_device
+
+  ! ========================================================================== !
+  ! Helpers
+
+  !> Run the same MMA iterations with every design variable on rank 0, on
+  !! rank 1, and spread over both ranks, and compare the final designs and
+  !! KKT residuals.
+  !! @param subsolver The MMA subsolver, 'dip' or 'pdip'.
+  !! @param bcknd The MMA backend, 'cpu' or 'device'.
+  subroutine check_empty_rank(subsolver, bcknd)
+    character(len=*), intent(in) :: subsolver, bcknd
+    real(kind=rp), dimension(n_global) :: x_first, x_second, x_spread
+    real(kind=rp), dimension(2) :: kkt_first, kkt_second, kkt_spread
+    real(kind=rp) :: diff_x, diff_kkt, diff_x_spread, diff_kkt_spread
+
+    ! The runs with an empty rank go first, so that neither of them can
+    ! pass on state left behind by the spread run
+    call run_mma(subsolver, bcknd, [n_global, 0], x_first, kkt_first)
+    call run_mma(subsolver, bcknd, [0, n_global], x_second, kkt_second)
+    call run_mma(subsolver, bcknd, [n_global / 2, n_global - n_global / 2], &
+         x_spread, kkt_spread)
+
+    diff_x = maxval(abs(x_second - x_first))
+    diff_kkt = maxval(abs(kkt_second - kkt_first))
+    diff_x_spread = maxval(abs(x_spread - x_first))
+    diff_kkt_spread = maxval(abs(kkt_spread - kkt_first) / &
+         max(abs(kkt_spread), tiny(1.0_rp)))
+
+    @assertEqual(0.0_rp, diff_x, message = "design, either rank empty")
+    @assertEqual(0.0_rp, diff_kkt, message = "KKT, either rank empty")
+    @assertEqual(0.0_rp, diff_x_spread, tol, message = "design, spread")
+    @assertEqual(0.0_rp, diff_kkt_spread, tol, message = "KKT, spread")
+
+  end subroutine check_empty_rank
+
+  !> Run n_iter MMA iterations with the given numbers of design variables on
+  !! the two ranks, and return the final design on every rank and the KKT
+  !! residuals of the last iteration.
+  !! @param subsolver The MMA subsolver, 'dip' or 'pdip'.
+  !! @param bcknd The MMA backend, 'cpu' or 'device'.
+  !! @param n_local The numbers of design variables on ranks 0 and 1.
+  !! @param x_global The final design, over the global indices.
+  !! @param kkt The max-norm and the 2-norm of the final KKT residual.
+  subroutine run_mma(subsolver, bcknd, n_local, x_global, kkt)
+    character(len=*), intent(in) :: subsolver, bcknd
+    integer, intent(in) :: n_local(2)
+    real(kind=rp), dimension(n_global), intent(out) :: x_global
+    real(kind=rp), dimension(2), intent(out) :: kkt
+    type(mma_t) :: mma
+    type(vector_t) :: x, df0dx, fval
+    type(matrix_t) :: dfdx
+    real(kind=rp), allocatable :: xmin(:), xmax(:)
+    real(kind=rp), dimension(m) :: a, c, d
+    integer :: n, offset, j, iter, ierr
+
+    n = n_local(pe_rank + 1)
+    offset = 0
+    if (pe_rank .eq. 1) offset = n_local(1)
+
+    ! Created as by the optimiser, so the host arrays of the empty vectors
+    ! are unallocated on a rank without design variables
+    call x%init(n)
+    call df0dx%init(n)
+    call fval%init(m)
+    call dfdx%init(m, n)
+
+    do j = 1, n
+       x%x(j) = 0.25_rp + 0.1_rp * real(offset + j, kind=rp)
+    end do
+    call x%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    allocate(xmin(n), xmax(n))
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+    a = 0.0_rp
+    c = 1000.0_rp
+    d = 1.0_rp
+
+    call mma%init_from_components(x, n, m, 1.0_rp, a, c, d, xmin, xmax, &
+         bcknd = bcknd, subsolver = subsolver)
+
+    do iter = 1, n_iter
+       call evaluate(x, offset, df0dx, fval, dfdx)
+       call mma%update(iter, x, df0dx, fval, dfdx)
+       call evaluate(x, offset, df0dx, fval, dfdx)
+       call mma%kkt(x, df0dx, fval, dfdx)
+    end do
+
+    kkt(1) = mma%get_residumax()
+    kkt(2) = mma%get_residunorm()
+
+    ! Every rank gets the whole design, the other rank adding zeros
+    x_global = 0.0_rp
+    do j = 1, n
+       x_global(offset + j) = x%x(j)
+    end do
+    call MPI_Allreduce(MPI_IN_PLACE, x_global, n_global, &
+         MPI_REAL_PRECISION%mpi_val, MPI_SUM, NEKO_COMM%mpi_val, ierr)
+
+    call mma%free()
+    call x%free()
+    call df0dx%free()
+    call fval%free()
+    call dfdx%free()
+    deallocate(xmin, xmax)
+
+  end subroutine run_mma
+
+  !> Evaluate a problem with two active constraints at the optimum:
+  !! minimise \f$ \sum_j (x_j - 0.1 j)^2 \f$ over the global indices j,
+  !! subject to \f$ 2.4 - \sum_j x_j \le 0 \f$ and
+  !! \f$ \sum_j x_j^2 - 1.1 \le 0 \f$. The design is copied to the host.
+  !! @param x The design.
+  !! @param offset The global index of the first local design variable, from 0.
+  !! @param df0dx The objective sensitivities.
+  !! @param fval The constraint values.
+  !! @param dfdx The constraint sensitivities.
+  subroutine evaluate(x, offset, df0dx, fval, dfdx)
+    type(vector_t), intent(inout) :: x, df0dx, fval
+    integer, intent(in) :: offset
+    type(matrix_t), intent(inout) :: dfdx
+    real(kind=rp) :: sums(2)
+    integer :: j, ierr
+
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    sums = 0.0_rp
+    do j = 1, x%size()
+       df0dx%x(j) = 2.0_rp * (x%x(j) - 0.1_rp * real(offset + j, kind=rp))
+       dfdx%x(1, j) = -1.0_rp
+       dfdx%x(2, j) = 2.0_rp * x%x(j)
+       sums(1) = sums(1) + x%x(j)
+       sums(2) = sums(2) + x%x(j)**2
+    end do
+    call MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_REAL_PRECISION%mpi_val, &
+         MPI_SUM, NEKO_COMM%mpi_val, ierr)
+    fval%x(1) = 2.4_rp - sums(1)
+    fval%x(2) = sums(2) - 1.1_rp
+
+    call df0dx%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call fval%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call dfdx%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+  end subroutine evaluate
+
+end module mma_empty_rank

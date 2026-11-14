@@ -6,6 +6,10 @@
 # so it is registered here rather than in the shared list in the parent
 # CMakeLists.txt, which runs device builds with a single rank.
 #
+# mma_empty_rank: an MMA solve with every design variable on one of the two
+# ranks must match the same solve spread over both, for both subsolvers and
+# both backends. It needs two ranks on every backend, for the same reason.
+#
 # mma_checkpoint_cpu_backend: saving an HDF5 checkpoint of a cpu-backend MMA
 # must not change its state, which on a device build lives only on the host.
 # It needs HDF5 and two ranks on every backend, for the same reason.
@@ -40,6 +44,29 @@ set_tests_properties(mma_kkt_nan PROPERTIES
 # Disable treating unused-variable as error for pfunit tests
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     target_compile_options(mma_kkt_nan PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+add_pfunit_ctest(mma_empty_rank
+    TEST_SOURCES mma_empty_rank.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 2
+)
+
+add_dependencies(Unit
+    mma_empty_rank
+)
+
+set_tests_properties(mma_empty_rank PROPERTIES
+    LABELS "unit;mma"
+    ENVIRONMENT "NEKO_LOG_FILE=mma_empty_rank.log"
+    TIMEOUT 120
+)
+
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(mma_empty_rank PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
 endif()
