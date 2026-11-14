@@ -64,7 +64,7 @@ endif()
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/optimizer_reinit)
 
 add_pfunit_ctest(optimizer_reinit
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/optimizer_reinit.pf
+    TEST_SOURCES optimizer_reinit.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/optimizer_reinit
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
