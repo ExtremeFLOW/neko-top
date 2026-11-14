@@ -50,7 +50,7 @@ add_custom_target(brinkman_design_no_mapping_prepare
 # Define the test itself
 
 add_pfunit_ctest(brinkman_design_no_mapping
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/brinkman_design_no_mapping.pf
+    TEST_SOURCES brinkman_design_no_mapping.pf
     WORKING_DIRECTORY ${NO_MAPPING_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
