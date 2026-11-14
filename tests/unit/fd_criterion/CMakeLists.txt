@@ -24,7 +24,7 @@ set(CMAKE_FOLDER "Tests/Unit/FDCriterion")
 # The pFUnit tests.
 
 add_pfunit_ctest(fd_criterion_test
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/fd_criterion_test.pf
+    TEST_SOURCES fd_criterion_test.pf
     OTHER_SOURCES ${SHARED_TEST_SOURCES}/fd_criterion.f90
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
