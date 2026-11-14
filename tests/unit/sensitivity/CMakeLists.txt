@@ -140,9 +140,11 @@ add_custom_target(
 )
 add_dependencies(sensitivity_test_prepare ${mpi_case_name}_case_file)
 
-# Like the multi-rank pFUnit tests in tests/unit/CMakeLists.txt, a device
-# backend runs it on one rank only.
-set(mpi_case_ranks $<IF:$<NOT:$<STREQUAL:${DEVICE_TYPE},CPU>>,1,2>)
+# Unlike the shared pFUnit list in tests/unit/CMakeLists.txt, this test's
+# whole point is the interaction between ranks, so it runs with two ranks on
+# every backend rather than one on a device. On a device build the two ranks
+# share the device.
+set(mpi_case_ranks 2)
 add_test(NAME ${mpi_case_name}_sensitivity
     COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${mpi_case_ranks}
         ${MPIEXEC_PREFLAGS}

@@ -19,7 +19,7 @@
 set(CMAKE_FOLDER "Tests/Unit/FDArgmaxProbe")
 
 add_pfunit_ctest(fd_argmax_probe_test
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/fd_argmax_probe_test.pf
+    TEST_SOURCES fd_argmax_probe_test.pf
     OTHER_SOURCES ${SHARED_TEST_SOURCES}/fd_criterion.f90
         ${SHARED_TEST_SOURCES}/sensitivity.f90
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
