@@ -20,11 +20,29 @@ function help() {
     echo -e "  -N#         Number of cells in the x and y direction (e.g. -N8)."
     echo -e "  -np=#       MPI ranks for mpirun -n (e.g. -np=4)."
     echo -e ""
+    echo -e " Environment:"
+    echo -e "  NEKO_TOP_BUILD_DIR  Build directory containing"
+    echo -e "                      sensitivity_regression_driver"
+    echo -e "                      (default: <repo root>/build)."
+    echo -e ""
     exit 0
 }
 
 CURRENT_DIR=$(pwd)
-WORKING_DIR=$(dirname "$0")
+WORKING_DIR=$(cd "$(dirname "$0")" && pwd)
+ROOT_DIR=$(realpath "${WORKING_DIR}/../../../")
+
+# The binary is built into the build tree (its RUNTIME_OUTPUT_DIRECTORY), not
+# next to this script, so it is not simply "./sensitivity_regression_driver"
+# any more. Default to the conventional build directory created by
+# `./setup.sh -t`, overridable for a differently-named build directory.
+# Resolved here, before the cd below, so a relative NEKO_TOP_BUILD_DIR is
+# taken relative to the caller's own directory rather than silently
+# reinterpreted relative to this script's directory.
+BUILD_DIR=$(realpath -m "${NEKO_TOP_BUILD_DIR:-${ROOT_DIR}/build}")
+SENSITIVITY_BIN="${BUILD_DIR}/tests/regression/sensitivity/"
+SENSITIVITY_BIN="${SENSITIVITY_BIN}sensitivity_regression_driver"
+
 cd "$WORKING_DIR" || exit 1
 
 # Handle options
@@ -51,6 +69,14 @@ for arg in "$@"; do
         esac
     fi
 done
+
+if [[ ! -x "$SENSITIVITY_BIN" ]]; then
+    echo -e "sensitivity_regression_driver not found or not executable:" >&2
+    echo -e "  $SENSITIVITY_BIN" >&2
+    echo -e "Build Neko-TOP's tests first (e.g. ./setup.sh -t), or set" >&2
+    echo -e "NEKO_TOP_BUILD_DIR to the build directory used." >&2
+    exit 1
+fi
 
 Nx=$((N * 2))
 Ny=$N
@@ -91,7 +117,7 @@ for case in ${cases[@]}; do
     case_name=$(basename "$case")
     export NEKO_LOG_FILE="neko_${case_name%.*}.log"
     echo "Running ${case} with mpirun -n $NP"
-    mpirun -n "$NP" ./sensitivity_regression_driver "${case}" || exit 1
+    mpirun -n "$NP" "$SENSITIVITY_BIN" "${case}" || exit 1
     mv steady_state_data.csv steady_state_data_${case_name%.*}.csv
 done
 
