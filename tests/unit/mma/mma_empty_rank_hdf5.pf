@@ -1,0 +1,253 @@
+!> Unit test: an HDF5 checkpoint of an MMA object must round-trip when a rank
+!! owns no design variables.
+!!
+!! A rank without design variables still takes part in the collective write
+!! and read of the distributed MMA vectors, with an empty selection, while
+!! the host arrays of its empty vectors may be unallocated. A build with
+!! runtime checks stops on such an array passed to HDF5, and the other rank
+!! then waits in the collective call. The test saves an MMA object with every
+!! design variable on one of two ranks, loads the checkpoint into an object
+!! initialised with other values, and saves that object again. The saved
+!! checkpoint must hold the values of the first object, and the distributed
+!! datasets of the two checkpoints must be equal, once with each rank empty.
+module mma_empty_rank_hdf5
+  use mpi
+  use pfunit
+  use hdf5
+  use num_types, only: rp, dp, sp
+  use neko, only: neko_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use comm, only: NEKO_COMM, pe_rank, MPI_REAL_PRECISION
+  use mma, only: mma_t
+  use vector, only: vector_t
+  use device, only: HOST_TO_DEVICE
+  use utils, only: neko_error
+  use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_mma_empty_rank_hdf5_case
+   contains
+     procedure :: setUp
+  end type test_mma_empty_rank_hdf5_case
+
+  logical :: initialized = .false.
+
+  !> Number of design variables, all on one rank.
+  integer, parameter :: n_global = 6
+  !> Number of constraints.
+  integer, parameter :: m = 2
+  !> The distributed datasets of an MMA checkpoint.
+  character(len=5), parameter :: dist_names(6) = &
+       ['xmin ', 'xmax ', 'xold1', 'xold2', 'low  ', 'upp  ']
+
+contains
+
+  subroutine setUp(this)
+    class(test_mma_empty_rank_hdf5_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  ! ========================================================================== !
+  ! The tests
+
+  @test(npes=[2])
+  subroutine round_trip_second_rank_empty(this)
+    class(test_mma_empty_rank_hdf5_case), intent(inout) :: this
+
+    call check_round_trip(0, 'cpu', 'mma_empty_rank1_cpu')
+
+  end subroutine round_trip_second_rank_empty
+
+  @test(npes=[2])
+  subroutine round_trip_first_rank_empty(this)
+    class(test_mma_empty_rank_hdf5_case), intent(inout) :: this
+
+    call check_round_trip(1, 'cpu', 'mma_empty_rank0_cpu')
+
+  end subroutine round_trip_first_rank_empty
+
+  ! The device backend exists in a device build only, so these two pass
+  ! without checking anything in a CPU build
+
+  @test(npes=[2])
+  subroutine round_trip_second_rank_empty_device(this)
+    class(test_mma_empty_rank_hdf5_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    call check_round_trip(0, 'device', 'mma_empty_rank1_device')
+
+  end subroutine round_trip_second_rank_empty_device
+
+  @test(npes=[2])
+  subroutine round_trip_first_rank_empty_device(this)
+    class(test_mma_empty_rank_hdf5_case), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 0) return
+    call check_round_trip(1, 'device', 'mma_empty_rank0_device')
+
+  end subroutine round_trip_first_rank_empty_device
+
+  ! ========================================================================== !
+  ! Helpers
+
+  !> Save an MMA object whose design variables all sit on one rank, load the
+  !! checkpoint into an object initialised with other values, and save that
+  !! object again. Then compare the distributed datasets of the two files
+  !! with each other, and those of the first file with the values saved.
+  !! @param owner The rank that owns every design variable.
+  !! @param bcknd The MMA backend, 'cpu' or 'device'.
+  !! @param prefix The prefix of the two checkpoint files.
+  subroutine check_round_trip(owner, bcknd, prefix)
+    integer, intent(in) :: owner
+    character(len=*), intent(in) :: bcknd, prefix
+    type(mma_t) :: saved, loaded
+    real(kind=rp), dimension(n_global) :: first, second, expected
+    real(kind=rp) :: diffs(2)
+    integer :: n, j, k, ierr
+
+    n = 0
+    if (pe_rank .eq. owner) n = n_global
+
+    call init_mma(saved, n, 0.25_rp, 0.0_rp, 1.0_rp, bcknd)
+    call save_fresh(saved, prefix // '_saved.h5')
+
+    call init_mma(loaded, n, 0.05_rp, -0.5_rp, 2.0_rp, bcknd)
+    call loaded%load_checkpoint(prefix // '_saved.h5')
+    call save_fresh(loaded, prefix // '_loaded.h5')
+
+    call saved%free()
+    call loaded%free()
+
+    ! Rank 0 reads both files whole and shares the largest differences
+    diffs = 0.0_rp
+    if (pe_rank .eq. 0) then
+       call hdf5_session_init()
+       do k = 1, size(dist_names)
+          call read_dataset(prefix // '_saved.h5', trim(dist_names(k)), first)
+          call read_dataset(prefix // '_loaded.h5', trim(dist_names(k)), &
+               second)
+
+          ! The values of the saved object: the bounds, the initial design
+          ! in both previous designs, and zero asymptotes
+          select case (trim(dist_names(k)))
+          case ('xmin')
+             expected = 0.0_rp
+          case ('xmax')
+             expected = 1.0_rp
+          case ('xold1', 'xold2')
+             do j = 1, n_global
+                expected(j) = 0.25_rp + 0.1_rp * real(j, kind=rp)
+             end do
+          case default
+             expected = 0.0_rp
+          end select
+
+          diffs(1) = max(diffs(1), maxval(abs(first - expected)))
+          diffs(2) = max(diffs(2), maxval(abs(second - first)))
+       end do
+       call hdf5_session_finalize()
+    end if
+    call MPI_Bcast(diffs, 2, MPI_REAL_PRECISION%mpi_val, 0, &
+         NEKO_COMM%mpi_val, ierr)
+
+    @assertEqual(0.0_rp, diffs(1), message = "saved file vs saved values")
+    @assertEqual(0.0_rp, diffs(2), message = "loaded file vs saved file")
+
+  end subroutine check_round_trip
+
+  !> Initialise an MMA object with the design \f$ x_j = s + 0.1 j \f$ over
+  !! the global indices j, and constant bounds.
+  !! @param obj The MMA object.
+  !! @param n The number of design variables on this rank, 0 or n_global.
+  !! @param shift The shift s of the design.
+  !! @param lower The lower bound of every design variable.
+  !! @param upper The upper bound of every design variable.
+  !! @param bcknd The MMA backend, 'cpu' or 'device'.
+  subroutine init_mma(obj, n, shift, lower, upper, bcknd)
+    type(mma_t), intent(inout) :: obj
+    integer, intent(in) :: n
+    real(kind=rp), intent(in) :: shift, lower, upper
+    character(len=*), intent(in) :: bcknd
+    type(vector_t) :: x
+    real(kind=rp), dimension(n) :: xmin, xmax
+    real(kind=rp), dimension(m) :: a, c, d
+    integer :: j
+
+    call x%init(n)
+    do j = 1, n
+       x%x(j) = shift + 0.1_rp * real(j, kind=rp)
+    end do
+    call x%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    xmin = lower
+    xmax = upper
+    a = 0.0_rp
+    c = 1000.0_rp
+    d = 1.0_rp
+
+    call obj%init_from_components(x, n, m, 1.0_rp, a, c, d, xmin, xmax, &
+         bcknd = bcknd, subsolver = 'dip')
+
+    call x%free()
+
+  end subroutine init_mma
+
+  !> Save a checkpoint to a file that does not exist yet.
+  !! @param obj The MMA object.
+  !! @param fname The checkpoint file, removed first if it exists.
+  subroutine save_fresh(obj, fname)
+    type(mma_t), intent(inout) :: obj
+    character(len=*), intent(in) :: fname
+    logical :: file_exists
+    integer :: file_unit, ierr
+
+    inquire(file = fname, exist = file_exists)
+    if (file_exists .and. pe_rank .eq. 0) then
+       open(newunit = file_unit, file = fname, iostat = ierr)
+       close(unit = file_unit, status = 'delete', iostat = ierr)
+    end if
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
+
+    call obj%save_checkpoint(fname)
+
+  end subroutine save_fresh
+
+  !> Read a whole distributed dataset of an MMA checkpoint on this rank only.
+  !! @param fname The checkpoint file.
+  !! @param name The name of the dataset.
+  !! @param values The values of the dataset.
+  subroutine read_dataset(fname, name, values)
+    character(len=*), intent(in) :: fname, name
+    real(kind=rp), dimension(n_global), intent(out) :: values
+    integer(hid_t) :: file_id, grp_id, dset_id, h5t_real
+    integer(hsize_t) :: dims(1)
+    integer :: ierr
+
+    select case (rp)
+    case (dp)
+       h5t_real = H5T_NATIVE_DOUBLE
+    case (sp)
+       h5t_real = H5T_NATIVE_REAL
+    case default
+       call neko_error('mma_empty_rank_hdf5: unsupported real kind')
+    end select
+
+    values = huge(0.0_rp)
+    dims(1) = int(n_global, hsize_t)
+    call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, ierr)
+    call h5gopen_f(file_id, '/MMA/checkpoint', grp_id, ierr)
+    call h5dopen_f(grp_id, name, dset_id, ierr)
+    call h5dread_f(dset_id, h5t_real, values, dims, ierr)
+    call h5dclose_f(dset_id, ierr)
+    call h5gclose_f(grp_id, ierr)
+    call h5fclose_f(file_id, ierr)
+
+  end subroutine read_dataset
+
+end module mma_empty_rank_hdf5
