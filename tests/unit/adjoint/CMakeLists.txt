@@ -43,7 +43,7 @@ endif()
 # adv_adjoint_dealias_free
 
 add_pfunit_ctest(adv_adjoint_dealias_free
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/adv_adjoint_dealias_free.pf
+    TEST_SOURCES adv_adjoint_dealias_free.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
