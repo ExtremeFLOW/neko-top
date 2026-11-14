@@ -194,7 +194,7 @@ if (HAVE_HDF5)
     # no case file.
     add_pfunit_ctest(design_checkpoint_hdf5
         TEST_SOURCES
-            ${CMAKE_CURRENT_SOURCE_DIR}/test_design_checkpoint_hdf5.pf
+            test_design_checkpoint_hdf5.pf
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
         MAX_PES 2
