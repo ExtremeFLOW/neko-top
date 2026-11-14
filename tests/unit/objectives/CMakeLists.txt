@@ -21,7 +21,7 @@ set(STEP_COUNT_CASE "time_window_run_length.case")
 
 # pFUnit source for the never-sampled objective check, which reuses the same
 # case with every objective window moved past end_time
-set(NEVER_SAMPLED_TEST ${CMAKE_CURRENT_SOURCE_DIR}/never_sampled.pf)
+set(NEVER_SAMPLED_TEST never_sampled.pf)
 
 # ============================================================================ #
 # Use a private .mod folder to avoid clashes with other test targets
