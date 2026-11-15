@@ -118,6 +118,19 @@ Currently, we have added tests for the following components:
   for `viscous_dissipation.case`) and `1e-3`, lie between the two. Whenever
   the cases or the driver's probe selection change, confirm again that both
   fail with the masked full weak Laplacian as the forcing.
+- `unsteady_restart_sensitivity`, a pFUnit test (`unsteady_restart.pf`) on
+  `unsteady_brinkman_dissipation.case`, restarted through `case.restart_file`
+  from a Neko checkpoint file. A restarted run starts from the time of the
+  file but counts its time steps from zero, and the start time of the case
+  stays where it is. The test writes a checkpoint file holding the initial
+  state 10 time steps after the start time. The run restarted from it must
+  give the objective value and the sensitivity of the same 10 time steps
+  taken from the start time, to round-off. With `n_memory` set to 4, the
+  adjoint restores states from RAM, by restarting from the checkpoint files
+  of the run, and from a checkpoint file alone. When the state recovery sized
+  the run from the start time of the case, it kept none of the states in RAM,
+  the adjoint restored slots that were never written, and the sensitivity was
+  22% off.
 
 `scalar_mixing_objective_t` is not yet covered here (its only existing case,
 `tests/regression/sensitivity/cases/passive_scalar.case`, needed a Neko-core
