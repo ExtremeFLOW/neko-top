@@ -267,8 +267,8 @@ contains
 
     ! The objective's window is the open default unless the case set one
     if (.not. simulation%unsteady .and. &
-         (this%start_time .gt. 0.0_dp .or. &
-         real(this%end_time, kind=rp) .lt. huge(0.0_rp))) then
+         (this%start_time .gt. 0.0_dp .or. this%end_time .lt. huge(0.0_dp)) &
+         ) then
        call neko_log%message("Note: objective '" // this%get_name() // &
             "' has a time window, which a steady problem ignores.")
     end if
