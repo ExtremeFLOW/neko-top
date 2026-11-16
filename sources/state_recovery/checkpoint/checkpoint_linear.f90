@@ -81,12 +81,10 @@ contains
     ! Only save to RAM from the last disc checkpoint to the end of the forward
     ! simulation. With fixed timesteps, the total count and the last disc-save
     ! timestep are known from the time object: the count is the timesteps
-    ! taken so far plus those left to the end time. It is not counted from the
-    ! start time, as a run restarted from a checkpoint file starts from the
-    ! time of the file but counts its timesteps from zero.
-    ! Note: nint rounds to the nearest integer, as the division can be slightly
-    ! off the actual number of steps due to floating point errors.
-    n_total = tstep + nint((end_time - time) / dt)
+    ! taken so far plus those left to the end time.
+    ! Note: floor rounds down to the nearest integer, as the division can be
+    ! slightly off the actual number of steps due to floating point errors.
+    n_total = tstep + floor((end_time - time) / dt)
     if (tstep .ge. n_total - modulo(n_total, this%n_saves_memory)) then
        call this%save_data(index + 1)
     end if
