@@ -32,12 +32,16 @@ add_dependencies(Regression reg_valgrind_bin)
 set(CMAKE_Fortran_MODULE_DIRECTORY ${NEKO_TOP_MOD_DIR} CACHE PATH
     "Fortran module directory" FORCE)
 
-# Register valgrind regression test.
+# Register the valgrind regression tests. Building reg_valgrind_bin is the
+# setup test of the regression_valgrind_bin fixture, see "Keeping test
+# executables in sync" in documentation/pages/dev_guide/testing.md.
 add_test(NAME regression_valgrind_build
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target reg_valgrind_bin
 )
 set_tests_properties(regression_valgrind_build PROPERTIES
+    FIXTURES_SETUP "regression_valgrind_bin"
     LABELS "regression;valgrind"
+    RESOURCE_LOCK "neko_top_build_tree"
     TIMEOUT 900
 )
 
@@ -61,7 +65,7 @@ add_test(NAME regression_valgrind_steady_mixer
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 set_tests_properties(regression_valgrind_steady_mixer PROPERTIES
-    DEPENDS "regression_valgrind_build"
+    FIXTURES_REQUIRED "regression_valgrind_bin"
     LABELS "regression;valgrind"
     RESOURCE_LOCK "regression_valgrind_workspace"
     SKIP_RETURN_CODE 77
@@ -88,7 +92,7 @@ add_test(NAME regression_valgrind_unsteady_mixer
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 set_tests_properties(regression_valgrind_unsteady_mixer PROPERTIES
-    DEPENDS "regression_valgrind_build"
+    FIXTURES_REQUIRED "regression_valgrind_bin"
     LABELS "regression;valgrind"
     RESOURCE_LOCK "regression_valgrind_workspace"
     SKIP_RETURN_CODE 77
