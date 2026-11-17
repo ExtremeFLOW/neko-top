@@ -33,15 +33,15 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${NEKO_TOP_MOD_DIR} CACHE PATH
     "Fortran module directory" FORCE)
 
 # Register valgrind regression test.
-add_test(NAME unsteady_mixer_valgrind_build
+add_test(NAME valgrind_build
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target reg_valgrind_bin
 )
-set_tests_properties(unsteady_mixer_valgrind_build PROPERTIES
+set_tests_properties(valgrind_build PROPERTIES
     LABELS "regression;valgrind"
     TIMEOUT 900
 )
 
-add_test(NAME unsteady_mixer_valgrind_regression
+add_test(NAME valgrind_regression_steady_mixer
     COMMAND ${CMAKE_COMMAND} -E env
         PATH=${neko_PATH}
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
@@ -60,15 +60,15 @@ add_test(NAME unsteady_mixer_valgrind_regression
         ${CMAKE_CURRENT_SOURCE_DIR}/check_valgrind.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-set_tests_properties(unsteady_mixer_valgrind_regression PROPERTIES
-    DEPENDS "unsteady_mixer_valgrind_build"
+set_tests_properties(valgrind_regression_steady_mixer PROPERTIES
+    DEPENDS "valgrind_build"
     LABELS "regression;valgrind"
     RESOURCE_LOCK "valgrind_regression_workspace"
     SKIP_RETURN_CODE 77
     TIMEOUT 3600
 )
 
-add_test(NAME unsteady_mixer_valgrind_unsteady_regression
+add_test(NAME valgrind_regression_unsteady_mixer
     COMMAND ${CMAKE_COMMAND} -E env
         PATH=${neko_PATH}
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
@@ -87,8 +87,8 @@ add_test(NAME unsteady_mixer_valgrind_unsteady_regression
         ${CMAKE_CURRENT_SOURCE_DIR}/check_valgrind.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-set_tests_properties(unsteady_mixer_valgrind_unsteady_regression PROPERTIES
-    DEPENDS "unsteady_mixer_valgrind_build"
+set_tests_properties(valgrind_regression_unsteady_mixer PROPERTIES
+    DEPENDS "valgrind_build"
     LABELS "regression;valgrind"
     RESOURCE_LOCK "valgrind_regression_workspace"
     SKIP_RETURN_CODE 77
