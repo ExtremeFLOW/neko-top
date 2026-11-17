@@ -219,19 +219,8 @@
             }
         ]
     },
-    "unsteady": true,
-    "state_recovery": {
-        "type": "checkpoint",
-        "enabled": true,
-        "format": "chkp",
-        "n_memory": 64
-    },
+    "unsteady": false,
     "optimization": {
-        "time_window_test": {
-            "compare_steady": true,
-            "require_steady_state": true,
-            "tolerance": 1e-09
-        },
         "design": {
             "type": "brinkman",
             "verbose_design": false,
@@ -263,33 +252,6 @@
                 "xmin": 0.0,
                 "xmax": 1.0
             }
-        },
-        "objectives": [
-            {
-                "type": "viscous_dissipation",
-                "name": "viscous final step",
-                "weight": 1.0,
-                "start_time": 1.495
-            },
-            {
-                "type": "brinkman_dissipation",
-                "name": "brinkman final step",
-                "weight": 1.0,
-                "start_time": 1.495
-            },
-            {
-                "type": "scalar_mixing",
-                "name": "mixing final step",
-                "weight": 1.0,
-                "start_time": 1.495
-            },
-            {
-                "type": "scalar_mixing",
-                "name": "mixing outlet final step",
-                "weight": 1.0,
-                "start_time": 1.495,
-                "mask_name": "outlet_region"
-            }
-        ]
+        }
     }
 }
