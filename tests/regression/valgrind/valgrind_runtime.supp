@@ -28,6 +28,19 @@
    fun:__comm_MOD_comm_init
 }
 
+# hwloc discovers the hardware when MPI starts. Its PCI plugin makes
+# libpciaccess load every pci.ids name of each PCI vendor found on the machine
+# and keep them until exit, so the still-reachable total depends on the
+# hardware of the runner: about 650 KB on a VM that exposes an Intel PCI
+# device, a few KB without one (e.g. WSL2). Not owned by the project.
+{
+   hwloc_topology_load_reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   ...
+   fun:hwloc_topology_load
+}
+
 {
    openmpi_orte_init_generic
    Memcheck:Leak
