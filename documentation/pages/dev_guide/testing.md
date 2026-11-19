@@ -34,3 +34,29 @@ setting `OFF` disables all runtime checks.
 - Several tests currently fail with it enabled, due to collapsed-index loops in
 the sources (for example `x(i,1,1,1)` with `i` running over the whole array,
 which `-fcheck=bounds` rejects).
+
+## Keeping test executables in sync {#testing-build-fixtures}
+
+CTest only runs tests; it does not build anything. After editing the sources,
+build before testing, or `ctest` runs the executables from the previous build:
+
+```bash
+cmake --build build
+ctest --test-dir build
+```
+
+Some regression tests register their build step as a test of its own, so that
+running `ctest` alone keeps their executable in sync with the sources. The CI
+job for the valgrind regression tests relies on this, as it runs `ctest`
+without a separate build step. In `tests/regression/valgrind/CMakeLists.txt`:
+
+- `regression_valgrind_build` runs `cmake --build` for `reg_valgrind_bin` and
+  is the setup test (`FIXTURES_SETUP`) of the `regression_valgrind_bin`
+  fixture.
+- `regression_valgrind_steady_mixer` and `regression_valgrind_unsteady_mixer`
+  require that fixture (`FIXTURES_REQUIRED`).
+
+Concurrent `cmake --build` calls on one build tree race on shared outputs, so
+every test that builds in the tree should take the `neko_top_build_tree`
+resource lock (`RESOURCE_LOCK`). CTest then never runs two of them at once
+under `ctest -j`.
