@@ -42,16 +42,12 @@ cp -f "$prepare_script" prepare.sh
 cp -f "$checker_script" check_valgrind.py
 
 # Remove stale artifacts from previous runs in this build directory.
-rm -f box.nmsh prepare.log valgrind_regression.log valgrind_stdout.log valgrind_stderr.log
+rm -f prepare.log valgrind_regression.log valgrind_stdout.log valgrind_stderr.log
 rm -f optimization_data.csv neko_valgrind.log
 rm -rf checkpoints
 
-mesh_nx="${VALGRIND_MESH_NX:-16}"
-mesh_ny="${VALGRIND_MESH_NY:-4}"
-mesh_nz="${VALGRIND_MESH_NZ:-4}"
-
 # Generate a deterministic mesh local to this test run.
-bash ./prepare.sh -x"${mesh_nx}" -y"${mesh_ny}" -z"${mesh_nz}" > prepare.log
+bash ./prepare.sh > prepare.log
 
 # Execute the case with valgrind and parse leak summary.
 if ! valgrind \
