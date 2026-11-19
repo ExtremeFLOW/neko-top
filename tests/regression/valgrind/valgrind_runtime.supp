@@ -2,86 +2,36 @@
 # These entries target OpenMPI/hwloc/libevent/CUDA initialization allocations
 # that persist at process teardown and are outside project ownership.
 
+# Everything allocated while MPI_Init runs is owned by the MPI runtime: ORTE in
+# OpenMPI 4 (e.g. Ubuntu 24.04), ompi_mpi_instance_init in OpenMPI 5 (e.g.
+# Ubuntu 26.04), and in both the MCA frameworks, hwloc and the transports. The
+# entry ends at ompi_mpi_init (not comm_init) so stacks truncated by
+# --num-callers still match.
 {
-   openmpi_ompi_op_init
-   Memcheck:Leak
-   match-leak-kinds: definite
-   fun:malloc
-   ...
-   fun:ompi_op_base_op_select
-   fun:ompi_op_init
-   fun:ompi_mpi_init
-   ...
-   fun:__comm_MOD_comm_init
-}
-
-{
-   openmpi_orte_init_hwloc
+   openmpi_mpi_init
    Memcheck:Leak
    match-leak-kinds: definite,indirect
+   ...
+   fun:ompi_mpi_init
+}
+
+# hwloc discovers the hardware when MPI starts. Its PCI plugin makes
+# libpciaccess load every pci.ids name of each PCI vendor found on the machine
+# and keep them until exit, so the still-reachable total depends on the
+# hardware of the runner: about 650 KB on a VM that exposes an Intel PCI
+# device, a few KB without one (e.g. WSL2). Not owned by the project.
+{
+   hwloc_topology_load_reachable
+   Memcheck:Leak
+   match-leak-kinds: reachable
    ...
    fun:hwloc_topology_load
-   ...
-   fun:orte_init
-   fun:ompi_mpi_init
-   ...
-   fun:__comm_MOD_comm_init
-}
-
-{
-   openmpi_orte_init_generic
-   Memcheck:Leak
-   match-leak-kinds: definite,indirect
-   ...
-   fun:orte_init
-   fun:ompi_mpi_init
-   ...
-   fun:__comm_MOD_comm_init
-}
-
-# OpenMPI 5 (e.g. Ubuntu 26.04) removed ORTE and calls the MCA frameworks,
-# PMIx and the UCX transports through ompi_mpi_instance_init, so the OpenMPI 4
-# entries above do not match. Everything allocated while MPI_Init runs is owned
-# by the MPI runtime. The entry ends at ompi_mpi_init (not comm_init) so stacks
-# truncated by --num-callers still match.
-{
-   openmpi5_mpi_init
-   Memcheck:Leak
-   match-leak-kinds: definite,indirect
-   ...
-   fun:ompi_mpi_init
-}
-
-{
-   openmpi_mca_framework_open
-   Memcheck:Leak
-   match-leak-kinds: definite,indirect
-   fun:malloc
-   ...
-   fun:mca_base_framework_open
-   fun:ompi_mpi_init
-   ...
-   fun:__comm_MOD_comm_init
-}
-
-{
-   openmpi_mca_btl_base_select
-   Memcheck:Leak
-   match-leak-kinds: definite
-   fun:malloc
-   ...
-   fun:mca_btl_base_select
-   ...
-   fun:ompi_mpi_init
-   ...
-   fun:__comm_MOD_comm_init
 }
 
 {
    openmpi_libevent_worker
    Memcheck:Leak
    match-leak-kinds: definite,indirect
-   ...
    ...
    fun:event_base_loop
    ...
@@ -102,21 +52,9 @@
 }
 
 {
-   cuda_cugetprocaddress_malloc
+   cuda_cugetprocaddress
    Memcheck:Leak
    match-leak-kinds: definite
-   fun:malloc
-   ...
-   fun:cuGetProcAddress_v2
-   ...
-   fun:__cuda_intf_MOD_cuda_init
-}
-
-{
-   cuda_cugetprocaddress_calloc
-   Memcheck:Leak
-   match-leak-kinds: definite
-   fun:calloc
    ...
    fun:cuGetProcAddress_v2
    ...
@@ -176,18 +114,6 @@
 
 {
    openmp_allocate_tls_possible
-   Memcheck:Leak
-   match-leak-kinds: possible
-   fun:calloc
-   fun:allocate_dtv
-   fun:_dl_allocate_tls
-   ...
-   fun:GOMP_parallel
-   fun:__comm_MOD_comm_init
-}
-
-{
-   openmp_allocate_tls_possible_generic
    Memcheck:Leak
    match-leak-kinds: possible
    fun:calloc
@@ -291,16 +217,6 @@
 
 {
    jsonfortran_all_leaks
-   Memcheck:Leak
-   match-leak-kinds: definite,indirect,possible,reachable
-   fun:malloc
-   ...
-   obj:*/libjsonfortran.so*
-   ...
-}
-
-{
-   jsonfortran_all_leaks_any_allocator
    Memcheck:Leak
    match-leak-kinds: definite,indirect,possible,reachable
    ...
