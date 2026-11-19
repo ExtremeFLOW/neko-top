@@ -175,6 +175,14 @@ endif()
 # xold2 state, and of the base-class continuation-on-restart fix. Its own
 # WORKING_DIRECTORY, so it cannot collide with optimizer_checkpoint's
 # cleanup fixture above under `ctest --parallel`.
+#
+# long_checkpoint_path opens a checkpoint file name of 265 characters
+# through MPI-IO. Open MPI 4.1.x and 5.0.0 to 5.0.9 probe the lockedfile
+# shared file pointer component with that name plus ".locktest.<rank>"
+# written into a 256-character buffer (fixed upstream by open-mpi/ompi
+# 91996cd, "sharedfp/lockedfile: do not limit filename length"), which
+# aborts with "buffer overflow detected" on Ubuntu 24.04. No test here uses
+# a shared file pointer, so the component is excluded.
 
 file(MAKE_DIRECTORY
     ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_checkpoint)
@@ -191,6 +199,10 @@ set_tests_properties(steepest_descent_checkpoint PROPERTIES
     LABELS "unit;optimizer;hdf5"
     ENVIRONMENT "NEKO_LOG_FILE=steepest_descent_checkpoint.log"
     TIMEOUT 120
+)
+# Exclude the Open MPI component described above
+set_property(TEST steepest_descent_checkpoint APPEND PROPERTY
+    ENVIRONMENT "OMPI_MCA_sharedfp=^lockedfile"
 )
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     target_compile_options(steepest_descent_checkpoint PRIVATE

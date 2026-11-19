@@ -286,9 +286,7 @@ contains
 
           write (log_buf, '(A,ES12.6)') "Tolerance     : ", tolerance
           call neko_log%message(log_buf)
-          write (log_buf, '(A,A)') "Mesh file     : ", &
-               trim(mesh_file_name)
-          call neko_log%message(log_buf)
+          call neko_log%message("Mesh file     : " // trim(mesh_file_name))
 
        end if ! if mesh_file_name .eq. none
 

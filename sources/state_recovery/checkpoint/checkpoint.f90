@@ -280,16 +280,16 @@ contains
     ! Write a status message with the parameters set
     call neko_log%section("Checkpointing")
 
-    write(msg, '(A, A)') "Algorithm:                    ", trim(this%algorithm)
-    call neko_log%message(trim(msg))
+    ! The string values are concatenated rather than written into msg, since
+    ! the path and file name can be longer than a LOG_SIZE line.
+    call neko_log%message("Algorithm:                    " // &
+         trim(this%algorithm))
     write(msg, '(A,I0)') "Number of checkpoints in RAM: ", this%n_saves_memory
     call neko_log%message(trim(msg))
-    write(msg, '(A, A)') "Checkpoint file path:         ", trim(this%path)
-    call neko_log%message(trim(msg))
-    write(msg, '(A, A)') "Checkpoint file name:         ", trim(this%filename)
-    call neko_log%message(trim(msg))
-    write(msg, '(A, A)') "Checkpoint file format:       ", trim(this%fmt)
-    call neko_log%message(trim(msg))
+    call neko_log%message("Checkpoint file path:         " // trim(this%path))
+    call neko_log%message("Checkpoint file name:         " // &
+         trim(this%filename))
+    call neko_log%message("Checkpoint file format:       " // trim(this%fmt))
 
     if (.not. this%keep_checkpoints) then
        call neko_log%message("Checkpoint files will be deleted.")
