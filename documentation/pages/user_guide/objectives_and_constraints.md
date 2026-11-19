@@ -80,7 +80,7 @@ objective are larger by the same factor.
 
 The window only applies to unsteady problems. A steady problem evaluates its
 objectives once, on the converged field, so `start_time` and `end_time` have no
-effect there.
+effect there, and a note in the log says so when either is set.
 
 The two paths agree wherever they are asking the same question. Once a problem
 has reached a steady state, an unsteady objective averaged over a window inside
