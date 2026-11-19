@@ -280,12 +280,14 @@
             {
                 "type": "scalar_mixing",
                 "name": "mixing [19, 20]",
+                "phi_ref": 0.5,
                 "weight": 1.0,
                 "start_time": 18.995
             },
             {
                 "type": "scalar_mixing",
                 "name": "mixing outlet [19, 20]",
+                "phi_ref": 0.5,
                 "weight": 1.0,
                 "start_time": 18.995,
                 "mask_name": "outlet_region"

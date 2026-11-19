@@ -41,7 +41,7 @@ module scalar_mixing_objective
   use simulation_m, only: simulation_t
   use design, only: design_t
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default
+  use json_utils, only: json_get, json_get_or_default
   use field, only: field_t
   use field_math, only: field_copy, field_cadd, field_col2, field_cmult
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -126,7 +126,7 @@ contains
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
-    call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
+    call json_get(json, "phi_ref", phi_ref)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
     call json_get_or_default(json, "scalar_name", scalar_name, "s")
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)

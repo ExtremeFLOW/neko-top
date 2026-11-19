@@ -280,12 +280,14 @@
             {
                 "type": "scalar_mixing",
                 "name": "mixing final step",
+                "phi_ref": 0.5,
                 "weight": 1.0,
                 "start_time": 2.495
             },
             {
                 "type": "scalar_mixing",
                 "name": "mixing outlet final step",
+                "phi_ref": 0.5,
                 "weight": 1.0,
                 "start_time": 2.495,
                 "mask_name": "outlet_region"
