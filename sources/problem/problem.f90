@@ -47,6 +47,8 @@ module problem
   use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use vector, only: vector_t
   use matrix, only: matrix_t
+  use field, only: field_t
+  use field_math, only: field_copy
   use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
@@ -79,6 +81,21 @@ module problem
      !! as the functionals sum `value_weight`, so that it equals that of a
      !! functional without a time window bit for bit.
      real(kind=xp) :: run_time = 0.0_xp
+     !> The velocity the last unsteady forward run started from. Its first
+     !! step applies the design's Brinkman force to it, but the state
+     !! recovery holds only the states after each step.
+     type(field_t) :: u_initial
+     !> See `u_initial`.
+     type(field_t) :: v_initial
+     !> See `u_initial`.
+     type(field_t) :: w_initial
+     !> During the unsteady adjoint run, the velocity of the primal step after
+     !! the restored one. It advects the adjoint scalar.
+     type(field_t) :: u_next
+     !> See `u_next`.
+     type(field_t) :: v_next
+     !> See `u_next`.
+     type(field_t) :: w_next
 
      !> The objective of the problem.
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
@@ -241,6 +258,12 @@ contains
     this%n_objectives = 0
     this%n_constraints = 0
     this%run_time = 0.0_xp
+    call this%u_initial%free()
+    call this%v_initial%free()
+    call this%w_initial%free()
+    call this%u_next%free()
+    call this%v_next%free()
+    call this%w_next%free()
 
     ! Free the objective list
     if (allocated(this%objective_list)) then
@@ -530,6 +553,16 @@ contains
     call simulation%reset()
     call simulation_init(simulation%neko_case, dt_controller)
 
+    ! Keep the velocity the first step starts from, for the adjoint run
+    if (.not. allocated(this%u_initial%x)) then
+       call this%u_initial%init(simulation%fluid%dm_Xh, "u_initial")
+       call this%v_initial%init(simulation%fluid%dm_Xh, "v_initial")
+       call this%w_initial%init(simulation%fluid%dm_Xh, "w_initial")
+    end if
+    call field_copy(this%u_initial, simulation%fluid%u)
+    call field_copy(this%v_initial, simulation%fluid%v)
+    call field_copy(this%w_initial, simulation%fluid%w)
+
     ! Reset the objective value to zero
     call this%reset_objectives()
 
@@ -582,19 +615,40 @@ contains
 
   !> Run the adjoint backwards
   subroutine problem_run_backward_unsteady(this, simulation, design)
-    class(problem_t), intent(inout) :: this
+    class(problem_t), target, intent(inout) :: this
     class(simulation_t), intent(inout) :: simulation
     class(design_t), intent(inout) :: design
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
-    real(kind=rp) :: total_time
+    real(kind=dp) :: total_time
     integer :: i, j
     type(time_state_t) :: accumulation_time
+    logical :: have_scalar
+
+    if (.not. allocated(this%u_initial%x)) then
+       call neko_error("The unsteady adjoint needs the initial velocity " // &
+            "of a forward run of this problem.")
+    end if
 
     call dt_controller%init(simulation%neko_case%params)
 
     call simulation_adjoint_init(simulation%adjoint_case, dt_controller)
+
+    ! Primal step i + 1 advects the scalar of step i with the new velocity of
+    ! step i + 1. The adjoint scalar step after restoring step i transposes
+    ! that advection, so it is advected with the velocity kept before the
+    ! restore rather than with the restored one.
+    have_scalar = allocated(simulation%adjoint_case%adjoint_scalars)
+    if (have_scalar) then
+       if (.not. allocated(this%u_next%x)) then
+          call this%u_next%init(simulation%fluid%dm_Xh, "u_next")
+          call this%v_next%init(simulation%fluid%dm_Xh, "v_next")
+          call this%w_next%init(simulation%fluid%dm_Xh, "w_next")
+       end if
+       call set_adjoint_scalar_velocity(simulation, this%u_next, &
+            this%v_next, this%w_next)
+    end if
 
     ! Reset the sensitivity value to zero
     call this%reset_objective_sensitivities()
@@ -613,6 +667,14 @@ contains
     call profiler_start_region("Adjoint simulation")
 
     do i = simulation%n_timesteps, 1, -1
+       ! Keep the velocity of the step after the one to restore. Before the
+       ! first restore it is that of the last step, which advects only the
+       ! zero terminal adjoint scalar.
+       if (have_scalar) then
+          call field_copy(this%u_next, simulation%fluid%u)
+          call field_copy(this%v_next, simulation%fluid%v)
+          call field_copy(this%w_next, simulation%fluid%w)
+       end if
        ! restore primal field
        call simulation%state_recover%restore(i)
        ! accumulate objective sensitivity
@@ -625,10 +687,47 @@ contains
           call this%objective_list(j)%objective%update_forcing_scale( &
                accumulation_time, this%run_time)
        end do
-       ! step the adjoint backwards
+       ! Step the adjoint backwards over forward step i, at the time that
+       ! step started from. The steps are all of the same length, so that
+       ! time is counted in steps from zero rather than taken off the length
+       ! of the run: the round-off of that difference can leave the last
+       ! step just before zero, outside the window of every source term
+       ! that starts there.
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
-            cfl, loop_start, total_time)
+            cfl, loop_start, forward_time = &
+            real(i - 1, kind=dp) * simulation%adjoint_case%time%dt)
     end do
+
+    ! Each sample above pairs the restored velocity of step i with the
+    ! adjoint velocity of the adjoint step before it: the design coupling
+    ! term of primal step i + 1, whose Brinkman force acts on the velocity of
+    ! step i. That leaves out primal step 1, whose force acts on the initial
+    ! velocity, so its term, the initial velocity against the adjoint
+    ! velocity of the last adjoint step, is added here, at the start time of
+    ! the run. It takes over the time step of the sample at the end of the
+    ! run, which pairs the last velocity with the zero terminal adjoint
+    ! velocity and adds nothing else. The copy overwrites the restored first
+    ! state, which nothing reads after this.
+    call field_copy(simulation%fluid%u, this%u_initial)
+    call field_copy(simulation%fluid%v, this%v_initial)
+    call field_copy(simulation%fluid%w, this%w_initial)
+    accumulation_time = simulation%adjoint_case%time
+    accumulation_time%t = 0.0_dp
+    do j = 1, this%n_objectives
+       select type (o => this%objective_list(j)%objective)
+       class is (augmented_lagrangian_objective_t)
+          call o%accumulate_sensitivity(design, accumulation_time, &
+               count_time = .false.)
+       end select
+    end do
+
+    ! Point the adjoint scalars back at the primal velocity, so that they do
+    ! not keep pointing at the velocity fields of this problem, which the
+    ! drivers free before the simulation
+    if (have_scalar) then
+       call set_adjoint_scalar_velocity(simulation, simulation%fluid%u, &
+            simulation%fluid%v, simulation%fluid%w)
+    end if
 
     ! Leave every forcing scale at one, as the steady path assumes
     do j = 1, this%n_objectives
@@ -640,6 +739,26 @@ contains
     call simulation_adjoint_finalize(simulation%adjoint_case)
 
   end subroutine problem_run_backward_unsteady
+
+  !> Point the velocity that advects the adjoint scalars at the given fields.
+  !! @param simulation The simulation.
+  !! @param u The x-component of the velocity.
+  !! @param v The y-component of the velocity.
+  !! @param w The z-component of the velocity.
+  subroutine set_adjoint_scalar_velocity(simulation, u, v, w)
+    class(simulation_t), intent(inout) :: simulation
+    type(field_t), target, intent(inout) :: u, v, w
+    integer :: i
+
+    associate(fields => &
+         simulation%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
+      do i = 1, size(fields)
+         fields(i)%u => u
+         fields(i)%v => v
+         fields(i)%w => w
+      end do
+    end associate
+  end subroutine set_adjoint_scalar_velocity
 
   ! ========================================================================== !
   ! Update the objectives and constraints
