@@ -1,0 +1,7 @@
+<map id="dummy_constraint::dummy_constraint_t" name="dummy_constraint::dummy_constraint_t">
+<area shape="rect" id="Node000001" title="A dummy constraint." alt="" coords="5,174,207,218"/>
+<area shape="rect" id="Node000002" href="$db/d06/structconstraint_1_1constraint__t.html" title="The abstract constraint type." alt="" coords="20,98,192,126"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="108,140,108,174,104,172,104,144"/>
+<area shape="rect" id="Node000003" href="$d0/da6/structbase__functional_1_1base__functional__t.html" title="The base functional type." alt="" coords="24,5,188,50"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="107,63,109,98,103,97,105,68"/>
+</map>

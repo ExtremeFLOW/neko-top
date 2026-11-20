@@ -1,0 +1,5 @@
+<map id="ramp_mapping_cpu::convex_down_ramp_mapping_apply_backward_cpu" name="ramp_mapping_cpu::convex_down_ramp_mapping_apply_backward_cpu">
+<area shape="rect" id="Node000001" title="Apply convex&#45;down RAMP chain rule on CPU." alt="" coords="239,5,450,67"/>
+<area shape="rect" id="Node000002" href="$d6/daf/namespaceramp__mapping.html#a53a0cefe48c4e68baf6cff3eca8e9bc6" title="Constructor from json." alt="" coords="5,14,191,58"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="220,36,191,39,191,34,226,36"/>
+</map>

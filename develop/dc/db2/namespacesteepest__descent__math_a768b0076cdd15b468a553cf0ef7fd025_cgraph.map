@@ -1,0 +1,14 @@
+<map id="steepest_descent_math::sd_update_design" name="steepest_descent_math::sd_update_design">
+<area shape="rect" id="Node000001" title="Move&#45;limited, box&#45;constrained design update (Eq. D24)." alt="" coords="5,57,182,102"/>
+<area shape="rect" id="Node000002" href="$d4/dca/namespacedevice__steepest__descent.html#a8d390b028b7aa94577f0adc1ee9928ef" title="Move&#45;limited, box&#45;constrained design update on the device (Eq. D24)." alt="" coords="230,22,426,67"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="181,64,217,61,212,62,182,69"/>
+<area shape="rect" id="Node000006" href="$d1/df4/namespacesteepest__descent__cpu.html#af347da57ee20be3902882e918242c60c" title="Move&#45;limited, box&#45;constrained design update on CPU (Eq. D24)." alt="" coords="240,92,416,136"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="182,90,227,98,221,99,182,95"/>
+<area shape="rect" id="Node000003" href="$da/d18/steepest__descent_8cu.html#ab3b5a81a88b39296e26d9d4158433b0b" title=" " alt="" coords="474,5,650,33"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="426,31,461,30,456,31,427,36"/>
+<area shape="rect" id="Node000005" href="$de/d19/steepest__descent_8hip.html#a835b2958552bd92fddadaa75941fdf4c" title=" " alt="" coords="480,57,645,85"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="426,53,467,60,461,60,426,58"/>
+<area shape="rect" id="Node000004" href="$d0/da1/cuda_2steepest__descent__kernel_8h.html#a799d12a7cc93eda0a354a4fbb3389bc3" title=" " alt="" coords="698,32,884,60"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="651,27,686,33,680,33,651,32"/>
+<area shape="poly" id="edge5_Node000005_Node000004" title=" " alt="" coords="645,59,685,58,680,58,645,65"/>
+</map>

@@ -1,0 +1,7 @@
+<map id="advection_adjoint::advection_adjoint_t" name="advection_adjoint::advection_adjoint_t">
+<area shape="rect" id="Node000001" title="Base abstract type for computing the advection operator." alt="" coords="100,5,249,50"/>
+<area shape="rect" id="Node000002" href="$d1/d10/structadv__lin__dealias_1_1adv__lin__dealias__t.html" title="Type encapsulating advection routines with dealiasing." alt="" coords="5,98,160,143"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="144,60,106,100,102,96,139,62"/>
+<area shape="rect" id="Node000003" href="$d0/d7a/structadv__lin__no__dealias_1_1adv__lin__no__dealias__t.html" title="Type encapsulating advection routines with no dealiasing applied." alt="" coords="184,98,349,143"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="208,59,248,98,242,98,206,64"/>
+</map>

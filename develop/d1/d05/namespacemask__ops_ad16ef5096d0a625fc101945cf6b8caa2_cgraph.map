@@ -1,0 +1,4 @@
+<map id="mask_ops::compute_masked_volume" name="mask_ops::compute_masked_volume">
+<area shape="rect" id="Node000001" title="Compute the volume of the domain contained within the mask." alt="" coords="5,29,216,74"/>
+<area shape="poly" id="edge1_Node000001_Node000001" title=" " alt="" coords="70,28,69,19,76,10,90,5,111,3,133,5,148,14,143,14,132,10,110,8,91,10,79,15,74,21,75,30"/>
+</map>

@@ -1,0 +1,13 @@
+<map id="Graphical Class Hierarchy" name="Graphical Class Hierarchy">
+<area shape="rect" id="Node000000" title=" " alt="" coords="5,212,120,239"/>
+<area shape="rect" id="Node000001" href="$d4/d81/structadjoint__brinkman__dissipation__source__term_1_1adjoint__brinkman__dissipation__source__term__t.html" title="A adjoint source term corresponding to an objective of." alt="" coords="168,5,399,67"/>
+<area shape="poly" id="edge33_Node000000_Node000001" title=" " alt="" coords="75,197,111,137,136,105,166,77,187,65,183,70,169,81,140,108,115,140,79,199"/>
+<area shape="rect" id="Node000002" href="$d3/d68/structadjoint__mixing__scalar__source__term_1_1adjoint__mixing__scalar__source__term__t.html" title=" " alt="" coords="199,92,368,170"/>
+<area shape="poly" id="edge34_Node000000_Node000002" title=" " alt="" coords="109,203,200,165,196,169,112,207"/>
+<area shape="rect" id="Node000003" href="$df/d96/structadjoint__scalar__convection__source__term_1_1adjoint__scalar__convection__source__term__t.html" title=" " alt="" coords="179,195,388,256"/>
+<area shape="poly" id="edge35_Node000000_Node000003" title=" " alt="" coords="134,223,181,224,176,227,136,228"/>
+<area shape="rect" id="Node000004" href="$d3/d60/structadjoint__viscous__dissipation__source__term_1_1adjoint__viscous__dissipation__source__term__t.html" title="An adjoint source term for objectives of viscous dissipation." alt="" coords="174,280,392,342"/>
+<area shape="poly" id="edge36_Node000000_Node000004" title=" " alt="" coords="112,243,169,266,200,279,194,280,167,271,112,248"/>
+<area shape="rect" id="Node000005" href="$db/db4/structsimple__brinkman__source__term_1_1simple__brinkman__source__term__t.html" title="A simple Brinkman source term." alt="" coords="191,365,376,427"/>
+<area shape="poly" id="edge37_Node000000_Node000005" title=" " alt="" coords="81,250,118,302,142,328,169,351,194,367,188,367,166,356,139,332,114,305,79,256"/>
+</map>

@@ -1,0 +1,15 @@
+<map id="/home/runner/work/neko&#45;top/neko&#45;top/source/sources/mapping_functions/bcknd/device/hip/RAMP_mapping.hip" name="/home/runner/work/neko&#45;top/neko&#45;top/source/sources/mapping_functions/bcknd/device/hip/RAMP_mapping.hip">
+<area shape="rect" id="Node000001" title=" " alt="" coords="220,5,459,84"/>
+<area shape="rect" id="Node000002" title=" " alt="" coords="5,140,71,168"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="220,86,84,134,80,136,78,131,82,130,219,81"/>
+<area shape="rect" id="Node000003" title=" " alt="" coords="95,140,165,168"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="266,84,170,136,168,131,261,85"/>
+<area shape="rect" id="Node000004" title=" " alt="" coords="189,140,324,168"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="312,83,278,130,274,126,307,86"/>
+<area shape="rect" id="Node000005" title=" " alt="" coords="349,132,495,177"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="370,82,399,120,394,119,368,87"/>
+<area shape="rect" id="Node000006" title=" " alt="" coords="519,140,696,168"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="437,82,564,134,558,135,436,87"/>
+<area shape="rect" id="Node000007" href="$d0/dbf/hip_2RAMP__mapping__kernel_8h.html" title=" " alt="" coords="720,140,902,168"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="460,71,741,136,736,137,459,76"/>
+</map>

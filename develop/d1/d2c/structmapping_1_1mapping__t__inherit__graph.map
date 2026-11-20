@@ -1,0 +1,15 @@
+<map id="mapping::mapping_t" name="mapping::mapping_t">
+<area shape="rect" id="Node000001" title="Base abstract class for mapping." alt="" coords="5,204,161,231"/>
+<area shape="rect" id="Node000002" href="$d1/d05/structborrvall__petersson__mapping_1_1borrvall__petersson__mapping__t.html" title="A Borrvall &amp; Petersson mapping of coefficients This is the material interpolation described by Borrva..." alt="" coords="209,5,423,67"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="100,190,145,134,174,103,207,77,229,66,225,69,210,81,178,107,149,137,104,193"/>
+<area shape="rect" id="Node000003" href="$d3/dff/structheaviside__mapping_1_1heaviside__mapping__t.html" title="Smooth Heaviside mapping." alt="" coords="236,91,396,136"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="118,193,208,146,241,135,237,138,210,151,122,197"/>
+<area shape="rect" id="Node000004" href="$d8/de7/structlinear__mapping_1_1linear__mapping__t.html" title="A linear mapping of coefficients $f(x) = f_{min} + (f_{max} &#45; f_{min}) x$." alt="" coords="232,160,400,205"/>
+<area shape="poly" id="edge3_Node000001_Node000004" title=" " alt="" coords="175,201,234,194,230,197,177,206"/>
+<area shape="rect" id="Node000005" href="$db/d00/structpde__filter__mapping_1_1pde__filter__t.html" title="A PDE based filter mapping , see Lazarov &amp; O. Sigmund 2010, by solving an equation of the form ." alt="" coords="243,230,389,274"/>
+<area shape="poly" id="edge4_Node000001_Node000005" title=" " alt="" coords="176,229,244,240,240,242,176,234"/>
+<area shape="rect" id="Node000006" href="$db/d4d/structramp__mapping_1_1ramp__mapping__t.html" title="A RAMP mapping of coefficients This is the standard RAMP described in https://doi...." alt="" coords="235,299,396,344"/>
+<area shape="poly" id="edge5_Node000001_Node000006" title=" " alt="" coords="120,237,210,284,241,298,236,299,208,289,120,242"/>
+<area shape="rect" id="Node000007" href="$d7/d04/structsimp__mapping_1_1simp__mapping__t.html" title="A SIMP mapping of coefficients." alt="" coords="237,368,394,413"/>
+<area shape="poly" id="edge6_Node000001_Node000007" title=" " alt="" coords="103,242,148,299,177,328,210,354,239,371,234,370,207,358,174,332,144,302,101,247"/>
+</map>

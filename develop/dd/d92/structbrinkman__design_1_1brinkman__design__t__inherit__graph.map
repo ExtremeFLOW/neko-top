@@ -1,0 +1,5 @@
+<map id="brinkman_design::brinkman_design_t" name="brinkman_design::brinkman_design_t">
+<area shape="rect" id="Node000001" title="A topology optimization design variable." alt="" coords="5,81,209,126"/>
+<area shape="rect" id="Node000002" href="$da/d3b/structdesign_1_1design__t.html" title="An abstract design type." alt="" coords="43,5,171,33"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="109,47,109,81,105,79,105,51"/>
+</map>

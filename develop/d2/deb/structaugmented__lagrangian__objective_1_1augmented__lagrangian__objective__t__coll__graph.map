@@ -1,0 +1,7 @@
+<map id="augmented_lagrangian_objective::augmented_lagrangian_objective_t" name="augmented_lagrangian_objective::augmented_lagrangian_objective_t">
+<area shape="rect" id="Node000001" title="An objective function implementing our augmented lagrangian sensitivity contribution." alt="" coords="5,174,182,235"/>
+<area shape="rect" id="Node000002" href="$d3/d95/structobjective_1_1objective__t.html" title="The abstract objective type." alt="" coords="13,98,174,126"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="95,139,96,174,91,172,92,144"/>
+<area shape="rect" id="Node000003" href="$d0/da6/structbase__functional_1_1base__functional__t.html" title="The base functional type." alt="" coords="12,5,175,50"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="94,63,96,98,91,97,93,68"/>
+</map>

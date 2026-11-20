@@ -1,0 +1,14 @@
+<map id="steepest_descent_math::sd_update_move_limits" name="steepest_descent_math::sd_update_move_limits">
+<area shape="rect" id="Node000001" title="Adapt the move limits (Eq. D23)." alt="" coords="5,79,190,123"/>
+<area shape="rect" id="Node000002" href="$d4/dca/namespacedevice__steepest__descent.html#a299b66b0cd4005b9321bb6bf621ba587" title="Adapt the move limits on the device (Eq. D23)." alt="" coords="250,32,440,93"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="190,84,237,79,232,80,191,89"/>
+<area shape="rect" id="Node000006" href="$d1/df4/namespacesteepest__descent__cpu.html#aac44ed9c7671328d55ce193f1d9a8eed" title="Adapt the move limits on CPU (Eq. D23)." alt="" coords="238,117,452,162"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="190,113,225,120,220,121,190,118"/>
+<area shape="rect" id="Node000003" href="$da/d18/steepest__descent_8cu.html#adc9f2c1aca0855dc494d649469d58a2a" title=" " alt="" coords="500,5,670,50"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="440,46,487,42,482,43,441,51"/>
+<area shape="rect" id="Node000005" href="$de/d19/steepest__descent_8hip.html#a721d22416e571264f4d73dd315e0585c" title=" " alt="" coords="506,75,665,119"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="440,73,493,83,488,83,440,79"/>
+<area shape="rect" id="Node000004" href="$d0/da1/cuda_2steepest__descent__kernel_8h.html#a954d914d8242876689c6ce54f8f608ba" title=" " alt="" coords="718,40,895,85"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="670,38,706,46,700,46,670,44"/>
+<area shape="poly" id="edge5_Node000005_Node000004" title=" " alt="" coords="665,82,700,79,705,78,666,87"/>
+</map>
