@@ -95,9 +95,12 @@ runs:
     # Setup the system for building the ParMETIS library
 
     - name: Install dependencies
+      if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt-get install -y openmpi-bin libopenmpi-dev
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          cmake make openmpi-bin libopenmpi-dev ${{ inputs.c-compiler }}
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the ParMETIS library.

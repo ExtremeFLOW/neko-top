@@ -110,7 +110,11 @@ runs:
       if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt-get install -y openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
+        # The compilers come from the job: the MPI wrappers use OMPI_FC, and
+        # CMake uses CC for the C sources.
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          cmake make openmpi-bin libopenmpi-dev libopenblas-dev liblapack-dev
 
     # ------------------------------------------------------------------------ #
     # Configure, build, install the library
