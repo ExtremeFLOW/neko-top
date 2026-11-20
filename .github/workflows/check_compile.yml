@@ -129,9 +129,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Use a fast apt mirror
-        uses: ./.github/actions/apt_mirror
-
       - name: Setup system dependencies
         shell: bash
         run: |
@@ -168,9 +165,14 @@ jobs:
           printf '%s\n' "CXX=$cxx" "OMPI_CXX=$cxx" >> "$GITHUB_ENV"
           printf '%s\n' "f-compiler=$fc" "c-compiler=$cc" >> "$GITHUB_OUTPUT"
 
+      # The backend packages are large (1.5-3.5 GB) and apt mirrors are at
+      # times very slow. With a responsive mirror this step takes about
+      # 3 minutes (up to 7 for HIP), so give up after 15 rather than letting a
+      # slow mirror use the job's full 60 minutes, and re-run the job instead.
       - name: Setup backend
         id: setup-backend
         shell: bash
+        timeout-minutes: 15
         run: ${{ matrix.setup-backend }}
 
       # ---------------------------------------------------------------------- #

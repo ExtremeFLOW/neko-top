@@ -44,9 +44,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Use a fast apt mirror
-        uses: ./.github/actions/apt_mirror
-
       - name: Setup system dependencies
         run: |
           sudo apt-get update

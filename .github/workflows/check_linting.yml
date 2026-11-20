@@ -162,9 +162,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Use a fast apt mirror
-        uses: ./.github/actions/apt_mirror
-
       - name: Setup env.
         run: |
           sudo apt-get update

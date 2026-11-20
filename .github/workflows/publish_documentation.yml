@@ -59,9 +59,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           path: tools
-          sparse-checkout: |
-            documentation/versioning
-            .github/actions/apt_mirror
+          sparse-checkout: documentation/versioning
 
       - name: Determine the version
         id: version
@@ -89,9 +87,6 @@ jobs:
           fi
           echo "Publishing $REF as $version."
           echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Use a fast apt mirror
-        uses: ./tools/.github/actions/apt_mirror
 
       - name: Build the documentation
         working-directory: source
