@@ -1,0 +1,30 @@
+name: Use a fast apt mirror
+description: >-
+  Replace the slow Ubuntu EC2 apt mirror of runners hosted on AWS with the Azure
+  mirror. Use it before the first apt-get call of a job. Runners hosted on Azure
+  are left as they are.
+
+runs:
+  using: composite
+  steps:
+    # GitHub runs its Ubuntu images on Azure and, since November 2026, also on
+    # AWS (the "Set up job" log shows "Cloud: AWS", see
+    # https://github.com/actions/runner-images/pull/15335). The AWS images list
+    # us-east-2.ec2.archive.ubuntu.com as their first apt mirror, which often
+    # serves packages at 0.1-2 MB/s instead of tens of MB/s. apt only moves on
+    # to the next mirror when a download stalls, not when it is slow, so the
+    # CUDA toolkit (1.5-2 GB) can run into the job timeout. The Azure mirror is
+    # fast from both clouds.
+    - name: Use a fast apt mirror
+      shell: bash
+      run: |
+        pattern='s#https?://[a-z0-9-]+\.ec2\.archive\.ubuntu\.com/ubuntu/?#http://azure.archive.ubuntu.com/ubuntu/#'
+        # The images list the mirrors in apt-mirrors.txt, but check the
+        # sources as well in case cloud-init wrote the mirror there directly.
+        for file in /etc/apt/apt-mirrors.txt /etc/apt/sources.list \
+          /etc/apt/sources.list.d/ubuntu.sources; do
+          if [ -f "$file" ] && grep -Eq '\.ec2\.archive\.ubuntu\.com' "$file"; then
+            sudo sed -i -E "$pattern" "$file"
+            echo "Replaced the EC2 apt mirror with the Azure mirror in $file."
+          fi
+        done

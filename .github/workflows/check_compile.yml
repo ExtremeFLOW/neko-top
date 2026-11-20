@@ -131,6 +131,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Use a fast apt mirror
+        uses: ./.github/actions/apt_mirror
+
       # ubuntu-latest moves between releases, so derive the actual release
       # for distribution-specific package repositories.
       - name: Detect runner image

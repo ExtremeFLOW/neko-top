@@ -38,6 +38,10 @@ jobs:
           path: documentation/html/
           key: ${{ steps.create-key.outputs.key }}
 
+      - name: Use a fast apt mirror
+        if: steps.cache-documentation.outputs.cache-hit != 'true'
+        uses: ./.github/actions/apt_mirror
+
       - name: Setup system
         if: steps.cache-documentation.outputs.cache-hit != 'true'
         run: |
