@@ -51,6 +51,7 @@ add_subdirectory(${EXAMPLES_DIR}/unsteady_mixer)
 add_subdirectory(${EXAMPLES_DIR}/unsteady_rugby_ball)
 add_subdirectory(${EXAMPLES_DIR}/heat_compliance)
 add_subdirectory(${EXAMPLES_DIR}/wiggles)
+add_subdirectory(${EXAMPLES_DIR}/sensitivity_test)
 
 # If the benchmark_mixer folder exists, add it as well
 if (EXISTS ${EXAMPLES_DIR}/benchmark_mixer/CMakeLists.txt)
