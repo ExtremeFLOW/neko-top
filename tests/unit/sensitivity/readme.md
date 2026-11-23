@@ -395,6 +395,19 @@ Currently, we have added tests for the following components:
   this objective's own `update_sensitivity` is empty.
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
+- `viscous_dissipation_objective_t` and `brinkman_dissipation_objective_t`
+  after a weight continuation step (`viscous_dissipation_continuation.case`,
+  `brinkman_dissipation_continuation.case`) — the same cases with the weight
+  given as `[10.0, 1.0]` (viscous) and `[1.0, 10.0]` (Brinkman). The
+  optional key `optimization.fd_test_continuation_iteration` makes the driver
+  advance the continuation scheduler to that iteration before
+  differentiating. The adjoint forcing must follow the weight: with it frozen
+  at the first value the error at the smallest perturbation was `-8.99e-1`
+  (viscous) and `-2.47e-2` (Brinkman). Following it, the viscous case
+  reproduces the plain case exactly, and the Brinkman case, at ten times the
+  weight, has the plain case's error of `4.26e-3`. The Brinkman case ends at
+  a weight other than 1, so it also fails if the forcing drops the weight
+  altogether.
 - `brinkman_dissipation_objective_t`, steady with a time window
   (`brinkman_dissipation_window.case`) — `brinkman_dissipation.case` with the
   objective's window starting at `t = 1`, after the run has ended at
@@ -484,6 +497,19 @@ Currently, we have added tests for the following components:
   moved to the strict criterion) and `1e-3`, lie between the two. Whenever
   the cases or the driver's probe selection change, confirm again that both
   fail with the masked full weak Laplacian as the forcing.
+- `unsteady_restart_sensitivity`, a pFUnit test (`unsteady_restart.pf`) on
+  `unsteady_brinkman_dissipation.case`, restarted through `case.restart_file`
+  from a Neko checkpoint file. A restarted run starts from the time of the
+  file but counts its time steps from zero, and the start time of the case
+  stays where it is. The test writes a checkpoint file holding the initial
+  state 10 time steps after the start time. The run restarted from it must
+  give the objective value and the sensitivity of the same 10 time steps
+  taken from the start time, to round-off. With `n_memory` set to 4, the
+  adjoint restores states from RAM, by restarting from the checkpoint files
+  of the run, and from a checkpoint file alone. When the state recovery sized
+  the run from the start time of the case, it kept none of the states in RAM,
+  the adjoint restored slots that were never written, and the sensitivity was
+  22% off.
 
 `scalar_mixing_objective_t` is not covered here: a dedicated case
 (`scalar_mixing.case`) was tried at unit-tier resolution but could not

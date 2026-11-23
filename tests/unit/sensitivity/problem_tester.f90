@@ -24,6 +24,7 @@ program problem_tester
        fd_read_targets, fd_target_t, fd_argmax_probe_index
   use fd_criterion, only: fd_strict_options_t
   use logger, only: neko_log, LOG_SIZE
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
 
   ! JSON related arguments
@@ -61,6 +62,7 @@ program problem_tester
   type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
+  integer :: continuation_iteration
 
   !> What this run checks: the weighted objective total, individual
   !! constraints, or any mixture of the two. Defaults to the historical
@@ -89,6 +91,11 @@ program problem_tester
   call json_get(parameters, 'optimization.design', design_parameters)
   call json_get_or_default(parameters, 'optimization.fd_test_tolerance', &
        tolerance, 1e-5_rp)
+  ! Optionally advance the continuation scheduler to the given optimisation
+  ! iteration before differentiating, as the optimizer does.
+  call json_get_or_default(parameters, &
+       'optimization.fd_test_continuation_iteration', continuation_iteration, &
+       0)
 
   ! This tier always takes a one-sided difference, hence the .false.
   call fd_read_strict_options(parameters, .false., strict_options)
@@ -102,9 +109,13 @@ program problem_tester
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
+  call nekotop_continuation%init(parameters)
   call sim%init(parameters)
   call des%init(design_parameters, sim)
   call prob%init(parameters, des, sim)
+  if (continuation_iteration .gt. 0) then
+     call nekotop_continuation%update(continuation_iteration)
+  end if
 
   ! -------------------------------------------------------------------------- !
   ! Determine what to check. A case may name any mixture of the weighted
@@ -225,6 +236,7 @@ program problem_tester
   call prob%free()
   call des%free()
   call sim%free()
+  call nekotop_continuation%free()
 
   ! Finalize the Neko environment
   call neko_finalize()
