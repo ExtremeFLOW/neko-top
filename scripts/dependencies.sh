@@ -454,23 +454,18 @@ function find_neko() {
         fi
 
         # Update compile dependencies if makedepf90 is installed
-        if [[ -n "$(which makedepf90)" && "$NEKO_CLEAN" == true ]]; then
-            size_pre=$(stat -c %s src/.depends)
-            cd src/ && make depend && cd ../
-            if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
-                automake -a
-                rm -fr autom4te.cache
-            fi
+        if [[ -n "$(which makedepf90 2>/dev/null)" && "$NEKO_CLEAN" == true ]]; then
+            cd $NEKO_DIR/src/ && make depend && cd $NEKO_DIR
         fi
 
-        echo "Building and installing Neko, see logs for output"
-        rm -f build.log check.log install.log
-        [ "$NEKO_CLEAN" == true ] && make clean >> build.log
-        make -j >> build.log
-        [ "$NEKO_TEST" == true ] && make check -j >> check.log
-        make install >> install.log
-
-        cd $CURRENT_DIR
+        if [ "$NEKO_CLEAN" == true ]; then
+            echo "Building and installing Neko, see logs for output"
+            rm -f build.log check.log install.log
+            [ "$NEKO_CLEAN" == true ] && make clean >> build.log
+            make -j >> build.log
+            [ "$NEKO_TEST" == true ] && make check -j >> check.log
+            make install >> install.log
+        fi
 
         # Revert the patches to keep the repository clean
         if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
@@ -480,6 +475,8 @@ function find_neko() {
                 fi
             done
         fi
+
+        cd $CURRENT_DIR
     fi
 
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
