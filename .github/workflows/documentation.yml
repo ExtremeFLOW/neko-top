@@ -42,7 +42,10 @@ jobs:
         if: steps.cache-documentation.outputs.cache-hit != 'true'
         run: |
           sudo apt-get update
-          sudo apt-get install -y git cmake doxygen graphviz
+          # CMake enables Fortran before it reads ONLY_DOCS, and graphviz
+          # draws the text in the diagrams with the Liberation fonts.
+          sudo apt-get install -y --no-install-recommends \
+            git cmake gfortran doxygen graphviz fonts-liberation
 
       - name: Configure
         if: steps.cache-documentation.outputs.cache-hit != 'true'

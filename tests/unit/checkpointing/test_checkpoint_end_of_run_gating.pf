@@ -141,7 +141,7 @@ contains
 
     call chkp%init_from_components(sim%neko_case, 'linear', &
          n_saves_memory = checkpoint_saves_in_memory, &
-         path = 'checkpoint_end_of_run_gating', &
+         path = 'checkpoint_end_of_run_gating_chkp', &
          filename = 'checkpoint', &
          fmt = 'chkp', &
          keep_checkpoints = .false.)
