@@ -77,33 +77,31 @@ jobs:
 
         # Define the setup jobs.
         include:
-          - compiler: GNU-13
-            setup-compiler: |
-              echo "FC=gfortran-13" >> $GITHUB_ENV
-              echo "OMPI_FC=gfortran-13" >> $GITHUB_ENV
-              echo "c-compiler=gcc-13" >> $GITHUB_OUTPUT
-              echo "f-compiler=gfortran-13" >> $GITHUB_OUTPUT
-
-          - compiler: GNU-14
-            setup-compiler: |
-              echo "FC=gfortran-14" >> $GITHUB_ENV
-              echo "OMPI_FC=gfortran-14" >> $GITHUB_ENV
-              echo "c-compiler=gcc-14" >> $GITHUB_OUTPUT
-              echo "f-compiler=gfortran-14" >> $GITHUB_OUTPUT
-
-          - compiler: GNU-15
-            setup-compiler: |
-              echo "FC=gfortran-15" >> $GITHUB_ENV
-              echo "OMPI_FC=gfortran-15" >> $GITHUB_ENV
-              echo "c-compiler=gcc-15" >> $GITHUB_OUTPUT
-              echo "f-compiler=gfortran-15" >> $GITHUB_OUTPUT
-
+          # Setup device specific dependencies.
+          # Here we make sure to keep installs minimal by dropping actual
+          # drivers, and other unnecessary packages, since the runners do not
+          # have GPUs.
           - backend: CUDA
             setup-backend: |
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends nvidia-cuda-toolkit
+              sudo apt-get clean
               echo "backend-path=/usr" >> $GITHUB_OUTPUT
 
           - backend: HIP
             setup-backend: |
+              # Following the instructions from
+              # https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html
+
+              source /etc/os-release
+              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/$VERSION_CODENAME/
+              sudo apt-get install -y --no-install-recommends ./amdgpu-install_*.deb
+              rm -f amdgpu-install_*.deb
+
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends rocm-dev hipblas-dev hipsolver-dev
+              sudo apt-get clean
+
               ROCM_DIR=$(ls -d /opt/rocm-*)
               CMAKE_PREFIX_PATH="$ROCM_DIR/lib/cmake:$CMAKE_PREFIX_PATH"
               echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
@@ -131,64 +129,50 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # ubuntu-latest moves between releases, so derive the actual release
-      # for distribution-specific package repositories.
-      - name: Detect runner image
-        id: image
-        shell: bash
-        run: |
-          source /etc/os-release
-          echo "codename=$VERSION_CODENAME" >> $GITHUB_OUTPUT
-
-      - name: Setup Compiler
-        id: setup-compiler
-        shell: bash
-        run: ${{ matrix.setup-compiler }}
-
       - name: Setup system dependencies
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake libopenblas-dev libopenmpi-dev \
-            openmpi-bin pkg-config liblapack-dev ninja-build
+          sudo apt-get install -y --no-install-recommends \
+            cmake libopenblas-dev libopenmpi-dev openmpi-bin pkg-config \
+            liblapack-dev ninja-build
 
-      # Setup device specific dependencies.
-      #
-      # The GPU toolchains are installed directly instead of through an apt
-      # cache: restoring a multi-GB cache is no faster than downloading from the
-      # package mirrors, and those caches use most of the 10 GB cache quota.
-      # Only the compilers and the libraries we link are needed, as the runners
-      # have no GPU to run on.
-
-      # nvcc plus cudart/cusolver (neko-top) and cudart (neko). Recommends only
-      # add profilers, documentation and Java/X11 dependencies.
-      - name: Setup Device (CUDA)
-        if: matrix.backend == 'cuda'
-        run: |
-          sudo apt-get install -y --no-install-recommends nvidia-cuda-toolkit
-          # Drop the downloaded packages to free disk space.
-          sudo apt-get clean
-
-      # The HIP compiler and runtime plus hipblas/hipsolver (neko-top). The
-      # kernel driver (amdgpu-dkms) is not needed to compile.
-      - name: Setup Device (HIP)
-        if: matrix.backend == 'hip'
+      # Install the compiler of the matrix entry and make every build use it,
+      # both directly and through the OpenMPI wrappers (mpif90, mpicc, ...).
+      - name: Setup Compiler
+        id: setup-compiler
+        shell: bash
         env:
-          CODENAME: ${{ steps.image.outputs.codename }}
+          COMPILER: ${{ matrix.compiler }}
         run: |
-          # Following the instructions from https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html
+          case "$COMPILER" in
+            GNU-*)
+              version=${COMPILER#GNU-}
+              fc=gfortran-$version cc=gcc-$version cxx=g++-$version
+              packages="$fc $cc $cxx"
+              ;;
+            *)
+              echo "Unknown compiler '$COMPILER'." >&2
+              exit 1
+              ;;
+          esac
 
-          wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/$CODENAME/
-          sudo apt-get install -y ./amdgpu-install_*.deb
           sudo apt-get update
-          sudo apt-get install -y rocm-dev hipblas-dev hipsolver-dev
-          # Drop the downloaded packages to free disk space.
-          sudo apt-get clean
-          rm -f amdgpu-install_*.deb
+          sudo apt-get install -y --no-install-recommends $packages
 
+          printf '%s\n' "FC=$fc" "OMPI_FC=$fc" >> "$GITHUB_ENV"
+          printf '%s\n' "CC=$cc" "OMPI_CC=$cc" >> "$GITHUB_ENV"
+          printf '%s\n' "CXX=$cxx" "OMPI_CXX=$cxx" >> "$GITHUB_ENV"
+          printf '%s\n' "f-compiler=$fc" "c-compiler=$cc" >> "$GITHUB_OUTPUT"
+
+      # The backend packages are large (1.5-3.5 GB) and apt mirrors are at
+      # times very slow. With a responsive mirror this step takes about
+      # 3 minutes (up to 7 for HIP), so give up after 15 rather than letting a
+      # slow mirror use the job's full 60 minutes, and re-run the job instead.
       - name: Setup backend
         id: setup-backend
         shell: bash
+        timeout-minutes: 15
         run: ${{ matrix.setup-backend }}
 
       # ---------------------------------------------------------------------- #
@@ -207,6 +191,7 @@ jobs:
         uses: ./.github/actions/setup_parmetis
         with:
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
 
       - name: Get HDF5
         id: get-hdf5
@@ -229,6 +214,7 @@ jobs:
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
           backend: ${{ matrix.backend }}
           backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
@@ -269,17 +255,17 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Running Unit Tests
-        if: ${{ matrix.backend == 'cpu' }}
+        if: ${{ matrix.backend == 'CPU' }}
         run: |
           ctest -L unit --test-dir build --output-on-failure --parallel
 
       - name: Building Examples
-        if: ${{ matrix.backend == 'cpu' }}
+        if: ${{ matrix.backend == 'CPU' }}
         run: |
           cmake --build build --target Examples --parallel
 
       - name: Run Rugby Ball
-        if: ${{ matrix.backend == 'cpu' }}
+        if: ${{ matrix.backend == 'CPU' }}
         env:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
