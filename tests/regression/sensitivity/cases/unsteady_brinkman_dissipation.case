@@ -92,6 +92,7 @@
     "optimization": {
         "design": {
             "type": "brinkman",
+            "dealias": true,
             "mapping": [
                 {
                     "type": "PDE_filter",
@@ -114,6 +115,9 @@
                 "zone_name": "optimization_domain"
             }
         },
+        "augmented_lagrangian": {
+            "dealias_sensitivity": true
+        },
         "solver": {
             "type": "mma",
             "max_iterations": 50,
@@ -129,7 +133,9 @@
         "objectives": [
             {
                 "type": "brinkman_dissipation",
-                "weight": 1.0
+                "weight": 1.0,
+                "dealias_sensitivity": true,
+                "dealias_forcing": true
             }
         ]
     }

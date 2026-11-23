@@ -6,11 +6,16 @@ set(test_list
     "volume.case"
     "volume_filtered.case"
     "viscous_dissipation.case"
+    "brinkman_dissipation_window.case"
     "brinkman_dissipation.case"
     "viscous_dissipation_variable_dt.case"
     "viscous_dissipation_variable_dt_weighted.case"
     "unsteady_brinkman_dissipation.case"
     "unsteady_brinkman_dissipation_masked.case"
+    "viscous_dissipation_masked.case"
+    "unsteady_viscous_dissipation_masked.case"
+    "unsteady_brinkman_dissipation_window.case"
+    "unsteady_brinkman_dissipation_window_end.case"
 )
 
 # Path to the common driver source
@@ -95,7 +100,6 @@ foreach(case_file ${test_list})
     )
     set_tests_properties(${case_name}_sensitivity
         PROPERTIES
-            DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
             TIMEOUT 300
@@ -134,7 +138,6 @@ add_test(NAME ${case_name}
 )
 set_tests_properties(${case_name}
     PROPERTIES
-        DEPENDS "adjoint_joblimit_tester_bin;sensitivity_test_prepare"
         LABELS "sensitivity;unit"
         ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
         TIMEOUT 300
@@ -143,3 +146,29 @@ set_tests_properties(${case_name}
 # ============================================================================ #
 # Final dependencies
 add_dependencies(Unit sensitivity_test_prepare)
+
+# ============================================================================ #
+# The unsteady sensitivity of a run restarted from a checkpoint file must be
+# that of the same run from the start time, see unsteady_restart.pf. It runs
+# unsteady_brinkman_dissipation.case, which the loop above copies here.
+add_pfunit_ctest(unsteady_restart_sensitivity
+    TEST_SOURCES unsteady_restart.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 1
+)
+
+# Disable treating pFUnit's generated variables as unused.
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(unsteady_restart_sensitivity PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+set_tests_properties(unsteady_restart_sensitivity PROPERTIES
+    LABELS "sensitivity;unit"
+    ENVIRONMENT "NEKO_LOG_FILE=unsteady_restart_sensitivity.log"
+    TIMEOUT 300
+)
+add_dependencies(Unit unsteady_restart_sensitivity)
+add_dependencies(unsteady_restart_sensitivity sensitivity_test_prepare)

@@ -102,16 +102,26 @@ The filter can be selected by prescribing `"type": "PDE_filter"` and has the
 following input parameters:
 
 
-| Name             | Description                                                       | Admissible values         | Default value  |
-| ---------------- | ----------------------------------------------------------------- | ------------------------- | -------------- |
-| `r`              | Physical filter radius. Internally scaled as \f$r/(2\sqrt{3})\f$. | Real                      | -              |
-| `tol`            | The desired tolerance used when solving the system.               | Real                      | `0.0000000001` |
-| `max_iter`       | Maximum number of iterations when solving the system.             | Integer                   | `200`          |
-| `solver`         | Numerical solver used to solve the system.                        | `cg`,`gmres`, `gmres`     | `cg`           |
-| `preconditioner` | Pre-conditioner used to solve the system.                         | `ident`, `hsmg`, `jacobi` | `jacobi`       |
+| Name                 | Description                                                       | Admissible values         | Default value  |
+| -------------------- | ----------------------------------------------------------------- | ------------------------- | -------------- |
+| `r`                  | Physical filter radius. Internally scaled as \f$r/(2\sqrt{3})\f$. | Real                      | -              |
+| `tol`                | The desired tolerance used when solving the system.               | Real                      | `0.0000000001` |
+| `max_iter`           | Maximum number of iterations when solving the system.             | Integer                   | `200`          |
+| `solver`             | Numerical solver used to solve the system.                        | `cg`, `gmres`             | `cg`           |
+| `preconditioner`     | Pre-conditioner used to solve the system.                         | `ident`, `hsmg`, `jacobi` | `jacobi`       |
+| `strict_convergence` | Stop with an error when a filter solve does not converge.         | `true` or `false`         | `false`        |
 
 Since the Helmholtz operator is Symmetric Positive Definite (SPD), `CG` is recommended.
 The convergence rate is highly dependent on the filter radius; larger radii typically improve the condition number.
+
+The tolerance `tol` applies to the absolute residual, so the number of
+iterations needed to reach it depends on the mesh, the polynomial order, the
+filter radius and the magnitude of the field being filtered.
+A filter solve that does not reach it within
+`max_iter` iterations is reported with a warning in the log, and the
+unconverged result is used. With `"strict_convergence": true` the run stops
+with an error instead. The filter does not follow
+`case.fluid.strict_convergence`; set the key on each filter that needs it.
 
 ## Linear mapping {#mapping_linear}
 A linear mapping of the form

@@ -61,9 +61,11 @@
                         {
                             "type": "boundary_mesh",
                             "name": "data/surfaces/cylinder.stl",
+                            // Indicator 1 inside the cylinder, 0 beyond a thin
+                            // band; the PDE filter radius sets the smoothing.
                             "distance_transform": {
-                                "type": "step",
-                                "value": 0.0
+                                "type": "smooth_step",
+                                "value": 0.001
                             },
                             "mesh_transform": {
                                 "type": "bounding_box",

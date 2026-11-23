@@ -37,7 +37,7 @@ module adjoint_fluid_scheme
   use checkpoint, only: chkp_t
   use num_types, only: rp
   use field, only: field_t
-  use space, only: space_t
+  use space, only: space_t, GL
   use dofmap, only: dofmap_t
   use coefs, only: coef_t
   use dirichlet, only: dirichlet_t
@@ -55,6 +55,7 @@ module adjoint_fluid_scheme
   use field_list, only : field_list_t
   use interpolation, only: interpolator_t
   use scratch_registry, only : scratch_registry_t
+  use utils, only: neko_error
 
   implicit none
   private
@@ -82,6 +83,8 @@ module adjoint_fluid_scheme
      type(interpolator_t) :: GLL_to_GL
      !> Scratch registry on the GL space
      type(scratch_registry_t) :: scratch_GL
+     !> Has the Gauss over-integration stack above been built?
+     logical :: gauss_initialised = .false.
 
      type(time_scheme_controller_t), allocatable :: ext_bdf
 
@@ -155,6 +158,9 @@ module adjoint_fluid_scheme
      procedure(fluid_scheme_base_compute_cfl_intrf), pass(this), deferred :: compute_cfl
      !> Set rho and mu
      procedure(update_material_properties), pass(this), deferred :: update_material_properties
+     !> Build the Gauss over-integration stack on first request
+     procedure, pass(this), non_overridable :: require_gauss_stack => &
+          adjoint_fluid_scheme_require_gauss_stack
   end type adjoint_fluid_scheme_t
 
   !> Initialize all fields
@@ -295,4 +301,48 @@ module adjoint_fluid_scheme
        character(len=*) :: type_name
      end subroutine adjoint_fluid_scheme_factory
   end interface
+
+contains
+
+  !> Build the Gauss over-integration stack on first request.
+  !! @details Constructs `Xh_GL`, `dm_Xh_GL`, `gs_Xh_GL`, `c_Xh_GL`,
+  !! `GLL_to_GL` and `scratch_GL`. The stack is only needed by consumers that
+  !! over-integrate, so it is built on demand rather than in `init_base`.
+  !! The routine is idempotent: a repeated call is a no-op, leaving any
+  !! pointers already captured into the stack valid.
+  !! @note `dofmap_t%init`, `gs_t%init` and `coef_t%init` are collective, so
+  !! every call site must be reached by all ranks.
+  !! @note Must be called after `init_base`, which associates `msh` and
+  !! initialises `Xh`; both are read here.
+  !! @param this The adjoint fluid scheme owning the stack.
+  subroutine adjoint_fluid_scheme_require_gauss_stack(this)
+    class(adjoint_fluid_scheme_t), target, intent(inout) :: this
+    integer :: lxd
+
+    if (this%gauss_initialised) return
+
+    if (.not. associated(this%msh)) then
+       call neko_error('require_gauss_stack called before init_base')
+    end if
+
+    ! over intergration order (hard coded now, should be optional)
+    lxd = (3 * (this%Xh%lx + 1)) / 2
+
+    call this%Xh_GL%init(GL, lxd, lxd, lxd)
+
+    call this%dm_Xh_GL%init(this%msh, this%Xh_GL)
+
+    call this%gs_Xh_GL%init(this%dm_Xh_GL)
+
+    call this%c_Xh_GL%init(this%gs_Xh_GL)
+
+    call this%GLL_to_GL%init(this%Xh_GL, this%Xh)
+
+    ! Overintegration scratch registry (5 should be sufficient)
+    call this%scratch_GL%init(5, 2, this%dm_Xh_GL)
+
+    this%gauss_initialised = .true.
+
+  end subroutine adjoint_fluid_scheme_require_gauss_stack
+
 end module adjoint_fluid_scheme

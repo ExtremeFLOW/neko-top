@@ -1,66 +1,69 @@
 # Cleanup.yml
 # ---------------------------------------------------------------------------- #
-# Cleanup workflow upon merge. Remove stored cache and temporary files.
+# Remove caches that no other branch can use: those created for a pull
+# request's merge ref, and those created by merge queue runs.
 # ---------------------------------------------------------------------------- #
 
 name: Cleanup After Merge
 on:
-  workflow_call: # Triggered by other workflows
+  workflow_call: # Called at the end of merge queue (merge_group) runs
   pull_request_target: # Trigger on pull request close
     types: closed
 
 permissions:
-  contents: read # Minimum permission for actions/checkout
-  pull-requests: read # To read PR info
-  actions: write # To delete caches
+  actions: write # To list and delete caches
 
 jobs:
   cleanup:
     name: Cleanup Caches
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v6
-
-      - name: Remove Cache from merged Pull Request
+      # No checkout: only the gh CLI is needed, and pull_request_target jobs
+      # should not check out code.
+      - name: Remove caches
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BRANCH: refs/pull/${{ github.event.pull_request.number }}/merge
-
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          MERGE_GROUP_REF: ${{ github.event.merge_group.head_ref }}
         run: |
-          echo "Fetching list of cache keys"
-          cacheKeysForPR=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
+          # Select the caches to remove: those whose ref equals EXACT_REF or
+          # starts with REF_PREFIX. Both are checked to be non-empty, as an
+          # empty prefix would match every cache in the repository.
+          case "$EVENT_NAME" in
+            pull_request_target)
+              # The pull request's merge ref, and any merge queue branches
+              # created for it (gh-readonly-queue/<base>/pr-<number>-<sha>).
+              EXACT_REF="refs/pull/$PR_NUMBER/merge"
+              REF_PREFIX="refs/heads/gh-readonly-queue/$BASE_REF/pr-$PR_NUMBER-"
+              [[ -n "$PR_NUMBER" && -n "$BASE_REF" ]] || exit 1
+              ;;
+            merge_group)
+              # The merge queue branch of this run.
+              EXACT_REF="$MERGE_GROUP_REF"
+              REF_PREFIX="$MERGE_GROUP_REF"
+              [[ -n "$MERGE_GROUP_REF" ]] || exit 1
+              ;;
+            *)
+              echo "Nothing to clean up for $EVENT_NAME events."
+              exit 0
+              ;;
+          esac
+          export EXACT_REF REF_PREFIX
+          echo "Removing caches for $EXACT_REF and $REF_PREFIX*"
 
-          if [ -z "$cacheKeysForPR" ]; then
-            echo "No caches found for this ref"
-          else
-            echo "Deleting caches..."
-            for cacheKey in $cacheKeysForPR
-            do
-                echo "Deleting cache with key: $cacheKey"
-                gh cache delete $cacheKey
-            done
+          ids=$(gh cache list --limit 1000 --json id,ref --jq '.[]
+            | select(.ref == env.EXACT_REF or (.ref | startswith(env.REF_PREFIX)))
+            | .id')
+
+          if [ -z "$ids" ]; then
+            echo "No caches found."
+            exit 0
           fi
-          echo "Done"
-
-      - name: Cleanup Cache from Merge queue
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          BRANCH: refs/heads/gh-readonly-queue/${{ github.event.pull_request.base.ref }}/pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.base.sha }}
-
-        run: |
-          echo "Fetching list of cache keys"
-          cacheKeysForMergeQueue=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
-
-          if [ -z "$cacheKeysForMergeQueue" ]; then
-            echo "No caches found for this ref"
-          else
-            echo "Deleting caches..."
-            for cacheKey in $cacheKeysForMergeQueue
-            do
-                echo "Deleting cache with key: $cacheKey"
-                gh cache delete $cacheKey
-            done
-          fi
-          echo "Done"
+          for id in $ids; do
+            echo "Deleting cache $id"
+            gh cache delete "$id"
+          done

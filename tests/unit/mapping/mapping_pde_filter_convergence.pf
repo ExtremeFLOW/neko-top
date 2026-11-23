@@ -1,0 +1,324 @@
+! Verification that PDE_filter_t reports a filter solve that does not
+! converge, rather than returning the unconverged field silently.
+!
+! The filter is initialised from JSON, as a case file does, on a one-element
+! hex mesh at polynomial order 7 (lx = 8). An unreachable tolerance together
+! with a small iteration cap stops every solve before it converges:
+!
+!   1. Without strict convergence, each unconverged solve, forward and
+!      backward, logs one warning to the file named by NEKO_LOG_FILE.
+!   2. With strict convergence, each unconverged solve raises an error. The
+!      error is redirected to a pFUnit exception, so that it can be caught.
+!   3. A converged solve neither warns nor raises an error, even with strict
+!      convergence. This also shows that the default tolerance is reached on
+!      this mesh, so the solves above stop because of the cap.
+!
+! setUp opens the log afresh, so each test counts only its own warnings. The
+! assertions come after the clean-up, so a failing test leaves nothing behind
+! for the next one.
+module mapping_pde_filter_convergence
+  use mpi
+  use pfunit
+  use funit, only: throw, catch, SourceLocation
+  use num_types, only: rp, dp
+  use mesh, only: mesh_t
+  use point, only: point_t
+  use space, only: space_t, GLL
+  use dofmap, only: dofmap_t
+  use gather_scatter, only: gs_t
+  use field, only: field_t
+  use coefs, only: coef_t
+  use PDE_filter_mapping, only: PDE_filter_t
+  use json_module, only: json_file
+  use registry, only: neko_registry
+  use scratch_registry, only: neko_scratch_registry
+  use comm, only: NEKO_COMM, pe_rank, pe_size, comm_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_init, device_finalize, device_memcpy, &
+       HOST_TO_DEVICE
+  use logger, only: neko_log
+  use utils, only: throw_error, default_throw_error
+  implicit none
+
+  !> Polynomial order of the test space (order 7 => lx = 8).
+  integer, parameter :: LX = 8
+
+  !> A filter that cannot converge: the tolerance is below round-off and the
+  !! solve is stopped after a few iterations.
+  character(len=*), parameter :: unconverged_json = &
+       '{"r": 0.2, "tol": 1.0e-30, "max_iter": 5}'
+
+  !> The same filter with strict convergence.
+  character(len=*), parameter :: strict_unconverged_json = &
+       '{"r": 0.2, "tol": 1.0e-30, "max_iter": 5, "strict_convergence": true}'
+
+  !> A filter with the default tolerance and iteration cap, and strict
+  !! convergence.
+  character(len=*), parameter :: strict_converged_json = &
+       '{"r": 0.2, "strict_convergence": true}'
+
+  !> Text of the warning logged for an unconverged solve.
+  character(len=*), parameter :: warning_text = &
+       'PDE filter solver did not converge'
+
+  @TestCase
+  type, extends(MPITestCase) :: test_pde_filter_convergence
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_pde_filter_convergence
+
+contains
+
+  subroutine setUp(this)
+    class(test_pde_filter_convergence), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call comm_init
+    ! A fresh log for each test, written to the file named by NEKO_LOG_FILE.
+    call neko_log%init()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_pde_filter_convergence), intent(inout) :: this
+    ! A test that fails early must not leave neko_error redirected.
+    throw_error => default_throw_error
+    call neko_log%free()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+  end subroutine tearDown
+
+  !> Raise a pFUnit exception in place of stopping, so that a test can catch
+  !! the error raised by a strict filter.
+  !! @param filename The file that raised the error.
+  !! @param line_number The line that raised the error.
+  !! @param message The error message, if any.
+  subroutine throw_to_pfunit(filename, line_number, message)
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: line_number
+    character(len=*), optional, intent(in) :: message
+
+    call throw('neko_error was called', SourceLocation(filename, line_number))
+
+  end subroutine throw_to_pfunit
+
+  !> Build the SEM coefficients on a single hex element spanning the unit
+  !! cube, and set up the registries the filter relies on.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter handle.
+  !! @param coef The SEM coefficients.
+  subroutine build_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+    type(point_t) :: p(8)
+    integer :: i
+
+    do i = 1, 8
+       call p(i)%init(real(mod(i - 1, 2), dp), real(mod((i - 1) / 2, 2), dp), &
+            real((i - 1) / 4, dp))
+       call p(i)%set_id(i)
+    end do
+
+    call msh%init(3, 1)
+    call msh%add_element(1, 1, p(1), p(2), p(3), p(4), p(5), p(6), p(7), &
+         p(8))
+    call msh%generate_conn()
+
+    call Xh%init(GLL, LX, LX, LX)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+    call neko_scratch_registry%init(dof = dof)
+    call neko_registry%init()
+
+  end subroutine build_fixture
+
+  !> Free everything build_fixture set up.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter handle.
+  !! @param coef The SEM coefficients.
+  subroutine free_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine free_fixture
+
+  !> An impulse at an interior node, set on the host and copied to the
+  !! device, as the filter reads the device copy on device backends.
+  !! @param f The field to set.
+  subroutine make_impulse(f)
+    type(field_t), intent(inout) :: f
+
+    f%x = 0.0_rp
+    f%x(4, 4, 4, 1) = 1.0_rp
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(f%x, f%x_d, f%size(), HOST_TO_DEVICE, .true.)
+    end if
+
+  end subroutine make_impulse
+
+  !> Close the log and count its lines that report an unconverged filter
+  !! solve. The log is closed first, as a file may not be connected to two
+  !! units at once.
+  !! @return The number of warnings, or -1 if NEKO_LOG_FILE is not set.
+  function count_warnings() result(n)
+    integer :: n
+    character(len=1024) :: log_file, line
+    integer :: log_unit, envvar_len, stat
+
+    call neko_log%free()
+
+    n = -1
+    call get_environment_variable('NEKO_LOG_FILE', log_file, envvar_len)
+    if (envvar_len .eq. 0) return
+
+    n = 0
+    open(newunit = log_unit, file = trim(log_file), status = 'old', &
+         action = 'read')
+    do
+       read(log_unit, '(A)', iostat = stat) line
+       if (stat .ne. 0) exit
+       if (index(line, warning_text) .gt. 0) n = n + 1
+    end do
+    close(log_unit)
+
+  end function count_warnings
+
+  !> Filter an impulse forwards and backwards with a filter set up from
+  !! `json_string`, and record whether each solve converged and whether it
+  !! raised an error.
+  !! @param json_string The JSON object of the filter.
+  !! @param converged Whether the forward and the backward solve converged.
+  !! @param raised Whether the forward and the backward solve raised an
+  !! error.
+  !! @param n_warnings The number of warnings logged, see count_warnings.
+  subroutine run_filter(json_string, converged, raised, n_warnings)
+    character(len=*), intent(in) :: json_string
+    logical, intent(out) :: converged(2), raised(2)
+    integer, intent(out) :: n_warnings
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t), target :: coef
+    type(PDE_filter_t) :: map
+    type(json_file) :: json
+    type(field_t) :: u, f
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+
+    call json%initialize()
+    call json%load_from_string(json_string)
+    call map%init(json, coef)
+
+    call u%init(coef%dof, 'u')
+    call f%init(coef%dof, 'f')
+    call make_impulse(u)
+
+    throw_error => throw_to_pfunit
+
+    call map%forward_mapping(f, u)
+    converged(1) = map%ksp_results(1)%converged
+    raised(1) = catch()
+
+    call map%backward_mapping(f, u, u)
+    converged(2) = map%ksp_results(1)%converged
+    raised(2) = catch()
+
+    throw_error => default_throw_error
+
+    n_warnings = count_warnings()
+
+    call u%free()
+    call f%free()
+    call map%free()
+    call json%destroy()
+    call free_fixture(msh, Xh, dof, gs, coef)
+
+  end subroutine run_filter
+
+  !> An unconverged solve logs one warning, forward and backward.
+  @test(npes=[1])
+  subroutine test_unconverged_solve_warns(this)
+    class(test_pde_filter_convergence), intent(inout) :: this
+    logical :: converged(2), raised(2)
+    integer :: n_warnings, ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call run_filter(unconverged_json, converged, raised, n_warnings)
+
+    @assertFalse(converged(1), 'The forward solve converged')
+    @assertFalse(converged(2), 'The backward solve converged')
+    @assertFalse(raised(1), 'The forward solve raised an error')
+    @assertFalse(raised(2), 'The backward solve raised an error')
+    @assertEqual(2, n_warnings, 'Warnings logged (-1: no NEKO_LOG_FILE)')
+
+  end subroutine test_unconverged_solve_warns
+
+  !> With strict convergence, an unconverged solve raises an error, forward
+  !! and backward.
+  @test(npes=[1])
+  subroutine test_strict_unconverged_solve_aborts(this)
+    class(test_pde_filter_convergence), intent(inout) :: this
+    logical :: converged(2), raised(2)
+    integer :: n_warnings, ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call run_filter(strict_unconverged_json, converged, raised, n_warnings)
+
+    @assertFalse(converged(1), 'The forward solve converged')
+    @assertFalse(converged(2), 'The backward solve converged')
+    @assertTrue(raised(1), 'The forward solve raised no error')
+    @assertTrue(raised(2), 'The backward solve raised no error')
+
+  end subroutine test_strict_unconverged_solve_aborts
+
+  !> A converged solve neither warns nor raises an error, even with strict
+  !! convergence.
+  @test(npes=[1])
+  subroutine test_converged_solve_is_silent(this)
+    class(test_pde_filter_convergence), intent(inout) :: this
+    logical :: converged(2), raised(2)
+    integer :: n_warnings, ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call run_filter(strict_converged_json, converged, raised, n_warnings)
+
+    @assertTrue(converged(1), 'The forward solve did not converge')
+    @assertTrue(converged(2), 'The backward solve did not converge')
+    @assertFalse(raised(1), 'The forward solve raised an error')
+    @assertFalse(raised(2), 'The backward solve raised an error')
+    @assertEqual(0, n_warnings, 'Warnings logged (-1: no NEKO_LOG_FILE)')
+
+  end subroutine test_converged_solve_is_silent
+
+end module mapping_pde_filter_convergence

@@ -34,7 +34,7 @@ Brinkman source-term coupling.
 | `name` | string | No | `"Brinkman Design"` | Design name |
 | `domain.type` | string | No | `"full"` | `"full"` or `"point_zone"` |
 | `domain.zone_name` | string | Cond. | - | Required when `domain.type = "point_zone"` |
-| `dealias` | bool | No | `true` | Controls dealiasing for Brinkman source terms |
+| `dealias` | bool | No | `case.numerics.dealias` | Controls dealiasing for Brinkman source terms, see [Adjoint over-integration](@ref configuration-adjoint-dealias) |
 | `verbose_design` | bool | No | `false` | Write all forward mapping stages |
 | `verbose_sensitivity` | bool | No | `false` | Write all backward sensitivity stages |
 | `output_precision` | string | No | `"sp"` | `"sp"` or `"dp"` for design/sensitivity field output |

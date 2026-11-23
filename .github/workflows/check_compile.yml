@@ -22,6 +22,15 @@ on:
         description: "The version of HDF5 to use."
         required: true
         type: string
+      runner-images:
+        description: "JSON list of GitHub-hosted runner images to test on."
+        required: false
+        type: string
+        default: '["ubuntu-24.04", "ubuntu-latest"]'
+
+# Read-only access by default. Jobs that need more ask for it themselves.
+permissions:
+  contents: read
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
@@ -40,28 +49,59 @@ jobs:
       fail-fast: false
       matrix:
         # Default matrix
+        os: ${{ fromJSON(inputs.runner-images) }}
         precision: [dp]
         backend: [CPU, CUDA, HIP]
-        compiler: [GNU-13, GNU-14]
+        compiler: [GNU-13, GNU-14, GNU-15]
 
-        # Define the setup jobs
+        exclude:
+          # ROCm is only published for Ubuntu 22.04 and 24.04. On newer images
+          # the 24.04 build of ROCm's lld fails to load (libxml2.so.2 is gone),
+          # so CMake cannot identify the HIP compiler. Re-enable once ROCm
+          # ships packages for the release behind ubuntu-latest.
+          - os: ubuntu-latest
+            backend: HIP
+
+          # A compiler can only use the system OpenMPI's mpi_f08 module if it
+          # reads the module format of the gfortran that built OpenMPI. Ubuntu
+          # 24.04 builds OpenMPI with gfortran 13 (format shared by gfortran
+          # 8-14) and has no gfortran 15. Ubuntu 26.04 (ubuntu-latest) builds
+          # it with gfortran 15, whose format gfortran 13 and 14 cannot read.
+          # Revisit when ubuntu-latest moves to a new release.
+          - os: ubuntu-24.04
+            compiler: GNU-15
+          - os: ubuntu-latest
+            compiler: GNU-13
+          - os: ubuntu-latest
+            compiler: GNU-14
+
+        # Define the setup jobs.
         include:
-          - compiler: GNU-13
-            setup-compiler: |
-              echo "c-compiler=gcc-13" >> $GITHUB_OUTPUT
-              echo "f-compiler=gfortran-13" >> $GITHUB_OUTPUT
-
-          - compiler: GNU-14
-            setup-compiler: |
-              echo "c-compiler=gcc-14" >> $GITHUB_OUTPUT
-              echo "f-compiler=gfortran-14" >> $GITHUB_OUTPUT
-
+          # Setup device specific dependencies.
+          # Here we make sure to keep installs minimal by dropping actual
+          # drivers, and other unnecessary packages, since the runners do not
+          # have GPUs.
           - backend: CUDA
             setup-backend: |
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends nvidia-cuda-toolkit
+              sudo apt-get clean
               echo "backend-path=/usr" >> $GITHUB_OUTPUT
 
           - backend: HIP
             setup-backend: |
+              # Following the instructions from
+              # https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html
+
+              source /etc/os-release
+              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/$VERSION_CODENAME/
+              sudo apt-get install -y --no-install-recommends ./amdgpu-install_*.deb
+              rm -f amdgpu-install_*.deb
+
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends rocm-dev hipblas-dev hipsolver-dev
+              sudo apt-get clean
+
               ROCM_DIR=$(ls -d /opt/rocm-*)
               CMAKE_PREFIX_PATH="$ROCM_DIR/lib/cmake:$CMAKE_PREFIX_PATH"
               echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
@@ -71,10 +111,16 @@ jobs:
     # ------------------------------------------------------------------------ #
     # Define the job itself.
     # ------------------------------------------------------------------------ #
-    name: ${{ matrix.backend }} - ${{ matrix.compiler }} - ${{ matrix.precision }}
-    runs-on: ubuntu-latest
+    name: ${{ matrix.backend }} - ${{ matrix.compiler }} - ${{ matrix.precision }} - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
     env:
-      JOB_NAME: ${{ matrix.backend }}-${{ matrix.compiler }}-${{ matrix.precision }}
+      JOB_NAME: ${{ matrix.backend }}-${{ matrix.compiler }}-${{ matrix.precision }}-${{ matrix.os }}
+      # The runners have no UCX-capable network devices. Disable the UCX
+      # one-sided (osc) component so OpenMPI does not write
+      # "OSC UCX component priority set inside component query failed" to
+      # stderr, which run.sh would treat as a failed case.
+      OMPI_MCA_osc: "^ucx"
     steps:
       # ---------------------------------------------------------------------- #
       # Checkout the repository and setup the environment
@@ -82,49 +128,51 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Setup Compiler
-        id: setup-compiler
-        shell: bash
-        run: ${{ matrix.setup-compiler }}
 
       - name: Setup system dependencies
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake libopenblas-dev libopenmpi-dev \
-            openmpi-bin pkg-config liblapack-dev ninja-build
+          sudo apt-get install -y --no-install-recommends \
+            cmake libopenblas-dev libopenmpi-dev openmpi-bin pkg-config \
+            liblapack-dev ninja-build
 
-      # Setup device specific dependencies
-      - name: Setup Device (CUDA)
-        if: matrix.backend == 'cuda'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: nvidia-cuda-toolkit
-          version: cuda-cache-1.0
-
-      - name: Setup Device (HIP) - install rocm-dev
-        if: matrix.backend == 'hip'
+      # Install the compiler of the matrix entry and make every build use it,
+      # both directly and through the OpenMPI wrappers (mpif90, mpicc, ...).
+      - name: Setup Compiler
+        id: setup-compiler
+        shell: bash
+        env:
+          COMPILER: ${{ matrix.compiler }}
         run: |
-          # Following the instructions from https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html
+          case "$COMPILER" in
+            GNU-*)
+              version=${COMPILER#GNU-}
+              fc=gfortran-$version cc=gcc-$version cxx=g++-$version
+              packages="$fc $cc $cxx"
+              ;;
+            *)
+              echo "Unknown compiler '$COMPILER'." >&2
+              exit 1
+              ;;
+          esac
 
-          wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/7.2.1/ubuntu/noble/
-          sudo apt install ./amdgpu-install_*.deb
-          sudo apt update
-          sudo apt install -y rocm-dev
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends $packages
 
-      - name: Setup Device (HIP) - install amdgpu-dkms
-        if: matrix.backend == 'hip'
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: amdgpu-dkms hipsolver-dev hipblas-dev
-          version: hip-cache-1.0
+          printf '%s\n' "FC=$fc" "OMPI_FC=$fc" >> "$GITHUB_ENV"
+          printf '%s\n' "CC=$cc" "OMPI_CC=$cc" >> "$GITHUB_ENV"
+          printf '%s\n' "CXX=$cxx" "OMPI_CXX=$cxx" >> "$GITHUB_ENV"
+          printf '%s\n' "f-compiler=$fc" "c-compiler=$cc" >> "$GITHUB_OUTPUT"
 
+      # The backend packages are large (1.5-3.5 GB) and apt mirrors are at
+      # times very slow. With a responsive mirror this step takes about
+      # 3 minutes (up to 7 for HIP), so give up after 15 rather than letting a
+      # slow mirror use the job's full 60 minutes, and re-run the job instead.
       - name: Setup backend
         id: setup-backend
         shell: bash
+        timeout-minutes: 15
         run: ${{ matrix.setup-backend }}
 
       # ---------------------------------------------------------------------- #
@@ -143,6 +191,7 @@ jobs:
         uses: ./.github/actions/setup_parmetis
         with:
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
 
       - name: Get HDF5
         id: get-hdf5
@@ -157,11 +206,15 @@ jobs:
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          json-fortran-version: ${{ inputs.json-fortran-version }}
           parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
+          parmetis-version: ${{ steps.get-parmetis.outputs.version }}
           hdf5-root: ${{ steps.get-hdf5.outputs.install-dir }}
+          hdf5-version: ${{ inputs.hdf5-version }}
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
           backend: ${{ matrix.backend }}
           backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
@@ -202,25 +255,25 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Running Unit Tests
-        if: ${{ matrix.backend == 'cpu' }}
+        if: ${{ matrix.backend == 'CPU' }}
         run: |
           ctest -L unit --test-dir build --output-on-failure --parallel
 
       - name: Building Examples
-        if: ${{ matrix.backend == 'cpu' }}
+        if: ${{ matrix.backend == 'CPU' }}
         run: |
           cmake --build build --target Examples --parallel
 
       - name: Run Rugby Ball
-        if: ${{ matrix.backend == 'cpu' }}
+        if: ${{ matrix.backend == 'CPU' }}
         env:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
           PARMETIS_DIR: ${{ steps.get-parmetis.outputs.install-dir }}
         run: |
-          # Adjust the end time and max iterations for the rugby ball case
-          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
-          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
+          # Run 10 timesteps and 2 optimization iterations of the rugby ball
+          python3 .github/workflows/extra/shorten_cases.py \
+            --steps 10 --iterations 2 examples/rugby_ball/rugby_ball.case
 
           ./run.sh -rc rugby_ball
 

@@ -18,12 +18,14 @@ endif()
 # Check if we wish to build the docs
 message(CHECK_START "Doxygen configuration")
 
-# Use fetch content to download the doxygen theme: doxygen-awesome-css
+# Use fetch content to download the doxygen theme: doxygen-awesome-css. The
+# version is pinned so the published documentation (and the version switcher
+# placed in its title area) does not change with upstream development.
 include(FetchContent)
 FetchContent_Declare(
     doxygen-awesome-css
     GIT_REPOSITORY https://github.com/jothepro/doxygen-awesome-css.git
-    GIT_TAG        main
+    GIT_TAG        v2.5.0
 )
 FetchContent_MakeAvailable(doxygen-awesome-css)
 

@@ -6,15 +6,15 @@ compiler. The action will also cache the build to speed up future builds.
 
 ## Inputs
 
-| Name               | Optional | Description                                                                                        | Default                     |
-| ------------------ | -------- | -------------------------------------------------------------------------------------------------- | --------------------------- |
-| `install-dir`      | Yes      | The directory to install Neko-TOP to.                                                              | `/home/runner/pkg/neko-top` |
-| `working-dir`      | Yes      | The directory to work in.                                                                          | `/home/runner/tmp/neko-top` |
-| `os`               | Yes      | The operating system to use for building Neko-TOP. Which should allow the use of matrix workflows. | `runner.os`                 |
-| `compiler`         | Yes      | The compiler to use for building Neko-TOP. The compiler should be available in the PATH.           | `gfortran`.                 |
-| `compiler-options` | Yes      | The compiler options to use for building Neko-TOP.                                                 | `-O3`                       |
-| `build-options`    | Yes      | The build options to use for building Neko-TOP.                                                    | `--parallel=$(nproc)`.      |
-| `version`          | Yes      | The version of Neko-TOP to build.                                                                  | `develop`.                  |
+| Name               | Optional | Description                                                                                        | Default                             |
+| ------------------ | -------- | -------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| `install-dir`      | Yes      | The directory to install Neko-TOP to.                                                              | `${{ runner.temp }}/pkg/neko-top`   |
+| `working-dir`      | Yes      | The directory to work in.                                                                          | `${{ runner.temp }}/build/neko-top` |
+| `os`               | Yes      | The operating system to use for building Neko-TOP. Which should allow the use of matrix workflows. | `runner.os`                         |
+| `compiler`         | Yes      | The compiler to use for building Neko-TOP. The compiler should be available in the PATH.           | `gfortran`.                         |
+| `compiler-options` | Yes      | The compiler options to use for building Neko-TOP.                                                 | `-O3`                               |
+| `build-options`    | Yes      | The build options to use for building Neko-TOP.                                                    | `--parallel=$(nproc)`.              |
+| `version`          | Yes      | The version of Neko-TOP to build.                                                                  | `develop`.                          |
 
 ## Outputs
 

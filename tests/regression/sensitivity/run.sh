@@ -95,8 +95,8 @@ for case in ${cases[@]}; do
     mv steady_state_data.csv steady_state_data_${case_name%.*}.csv
 done
 
-python steady_state_plotter.py || exit 1
-python FD_check.py || exit 1
+python3 steady_state_plotter.py || exit 1
+python3 FD_check.py || exit 1
 
 # Clean up generated files
 find . -maxdepth 1 -type f -name "box.nmsh" -delete

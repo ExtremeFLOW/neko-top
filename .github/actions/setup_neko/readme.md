@@ -11,16 +11,16 @@ hash. This ensures we update the cache regularly.
 
 ## Inputs
 
-| Name               | Optional | Description                                                                                    | Default                         |
-| ------------------ | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------- |
-| `install-dir`      | Yes      | The directory to install Neko to.                                                              | `/home/runner/pkg/neko`         |
-| `working-dir`      | Yes      | The directory to work in.                                                                      | `/home/runner/tmp/neko`         |
-| `os`               | Yes      | The operating system to use for building Neko. Which should allow the use of matrix workflows. | `runner.os`                     |
-| `compiler`         | Yes      | The compiler to use for building Neko. The compiler should be available in the PATH.           | `gfortran`.                     |
-| `compiler-options` | Yes      | The compiler options to use for building Neko.                                                 | `-O3`                           |
-| `build-options`    | Yes      | The build options to use for building Neko.                                                    | `-j $(nproc)`.                  |
-| `version`          | Yes      | The version of Neko to build.                                                                  | `v0.7.2`.                       |
-| `json-fortran-dir` | Yes      | The directory where JSON-Fortran was installed.                                                | `/home/runner/pkg/json-fortran` |
+| Name               | Optional | Description                                                                                    | Default                               |
+| ------------------ | -------- | ---------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `install-dir`      | Yes      | The directory to install Neko to.                                                              | `${{ runner.temp }}/pkg/neko`         |
+| `working-dir`      | Yes      | The directory to work in.                                                                      | `${{ runner.temp }}/build/neko`       |
+| `os`               | Yes      | The operating system to use for building Neko. Which should allow the use of matrix workflows. | `runner.os`                           |
+| `compiler`         | Yes      | The compiler to use for building Neko. The compiler should be available in the PATH.           | `gfortran`.                           |
+| `compiler-options` | Yes      | The compiler options to use for building Neko.                                                 | `-O3`                                 |
+| `build-options`    | Yes      | The build options to use for building Neko.                                                    | `-j $(nproc)`.                        |
+| `version`          | Yes      | The version of Neko to build.                                                                  | `v0.7.2`.                             |
+| `json-fortran-dir` | Yes      | The directory where JSON-Fortran was installed.                                                | `${{ runner.temp }}/pkg/json-fortran` |
 
 ## Outputs
 

@@ -47,6 +47,7 @@ module adjoint_mixing_scalar_source_term
   use coefs, only : coef_t
   use field_math, only: field_add2s2, field_copy, field_cadd
   use mask_ops, only: mask_exterior_const, compute_masked_volume
+  use math, only: abscmp
   use point_zone, only: point_zone_t
   implicit none
   private
@@ -66,6 +67,9 @@ module adjoint_mixing_scalar_source_term
      type(field_t), pointer :: s => null()
      !> A scalaing factor
      real(kind=rp) :: obj_scale
+     !> Scale of the forcing, owned by the objective. Zero switches the
+     !! forcing off.
+     real(kind=rp), pointer :: scale => null()
      !> Reference concentration
      real(kind=rp) :: phi_ref
      !> A mask for where the source term is evaluated
@@ -123,8 +127,10 @@ contains
   !! @param coef The SEM coeffs.
   !! @param start_time start of the integration window.
   !! @param end_time end of the integration window.
+  !! @param scale scale of the forcing, owned by the objective.
   subroutine adjoint_mixing_scalar_source_term_init_from_components(this, &
-       f_s, s, obj_scale, phi_ref, mask, if_mask, coef, start_time, end_time)
+       f_s, s, obj_scale, phi_ref, mask, if_mask, coef, start_time, end_time, &
+       scale)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_s
     type(field_t), intent(in), target :: s
@@ -135,6 +141,7 @@ contains
     type(coef_t), intent(in) :: coef
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
+    real(kind=rp), pointer, intent(in) :: scale
 
     type(field_list_t) :: fields
 
@@ -151,6 +158,7 @@ contains
     ! point everything in the correct places
     this%s => s
     this%obj_scale = obj_scale
+    this%scale => scale
     this%phi_ref = phi_ref
     this%if_mask = if_mask
 
@@ -170,6 +178,7 @@ contains
     call this%free_base()
     nullify(this%s)
     nullify(this%mask)
+    nullify(this%scale)
 
   end subroutine adjoint_mixing_scalar_source_term_free
 
@@ -183,6 +192,8 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
+    ! Off outside the objective's time window
+    if (abscmp(this%scale, 0.0_rp)) return
 
     fs => this%fields%get(1)
 
@@ -197,7 +208,8 @@ contains
     end if
 
     ! append to RHS with scaling and mask volume
-    call field_add2s2(fs, work, this%obj_scale / this%mask_volume)
+    call field_add2s2(fs, work, &
+         this%scale * this%obj_scale / this%mask_volume)
     call neko_scratch_registry%relinquish_field(temp_indices)
 
 

@@ -46,7 +46,7 @@ module optimizer
   use logger, only: neko_log, LOG_SIZE
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX, MPI_Bcast, &
-       MPI_LOGICAL, MPI_Barrier
+       MPI_LOGICAL, MPI_Barrier, MPI_INTEGER
   use utils, only: neko_error, filename_path, filename_suffix, read_duration, &
        mkdir
   use csv_file, only: csv_file_t
@@ -315,11 +315,11 @@ contains
     logical, intent(in), optional :: checkpoint_overwrite
     character(len=LOG_SIZE) :: msg
     character(len=256) :: file_name
+    integer :: i
     logical :: exists
 
     ! Initialize internals
     this%start_time = MPI_Wtime()
-    this%initialized = .true.
 
     ! Mandatory settings
     this%optimizer_type = optimizer_type
@@ -355,6 +355,27 @@ contains
        end if
     end if
 
+    ! If no restart file have been specified, look for the latest checkpoint
+    ! file in the path. This helps us recover from a crash and automatic restart
+    if (len_trim(this%restart_file) .eq. 0) then
+       i = -1
+       if (pe_rank .eq. 0) then
+          do i = this%max_iterations, 1, -1
+             exists = .false.
+             file_name = checkpoint_filename(this, iteration = i)
+             inquire(file = file_name, exist = exists)
+             if (exists) exit
+          end do
+          if (.not. exists) i = -1
+       end if
+
+       call MPI_Bcast(i, 1, MPI_INTEGER, 0, NEKO_COMM)
+       if (i .gt. 0) then
+          this%restart_file = checkpoint_filename(this, iteration = i)
+       end if
+    end if
+
+    this%initialized = .true.
   end subroutine optimizer_init_base
 
   !> Base free routine for the optimizer

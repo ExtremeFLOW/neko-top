@@ -49,6 +49,25 @@ present, one scalar field.
 \note Scalar freezing is not yet applied by this component. The current
 implementation only freezes the fluid solver.
 
+### The scalar after the fluid is frozen
+
+Since the scalar is not frozen, it keeps evolving in the frozen flow, and
+`steady` keeps computing its increment after freezing the fluid.
+
+With `scalar_coupled = false` the scalar takes no part in the decision to
+freeze. The fluid is often frozen long before the scalar converges, more so
+the higher `Pe`, so any scalar objective is evaluated on a scalar that may
+still be evolving at the end of the run. `steady` therefore issues a warning:
+
+- when it freezes the fluid while the scalar increment is above `tol`, and
+- again on its last computation of that run, if the scalar increment is still
+  above `tol`. If it has fallen below `tol` by then, a message says so
+  instead.
+
+The remedy is `scalar_coupled = true`, with an `end_time` long enough for both
+fields to converge. With `scalar_coupled = true` neither warning is issued,
+since the fluid is then only frozen once the scalar has converged too.
+
 ### Parameters
 
 | Parameter         | Type         | Default   | Description                                                                       |
@@ -67,6 +86,9 @@ The component writes convergence data to `steady_state_data.csv` with header:
 `iter,time,u,v,w,p,scalar`
 
 where each field column is the normed increment at that logging point.
+Rows continue after the fluid is frozen, so the scalar column follows the
+scalar to the end of the run. In those rows `u`, `v`, `w` and `p` are exactly
+zero, the increment of a frozen field.
 
 ### Limitations
 

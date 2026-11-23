@@ -51,7 +51,8 @@ module steepest_descent_checkpoint
   integer, parameter :: N_GLOBAL = 3
 
   ! ========================================================================== !
-  ! Inline helpers (kept per-file, not shared, per backlog #88).
+  ! Inline helpers (kept per-file: one helper module compiled into several
+  ! test targets races in parallel builds).
 
   !> Stub design that just stores its values; `update_design` has no mask
   !! here (the checkpoint test does not need one).

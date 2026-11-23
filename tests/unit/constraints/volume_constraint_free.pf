@@ -1,5 +1,5 @@
 ! Verification that a `volume_constraint_t` drops its mapping cascade when it
-! is freed or re-initialised (backlog #94).
+! is freed or re-initialised.
 !
 ! A volume constraint initialised from JSON with a PDE_filter mapping maps
 ! its sensitivity backward through the filter. Once that constraint is

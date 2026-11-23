@@ -40,6 +40,9 @@ runs:
     - name: Score the repository
       shell: bash
       id: score-repository
+      env:
+        # Provides pkg_resources for flinter, see requirements-flint.txt.
+        PYTHONPATH: ${{ github.action_path }}/compat
       run: |
         # If more than one directory is specified, then loop through them.
         score=0

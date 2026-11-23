@@ -128,7 +128,8 @@
                     {
                         "type": "PDE_filter",
                         "r": 0.2,
-                        "tol": 1.0e-25
+                        "tol": 1.0e-14,
+                        "strict_convergence": true
                     }
                 ]
             }
