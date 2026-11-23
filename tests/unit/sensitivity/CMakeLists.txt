@@ -148,3 +148,29 @@ set_tests_properties(${case_name}
 # ============================================================================ #
 # Final dependencies
 add_dependencies(Unit sensitivity_test_prepare)
+
+# ============================================================================ #
+# The unsteady sensitivity of a run restarted from a checkpoint file must be
+# that of the same run from the start time, see unsteady_restart.pf. It runs
+# unsteady_brinkman_dissipation.case, which the loop above copies here.
+add_pfunit_ctest(unsteady_restart_sensitivity
+    TEST_SOURCES unsteady_restart.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 1
+)
+
+# Disable treating pFUnit's generated variables as unused.
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(unsteady_restart_sensitivity PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+set_tests_properties(unsteady_restart_sensitivity PROPERTIES
+    LABELS "sensitivity;unit"
+    ENVIRONMENT "NEKO_LOG_FILE=unsteady_restart_sensitivity.log"
+    TIMEOUT 300
+)
+add_dependencies(Unit unsteady_restart_sensitivity)
+add_dependencies(unsteady_restart_sensitivity sensitivity_test_prepare)
