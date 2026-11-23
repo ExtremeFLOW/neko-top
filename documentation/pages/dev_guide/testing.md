@@ -35,6 +35,16 @@ setting `OFF` disables all runtime checks.
 the sources (for example `x(i,1,1,1)` with `i` running over the whole array,
 which `-fcheck=bounds` rejects).
 
+## Regression testing {#testing-regression}
+
+`tests/regression/mma/run.sh` and `tests/regression/sensitivity/run.sh` are
+developer scripts that run their regression cases directly against an
+already-built `reg_mma_bin` / `sensitivity_regression_driver`, independently
+of `ctest`. Both locate the binary in the build tree (its
+`RUNTIME_OUTPUT_DIRECTORY`) via `NEKO_TOP_BUILD_DIR`, which defaults to
+`<repo root>/build` -- the directory `./setup.sh -t` creates -- and can be
+set to a differently-named build directory.
+
 ## Validation tests {#testing-validation}
 
 Validation tests reproduce published results and run for hours, so they are

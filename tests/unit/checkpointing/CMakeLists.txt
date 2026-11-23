@@ -98,7 +98,7 @@ target_link_libraries(checkpointing_test_utils PRIVATE Neko-TOP::neko-top)
 
 add_pfunit_ctest(checkpoint_restore_consistency
     TEST_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency.pf
+        test_checkpoint_restore_consistency.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
     MAX_PES 2
@@ -106,7 +106,7 @@ add_pfunit_ctest(checkpoint_restore_consistency
 
 add_pfunit_ctest(checkpoint_end_of_run_gating
     TEST_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_end_of_run_gating.pf
+        test_checkpoint_end_of_run_gating.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
     MAX_PES 2
@@ -161,7 +161,7 @@ endif()
 if (HAVE_HDF5)
     add_pfunit_ctest(checkpoint_restore_consistency_hdf5
         TEST_SOURCES
-            ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency_hdf5.pf
+            test_checkpoint_restore_consistency_hdf5.pf
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
         MAX_PES 2
