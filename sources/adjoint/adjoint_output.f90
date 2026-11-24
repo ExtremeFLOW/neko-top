@@ -157,7 +157,6 @@ contains
   subroutine adjoint_output_sample(this, t)
     class(adjoint_output_t), intent(inout) :: this
     real(kind=dp), intent(in) :: t
-    integer :: i
 
     call this%adjoint%copy_from(DEVICE_TO_HOST, sync = .true.)
 
