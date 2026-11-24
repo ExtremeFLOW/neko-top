@@ -16,7 +16,7 @@ set(CMAKE_FOLDER "Tests/Unit/MMA")
 # Define the tests themselves
 
 add_pfunit_ctest(mma_kkt_nan
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mma_kkt_nan.pf
+    TEST_SOURCES mma_kkt_nan.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 2
@@ -42,7 +42,7 @@ endif()
 
 if (HAVE_HDF5)
     add_pfunit_ctest(mma_checkpoint_cpu_backend
-        TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mma_checkpoint_cpu_backend.pf
+        TEST_SOURCES mma_checkpoint_cpu_backend.pf
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         LINK_LIBRARIES Neko-TOP::neko-top
         MAX_PES 2
