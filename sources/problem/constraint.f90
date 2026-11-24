@@ -37,7 +37,7 @@ module constraint
   use base_functional, only: base_functional_t
   use simulation_m, only: simulation_t
   use design, only: design_t
-  use num_types, only: rp
+  use num_types, only: rp, dp, xp
   use point_zone_registry, only: neko_point_zone_registry
   use json_module, only: json_file
   implicit none
@@ -101,8 +101,8 @@ contains
     character(len=*), intent(in) :: name
     integer, intent(in) :: design_size
     character(len=*), intent(in), optional :: mask_name
-    real(kind=rp), intent(in), optional :: start_time
-    real(kind=rp), intent(in), optional :: end_time
+    real(kind=dp), intent(in), optional :: start_time
+    real(kind=dp), intent(in), optional :: end_time
 
     call this%free_base()
 
@@ -119,13 +119,13 @@ contains
     if (present(start_time)) then
        this%start_time = start_time
     else
-       this%start_time = 0.0_rp
+       this%start_time = 0.0_dp
     end if
 
     if (present(end_time)) then
        this%end_time = end_time
     else
-       this%end_time = huge(0.0_rp)
+       this%end_time = huge(0.0_dp)
     end if
 
   end subroutine constraint_init_base
@@ -137,10 +137,10 @@ contains
     if (allocated(this%name)) deallocate(this%name)
 
     this%value = 0.0_rp
-    this%value_weight = 0.0_rp
-    this%sensitivity_weight = 0.0_rp
-    this%start_time = 0.0_rp
-    this%end_time = huge(0.0_rp)
+    this%value_weight = 0.0_xp
+    this%sensitivity_weight = 0.0_xp
+    this%start_time = 0.0_dp
+    this%end_time = huge(0.0_dp)
     call this%sensitivity%free()
 
     this%has_mask = .false.

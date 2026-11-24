@@ -42,6 +42,7 @@ submodule (optimizer) optimizer_hdf5_io
   use mpi_f08, only: MPI_INFO_NULL
   use comm, only: NEKO_COMM
   use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
+  implicit none
 
 contains
 

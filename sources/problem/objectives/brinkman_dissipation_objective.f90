@@ -46,7 +46,7 @@ module brinkman_dissipation_objective
   use adjoint_brinkman_dissipation_source_term, only: &
        adjoint_brinkman_dissipation_source_term_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -141,7 +141,7 @@ contains
     character(len=:), allocatable :: name
     real(kind=rp) :: weight
     logical :: dealias_sensitivity, dealias_forcing, dealias_fallback
-    real(kind=rp) :: start_time, end_time
+    real(kind=dp) :: start_time, end_time
 
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
@@ -153,8 +153,8 @@ contains
          dealias_sensitivity, dealias_fallback)
     call json_get_or_default(json, "dealias_forcing", &
          dealias_forcing, dealias_fallback)
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    call json_get_or_default(json, "start_time", start_time, 0.0_dp)
+    call json_get_or_default(json, "end_time", end_time, huge(0.0_dp))
 
     ! The two keys select one quadrature. Set differently, the sensitivity
     ! is not the gradient of any value this objective could report.
@@ -187,8 +187,8 @@ contains
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
     logical, intent(in) :: dealias
-    real(kind=rp), intent(in) :: start_time
-    real(kind=rp), intent(in) :: end_time
+    real(kind=dp), intent(in) :: start_time
+    real(kind=dp), intent(in) :: end_time
 
     type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
     real(kind=rp) :: forcing_start, forcing_end
