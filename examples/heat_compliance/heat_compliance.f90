@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 
 module heat_compliance
-  use num_types, only: rp, sp
+  use num_types, only: rp, sp, dp
   use objective, only: objective_t
   use design, only: design_t
   use constraint, only: constraint_t
@@ -95,7 +95,7 @@ module heat_compliance
      type(field_t) :: thermal_conductivity
      type(mapping_handler_t) :: mapping
      integer :: ksp_n, n, i
-     real(kind=rp) :: writting_counter
+     real(kind=dp) :: writting_counter
      type(fld_file_output_t), private :: output
      real(kind=rp) :: avg_B
      logical :: enable_output
@@ -170,7 +170,7 @@ contains
 
     call this%init_base(name, design%size(), 1.0_rp)
     this%coef => coef
-    this%writting_counter = 1.0_rp
+    this%writting_counter = 1.0_dp
 
     call json_get_or_default(parameters, 'optimization.solver.enable_output', &
          enable_output, .true.)
@@ -250,7 +250,7 @@ contains
     n_global = 0
     call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, &
          MPI_SUM, NEKO_COMM, ierr)
-    this%avg_B = glsumB/n_global
+    this%avg_B = glsumB / real(n_global, kind=rp)
 
   end subroutine heat_compliance_init
 
@@ -434,7 +434,7 @@ contains
 
     if (this%enable_output) then
        call this%output%sample(this%writting_counter)
-       this%writting_counter = this%writting_counter + 1
+       this%writting_counter = this%writting_counter + 1.0_dp
     end if
   end subroutine heat_compliance_update_sensitivity
 
@@ -630,7 +630,7 @@ contains
     ! Sensitivity: d/d rho = -1 / |Omega|   (flip sign if is_max)
     ! scaled by average B
     call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM, ierr)
-    avg_B = glsum(this%coef%B, n)/n_global
+    avg_B = glsum(this%coef%B, n) / real(n_global, kind=rp)
     call vector_rone(this%sensitivity, n)
     call vector_cmult(this%sensitivity, -avg_B / this%volume_domain, n)
 

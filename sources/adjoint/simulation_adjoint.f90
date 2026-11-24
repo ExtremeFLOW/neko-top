@@ -45,6 +45,7 @@ module simulation_adjoint
   use time_state, only : time_state_t
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
+  use neko_ext, only: set_time_scheme_coeffs
   use scratch_registry, only: neko_scratch_registry
   use device_math, only: device_glsc3
   use math, only: glsc3
@@ -123,11 +124,11 @@ contains
   subroutine simulation_adjoint_step(C, dt_controller, cfl, &
        tstep_loop_start_time, final_time)
     type(adjoint_case_t), intent(inout) :: C
-    real(kind=rp), intent(inout) :: cfl
+    real(kind=dp), intent(inout) :: cfl
     type(time_step_controller_t), intent(inout) :: dt_controller
     real(kind=dp), intent(in) :: tstep_loop_start_time
-    real(kind=rp), optional, intent(in) :: final_time
-    real(kind=rp) :: t_bkp
+    real(kind=dp), optional, intent(in) :: final_time
+    real(kind=dp) :: t_bkp
     real(kind=dp) :: start_time, end_time, tstep_start_time
     character(len=LOG_SIZE) :: log_buf
 
@@ -234,7 +235,7 @@ contains
           time%tlag(2) = time%t
        end if
 
-       call ext_bdf%set_coeffs(time%dtlag)
+       call set_time_scheme_coeffs(ext_bdf, time)
     end if
 
     time%t = time%t + time%dt
@@ -249,7 +250,7 @@ contains
     character(len=LOG_SIZE) :: log_buf
     character(len=:), allocatable :: restart_file
     character(len=:), allocatable :: restart_mesh_file
-    real(kind=rp) :: tol
+    real(kind=dp) :: tol
     logical :: found
 
     call C%case%params%get('case.restart_file', restart_file, found)
@@ -270,7 +271,7 @@ contains
 
     ! Free the previous mesh, dont need it anymore
     do i = 1, size(C%time%dtlag)
-       call C%case%fluid%ext_bdf%set_coeffs(C%time%dtlag)
+       call set_time_scheme_coeffs(C%case%fluid%ext_bdf, C%time)
     end do
 
     call C%fluid_adj%restart(C%case%chkp)
@@ -331,7 +332,7 @@ contains
   !> Write a checkpoint at joblimit
   subroutine simulation_adjoint_joblimit_chkp(C, t)
     type(adjoint_case_t), intent(inout) :: C
-    real(kind=rp), intent(inout) :: t
+    real(kind=dp), intent(inout) :: t
     type(file_t) :: chkpf
     character(len=:), allocatable :: chkp_format
     character(len=LOG_SIZE) :: log_buf

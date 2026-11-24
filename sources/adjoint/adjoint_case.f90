@@ -34,7 +34,7 @@
 
 ! Implements the `adjoint_case_t` type.
 module adjoint_case
-  use num_types, only: rp, dp, sp
+  use num_types, only: dp, sp
   use case, only: case_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
@@ -112,7 +112,7 @@ contains
     class(adjoint_case_t), target, intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
-    real(kind=rp) :: real_val = 0.0_rp
+    real(kind=dp) :: real_val = 0.0_dp
     character(len=:), allocatable :: string_val, file_format, name
     character(len=:), allocatable :: norm_control, norm_file
     integer :: precision, integer_val, layout
@@ -443,15 +443,15 @@ contains
     if (trim(string_val) .eq. 'org') then
        ! yes, it should be real_val below for type compatibility
        call json_get_or_lookup(neko_case%params, 'case.nsamples', integer_val)
-       real_val = real(integer_val, kind=rp)
+       real_val = real(integer_val, kind=dp)
        call this%output_controller%add(this%f_out, real_val, 'nsamples')
     else if (trim(string_val) .eq. 'never') then
-       call this%output_controller%add(this%f_out, 0.0_rp, 'never')
+       call this%output_controller%add(this%f_out, 0.0_dp, 'never')
     else if (trim(string_val) .eq. 'tsteps' .or. &
          trim(string_val) .eq. 'nsamples') then
        call json_get_or_lookup(neko_case%params, &
             'case.adjoint_fluid.output_value', integer_val)
-       real_val = real(integer_val, kind=rp)
+       real_val = real(integer_val, kind=dp)
        call this%output_controller%add(this%f_out, real_val, string_val)
     else if (trim(string_val) .eq. 'simulationtime') then
        call json_get_or_lookup(neko_case%params, &
@@ -469,7 +469,7 @@ contains
          'case.adjoint_fluid.norm_output_control', norm_control, 'never')
     if (trim(norm_control) .ne. 'never') then
        call json_get_or_default(neko_case%params, &
-            'case.adjoint_fluid.norm_output_value', real_val, 1.0_rp)
+            'case.adjoint_fluid.norm_output_value', real_val, 1.0_dp)
        call json_get_or_default(neko_case%params, &
             'case.adjoint_fluid.norm_output_file', norm_file, &
             'adjoint_norm.csv')
@@ -504,7 +504,7 @@ contains
     !
     ! Initialize time and step
     !
-    this%time%t = 0d0
+    this%time%t = 0.0_dp
     this%time%tstep = 0
 
   end subroutine adjoint_case_init_common

@@ -65,7 +65,7 @@ module base_functional
      character(len=:), allocatable :: name
 
      !> Value of the base_functional
-     real(kind=rp) :: value = 0.0_dp
+     real(kind=rp) :: value = 0.0_rp
      !> Sensitivity field
      type(vector_t) :: sensitivity
      !> containing a mask
@@ -256,8 +256,8 @@ contains
   subroutine functional_reset_value(this)
     class(base_functional_t), intent(inout) :: this
 
-    this%value = 0.0_dp
-    this%value_weight = 0.0_dp
+    this%value = 0.0_rp
+    this%value_weight = 0.0_xp
   end subroutine functional_reset_value
 
   !> Zero sensitivity of the function
@@ -265,7 +265,7 @@ contains
     class(base_functional_t), intent(inout) :: this
 
     call vector_rzero(this%sensitivity)
-    this%sensitivity_weight = 0.0_dp
+    this%sensitivity_weight = 0.0_xp
   end subroutine functional_reset_sensitivity
 
   !> Accumulate the value of the function
@@ -338,8 +338,8 @@ contains
 
     ! Rectangle rule; could potentially use higher order trapezoidal/Simpson
     ! etc, but this should suffice.
-    call vector_add3s2(this%sensitivity, &
-         sensitivity_new, sensitivity_old, weight_new, weight_old)
+    call vector_add3s2(this%sensitivity, sensitivity_new, sensitivity_old, &
+         real(weight_new, kind=rp), real(weight_old, kind=rp))
     this%sensitivity_weight = this%sensitivity_weight + dt
 
     nullify(sensitivity_new)
@@ -363,9 +363,9 @@ contains
     class(base_functional_t), intent(in) :: this
     type(time_state_t), intent(in) :: time
     logical :: inside
-    real(kind=rp) :: tol
+    real(kind=dp) :: tol
 
-    tol = 1.0e-6_rp * time%dt
+    tol = 1.0e-6_dp * time%dt
     inside = time%t .ge. this%start_time - tol .and. &
          time%t .le. this%end_time + tol
   end function functional_in_window

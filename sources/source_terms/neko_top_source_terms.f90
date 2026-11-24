@@ -46,6 +46,7 @@ submodule(neko_top) neko_top_source_terms
   use adjoint_scalar_convection_source_term, only: &
        adjoint_scalar_convection_source_term_allocate
   use simple_brinkman_source_term, only: simple_brinkman_source_term_allocate
+  implicit none
 
 contains
 

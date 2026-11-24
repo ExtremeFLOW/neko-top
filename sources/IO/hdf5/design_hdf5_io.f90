@@ -47,6 +47,7 @@ submodule (design) design_hdf5_io
   use num_types, only: sp, dp
   use scratch_registry, only: neko_scratch_registry
   use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
+  implicit none
 
 contains
 
