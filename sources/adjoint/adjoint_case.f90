@@ -221,15 +221,7 @@ contains
           allocate(this%adjoint_convection_term)
           ! The coupling term is the transpose of the linearised primal
           ! scalar advection, so it is dealiased exactly when that advection
-          ! is. Any other choice makes the sensitivity something other than
-          ! the gradient, so the key that used to allow one is rejected
-          ! rather than silently ignored.
-          if (neko_case%params%valid_path( &
-               'case.adjoint_scalar.dealias_coupling_term')) then
-             call neko_error("case.adjoint_scalar.dealias_coupling_term " // &
-                  "has been removed: the adjoint scalar coupling term " // &
-                  "follows case.numerics.dealias.")
-          end if
+          ! is.
           call json_get(numerics_params, 'dealias', dealias)
 
           ! The over-integration stack is only needed if this term dealiases
