@@ -69,7 +69,9 @@ contains
     integer :: ierr, info, drank
     logical :: file_exists, design_exists, overwrite_flag
     integer :: n_accum, n_array(pe_size)
+    real(kind=rp) :: empty(1)
 
+    empty = 0.0_rp
     overwrite_flag = .false.
     if (present(overwrite)) overwrite_flag = overwrite
 
@@ -205,11 +207,20 @@ contains
     call this%get_values(temp_vec)
     call temp_vec%copy_from(DEVICE_TO_HOST, sync = .true.)
 
-    ! Write values
+    ! Write values. A rank without design variables still takes part in the
+    ! collective write, with an empty selection and a placeholder buffer, since
+    ! the host array of an empty vector may be unallocated.
     call h5dcreate_f(grp_id, 'values', H5T_NEKO_REAL, &
          filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, temp_vec%x, ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    if (this%n .gt. 0) then
+       call h5dwrite_f(dset_id, H5T_NEKO_REAL, temp_vec%x, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    else
+       call h5dwrite_f(dset_id, H5T_NEKO_REAL, empty, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    end if
     call h5dclose_f(dset_id, ierr)
 
     call neko_scratch_registry%relinquish(temp_index)
@@ -243,11 +254,14 @@ contains
 
     character(len=64) :: name
     integer(hid_t) :: fapl_id, file_id, dset_id, &
-         attr_id, grp_id, str_type, filespace, memspace, xf_id
+         attr_id, grp_id, str_type, filespace, memspace, xf_id, space_id
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
-    integer :: ierr, info, mpi_comm
+    integer(hsize_t) :: n_stored
+    integer :: ierr, info, mpi_comm, mismatch
     integer :: n, n_global, n_accum, n_array(pe_size)
+    real(kind=rp) :: empty(1)
+    character(len=128) :: msg
 
     character(len=*), parameter :: h5_group = '/Design/checkpoint'
 
@@ -299,22 +313,43 @@ contains
     call h5tclose_f(str_type, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    ! Read array attribute n
-    ddim(1) = pe_size
-    n_array = -1
-
+    ! Read array attribute n. The read fills the stored extent, one entry per
+    ! rank of the run that wrote the checkpoint, so it must match the rank
+    ! count. The extent is the same on every rank, so all of them stop here.
     call h5aopen_f(grp_id, 'n', attr_id, ierr)
+    if (ierr .ne. 0) then
+       call neko_error('design: checkpoint has no attribute n')
+    end if
+    call h5aget_space_f(attr_id, space_id, ierr)
+    call h5sget_simple_extent_npoints_f(space_id, n_stored, ierr)
+    call h5sclose_f(space_id, ierr)
+    if (n_stored .ne. int(pe_size, hsize_t)) then
+       write(msg, '(A,I0,A,I0,A)') 'design: checkpoint was written with ' // &
+            'a different number of ranks (', n_stored, ', this run has ', &
+            pe_size, ')'
+       call neko_error(trim(msg))
+    end if
+
+    n_array = -1
+    ddim(1) = int(pe_size, hsize_t)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Ensure the Design object is allocated with the same configuration as the file
 
-    if (n_array(pe_rank + 1) .ne. this%n) then
-       call neko_error('design: mismatch in n during HDF5 read')
-    end if
     if (n_global .ne. this%n_global) then
        call neko_error('design: mismatch in n_global during HDF5 read')
+    end if
+
+    ! The local sizes differ per rank, so agree on the outcome before the
+    ! collective reads
+    mismatch = 0
+    if (n_array(pe_rank + 1) .ne. this%n) mismatch = 1
+    call MPI_Allreduce(MPI_IN_PLACE, mismatch, 1, MPI_INTEGER, MPI_MAX, &
+         NEKO_COMM, ierr)
+    if (mismatch .ne. 0) then
+       call neko_error('design: mismatch in n during HDF5 read')
     end if
     if (trim(name) .ne. trim(this%name)) then
        call neko_error('design: mismatch in name during HDF5 read' // &
@@ -345,11 +380,20 @@ contains
     call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
          ierr)
 
-    ! Read values
+    ! Read values. A rank without design variables still takes part in the
+    ! collective read, with an empty selection and a placeholder buffer, since
+    ! the host array of an empty vector may be unallocated.
     call neko_scratch_registry%request(temp_vec, temp_index, this%n, .false.)
     call h5dopen_f(grp_id, 'values', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, temp_vec%x, dcount, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    if (this%n .gt. 0) then
+       call h5dread_f(dset_id, H5T_NEKO_REAL, temp_vec%x, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    else
+       call h5dread_f(dset_id, H5T_NEKO_REAL, empty, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    end if
     call h5dclose_f(dset_id, ierr)
 
     call temp_vec%copy_from(HOST_TO_DEVICE, sync = .true.)

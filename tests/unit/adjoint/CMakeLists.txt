@@ -11,7 +11,7 @@ set(CMAKE_FOLDER "Tests/Unit/Adjoint")
 # Define the tests themselves
 
 add_pfunit_ctest(adv_adjoint_no_dealias_transpose
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/adv_adjoint_no_dealias_transpose.pf
+    TEST_SOURCES adv_adjoint_no_dealias_transpose.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1

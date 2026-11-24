@@ -47,7 +47,7 @@ add_custom_target(volume_constraint_free_prepare
 # Define the test itself
 
 add_pfunit_ctest(volume_constraint_free
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/volume_constraint_free.pf
+    TEST_SOURCES volume_constraint_free.pf
     WORKING_DIRECTORY ${VOLUME_FREE_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1

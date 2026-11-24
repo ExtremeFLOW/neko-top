@@ -14,11 +14,30 @@ module checkpointing_test_utils
   use field_math, only: field_glsubnorm
   use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
+  use vector, only: vector_t
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
+  use comm, only: NEKO_COMM
+  use mpi_f08, only: MPI_Barrier
   implicit none
   private
 
   logical, save :: runtime_initialized = .false.
 
+  !> Design that only stores its values, for the design checkpoint tests.
+  type, extends(design_t), public :: stored_design_t
+     !> The values of the design variables on this rank.
+     type(vector_t) :: values
+   contains
+     procedure, pass(this) :: init => stored_design_init
+     procedure, pass(this) :: free => stored_design_free
+     procedure, pass(this) :: get_values => stored_design_get_values
+     procedure, pass(this) :: update_design => stored_design_update_design
+     procedure, pass(this) :: map_forward => stored_design_map_forward
+     procedure, pass(this) :: map_backward => stored_design_map_backward
+     procedure, pass(this) :: write => stored_design_write
+  end type stored_design_t
+
+  public :: stop_on_every_rank
   public :: initialize_runtime_once
   public :: initialize_case_from_file
   public :: finalize_case_objects
@@ -156,5 +175,92 @@ contains
     end if
     call prob%free()
   end subroutine finalize_case_objects
+
+  ! ========================================================================== !
+  ! Error handling for tests that expect a run to stop
+
+  !> Error handler that stops only once every rank has raised an error.
+  !! @details neko_error prints its message before calling this, so every
+  !! message reaches the output before any rank stops. An error raised on
+  !! some ranks only never passes the barrier, which shows as a hang.
+  !! @param filename The file that raised the error.
+  !! @param line_number The line that raised the error.
+  !! @param message The error message, if any.
+  subroutine stop_on_every_rank(filename, line_number, message)
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: line_number
+    character(len=*), optional, intent(in) :: message
+
+    call MPI_Barrier(NEKO_COMM)
+    error stop 1
+
+  end subroutine stop_on_every_rank
+
+  ! ========================================================================== !
+  ! stored_design_t
+
+  !> Initialise the design with the values given on this rank.
+  !! @param x0 The values.
+  subroutine stored_design_init(this, x0)
+    class(stored_design_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: x0(:)
+
+    call this%free()
+    call this%init_base('stored_design', size(x0))
+    this%values = x0
+
+  end subroutine stored_design_init
+
+  !> Free the design.
+  subroutine stored_design_free(this)
+    class(stored_design_t), intent(inout) :: this
+
+    call this%values%free()
+    call this%free_base()
+
+  end subroutine stored_design_free
+
+  !> Copy the stored values into `values`, on the host and the device.
+  !! @param values The vector to fill.
+  subroutine stored_design_get_values(this, values)
+    class(stored_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
+
+    if (this%size() .gt. 0) values%x(1:this%size()) = this%values%x(:)
+    call values%copy_from(HOST_TO_DEVICE, .true.)
+
+  end subroutine stored_design_get_values
+
+  !> Store `values`, whose device side is current.
+  !! @param values The new values.
+  subroutine stored_design_update_design(this, values)
+    class(stored_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: values
+
+    if (this%size() .eq. 0) return
+    call values%copy_from(DEVICE_TO_HOST, .true.)
+    this%values%x(:) = values%x(1:this%size())
+    call this%values%copy_from(HOST_TO_DEVICE, .true.)
+
+  end subroutine stored_design_update_design
+
+  !> No mapping: the design has no simulation to map to.
+  subroutine stored_design_map_forward(this)
+    class(stored_design_t), intent(inout) :: this
+  end subroutine stored_design_map_forward
+
+  !> No mapping: the design has no simulation to map from.
+  !! @param sensitivity The sensitivity, unused.
+  subroutine stored_design_map_backward(this, sensitivity)
+    class(stored_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: sensitivity
+  end subroutine stored_design_map_backward
+
+  !> No output.
+  !! @param idx The output index, unused.
+  subroutine stored_design_write(this, idx)
+    class(stored_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
+  end subroutine stored_design_write
 
 end module checkpointing_test_utils
