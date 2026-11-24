@@ -604,7 +604,7 @@ contains
     integer :: i
 
     do i = 1, this%n_objectives
-       if (this%objective_list(i)%objective%value_weight .gt. 0.0_rp) cycle
+       if (this%objective_list(i)%objective%value_weight .gt. 0.0_xp) cycle
 
        write (log_buf, '(A,A,A)') "Objective '", &
             this%objective_list(i)%objective%get_name(), &
@@ -620,7 +620,7 @@ contains
     class(design_t), intent(inout) :: design
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
-    real(kind=rp) :: cfl
+    real(kind=dp) :: cfl
     real(kind=dp) :: total_time
     integer :: i, j
     type(time_state_t) :: accumulation_time
@@ -662,7 +662,8 @@ contains
     end if
 
     ! Total time of the forward simulation
-    total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
+    total_time = real(simulation%n_timesteps, kind=dp) * &
+         simulation%adjoint_case%time%dt
 
     call profiler_start_region("Adjoint simulation")
 

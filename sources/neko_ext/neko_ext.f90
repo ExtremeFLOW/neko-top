@@ -43,7 +43,7 @@ module neko_ext
   use case, only: case_t
   use adjoint_case, only: adjoint_case_t
   use json_utils, only: json_get, json_get_or_default
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use simcomp_executor, only: neko_simcomps
   use flow_ic, only: set_flow_ic
   use scalar_ic, only: set_scalar_ic
@@ -64,6 +64,8 @@ module neko_ext
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scalar_pnpn, only: scalar_pnpn_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
+  use time_state, only: time_state_t
+  use time_scheme_controller, only: time_scheme_controller_t
 
   implicit none
 
@@ -72,7 +74,7 @@ module neko_ext
   ! ========================================================================= !
   private
   public :: reset, reset_adjoint, field_to_vector, vector_to_field, &
-       get_scalar_indicies
+       get_scalar_indicies, set_time_scheme_coeffs
 
 contains
 
@@ -98,7 +100,7 @@ contains
     type(case_t), intent(inout) :: neko_case
     integer, intent(in) :: design_iteration
     character(len=*), intent(in) :: output_base_fname
-    real(kind=rp) :: t
+    real(kind=dp) :: t
     integer :: i
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
@@ -126,7 +128,7 @@ contains
     call neko_case%time%reset()
     t = neko_case%time%start_time
     do i = 1, size(neko_case%time%tlag)
-       neko_case%time%tlag(i) = t - i*neko_case%time%dtlag(i)
+       neko_case%time%tlag(i) = t - real(i, kind=dp) * neko_case%time%dtlag(i)
     end do
 
     ! Tag the field output filename with the design iteration, so this
@@ -155,7 +157,7 @@ contains
 
     ! Reset the external BDF coefficients
     do i = 1, size(neko_case%time%dtlag)
-       call neko_case%fluid%ext_bdf%set_coeffs(neko_case%time%dtlag)
+       call set_time_scheme_coeffs(neko_case%fluid%ext_bdf, neko_case%time)
     end do
 
     ! Restart the simulation components
@@ -291,7 +293,7 @@ contains
     type(case_t), intent(inout) :: neko_case
     integer, intent(in) :: design_iteration
     character(len=*), intent(in) :: output_base_fname
-    real(kind=rp) :: t
+    real(kind=dp) :: t
     integer :: i
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
@@ -319,7 +321,8 @@ contains
     call adjoint_case%time%reset()
     t = adjoint_case%time%start_time
     do i = 1, size(adjoint_case%time%tlag)
-       adjoint_case%time%tlag(i) = t - i*adjoint_case%time%dtlag(i)
+       adjoint_case%time%tlag(i) = t - &
+            real(i, kind=dp) * adjoint_case%time%dtlag(i)
     end do
 
     ! Tag the field output filename with the design iteration, so this
@@ -341,7 +344,8 @@ contains
 
     ! Reset the external BDF coefficients
     do i = 1, size(adjoint_case%time%dtlag)
-       call adjoint_case%fluid_adj%ext_bdf%set_coeffs(adjoint_case%time%dtlag)
+       call set_time_scheme_coeffs(adjoint_case%fluid_adj%ext_bdf, &
+            adjoint_case%time)
     end do
 
     ! ------------------------------------------------------------------------ !
@@ -546,6 +550,25 @@ contains
     end if
 
   end subroutine get_scalar_indicies
+
+  !> Set the coefficients of a time scheme from the lagged time steps.
+  !! @details The time scheme takes the lagged time steps in working
+  !! precision, while the time state keeps them in double precision. They are
+  !! converted one at a time into a local array.
+  !! @param[inout] ext_bdf The time scheme.
+  !! @param[in] time The time state holding the lagged time steps.
+  subroutine set_time_scheme_coeffs(ext_bdf, time)
+    type(time_scheme_controller_t), intent(inout) :: ext_bdf
+    type(time_state_t), intent(in) :: time
+    real(kind=rp) :: dtlag(size(time%dtlag))
+    integer :: i
+
+    do i = 1, size(dtlag)
+       dtlag(i) = real(time%dtlag(i), kind=rp)
+    end do
+    call ext_bdf%set_coeffs(dtlag)
+
+  end subroutine set_time_scheme_coeffs
 
   ! ========================================================================= !
   ! Private routines

@@ -44,9 +44,11 @@
 !! requires large amounts of memory and disk space.
 submodule (state_recover_checkpoint) checkpoint_linear
   use num_types, only: dp
+  use mpi_f08, only: MPI_Wtime
   use simulation, only: simulation_step, simulation_restart
   use time_step_controller, only: time_step_controller_t
   use profiler, only: profiler_start_region, profiler_end_region
+  implicit none
 
 contains
 
@@ -56,7 +58,7 @@ contains
   module subroutine checkpoint_save_linear(this)
     class(state_recover_checkpoint_t), intent(inout) :: this
     integer :: index, tstep, counter, n_total
-    real(kind=rp) :: time, end_time, dt
+    real(kind=dp) :: time, end_time, dt
 
     time = this%neko_case%time%t
     dt = this%neko_case%time%dt
@@ -102,7 +104,7 @@ contains
     real(kind=dp) :: loop_start
     integer :: k, previous_save, next_save, local_idx, counter
 
-    loop_start = MPI_WTIME()
+    loop_start = MPI_Wtime()
 
     ! Determine the nearest save states on both sides
     previous_save = tstep - modulo(tstep, this%n_saves_memory)

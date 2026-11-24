@@ -36,7 +36,7 @@
 module optimization_ic
   use gather_scatter, only : gs_t, GS_OP_ADD
   use neko_config, only : NEKO_BCKND_DEVICE
-  use num_types, only : rp
+  use num_types, only : rp, dp
   use device_math, only : device_col2
   use device, only : device_memcpy, HOST_TO_DEVICE
   use field, only : field_t
@@ -93,7 +93,8 @@ contains
     real(kind=rp) :: ic_value
     character(len=:), allocatable :: read_str
     character(len=:), allocatable :: fname, mesh_fname
-    real(kind=rp) :: zone_value, tol
+    real(kind=rp) :: zone_value
+    real(kind=dp) :: tol
     logical :: interpolate
 
     call json_get(params, "type", type)
@@ -113,7 +114,7 @@ contains
     case ('field')
        call json_get(params, 'file_name', fname)
        call json_get_or_default(params, 'interpolate', interpolate, .false.)
-       call json_get_or_default(params, 'tolerance', tol, 0.000001_rp)
+       call json_get_or_default(params, 'tolerance', tol, 0.000001_dp)
        call json_get_or_default(params, 'mesh_file_name', mesh_fname, "none")
 
        call set_optimization_ic_fld(fld, fname, interpolate, tol, mesh_fname)
@@ -231,7 +232,7 @@ contains
     type(field_t), intent(inout) :: fld
     character(len=*), intent(in) :: file_name
     logical, intent(in) :: interpolate
-    real(kind=rp), intent(in) :: tolerance
+    real(kind=dp), intent(in) :: tolerance
     character(len=*), intent(inout) :: mesh_file_name
 
     character(len=LOG_SIZE) :: log_buf

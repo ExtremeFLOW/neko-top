@@ -376,7 +376,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     type(json_file) :: dt_params
     real(kind=dp) :: loop_start
-    real(kind=rp) :: cfl
+    real(kind=dp) :: cfl
     integer :: i
 
     call json_get(this%neko_case%params, 'case.time', dt_params)
@@ -449,8 +449,8 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_forward%sample(real(idx, kind=rp))
-    call this%output_adjoint%sample(real(idx, kind=rp))
+    call this%output_forward%sample(real(idx, kind=dp))
+    call this%output_adjoint%sample(real(idx, kind=dp))
 
   end subroutine simulation_write
 
@@ -459,7 +459,7 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_forward%sample(real(idx, kind=rp))
+    call this%output_forward%sample(real(idx, kind=dp))
 
   end subroutine simulation_write_forward
 
@@ -468,7 +468,7 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_adjoint%sample(real(idx, kind=rp))
+    call this%output_adjoint%sample(real(idx, kind=dp))
 
   end subroutine simulation_write_adjoint
 
