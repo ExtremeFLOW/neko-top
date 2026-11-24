@@ -28,6 +28,11 @@ inputs:
     required: false
     default: "gfortran"
 
+  c-compiler:
+    description: "The C compiler to use. ParMETIS uses it through mpicc."
+    required: false
+    default: "gcc"
+
   compiler-flags:
     description: "The compiler flag to use."
     required: false
@@ -72,10 +77,11 @@ runs:
         VERSION: ${{ inputs.version }}
         OS: ${{ inputs.os }}
         COMPILER: ${{ inputs.compiler }}
+        C_COMPILER: ${{ inputs.c-compiler }}
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
       run: |
         OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
-        key="parmetis-$VERSION-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="parmetis-$VERSION-$OS-$COMPILER-$C_COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
@@ -89,9 +95,12 @@ runs:
     # Setup the system for building the ParMETIS library
 
     - name: Install dependencies
+      if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt-get install -y openmpi-bin libopenmpi-dev
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          cmake make openmpi-bin libopenmpi-dev ${{ inputs.c-compiler }}
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the ParMETIS library.
@@ -121,9 +130,10 @@ runs:
         CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         WORKING_DIR: ${{ inputs.working-dir }}
         VERSION: ${{ inputs.version }}
+        C_COMPILER: ${{ inputs.c-compiler }}
       run: |
         cd $WORKING_DIR/parmetis-$VERSION/metis
-        make config prefix=${PARMETIS_DIR}
+        make config prefix=${PARMETIS_DIR} cc=$C_COMPILER
         make -j && make install
 
     - name: Build ParMETIS
@@ -135,6 +145,8 @@ runs:
         CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         WORKING_DIR: ${{ inputs.working-dir }}
         VERSION: ${{ inputs.version }}
+        # ParMETIS builds with mpicc, which compiles with OMPI_CC.
+        OMPI_CC: ${{ inputs.c-compiler }}
       run: |
         cd $WORKING_DIR/parmetis-$VERSION
         make config prefix=${PARMETIS_DIR}

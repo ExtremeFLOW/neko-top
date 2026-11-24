@@ -38,7 +38,7 @@ set_target_properties(reg_problem_tester_sensitivity_bin
     PROPERTIES
         FOLDER "Tests/Regression/Sensitivity"
         RUNTIME_OUTPUT_NAME "sensitivity_regression_driver"
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 
 # Let the umbrella target trigger both build+prepare steps (if present)
