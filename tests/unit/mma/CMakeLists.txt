@@ -6,9 +6,17 @@
 # so it is registered here rather than in the shared list in the parent
 # CMakeLists.txt, which runs device builds with a single rank.
 #
+# mma_empty_rank: an MMA solve with every design variable on one of the two
+# ranks must match the same solve spread over both, for both subsolvers and
+# both backends. It needs two ranks on every backend, for the same reason.
+#
 # mma_checkpoint_cpu_backend: saving an HDF5 checkpoint of a cpu-backend MMA
 # must not change its state, which on a device build lives only on the host.
 # It needs HDF5 and two ranks on every backend, for the same reason.
+#
+# mma_empty_rank_hdf5: an HDF5 checkpoint of an MMA with every design variable
+# on one of the two ranks must round-trip. It needs HDF5 and two ranks on
+# every backend, for the same reason.
 
 set(CMAKE_FOLDER "Tests/Unit/MMA")
 
@@ -16,7 +24,7 @@ set(CMAKE_FOLDER "Tests/Unit/MMA")
 # Define the tests themselves
 
 add_pfunit_ctest(mma_kkt_nan
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mma_kkt_nan.pf
+    TEST_SOURCES mma_kkt_nan.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 2
@@ -40,9 +48,32 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     )
 endif()
 
+add_pfunit_ctest(mma_empty_rank
+    TEST_SOURCES mma_empty_rank.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 2
+)
+
+add_dependencies(Unit
+    mma_empty_rank
+)
+
+set_tests_properties(mma_empty_rank PROPERTIES
+    LABELS "unit;mma"
+    ENVIRONMENT "NEKO_LOG_FILE=mma_empty_rank.log"
+    TIMEOUT 120
+)
+
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(mma_empty_rank PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
 if (HAVE_HDF5)
     add_pfunit_ctest(mma_checkpoint_cpu_backend
-        TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mma_checkpoint_cpu_backend.pf
+        TEST_SOURCES mma_checkpoint_cpu_backend.pf
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         LINK_LIBRARIES Neko-TOP::neko-top
         MAX_PES 2
@@ -60,6 +91,29 @@ if (HAVE_HDF5)
 
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         target_compile_options(mma_checkpoint_cpu_backend PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+        )
+    endif()
+
+    add_pfunit_ctest(mma_empty_rank_hdf5
+        TEST_SOURCES mma_empty_rank_hdf5.pf
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        LINK_LIBRARIES Neko-TOP::neko-top
+        MAX_PES 2
+    )
+
+    add_dependencies(Unit
+        mma_empty_rank_hdf5
+    )
+
+    set_tests_properties(mma_empty_rank_hdf5 PROPERTIES
+        LABELS "unit;mma"
+        ENVIRONMENT "NEKO_LOG_FILE=mma_empty_rank_hdf5.log"
+        TIMEOUT 120
+    )
+
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(mma_empty_rank_hdf5 PRIVATE
             $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
         )
     endif()

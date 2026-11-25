@@ -392,8 +392,8 @@ contains
     this%n = n
     this%m = m
 
-    call this%xold1%init(n)
-    call this%xold2%init(n)
+    call mma_vector_init(this%xold1, n)
+    call mma_vector_init(this%xold2, n)
     this%xold1 = x
     this%xold2 = x
     ! On device builds the assignment copies device memory only, while the
@@ -403,20 +403,20 @@ contains
        call this%xold2%copy_from(DEVICE_TO_HOST, sync = .true.)
     end if
 
-    call this%alpha%init(n)
-    call this%beta%init(n)
+    call mma_vector_init(this%alpha, n)
+    call mma_vector_init(this%beta, n)
 
     call this%a%init(m)
     call this%c%init(m)
     call this%d%init(m)
-    call this%low%init(n)
-    call this%upp%init(n)
-    call this%xmax%init(n)
-    call this%xmin%init(n)
+    call mma_vector_init(this%low, n)
+    call mma_vector_init(this%upp, n)
+    call mma_vector_init(this%xmax, n)
+    call mma_vector_init(this%xmin, n)
 
     !internal dummy variables for MMA
-    call this%p0j%init(n)
-    call this%q0j%init(n)
+    call mma_vector_init(this%p0j, n)
+    call mma_vector_init(this%q0j, n)
     call this%pij%init(m, n)
     call this%qij%init(m, n)
     call this%bi%init(m)
@@ -426,8 +426,8 @@ contains
     call this%lambda%init(m)
     call this%s%init(m)
     call this%mu%init(m)
-    call this%xsi%init(n)
-    call this%eta%init(n)
+    call mma_vector_init(this%xsi, n)
+    call mma_vector_init(this%eta, n)
     this%z = 0.0_rp
     this%zeta = 0.0_rp
 
@@ -562,6 +562,7 @@ contains
     type(vector_t), intent(inout) :: x
     type(vector_t), intent(inout) :: df0dx, fval
     type(matrix_t), intent(inout) :: dfdx
+    real(kind=rp) :: x_empty(0), df0dx_empty(0)
 
     call profiler_start_region('FullMMAupdate')
     ! Select backend type
@@ -575,7 +576,14 @@ contains
           call dfdx%copy_from(DEVICE_TO_HOST, sync = .true.)
        end if
 
-       call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
+       ! The host arrays of the design and its sensitivities may be
+       ! unallocated on a rank without design variables
+       if (this%n .gt. 0) then
+          call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
+       else
+          call mma_update_cpu(this, iter, x_empty, df0dx_empty, fval%x, &
+               dfdx%x)
+       end if
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call x%copy_from(HOST_TO_DEVICE, sync = .true.)
@@ -595,22 +603,25 @@ contains
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(inout) :: x, df0dx, fval
     type(matrix_t), intent(inout) :: dfdx
+    real(kind=rp) :: x_empty(0), df0dx_empty(0)
 
     ! Select backend type
     select case (this%bcknd )
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(df0dx%x, df0dx%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(fval%x, fval%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(dfdx%x, dfdx%x_d, this%m * this%n, DEVICE_TO_HOST,&
-               sync = .true.)
+          call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call df0dx%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call fval%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call dfdx%copy_from(DEVICE_TO_HOST, sync = .true.)
        end if
 
-       call mma_KKT_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
+       ! The host arrays of the design and its sensitivities may be
+       ! unallocated on a rank without design variables
+       if (this%n .gt. 0) then
+          call mma_KKT_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
+       else
+          call mma_KKT_cpu(this, x_empty, df0dx_empty, fval%x, dfdx%x)
+       end if
     case ("device")
        call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
     case default
@@ -725,6 +736,23 @@ contains
 
   ! ========================================================================== !
   ! Private utilities
+
+  !> Initialise a vector of n design variables, with a host array also for
+  !! n = 0. vector_t leaves the host array of an empty vector unallocated,
+  !! but the cpu backend references the host arrays of these vectors on every
+  !! rank, so a rank without design variables gets zero-size ones. They are
+  !! allocated before the vector is initialised, which then keeps them and
+  !! does not pass an unallocated array on.
+  !! @param v The vector.
+  !! @param n The number of design variables on this rank.
+  subroutine mma_vector_init(v, n)
+    type(vector_t), intent(inout) :: v
+    integer, intent(in) :: n
+
+    if (n .eq. 0 .and. .not. allocated(v%x)) allocate(v%x(0))
+    call v%init(n)
+
+  end subroutine mma_vector_init
 
   !> Copy all internal vectors/matrices between host and device.
   !! Only the device backend keeps the state on the device. With the cpu

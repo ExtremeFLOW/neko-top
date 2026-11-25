@@ -98,7 +98,7 @@ target_link_libraries(checkpointing_test_utils PRIVATE Neko-TOP::neko-top)
 
 add_pfunit_ctest(checkpoint_restore_consistency
     TEST_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency.pf
+        test_checkpoint_restore_consistency.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
     MAX_PES 2
@@ -106,7 +106,7 @@ add_pfunit_ctest(checkpoint_restore_consistency
 
 add_pfunit_ctest(checkpoint_end_of_run_gating
     TEST_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_end_of_run_gating.pf
+        test_checkpoint_end_of_run_gating.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
     MAX_PES 2
@@ -161,7 +161,7 @@ endif()
 if (HAVE_HDF5)
     add_pfunit_ctest(checkpoint_restore_consistency_hdf5
         TEST_SOURCES
-            ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency_hdf5.pf
+            test_checkpoint_restore_consistency_hdf5.pf
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
         LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
         MAX_PES 2
@@ -186,6 +186,77 @@ if (HAVE_HDF5)
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         target_compile_options(checkpoint_restore_consistency_hdf5 PRIVATE
             $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+        )
+    endif()
+
+    # design_checkpoint_hdf5: a design checkpoint must round-trip exactly when
+    # a rank owns no design variables. It needs two ranks on every backend and
+    # no case file.
+    add_pfunit_ctest(design_checkpoint_hdf5
+        TEST_SOURCES
+            test_design_checkpoint_hdf5.pf
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        LINK_LIBRARIES checkpointing_test_utils Neko-TOP::neko-top
+        MAX_PES 2
+    )
+    set_tests_properties(design_checkpoint_hdf5 PROPERTIES
+        LABELS "unit;checkpointing;hdf5"
+        ENVIRONMENT "NEKO_LOG_FILE=design_checkpoint_hdf5.log;OMP_NUM_THREADS=1"
+        TIMEOUT 120
+    )
+    add_dependencies(Unit design_checkpoint_hdf5)
+
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(design_checkpoint_hdf5 PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+        )
+    endif()
+
+    # checkpoint_rank_change: the MMA and the design checkpoints must stop with
+    # an error on every rank when loaded on fewer or more ranks than the save.
+    # checkpoint_rank_change_uneven: the same on as many ranks with another
+    # layout, which needs three ranks. The error stops the run, so the driver
+    # runs outside pFUnit, from a script that launches it under a time limit.
+    add_executable(checkpoint_rank_change EXCLUDE_FROM_ALL
+        ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint_rank_change.f90
+    )
+    target_link_libraries(checkpoint_rank_change
+        PRIVATE checkpointing_test_utils Neko-TOP::neko-top
+    )
+    add_dependencies(Unit checkpoint_rank_change)
+
+    set(rank_change_script
+        ${CMAKE_CURRENT_SOURCE_DIR}/check_checkpoint_rank_change.cmake)
+    foreach(cases rank_count uneven)
+        set(test_name checkpoint_rank_change)
+        if (NOT cases STREQUAL "rank_count")
+            string(APPEND test_name "_${cases}")
+        endif()
+
+        # A directory per test, as both write the same checkpoint file
+        set(run_dir ${CMAKE_CURRENT_BINARY_DIR}/run/${test_name})
+        file(MAKE_DIRECTORY ${run_dir})
+        add_test(NAME ${test_name}
+            COMMAND ${CMAKE_COMMAND}
+                -DDRIVER=$<TARGET_FILE:checkpoint_rank_change>
+                -DMPIEXEC=${MPIEXEC_EXECUTABLE}
+                -DNUMPROC_FLAG=${MPIEXEC_NUMPROC_FLAG}
+                "-DPREFLAGS=${MPIEXEC_PREFLAGS}"
+                -DCASES=${cases}
+                -DTIME_LIMIT=60
+                -P ${rank_change_script}
+            WORKING_DIRECTORY ${run_dir}
+        )
+        set_tests_properties(${test_name} PROPERTIES
+            LABELS "unit;checkpointing;hdf5"
+            ENVIRONMENT "NEKO_LOG_FILE=${test_name}.log;OMP_NUM_THREADS=1"
+            TIMEOUT 900
+        )
+    endforeach()
+
+    if (NOT MPIEXEC_MAX_NUMPROCS OR MPIEXEC_MAX_NUMPROCS LESS 3)
+        set_tests_properties(checkpoint_rank_change_uneven PROPERTIES
+            DISABLED TRUE
         )
     endif()
 endif()

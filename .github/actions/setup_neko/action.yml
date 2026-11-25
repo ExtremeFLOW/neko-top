@@ -49,6 +49,11 @@ inputs:
     required: false
     default: "gfortran"
 
+  c-compiler:
+    description: "The C compiler to use."
+    required: false
+    default: "gcc"
+
   compiler-flags:
     description: "The compiler flag to use."
     required: false
@@ -106,6 +111,7 @@ runs:
         VERSION: ${{ inputs.version }}
         OS: ${{ inputs.os }}
         COMPILER: ${{ inputs.compiler }}
+        C_COMPILER: ${{ inputs.c-compiler }}
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
         RP: ${{ inputs.precision }}
         BACKEND: ${{ inputs.backend }}
@@ -126,7 +132,7 @@ runs:
           exit 1
         fi
         OS="$OS-$(source /etc/os-release && echo "$ID-$VERSION_ID")"
-        key="neko-$VERSION-${SHA:0:7}-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="neko-$VERSION-${SHA:0:7}-$OS-$COMPILER-$C_COMPILER-${COMPILER_FLAGS// /_}"
         [ -n "$RP" ] && key="$key-$RP"
         [ -n "$BACKEND" ] && key="$key-$BACKEND"
         [ -n "$JSON_FORTRAN_DIR" ] && key="$key-json-fortran-$JSON_FORTRAN_VERSION"
@@ -148,8 +154,11 @@ runs:
       if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt-get install -y autotools-dev automake autoconf openmpi-bin \
-          pkg-config liblapack-dev libopenblas-dev libopenmpi-dev
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          autotools-dev autoconf automake libtool make pkg-config \
+          openmpi-bin libopenmpi-dev libopenblas-dev liblapack-dev \
+          ${{ inputs.compiler }} ${{ inputs.c-compiler }}
 
     # ------------------------------------------------------------------------ #
     # Clone and build the Neko library
@@ -173,6 +182,8 @@ runs:
         INSTALL_DIR: ${{ inputs.install-dir }}
         WORKING_DIR: ${{ inputs.working-dir }}
         FC: ${{ inputs.compiler }}
+        CC: ${{ inputs.c-compiler }}
+        OMPI_CC: ${{ inputs.c-compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
         BACKEND: ${{ inputs.backend }}
         BACKEND_PATH: ${{ inputs.backend-path }}

@@ -16,7 +16,7 @@ module user
   logical :: is_initialized = .false.
 
   real(kind=rp) :: target_temperature = 0.0_rp
-  real(kind=rp) :: ramp_time_end = 0.0_rp
+  real(kind=dp) :: ramp_time_end = 0.0_dp
 
   !> Variables to store the Rayleigh and Peclet numbers
   real(kind=rp) :: Re = 0.0_rp
@@ -39,13 +39,13 @@ contains
     call json_get(params, "case.scalar.Pe", Pe)
     call json_get(params, "case.scalar.target_temperature", target_temperature)
     call json_get(params, "case.time.end_time", ramp_time_end)
-    ramp_time_end = ramp_time_end * 0.01_rp
+    ramp_time_end = ramp_time_end * 0.01_dp
 
   end subroutine user_startup
 
   !> Read the material properties from the JSON file
   subroutine set_material_properties(t, tstep, rho, mu, cp, lambda, params)
-    real(kind=rp), intent(in) :: t
+    real(kind=dp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=rp), intent(inout) :: rho, mu, cp, lambda
     type(json_file), intent(inout) :: params
@@ -102,7 +102,8 @@ contains
 
     s => neko_registry%get_field('s')
 
-    current_temperature = min(1.0_rp, time%t / ramp_time_end) * target_temperature
+    current_temperature = real(min(1.0_dp, time%t / ramp_time_end), kind=rp) &
+         * target_temperature
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cfill_mask(s%x_d, current_temperature, rhs_s%dof%size(), &

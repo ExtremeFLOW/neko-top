@@ -36,7 +36,7 @@
 !! \f$ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
 !! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, \f$
 module scalar_mixing_objective
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use design, only: design_t
@@ -118,7 +118,7 @@ contains
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp) :: weight
     real(kind=rp) :: phi_ref
-    real(kind=rp) :: start_time, end_time
+    real(kind=dp) :: start_time, end_time
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: scalar_name
@@ -129,8 +129,8 @@ contains
     call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
     call json_get_or_default(json, "scalar_name", scalar_name, "s")
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    call json_get_or_default(json, "start_time", start_time, 0.0_dp)
+    call json_get_or_default(json, "end_time", end_time, huge(0.0_dp))
 
     ! initialize
     call this%init_from_attributes(design, simulation, weight, name, &
@@ -158,8 +158,8 @@ contains
     character(len=*), intent(in) :: mask_name
     real(kind=rp), intent(in) :: phi_ref
     character(len=*), intent(in) :: scalar_name
-    real(kind=rp), intent(in) :: start_time
-    real(kind=rp), intent(in) :: end_time
+    real(kind=dp), intent(in) :: start_time
+    real(kind=dp), intent(in) :: end_time
 
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
     real(kind=rp) :: forcing_start, forcing_end
@@ -209,7 +209,7 @@ contains
       ! Initialize the scalar mixing adjoint source term
       call this%get_forcing_window(simulation, forcing_start, forcing_end)
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
-           this%get_weight(), this%phi_ref, this%mask, this%has_mask, &
+           this%weight, this%phi_ref, this%mask, this%has_mask, &
            this%coef, forcing_start, forcing_end, this%forcing_scale)
 
     end associate

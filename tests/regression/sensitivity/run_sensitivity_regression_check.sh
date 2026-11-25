@@ -12,15 +12,18 @@ case_name="$(basename "$case_file")"
 case_stem="${case_name%.*}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# This suite runs realistic (~1000-timestep) forward+adjoint solves per
-# perturbation and is not meant to gate every PR. It is opt-in: unset (or
-# empty) NEKO_TOP_RUN_SENSITIVITY_REGRESSION means "skip", matching how
-# run_valgrind_check.sh skips when the `valgrind` tool itself is absent, but
-# here the gate is an explicit choice rather than a tool-availability check.
+# This script is shared by both tiers of the sensitivity regression lane
+# (see CMakeLists.txt). The fast tier sets
+# NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1 in its own test command, so it
+# always passes the check below. The slow tier inherits the caller's
+# environment: unset (or empty) NEKO_TOP_RUN_SENSITIVITY_REGRESSION means
+# "skip", matching how run_valgrind_check.sh skips when the `valgrind` tool
+# itself is absent, but here the gate is an explicit choice rather than a
+# tool-availability check.
 if [[ -z "${NEKO_TOP_RUN_SENSITIVITY_REGRESSION:-}" ]]; then
     echo "Skipping sensitivity regression test: set" \
-        "NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1 to opt in (this lane is not" \
-        "part of the default/PR-blocking test budget)."
+        "NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1 to opt in (the slow tier is" \
+        "not part of the default test budget)."
     exit 77
 fi
 
@@ -61,7 +64,7 @@ csv_file="FD_check_${case_stem}.csv"
 rm -f "$csv_file"
 
 # The FD-vs-analytic tolerance assertion happens inside the driver itself
-# (shared `sensitivity` module, see tests/unit/sensitivity/sensitivity.f90) —
+# (shared `sensitivity` module, see tests/shared/sensitivity.f90) —
 # a non-zero exit here means the finite-difference check genuinely failed,
 # not just that something crashed.
 mpirun -n "$ranks" "$binary" "$case_name"

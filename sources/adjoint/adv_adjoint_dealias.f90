@@ -45,7 +45,7 @@ module adv_lin_dealias
   use operators, only: opgrad, cdtp
   use interpolation, only: interpolator_t
   use device_math, only: device_vdot3, device_sub2, device_col3, device_add4
-  use device, only: device_map
+  use device, only: device_map, device_unmap
   use utils, only: neko_error
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
@@ -154,6 +154,8 @@ contains
     type(coef_t), intent(inout), target :: coef
     integer :: nel, n_GL, n
 
+    call this%free()
+
     call this%Xh_GL%init(GL, lxd, lxd, lxd)
     this%Xh_GLL => coef%Xh
     this%coef_GLL => coef
@@ -225,9 +227,55 @@ contains
   end subroutine init_dealias
 
   !> Destructor
+  !! @param this The object.
   subroutine free_dealias(this)
     class(adv_lin_dealias_t), intent(inout) :: this
+
+    call free_work_array(this%temp, this%temp_d)
+    call free_work_array(this%tbf, this%tbf_d)
+    call free_work_array(this%tx, this%tx_d)
+    call free_work_array(this%ty, this%ty_d)
+    call free_work_array(this%tz, this%tz_d)
+    call free_work_array(this%vr, this%vr_d)
+    call free_work_array(this%vs, this%vs_d)
+    call free_work_array(this%vt, this%vt_d)
+    call free_work_array(this%txb, this%txb_d)
+    call free_work_array(this%tyb, this%tyb_d)
+    call free_work_array(this%tzb, this%tzb_d)
+    call free_work_array(this%duxb, this%duxb_d)
+    call free_work_array(this%duyb, this%duyb_d)
+    call free_work_array(this%duzb, this%duzb_d)
+    call free_work_array(this%dvxb, this%dvxb_d)
+    call free_work_array(this%dvyb, this%dvyb_d)
+    call free_work_array(this%dvzb, this%dvzb_d)
+    call free_work_array(this%dwxb, this%dwxb_d)
+    call free_work_array(this%dwyb, this%dwyb_d)
+    call free_work_array(this%dwzb, this%dwzb_d)
+
+    call this%coef_GL%free()
+    call this%GLL_to_GL%free()
+    call this%Xh_GL%free()
+
+    nullify(this%Xh_GLL)
+    nullify(this%coef_GLL)
+
   end subroutine free_dealias
+
+  !> Unmap a work array from the device and deallocate it.
+  !! @param x The work array.
+  !! @param x_d The device pointer of `x`.
+  subroutine free_work_array(x, x_d)
+    real(kind=rp), allocatable, intent(inout) :: x(:)
+    type(c_ptr), intent(inout) :: x_d
+
+    if (allocated(x)) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_unmap(x, x_d)
+       end if
+       deallocate(x)
+    end if
+
+  end subroutine free_work_array
 
 
   !> Add the adjoint advection term for the fluid in weak form, i.e.

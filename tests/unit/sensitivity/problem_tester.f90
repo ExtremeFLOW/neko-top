@@ -22,6 +22,7 @@ program problem_tester
   use math, only: abscmp, copy
   use device_math, only: device_copy
   use sensitivity, only: compute_sensitivity
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
 
   ! JSON related arguments
@@ -49,6 +50,7 @@ program problem_tester
   type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
+  integer :: continuation_iteration
 
   ! True => testing an objective, F => testing a constraint
   logical :: is_objective
@@ -72,13 +74,22 @@ program problem_tester
   call json_get(parameters, 'optimization.design', design_parameters)
   call json_get_or_default(parameters, 'optimization.fd_test_tolerance', &
        tolerance, 1e-5_rp)
+  ! Optionally advance the continuation scheduler to the given optimisation
+  ! iteration before differentiating, as the optimizer does.
+  call json_get_or_default(parameters, &
+       'optimization.fd_test_continuation_iteration', continuation_iteration, &
+       0)
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
+  call nekotop_continuation%init(parameters)
   call sim%init(parameters)
   call des%init(design_parameters, sim)
   call prob%init(parameters, des, sim)
+  if (continuation_iteration .gt. 0) then
+     call nekotop_continuation%update(continuation_iteration)
+  end if
 
   ! -------------------------------------------------------------------------- !
   ! Determine if objective or constraint
@@ -148,6 +159,7 @@ program problem_tester
   call prob%free()
   call des%free()
   call sim%free()
+  call nekotop_continuation%free()
 
   ! Finalize the Neko environment
   call neko_finalize()
