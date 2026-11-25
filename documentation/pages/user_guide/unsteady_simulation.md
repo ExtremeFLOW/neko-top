@@ -26,6 +26,12 @@ states one step at a time and assumes every step had the same `dt`, so a case
 that sets `case.time.variable_timestep` together with `"unsteady": true` stops
 with an error.
 
+Unsteady problems cannot use the `steady` simulation component. It drives a
+steady problem to convergence and then freezes the fluid, which is the
+opposite of an unsteady problem, so a case that lists a component of type
+`steady` under `case.simulation_components` together with `"unsteady": true`
+stops with an error at setup.
+
 ## Checkpoint based state recovery
 
 A straight forward approach is to simply store the entire forward state at each

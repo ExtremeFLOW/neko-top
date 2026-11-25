@@ -134,6 +134,12 @@ Currently, we have added tests for the following components:
   without the `timestep` that caps its first step
   (`variable_timestep_without_timestep.case`). They are not in `test_list`:
   each passes only if the run stops with its error.
+- The guard against the `steady` simulation component in an unsteady problem
+  (`unsteady_steady_component.case`). The component drives a steady problem
+  to convergence and freezes the fluid there, so `simulation_t%init` rejects
+  it when `"unsteady": true`. The test is registered on its own and passes
+  only if the run stops with that error: against code without the check the
+  run completes its finite-difference sweep and exits 0, which fails it.
 - `brinkman_dissipation_objective_t`, unsteady
   (`unsteady_brinkman_dissipation.case`) — 20 time steps at polynomial order
   3, with a PDE filter and the objective's default over-integration. It checks
