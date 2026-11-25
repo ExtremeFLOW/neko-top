@@ -49,8 +49,6 @@ submodule (design) design_hdf5_io
   use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
   implicit none
 
-  implicit none
-
 contains
 
   !> Write the Design object to an HDF5 file (parallel-aware).

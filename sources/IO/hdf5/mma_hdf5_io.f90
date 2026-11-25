@@ -46,8 +46,6 @@ submodule (mma) mma_hdf5_io
   use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
   implicit none
 
-  implicit none
-
 contains
 
   !> Write the MMA object to an HDF5 file (parallel-aware).

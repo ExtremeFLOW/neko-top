@@ -41,8 +41,6 @@ submodule(neko_top) neko_top_simcomps
   use steady_simcomp, only: steady_simcomp_allocate
   implicit none
 
-  implicit none
-
 contains
 
   !> @brief Register the known simulation components from Neko-TOP.

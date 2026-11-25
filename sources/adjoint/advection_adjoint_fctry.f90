@@ -43,8 +43,6 @@ submodule (advection_adjoint) advection_adjoint_fctry
   use adv_adjoint_dummy, only: adv_adjoint_dummy_t
   implicit none
 
-  implicit none
-
 contains
 
   !> A factory for \ref advection_t decendants. Both creates and initializes
