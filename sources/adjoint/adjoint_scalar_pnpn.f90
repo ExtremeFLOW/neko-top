@@ -335,6 +335,11 @@ contains
 
     call this%advs%free()
 
+    if (allocated(this%adv)) then
+       call this%adv%free()
+       deallocate(this%adv)
+    end if
+
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if

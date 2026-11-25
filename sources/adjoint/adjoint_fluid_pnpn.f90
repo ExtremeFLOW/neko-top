@@ -621,6 +621,11 @@ contains
     call this%advy%free()
     call this%advz%free()
 
+    if (allocated(this%adv)) then
+       call this%adv%free()
+       deallocate(this%adv)
+    end if
+
     if (allocated(this%Ax_vel)) then
        deallocate(this%Ax_vel)
     end if
