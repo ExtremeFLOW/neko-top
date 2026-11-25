@@ -37,10 +37,11 @@ module objective
   use base_functional, only: base_functional_t
   use simulation_m, only: simulation_t
   use design, only: design_t
-  use num_types, only: rp, xp
+  use num_types, only: rp, dp, xp
   use point_zone_registry, only: neko_point_zone_registry
   use json_module, only: json_file
   use time_state, only: time_state_t
+  use logger, only: neko_log
   implicit none
   private
 
@@ -131,8 +132,8 @@ contains
     integer, intent(in) :: design_size
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in), optional :: mask_name
-    real(kind=rp), intent(in), optional :: start_time
-    real(kind=rp), intent(in), optional :: end_time
+    real(kind=dp), intent(in), optional :: start_time
+    real(kind=dp), intent(in), optional :: end_time
 
     call this%free_base()
 
@@ -154,13 +155,13 @@ contains
     if (present(start_time)) then
        this%start_time = start_time
     else
-       this%start_time = 0.0_rp
+       this%start_time = 0.0_dp
     end if
 
     if (present(end_time)) then
        this%end_time = end_time
     else
-       this%end_time = huge(0.0_rp)
+       this%end_time = huge(0.0_dp)
     end if
 
   end subroutine objective_init_base
@@ -174,10 +175,10 @@ contains
     if (associated(this%forcing_scale)) deallocate(this%forcing_scale)
 
     this%value = 0.0_rp
-    this%value_weight = 0.0_rp
-    this%sensitivity_weight = 0.0_rp
-    this%start_time = 0.0_rp
-    this%end_time = huge(0.0_rp)
+    this%value_weight = 0.0_xp
+    this%sensitivity_weight = 0.0_xp
+    this%start_time = 0.0_dp
+    this%end_time = huge(0.0_dp)
     call this%sensitivity%free()
 
     this%has_mask = .false.
@@ -244,10 +245,12 @@ contains
 
   !> Get the time window to give the adjoint forcing source term.
   !!
-  !! A source term compares its window with the adjoint clock, which on the
-  !! unsteady path runs one step behind the primal state the forcing
-  !! consumes. There `update_forcing_scale` gates the forcing instead, and
-  !! the source term gets an open window.
+  !! A source term compares its window with the adjoint clock, not with the
+  !! time of the primal state the forcing consumes, so it always gets an
+  !! open window. On the unsteady path `update_forcing_scale` gates the
+  !! forcing by the objective's window instead. A steady problem evaluates
+  !! its objectives once, on the converged field, and ignores the window, so
+  !! a steady problem with one says so in the log.
   !! @param this The objective.
   !! @param simulation The simulation.
   !! @param start_time Start of the source term's window.
@@ -259,12 +262,15 @@ contains
     real(kind=rp), intent(out) :: start_time
     real(kind=rp), intent(out) :: end_time
 
-    if (simulation%unsteady) then
-       start_time = 0.0_rp
-       end_time = huge(0.0_rp)
-    else
-       start_time = real(this%start_time, kind=rp)
-       end_time = real(this%end_time, kind=rp)
+    start_time = 0.0_rp
+    end_time = huge(0.0_rp)
+
+    ! The objective's window is the open default unless the case set one
+    if (.not. simulation%unsteady .and. &
+         (this%start_time .gt. 0.0_dp .or. this%end_time .lt. huge(0.0_dp)) &
+         ) then
+       call neko_log%message("Note: objective '" // this%get_name() // &
+            "' has a time window, which a steady problem ignores.")
     end if
   end subroutine objective_get_forcing_window
 

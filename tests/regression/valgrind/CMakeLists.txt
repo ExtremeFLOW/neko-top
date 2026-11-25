@@ -32,16 +32,20 @@ add_dependencies(Regression reg_valgrind_bin)
 set(CMAKE_Fortran_MODULE_DIRECTORY ${NEKO_TOP_MOD_DIR} CACHE PATH
     "Fortran module directory" FORCE)
 
-# Register valgrind regression test.
-add_test(NAME unsteady_mixer_valgrind_build
+# Register the valgrind regression tests. Building reg_valgrind_bin is the
+# setup test of the regression_valgrind_bin fixture, see "Keeping test
+# executables in sync" in documentation/pages/dev_guide/testing.md.
+add_test(NAME regression_valgrind_build
     COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target reg_valgrind_bin
 )
-set_tests_properties(unsteady_mixer_valgrind_build PROPERTIES
+set_tests_properties(regression_valgrind_build PROPERTIES
+    FIXTURES_SETUP "regression_valgrind_bin"
     LABELS "regression;valgrind"
+    RESOURCE_LOCK "neko_top_build_tree"
     TIMEOUT 900
 )
 
-add_test(NAME unsteady_mixer_valgrind_regression
+add_test(NAME regression_valgrind_steady_mixer
     COMMAND ${CMAKE_COMMAND} -E env
         PATH=${neko_PATH}
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
@@ -60,15 +64,15 @@ add_test(NAME unsteady_mixer_valgrind_regression
         ${CMAKE_CURRENT_SOURCE_DIR}/check_valgrind.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-set_tests_properties(unsteady_mixer_valgrind_regression PROPERTIES
-    DEPENDS "unsteady_mixer_valgrind_build"
+set_tests_properties(regression_valgrind_steady_mixer PROPERTIES
+    FIXTURES_REQUIRED "regression_valgrind_bin"
     LABELS "regression;valgrind"
-    RESOURCE_LOCK "valgrind_regression_workspace"
+    RESOURCE_LOCK "regression_valgrind_workspace"
     SKIP_RETURN_CODE 77
     TIMEOUT 3600
 )
 
-add_test(NAME unsteady_mixer_valgrind_unsteady_regression
+add_test(NAME regression_valgrind_unsteady_mixer
     COMMAND ${CMAKE_COMMAND} -E env
         PATH=${neko_PATH}
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
@@ -87,10 +91,10 @@ add_test(NAME unsteady_mixer_valgrind_unsteady_regression
         ${CMAKE_CURRENT_SOURCE_DIR}/check_valgrind.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-set_tests_properties(unsteady_mixer_valgrind_unsteady_regression PROPERTIES
-    DEPENDS "unsteady_mixer_valgrind_build"
+set_tests_properties(regression_valgrind_unsteady_mixer PROPERTIES
+    FIXTURES_REQUIRED "regression_valgrind_bin"
     LABELS "regression;valgrind"
-    RESOURCE_LOCK "valgrind_regression_workspace"
+    RESOURCE_LOCK "regression_valgrind_workspace"
     SKIP_RETURN_CODE 77
     TIMEOUT 3600
 )

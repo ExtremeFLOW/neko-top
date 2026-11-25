@@ -17,6 +17,9 @@
 # test is then added to the CMake project using the `add_pfunit_ctest`
 # command, which creates a CTest target for the test. The tests are organized
 # into a "Tests/Unit" folder in the CMake project for better organization.
+# The tests in that list run with two ranks on CPU and one on a device. A test
+# whose point is the interaction between ranks is registered on its own below
+# instead, with two ranks on every backend.
 #
 # In addition to the simple unit tests using PFUnit, this file also includes
 # the subdirectory for sensitivity tests and other more complex tests.
@@ -47,18 +50,13 @@ add_subdirectory(mapping)
 add_subdirectory(adjoint)
 add_subdirectory(mma)
 add_subdirectory(constraints)
+add_subdirectory(design)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
 
 # Create a file list of the pFUnit test sources. These should be relative paths.
 set(PFUNIT_TEST_SOURCES "" CACHE INTERNAL "List of pFUnit test source files.")
-
-list(APPEND PFUNIT_TEST_SOURCES problem/time_window.pf)
-
-if (HAVE_HDF5)
-    list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
-endif()
 
 foreach(pf_file ${PFUNIT_TEST_SOURCES})
     # Ensure the path is relative to the tests/unit directory.
@@ -107,6 +105,65 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     )
     add_dependencies(Unit ${test_name})
 endforeach()
+
+# ============================================================================ #
+# Tests of the interaction between ranks. These run with two ranks on every
+# backend, rather than with two on CPU and one on a device like the tests
+# above. On a device build the two ranks share the device.
+
+# problem-time_window: the tests are declared for two ranks. Each rank
+# accumulates the time-window average on its own and must get it right, so the
+# accumulation cannot rely on a collective.
+add_pfunit_ctest(problem-time_window
+    TEST_SOURCES problem/time_window.pf
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 2
+)
+
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(problem-time_window PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+set_target_properties(problem-time_window PROPERTIES
+    FOLDER "Tests/Unit"
+)
+set_tests_properties(problem-time_window PROPERTIES
+    LABELS "unit"
+    ENVIRONMENT
+    "NEKO_LOG_FILE=${CMAKE_BINARY_DIR}/tests/unit/problem-time_window.log"
+    TIMEOUT 120
+)
+add_dependencies(Unit problem-time_window)
+
+# mma-io_hdf5: the MMA state is written to and read back from one HDF5 file in
+# parallel, each rank its own slice, with a different number of design
+# variables on each rank.
+if (HAVE_HDF5)
+    add_pfunit_ctest(mma-io_hdf5
+        TEST_SOURCES mma/io_hdf5.pf
+        LINK_LIBRARIES Neko-TOP::neko-top
+        MAX_PES 2
+    )
+
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(mma-io_hdf5 PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+        )
+    endif()
+
+    set_target_properties(mma-io_hdf5 PROPERTIES
+        FOLDER "Tests/Unit"
+    )
+    set_tests_properties(mma-io_hdf5 PROPERTIES
+        LABELS "unit"
+        ENVIRONMENT
+        "NEKO_LOG_FILE=${CMAKE_BINARY_DIR}/tests/unit/mma-io_hdf5.log"
+        TIMEOUT 120
+    )
+    add_dependencies(Unit mma-io_hdf5)
+endif()
 
 # ============================================================================ #
 # Tests that need a single rank only. These run with one rank on every backend,

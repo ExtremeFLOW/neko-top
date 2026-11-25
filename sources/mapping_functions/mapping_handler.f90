@@ -601,7 +601,7 @@ contains
     if (.not. this%outputs_initialized) then
        call neko_error('Mapping design output is not initialized')
     end if
-    call this%design_output%sample(real(idx, kind=rp))
+    call this%design_output%sample(real(idx, kind=dp))
 
   end subroutine mapping_handler_write_design
 
@@ -615,7 +615,7 @@ contains
     if (.not. this%outputs_initialized) then
        call neko_error('Mapping sensitivity output is not initialized')
     end if
-    call this%sensitivity_output%sample(real(idx, kind=rp))
+    call this%sensitivity_output%sample(real(idx, kind=dp))
 
   end subroutine mapping_handler_write_sensitivity
 

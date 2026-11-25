@@ -40,3 +40,20 @@ set_tests_properties(lint_test_depends PROPERTIES
     LABELS "lint;unit"
     TIMEOUT 60
 )
+
+# ============================================================================ #
+# Lint every add_pfunit_ctest() TEST_SOURCES .pf path: an absolute one (or one
+# prefixed with ${CMAKE_CURRENT_SOURCE_DIR}, which becomes one) makes pFUnit
+# write the generated driver into the source tree instead of the build tree.
+# Scans the CMakeLists.txt source text directly, so it needs neither MPI nor
+# a build either.
+
+add_test(NAME lint_pfunit_test_sources
+    COMMAND ${CMAKE_COMMAND}
+        -DTESTS_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/check_pfunit_test_sources.cmake
+)
+set_tests_properties(lint_pfunit_test_sources PROPERTIES
+    LABELS "lint;unit"
+    TIMEOUT 60
+)
