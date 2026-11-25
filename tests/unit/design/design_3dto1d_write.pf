@@ -1,0 +1,114 @@
+!> Unit test for the output of design_3dto1d_t.
+!!
+!! On a device backend the design values live on the device, and write
+!! copies them to the host, where MPI_Gatherv reads them. The copy must have
+!! completed before the gather reads the host buffer. The device values
+!! differ from the zeros of the host copy, and the ranks hold different
+!! numbers of values, so gathering an incomplete copy, or using a wrong
+!! displacement, changes the file that rank 0 writes.
+module design_3dto1d_write
+  use pfunit
+  use num_types, only: rp
+  use neko, only: neko_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use comm, only: pe_rank
+  use vector, only: vector_t
+  use device, only: HOST_TO_DEVICE
+  use device_math, only: device_cfill
+  use design_3dto1d, only: design_3dto1d_t
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_design_3dto1d_write_case
+   contains
+     procedure :: setUp
+  end type test_design_3dto1d_write_case
+
+  logical :: initialized = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_design_3dto1d_write_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  !> The file written by rank 0 must hold the values of every rank, in
+  !! global order, as they are held on the device on a device backend.
+  @test(npes=[2])
+  subroutine write_gathers_device_values(this)
+    class(test_design_3dto1d_write_case), intent(inout) :: this
+    integer, parameter :: idx = 7
+    character(len=*), parameter :: filename = 'design_iter_000007.txt'
+    integer, parameter :: n_busy = 2**22, n_repeat = 20
+    type(design_3dto1d_t) :: des
+    type(vector_t) :: values, busy
+    integer :: n, offset, n_global, i, iunit, n_bad, first_bad
+    real(kind=rp) :: x_pos, value
+    character(len=80) :: header
+    character(len=120) :: msg
+
+    ! Uneven sizes, so that the gather displacements matter. The offset is
+    ! the number of values on the lower ranks.
+    n = 4096 + 37 * pe_rank
+    offset = 4096 * pe_rank + 37 * pe_rank * (pe_rank - 1) / 2
+
+    call des%init(n)
+    n_global = des%size_global()
+
+    ! The global index as the value: exact in the written format, and never
+    ! the zero that the host copy of the design holds on a device backend
+    call values%init(n)
+    do i = 1, n
+       values%x(i) = real(offset + i, kind=rp)
+    end do
+    call values%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    ! Queue device work ahead of the copy in write, so that where the copy is
+    ! asynchronous to the host (pinned or zero-copy host memory, OpenCL), a
+    ! copy that is not waited for is still in flight when MPI_Gatherv reads
+    ! the buffer. A CUDA copy into Neko's pageable host arrays blocks until
+    ! it is done, so there the test checks the values and displacements only.
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call busy%init(n_busy)
+       do i = 1, n_repeat
+          call device_cfill(busy%x_d, real(i, kind=rp), n_busy)
+       end do
+    end if
+
+    ! On a device backend this updates the device copy only
+    call des%update_design(values)
+    call des%write(idx)
+
+    ! Freed before the check, which returns early when it fails
+    call busy%free()
+    call values%free()
+    call des%free()
+
+    if (pe_rank .eq. 0) then
+       n_bad = 0
+       first_bad = 0
+       open(newunit = iunit, file = filename, status = 'old', action = 'read')
+       read(iunit, '(A)') header
+       read(iunit, '(A)') header
+       do i = 1, n_global
+          read(iunit, *) x_pos, value
+          if (abs(value - real(i, kind=rp)) .gt. 0.0_rp) then
+             n_bad = n_bad + 1
+             if (first_bad .eq. 0) first_bad = i
+          end if
+       end do
+       close(iunit, status = 'delete')
+
+       write(msg, '(A,I0,A,I0)') "Wrong values in the written design: ", &
+            n_bad, ", the first at global index ", first_bad
+       @assertEqual(0, n_bad, message = trim(msg))
+    end if
+
+  end subroutine write_gathers_device_values
+
+end module design_3dto1d_write
