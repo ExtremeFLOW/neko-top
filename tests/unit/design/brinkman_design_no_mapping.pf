@@ -1,0 +1,380 @@
+! Verification that a Brinkman design without a "mapping" maps a continuous
+! design by the identity.
+!
+! The "mapping" of a `brinkman_design_t` is optional. Without it the mapping
+! cascade is empty and only makes a field continuous, by averaging the values
+! that neighbouring elements share. For a continuous design the Brinkman
+! amplitude must therefore equal the design, and a continuous sensitivity
+! must be passed back to the design unchanged. Before the fix,
+! the mapping handler was only initialised when "mapping" was present, so the
+! forward mapping at the end of the initialisation dereferenced unset mesh
+! coefficients and the run aborted with a segmentation fault.
+!
+! Four cases are checked:
+!   1. `init` from JSON, which also sets up the output of the design.
+!   2. `init_from_components`, which never sets an optimisation domain, so
+!      the design must not be masked.
+!   3. `free` after a JSON initialisation restricted to the point zone of the
+!      case, then `init_from_components`. Freeing must drop the mask, or the
+!      new design is masked with the stale domain.
+!   4. A pseudo-random design and sensitivity, which differ between the
+!      elements that share a point. The cascade must then still be a
+!      projection, unchanged when applied twice, and the backward map must be
+!      the transpose of the forward one.
+!
+! In the first two cases the design is updated to the x coordinate, and the
+! sensitivity mapped back is its square. The mesh is periodic in y and z
+! only, so both fields are continuous, and the averaging of shared points in
+! the cascade leaves them unchanged.
+!
+! Each test builds and frees its own simulation and then resets the
+! registries, so that the second test does not find the fields of the first.
+module brinkman_design_no_mapping
+  use mpi
+  use pfunit
+  use json_module, only: json_file
+  use json_utils, only: json_get
+  use json_utils_ext, only: json_read_file
+  use simulation_m, only: simulation_t
+  use brinkman_design, only: brinkman_design_t
+  use neko, only: neko_init
+  use neko_top, only: neko_top_register_types
+  use neko_ext, only: field_to_vector
+  use vector, only: vector_t
+  use num_types, only: rp
+  use registry, only: neko_registry
+  use scratch_registry, only: neko_scratch_registry
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
+  implicit none
+
+  !> Case file with the simulation and a design without a mapping.
+  character(len=*), parameter :: case_file = "brinkman_design_no_mapping.case"
+
+  !> The identity only rounds where the cascade averages shared points.
+  real(kind=rp), parameter :: match_tol = 1.0e2_rp * epsilon(1.0_rp)
+
+  !> An inner product sums over every point, rounding once per term.
+  real(kind=rp), parameter :: transpose_tol = 1.0e4_rp * epsilon(1.0_rp)
+
+  !> The cascade must move the pseudo-random design by at least this much,
+  !! or the design is continuous and the projection checks are inert.
+  real(kind=rp), parameter :: min_effect = 1.0e-2_rp
+
+  @TestCase
+  type, extends(MPITestCase) :: test_brinkman_no_mapping
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_brinkman_no_mapping
+
+  logical :: initialized_lock = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_brinkman_no_mapping), intent(inout) :: this
+
+    if (initialized_lock) return
+    initialized_lock = .true.
+
+    call neko_init()
+    call neko_top_register_types()
+
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_brinkman_no_mapping), intent(inout) :: this
+
+  end subroutine tearDown
+
+  !> Copy the Brinkman amplitude into a host-side vector.
+  !! @param amplitude The vector to fill.
+  subroutine get_host_amplitude(amplitude)
+    type(vector_t), intent(inout) :: amplitude
+
+    call field_to_vector(amplitude, &
+         neko_registry%get_field("brinkman_amplitude"))
+    call amplitude%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+  end subroutine get_host_amplitude
+
+  !> Update the design to the x coordinate, map a sensitivity backward, and
+  !! measure both mappings against the identity.
+  !! @param des The initialised design.
+  !! @param forward_diff Largest difference of the amplitude from the design.
+  !! @param backward_diff Largest difference of the mapped sensitivity from
+  !! the sensitivity it was mapped from.
+  subroutine run_identity(des, forward_diff, backward_diff)
+    type(brinkman_design_t), intent(inout) :: des
+    real(kind=rp), intent(out) :: forward_diff
+    real(kind=rp), intent(out) :: backward_diff
+    type(vector_t) :: x_coord, values, amplitude, sensitivity, mapped
+    integer :: n
+
+    n = des%size()
+    call x_coord%init(n)
+    call values%init(n)
+    call amplitude%init(n)
+    call sensitivity%init(n)
+    call mapped%init(n)
+
+    ! The amplitude must follow the updated design.
+    call des%get_x(x_coord)
+    call des%get_x(values)
+    call des%update_design(values)
+    call x_coord%copy_from(DEVICE_TO_HOST, sync = .true.)
+    call get_host_amplitude(amplitude)
+    forward_diff = maxval(abs(amplitude%x - x_coord%x))
+
+    ! The sensitivity must be passed back unchanged.
+    sensitivity%x = x_coord%x**2
+    call sensitivity%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call des%map_backward(sensitivity)
+    call des%get_sensitivity(mapped)
+    call mapped%copy_from(DEVICE_TO_HOST, sync = .true.)
+    backward_diff = maxval(abs(mapped%x - sensitivity%x))
+
+    call x_coord%free()
+    call values%free()
+    call amplitude%free()
+    call sensitivity%free()
+    call mapped%free()
+
+  end subroutine run_identity
+
+  !> Count the points a design masks: those where the amplitude is zero when
+  !! every design value is one.
+  !! @param des The initialised design.
+  !! @param n_masked The number of masked points.
+  subroutine count_masked(des, n_masked)
+    type(brinkman_design_t), intent(inout) :: des
+    integer, intent(out) :: n_masked
+    type(vector_t) :: values, amplitude
+    integer :: n
+
+    n = des%size()
+    call values%init(n)
+    call amplitude%init(n)
+
+    values%x = 1.0_rp
+    call values%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call des%update_design(values)
+    call get_host_amplitude(amplitude)
+    n_masked = count(amplitude%x .lt. 0.5_rp)
+
+    call values%free()
+    call amplitude%free()
+
+  end subroutine count_masked
+
+  !> Map a discontinuous design forward and a discontinuous sensitivity
+  !! backward. The forward map P must be a projection, P(P a) = P a, and the
+  !! backward map its transpose, <P a, b> = <a, P^T b>.
+  !! @param des The initialised design.
+  !! @param effect Largest change of the design by the forward map.
+  !! @param idempotence_diff Largest change of the amplitude when it is
+  !! mapped again.
+  !! @param transpose_diff Difference of <P a, b> and <a, P^T b>, relative to
+  !! <P a, b>. The test runs on one rank, so the local sums are the inner
+  !! products.
+  subroutine run_projection(des, effect, idempotence_diff, transpose_diff)
+    type(brinkman_design_t), intent(inout) :: des
+    real(kind=rp), intent(out) :: effect
+    real(kind=rp), intent(out) :: idempotence_diff
+    real(kind=rp), intent(out) :: transpose_diff
+    type(vector_t) :: design, values, amplitude, remapped
+    type(vector_t) :: sensitivity, mapped
+    real(kind=rp) :: forward_product
+    integer :: n, i
+
+    n = des%size()
+    call design%init(n)
+    call values%init(n)
+    call amplitude%init(n)
+    call remapped%init(n)
+    call sensitivity%init(n)
+    call mapped%init(n)
+
+    ! A pseudo-random value per point, so that the copies of a point in the
+    ! elements sharing it differ. The positive sensitivity keeps <P a, b>
+    ! far from zero.
+    do i = 1, n
+       design%x(i) = 0.5_rp + 0.4_rp * sin(0.37_rp * real(i, kind=rp))
+       sensitivity%x(i) = 0.5_rp + 0.5_rp * cos(0.53_rp * real(i, kind=rp))
+    end do
+
+    values%x = design%x
+    call values%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call des%update_design(values)
+    call get_host_amplitude(amplitude)
+    effect = maxval(abs(amplitude%x - design%x))
+
+    ! Mapping the amplitude again must leave it unchanged.
+    values%x = amplitude%x
+    call values%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call des%update_design(values)
+    call get_host_amplitude(remapped)
+    idempotence_diff = maxval(abs(remapped%x - amplitude%x))
+
+    ! The backward map must be the transpose of the forward one.
+    call sensitivity%copy_from(HOST_TO_DEVICE, sync = .true.)
+    call des%map_backward(sensitivity)
+    call des%get_sensitivity(mapped)
+    call mapped%copy_from(DEVICE_TO_HOST, sync = .true.)
+    forward_product = sum(amplitude%x * sensitivity%x)
+    transpose_diff = abs(forward_product - sum(design%x * mapped%x)) / &
+         abs(forward_product)
+
+    call design%free()
+    call values%free()
+    call amplitude%free()
+    call remapped%free()
+    call sensitivity%free()
+    call mapped%free()
+
+  end subroutine run_projection
+
+  !> Free the registries and initialise them again for the next test.
+  subroutine reset_registries()
+
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+    call neko_registry%init()
+    call neko_scratch_registry%init()
+
+  end subroutine reset_registries
+
+  ! ========================================================================== !
+  ! Test entry points.
+
+  !> A design initialised from JSON without a "mapping" maps by the identity,
+  !! and can be written.
+  @test(npes=[1])
+  subroutine identity_from_json(this)
+    class(test_brinkman_no_mapping), intent(inout) :: this
+    type(json_file) :: parameters, design_parameters
+    type(simulation_t), target :: sim
+    type(brinkman_design_t) :: des
+    type(vector_t) :: amplitude
+    real(kind=rp) :: initial_value, initial_diff, forward_diff, backward_diff
+
+    parameters = json_read_file(case_file)
+    call json_get(parameters, 'optimization.design', design_parameters)
+    call json_get(design_parameters, 'initial_distribution.value', &
+         initial_value)
+
+    call sim%init(parameters)
+    call des%init(design_parameters, sim)
+
+    ! The initialisation maps the uniform initial design.
+    call amplitude%init(des%size())
+    call get_host_amplitude(amplitude)
+    initial_diff = maxval(abs(amplitude%x - initial_value))
+
+    call run_identity(des, forward_diff, backward_diff)
+
+    ! Writing needs the output of the design, which a mapping used to set up.
+    call des%write(0)
+
+    call amplitude%free()
+    call des%free()
+    call sim%free()
+    call reset_registries()
+
+    @assertEqual(0.0_rp, initial_diff, match_tol, "initial amplitude")
+    @assertEqual(0.0_rp, forward_diff, match_tol, "forward mapping")
+    @assertEqual(0.0_rp, backward_diff, match_tol, "backward mapping")
+
+  end subroutine identity_from_json
+
+  !> A design initialised from components maps by the identity. It has no
+  !! optimisation domain, so it must not be masked.
+  @test(npes=[1])
+  subroutine identity_from_components(this)
+    class(test_brinkman_no_mapping), intent(inout) :: this
+    type(json_file) :: parameters
+    type(simulation_t), target :: sim
+    type(brinkman_design_t) :: des
+    real(kind=rp) :: forward_diff, backward_diff
+
+    parameters = json_read_file(case_file)
+    call sim%init(parameters)
+
+    ! The case does not dealias, so neither do the Brinkman source terms.
+    call des%init_from_components("Brinkman Design", sim, .false.)
+
+    call run_identity(des, forward_diff, backward_diff)
+
+    call des%free()
+    call sim%free()
+    call reset_registries()
+
+    @assertEqual(0.0_rp, forward_diff, match_tol, "forward mapping")
+    @assertEqual(0.0_rp, backward_diff, match_tol, "backward mapping")
+
+  end subroutine identity_from_components
+
+  !> A design restricted to a point zone must drop its mask when it is
+  !! freed, so that the design initialised again from components is not
+  !! masked.
+  @test(npes=[1])
+  subroutine free_drops_mask(this)
+    class(test_brinkman_no_mapping), intent(inout) :: this
+    type(json_file) :: parameters, design_parameters
+    type(simulation_t), target :: sim
+    type(brinkman_design_t) :: des
+    integer :: masked_before, masked_after
+    logical :: found
+
+    parameters = json_read_file(case_file)
+    call json_get(parameters, 'optimization.design', design_parameters)
+    call design_parameters%update('domain.type', 'point_zone', found)
+    call design_parameters%update('domain.zone_name', 'optimization_domain', &
+         found)
+
+    call sim%init(parameters)
+    call des%init(design_parameters, sim)
+    call count_masked(des, masked_before)
+
+    call des%free()
+    call des%init_from_components("Brinkman Design", sim, .false.)
+    call count_masked(des, masked_after)
+
+    call des%free()
+    call sim%free()
+    call reset_registries()
+
+    @assertTrue(masked_before .gt. 0, "the point zone masks nothing")
+    @assertEqual(0, masked_after, "stale mask after free")
+
+  end subroutine free_drops_mask
+
+  !> Without a mapping, the cascade must be a projection whose backward map
+  !! is its transpose, also for a design that is not continuous.
+  @test(npes=[1])
+  subroutine projection_without_mapping(this)
+    class(test_brinkman_no_mapping), intent(inout) :: this
+    type(json_file) :: parameters, design_parameters
+    type(simulation_t), target :: sim
+    type(brinkman_design_t) :: des
+    real(kind=rp) :: effect, idempotence_diff, transpose_diff
+
+    parameters = json_read_file(case_file)
+    call json_get(parameters, 'optimization.design', design_parameters)
+
+    call sim%init(parameters)
+    call des%init(design_parameters, sim)
+
+    call run_projection(des, effect, idempotence_diff, transpose_diff)
+
+    call des%free()
+    call sim%free()
+    call reset_registries()
+
+    @assertGreaterThan(effect, min_effect, "the design is continuous")
+    @assertEqual(0.0_rp, idempotence_diff, match_tol, "not a projection")
+    @assertEqual(0.0_rp, transpose_diff, transpose_tol, "not the transpose")
+
+  end subroutine projection_without_mapping
+
+end module brinkman_design_no_mapping
