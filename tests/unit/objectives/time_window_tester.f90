@@ -52,10 +52,6 @@ program time_window_tester
 
   !> End times requested for the unsteady runs, one run each.
   real(kind=dp), allocatable :: end_times(:)
-  !> End time of every run, in the order they are run.
-  real(kind=dp), allocatable :: run_end_times(:)
-  !> Which path each run is taken through.
-  logical, allocatable :: run_unsteady(:)
   !> Objective values, one row per run.
   real(kind=rp), allocatable :: results(:, :)
   type(vector_t) :: values
