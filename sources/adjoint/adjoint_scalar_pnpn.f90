@@ -71,7 +71,7 @@ module adjoint_scalar_pnpn
   use scratch_registry, only : neko_scratch_registry
   use time_state, only : time_state_t
   use bc, only : bc_t, BC_DIRICHLET
-  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_MAX
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_MAX, MPI_Allreduce
   implicit none
   private
 

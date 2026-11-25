@@ -7,7 +7,7 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD
+  use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD, MPI_Barrier
 
 
   use example_problem_mma, only: mma_obj
