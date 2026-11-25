@@ -388,6 +388,14 @@ function find_neko() {
             done
         fi
 
+        # Apply LUMI specific patches before building on LUMI systems
+        lumi_patches=($(find $NEKO_DIR/patches/ -name 'lumi_*.patch' -type f))
+        for patch in "${lumi_patches[@]}"; do
+            if git -C "$NEKO_DIR" apply --check "$patch" 2>/dev/null; then
+                git -C "$NEKO_DIR" apply "$patch"
+            fi
+        done
+
         # Determine available features
         FEATURES="--enable-contrib"
         [ -n "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
@@ -475,6 +483,13 @@ function find_neko() {
                 fi
             done
         fi
+
+         # Revert the patches to keep the repository clean
+        for patch in "${lumi_patches[@]}"; do
+            if git -C "$NEKO_DIR" apply --reverse --check "$patch" 2>/dev/null; then
+                git -C "$NEKO_DIR" apply --reverse "$patch"
+            fi
+        done
 
         cd $CURRENT_DIR
     fi
