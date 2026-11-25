@@ -211,10 +211,8 @@ contains
     endif
 
     ! MPI_Gatherv reads the host buffer, so the copy must have completed
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%values%x, this%values%x_d, local_size, &
-            DEVICE_TO_HOST, sync = .true.)
-    end if
+    call this%values%copy_from(DEVICE_TO_HOST, sync = .true.)
+
     ! Now gather the actual data with proper displacement handling
     call MPI_Gatherv(this%values%x, local_size, mpi_real_precision, &
          global_values, recvcounts, displs, mpi_real_precision, &
