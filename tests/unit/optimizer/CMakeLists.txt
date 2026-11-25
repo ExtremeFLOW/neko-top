@@ -10,7 +10,7 @@ set(CMAKE_FOLDER "Tests/Unit/Optimizer")
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_kernels)
 
 add_pfunit_ctest(steepest_descent_kernels
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_kernels.pf
+    TEST_SOURCES steepest_descent_kernels.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_kernels
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
@@ -37,7 +37,7 @@ file(MAKE_DIRECTORY
     ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_convergence)
 
 add_pfunit_ctest(steepest_descent_convergence
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_convergence.pf
+    TEST_SOURCES steepest_descent_convergence.pf
     WORKING_DIRECTORY
         ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_convergence
     LINK_LIBRARIES Neko-TOP::neko-top
@@ -112,7 +112,7 @@ add_custom_target(optimizer_checkpoint_prepare
 # Define the test itself
 
 add_pfunit_ctest(optimizer_checkpoint
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/optimizer_checkpoint.pf
+    TEST_SOURCES optimizer_checkpoint.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
@@ -180,7 +180,7 @@ file(MAKE_DIRECTORY
     ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_checkpoint)
 
 add_pfunit_ctest(steepest_descent_checkpoint
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_checkpoint.pf
+    TEST_SOURCES steepest_descent_checkpoint.pf
     WORKING_DIRECTORY
         ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_checkpoint
     LINK_LIBRARIES Neko-TOP::neko-top

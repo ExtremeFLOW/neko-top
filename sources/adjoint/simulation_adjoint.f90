@@ -45,6 +45,7 @@ module simulation_adjoint
   use time_state, only : time_state_t
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
+  use neko_ext, only: set_time_scheme_coeffs
   use scratch_registry, only: neko_scratch_registry
   use device_math, only: device_glsc3
   use math, only: glsc3
@@ -120,14 +121,21 @@ contains
   end subroutine simulation_adjoint_finalize
 
   !> Compute a single time-step of an adjoint case
+  !! @param C The adjoint case.
+  !! @param dt_controller The time-step controller.
+  !! @param cfl The CFL number, recomputed for the step.
+  !! @param tstep_loop_start_time The wall time the time-step loop started.
+  !! @param forward_time The time of the forward run the step is taken at.
+  !! If given, it replaces the adjoint time during the step, so that the
+  !! time windows of the source terms see the forward time.
   subroutine simulation_adjoint_step(C, dt_controller, cfl, &
-       tstep_loop_start_time, final_time)
+       tstep_loop_start_time, forward_time)
     type(adjoint_case_t), intent(inout) :: C
-    real(kind=rp), intent(inout) :: cfl
+    real(kind=dp), intent(inout) :: cfl
     type(time_step_controller_t), intent(inout) :: dt_controller
     real(kind=dp), intent(in) :: tstep_loop_start_time
-    real(kind=rp), optional, intent(in) :: final_time
-    real(kind=rp) :: t_bkp
+    real(kind=dp), optional, intent(in) :: forward_time
+    real(kind=dp) :: t_bkp
     real(kind=dp) :: start_time, end_time, tstep_start_time
     character(len=LOG_SIZE) :: log_buf
 
@@ -148,10 +156,10 @@ contains
 
     ! Advance time step from t to t+dt and print the status
     call simulation_settime(C%time, C%fluid_adj%ext_bdf)
-    ! for cosmetic reasons we want the simulation to run backwards
-    if (present(final_time)) then
+    ! Take the step at the forward time, so the simulation runs backwards
+    if (present(forward_time)) then
        t_bkp = C%time%t
-       C%time%t = final_time - t_bkp
+       C%time%t = forward_time
     end if
     call C%time%status()
 
@@ -188,7 +196,7 @@ contains
     call neko_log%section('Postprocessing')
 
     ! Correct the time so the output fields are the same as the primal
-    if (present(final_time)) then
+    if (present(forward_time)) then
        C%time%t = t_bkp
     end if
 
@@ -234,7 +242,7 @@ contains
           time%tlag(2) = time%t
        end if
 
-       call ext_bdf%set_coeffs(time%dtlag)
+       call set_time_scheme_coeffs(ext_bdf, time)
     end if
 
     time%t = time%t + time%dt
@@ -249,7 +257,7 @@ contains
     character(len=LOG_SIZE) :: log_buf
     character(len=:), allocatable :: restart_file
     character(len=:), allocatable :: restart_mesh_file
-    real(kind=rp) :: tol
+    real(kind=dp) :: tol
     logical :: found
 
     call C%case%params%get('case.restart_file', restart_file, found)
@@ -270,7 +278,7 @@ contains
 
     ! Free the previous mesh, dont need it anymore
     do i = 1, size(C%time%dtlag)
-       call C%case%fluid%ext_bdf%set_coeffs(C%time%dtlag)
+       call set_time_scheme_coeffs(C%case%fluid%ext_bdf, C%time)
     end do
 
     call C%fluid_adj%restart(C%case%chkp)
@@ -331,7 +339,7 @@ contains
   !> Write a checkpoint at joblimit
   subroutine simulation_adjoint_joblimit_chkp(C, t)
     type(adjoint_case_t), intent(inout) :: C
-    real(kind=rp), intent(inout) :: t
+    real(kind=dp), intent(inout) :: t
     type(file_t) :: chkpf
     character(len=:), allocatable :: chkp_format
     character(len=LOG_SIZE) :: log_buf

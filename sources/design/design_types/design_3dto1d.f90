@@ -190,7 +190,7 @@ contains
        ! Calculate element length and x positions
        Le = L_total / real(global_size, kind=rp)
        do i = 1, global_size
-          global_x(i) = Le * (i - 0.5_rp) ! Center of each element
+          global_x(i) = Le * (real(i, kind=rp) - 0.5_rp) ! Element center
        end do
     else
        ! Non-root ranks: minimal dummy allocations

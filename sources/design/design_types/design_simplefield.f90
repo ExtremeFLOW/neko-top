@@ -34,7 +34,7 @@
 
 ! Implements the `simplefield_design_t` type.
 module simplefield_design
-  use num_types, only: rp, sp
+  use num_types, only: rp, sp, dp
   use field, only: field_t
   use json_module, only: json_file
   use mapping, only: mapping_t
@@ -228,7 +228,7 @@ contains
   subroutine design_simple_write(this, idx)
     class(simplefield_design_t), intent(inout) :: this
     integer, intent(in) :: idx
-    call this%output%sample(real(idx, kind=rp))
+    call this%output%sample(real(idx, kind=dp))
   end subroutine design_simple_write
 
 end module simplefield_design

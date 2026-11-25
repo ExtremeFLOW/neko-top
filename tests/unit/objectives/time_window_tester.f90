@@ -31,7 +31,7 @@ program time_window_tester
   use logger, only: neko_log
 
   ! Modules specific to this test
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use vector, only: vector_t
   use objectives_user, only: objectives_user_setup
   implicit none
@@ -50,8 +50,12 @@ program time_window_tester
   !> The problem type
   type(problem_t) :: prob
 
-  !> End times requested, one run each.
-  real(kind=rp), allocatable :: end_times(:)
+  !> End times requested for the unsteady runs, one run each.
+  real(kind=dp), allocatable :: end_times(:)
+  !> End time of every run, in the order they are run.
+  real(kind=dp), allocatable :: run_end_times(:)
+  !> Which path each run is taken through.
+  logical, allocatable :: run_unsteady(:)
   !> Objective values, one row per run.
   real(kind=rp), allocatable :: results(:, :)
   type(vector_t) :: values

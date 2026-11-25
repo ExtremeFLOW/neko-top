@@ -102,12 +102,12 @@ contains
     ! computational cost by allowing us to skip the first and last cross
     ! products.
     v1 = vertices(:, 1)
-    cp = 0.0
+    cp = 0.0_rp
     do v = 2, nv - 1
        e1 = (vertices(:, v) - v1)
        e2 = (vertices(:, v + 1) - v1)
        tmp = cross(e1, e2)
-       cp = cp + 0.5 * tmp
+       cp = cp + 0.5_rp * tmp
     end do
 
     a = sqrt(dot(cp, cp))
@@ -211,7 +211,7 @@ contains
     if (present(w)) then
        m = sum_weighted(a, w) / sum(w)
     else
-       m = sum(a) / size(a)
+       m = sum(a) / real(size(a), kind=rp)
     end if
 
   end function average_weighted
@@ -228,7 +228,7 @@ contains
     real(kind=rp), dimension(:, :), allocatable, intent(out) :: nodes
 
     ! Local variables
-    integer :: n, v
+    integer :: n, v, d
     integer :: N_nodes
     type(tuple4_i4_t) :: t_hex
 
@@ -258,7 +258,9 @@ contains
        call ele%facet_order(t_hex, facet_id)
        do n = 1, N_nodes
           v = t_hex%x(n)
-          nodes(:, n) = real(C%msh%points(v)%x, kind=rp)
+          do d = 1, 3
+             nodes(d, n) = real(C%msh%points(v)%x(d), kind=rp)
+          end do
        end do
     end select
 
@@ -309,11 +311,12 @@ contains
        call get_facet_nodes(neko_case, element_id, facet_id, facet_nodes)
 
        ! Compute the center of the facet
-       facet_centers(:, f) = 0.0
+       facet_centers(:, f) = 0.0_rp
        do n = 1, size(facet_nodes, 2)
           facet_centers(:, f) = facet_centers(:, f) + facet_nodes(:, n)
        end do
-       facet_centers(:, f) = facet_centers(:, f) / size(facet_nodes, 2)
+       facet_centers(:, f) = facet_centers(:, f) / &
+            real(size(facet_nodes, 2), kind=rp)
 
        ! Compute the area of the facet
        facet_area(f) = area(size(facet_nodes, 2), facet_nodes)
