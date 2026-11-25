@@ -16,7 +16,7 @@ set(OBJECTIVES_DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/time_window_tester.f90)
 
 # pFUnit source for the run-length check, which reuses
 # `time_window_run_length.case`
-set(STEP_COUNT_TEST ${CMAKE_CURRENT_SOURCE_DIR}/step_count.pf)
+set(STEP_COUNT_TEST step_count.pf)
 set(STEP_COUNT_CASE "time_window_run_length.case")
 
 # ============================================================================ #

@@ -34,7 +34,7 @@
 
 ! Implements the `adjoint_case_t` type.
 module adjoint_case
-  use num_types, only: rp, dp, sp
+  use num_types, only: dp, sp
   use case, only: case_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
@@ -61,6 +61,7 @@ module adjoint_case
        adjoint_scalar_convection_source_term_t
   use json_utils_ext, only: json_key_fallback
   use adjoint_scalars, only: adjoint_scalars_t
+  use field, only: field_t
   implicit none
   private
   public :: adjoint_case_t
@@ -73,7 +74,11 @@ module adjoint_case
      class(adjoint_fluid_scheme_t), allocatable :: fluid_adj
      !> Adjoint scalar
      type(adjoint_scalars_t), allocatable :: adjoint_scalars
-     !> Source term coupling the adjoint scalar to the adjoint fluid
+     !> Source term coupling the adjoint scalar to the adjoint fluid. The
+     !! source-term handler of the adjoint fluid computes a copy of it, added
+     !! at initialisation; this one is never computed, and
+     !! `set_coupling_scalar` changes it only to keep it the same as the
+     !! copy.
      type(adjoint_scalar_convection_source_term_t), allocatable :: &
           adjoint_convection_term
      type(case_t), pointer :: case
@@ -93,6 +98,9 @@ module adjoint_case
    contains
      procedure, pass(this) :: init => adjoint_init_from_json
      procedure, pass(this) :: free => adjoint_free
+     !> Point the coupling term at the primal scalar or at its first lag.
+     procedure, pass(this) :: set_coupling_scalar => &
+          adjoint_case_set_coupling_scalar
   end type adjoint_case_t
 
 contains
@@ -112,7 +120,7 @@ contains
     class(adjoint_case_t), target, intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
-    real(kind=rp) :: real_val = 0.0_rp
+    real(kind=dp) :: real_val = 0.0_dp
     character(len=:), allocatable :: string_val, file_format, name
     character(len=:), allocatable :: norm_control, norm_file
     integer :: precision, integer_val, layout
@@ -125,7 +133,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
-    logical :: dealias_adjoint_scalar_convection
+    logical :: dealias
 
     !
     ! Setup adjoint fluid
@@ -211,25 +219,24 @@ contains
                neko_case%fluid%rho)
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
-          ! initialize the coupling term
-          json_key = json_key_fallback(neko_case%params, &
-               'case.adjoint_scalar.dealias_coupling_term', &
-               'case.numerics.dealias')
-          call json_get_or_default(neko_case%params, json_key, &
-               dealias_adjoint_scalar_convection, .true.)
+          ! The coupling term is the transpose of the linearised primal
+          ! scalar advection, so it is dealiased exactly when that advection
+          ! is.
+          call json_get(numerics_params, 'dealias', dealias)
 
           ! The over-integration stack is only needed if this term dealiases
-          if (dealias_adjoint_scalar_convection) then
+          if (dealias) then
              call this%fluid_adj%require_gauss_stack()
           end if
 
+          ! initialize the coupling term
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
                this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%scalar%s, &
                this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
                this%fluid_adj%c_Xh, this%fluid_adj%c_Xh_GL, &
                this%fluid_adj%GLL_to_GL, &
-               dealias_adjoint_scalar_convection, this%fluid_adj%scratch_GL)
+               dealias, this%fluid_adj%scratch_GL)
 
           select type (f => this%fluid_adj)
           type is (adjoint_fluid_pnpn_t)
@@ -443,15 +450,15 @@ contains
     if (trim(string_val) .eq. 'org') then
        ! yes, it should be real_val below for type compatibility
        call json_get_or_lookup(neko_case%params, 'case.nsamples', integer_val)
-       real_val = real(integer_val, kind=rp)
+       real_val = real(integer_val, kind=dp)
        call this%output_controller%add(this%f_out, real_val, 'nsamples')
     else if (trim(string_val) .eq. 'never') then
-       call this%output_controller%add(this%f_out, 0.0_rp, 'never')
+       call this%output_controller%add(this%f_out, 0.0_dp, 'never')
     else if (trim(string_val) .eq. 'tsteps' .or. &
          trim(string_val) .eq. 'nsamples') then
        call json_get_or_lookup(neko_case%params, &
             'case.adjoint_fluid.output_value', integer_val)
-       real_val = real(integer_val, kind=rp)
+       real_val = real(integer_val, kind=dp)
        call this%output_controller%add(this%f_out, real_val, string_val)
     else if (trim(string_val) .eq. 'simulationtime') then
        call json_get_or_lookup(neko_case%params, &
@@ -469,7 +476,7 @@ contains
          'case.adjoint_fluid.norm_output_control', norm_control, 'never')
     if (trim(norm_control) .ne. 'never') then
        call json_get_or_default(neko_case%params, &
-            'case.adjoint_fluid.norm_output_value', real_val, 1.0_rp)
+            'case.adjoint_fluid.norm_output_value', real_val, 1.0_dp)
        call json_get_or_default(neko_case%params, &
             'case.adjoint_fluid.norm_output_file', norm_file, &
             'adjoint_norm.csv')
@@ -504,7 +511,7 @@ contains
     !
     ! Initialize time and step
     !
-    this%time%t = 0d0
+    this%time%t = 0.0_dp
     this%time%tstep = 0
 
   end subroutine adjoint_case_init_common
@@ -543,5 +550,64 @@ contains
     this%have_scalar = .false.
 
   end subroutine adjoint_free
+
+  !> Point the term coupling the adjoint scalar to the adjoint fluid at the
+  !! primal scalar or at its first lag.
+  !! @details Forward scalar step \f$ m \f$ advects the scalar of state
+  !! \f$ m - 1 \f$ with the velocity of state \f$ m \f$, at every time
+  !! order. The coupling term of the adjoint of state \f$ m \f$ to the
+  !! adjoint fluid transposes that advection, so an unsteady simulation has
+  !! it read, from initialisation on, the scalar of state \f$ m - 1 \f$,
+  !! which the state recovery restores as the first lag of the primal
+  !! scalar. The adjoint fluid extrapolates the term over the adjoint steps,
+  !! which transposes the extrapolation of the advection over the forward
+  !! steps rather than shifting its level, so the lag is the right level at
+  !! every order, and at a constant time step the transpose is exact. The
+  !! steady adjoint reads the primal scalar itself. The source-term handler
+  !! of the adjoint fluid holds a copy of the term, added at
+  !! initialisation, so that copy is the one changed here; this one is
+  !! changed with it only to keep the two the same. Anything but exactly
+  !! one such term stops the run.
+  !! @param this The adjoint case.
+  !! @param lagged Whether the term reads the first lag of the primal
+  !! scalar rather than the primal scalar.
+  subroutine adjoint_case_set_coupling_scalar(this, lagged)
+    class(adjoint_case_t), target, intent(inout) :: this
+    logical, intent(in) :: lagged
+    type(field_t), pointer :: s
+    integer :: i, n_coupling
+
+    if (.not. allocated(this%adjoint_convection_term)) return
+
+    if (lagged) then
+       s => this%case%scalars%scalar_fields(1)%scalar%slag%lf(1)
+    else
+       s => this%case%scalars%scalar_fields(1)%scalar%s
+    end if
+    this%adjoint_convection_term%s => s
+
+    n_coupling = 0
+    select type (f => this%fluid_adj)
+    type is (adjoint_fluid_pnpn_t)
+       if (allocated(f%source_term%source_terms)) then
+          do i = 1, size(f%source_term%source_terms)
+             select type (st => f%source_term%source_terms(i)%source_term)
+             type is (adjoint_scalar_convection_source_term_t)
+                n_coupling = n_coupling + 1
+                st%s => s
+             end select
+          end do
+       end if
+    class default
+       call neko_error("The adjoint scalar coupling term needs " // &
+            "adjoint_fluid_pnpn_t")
+    end select
+    nullify(s)
+
+    if (n_coupling .ne. 1) then
+       call neko_error("The adjoint scalar needs exactly one term " // &
+            "coupling it to the adjoint fluid")
+    end if
+  end subroutine adjoint_case_set_coupling_scalar
 
 end module adjoint_case

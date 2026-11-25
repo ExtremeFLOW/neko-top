@@ -419,7 +419,8 @@ contains
     call this%init_base(name, n)
 
     ! compute the average mass matrix
-    this%avg_B = this%coef%volume / real(simulation%fluid%glb_unique_points)
+    this%avg_B = this%coef%volume / &
+         real(simulation%fluid%glb_unique_points, kind=rp)
 
     ! The over-integration stack is only needed if the Brinkman terms dealias
     if (dealias) then

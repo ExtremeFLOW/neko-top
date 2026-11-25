@@ -35,7 +35,7 @@
 module adjoint_fluid_scheme
   use gather_scatter, only: gs_t
   use checkpoint, only: chkp_t
-  use num_types, only: rp
+  use num_types, only: dp
   use field, only: field_t
   use space, only: space_t, GL
   use dofmap, only: dofmap_t
@@ -287,10 +287,10 @@ module adjoint_fluid_scheme
   abstract interface
      function fluid_scheme_base_compute_cfl_intrf(this, dt) result(c)
        import adjoint_fluid_scheme_t
-       import rp
+       import dp
        class(adjoint_fluid_scheme_t), intent(in) :: this
-       real(kind=rp), intent(in) :: dt
-       real(kind=rp) :: c
+       real(kind=dp), intent(in) :: dt
+       real(kind=dp) :: c
      end function fluid_scheme_base_compute_cfl_intrf
   end interface
 

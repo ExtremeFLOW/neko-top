@@ -17,7 +17,7 @@ program usrneko
   use neko, only: neko_init, neko_finalize, neko_solve
   use case, only: case_t
   use field, only: field_t
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use vector, only: vector_t
   use matrix, only: matrix_t
   use math, only: copy
@@ -52,7 +52,7 @@ program usrneko
 
   integer :: nloc
   type(vector_t) :: xcoord, ycoord, zcoord, initdesign
-  real(kind=rp) :: t_start, t_end
+  real(kind=dp) :: t_start, t_end
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument

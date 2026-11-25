@@ -233,9 +233,15 @@ contains
     call this%chkp_output%init(neko_case%chkp, this%filename, &
          fmt = this%fmt, path = this%path, overwrite = .true.)
 
+    ! A scalar step advects the scalar from before the step, its first lag
+    ! after the step, with the new velocity, at every time order. The
+    ! adjoint of that advection reads the lag, so it is kept with every
+    ! state (see `adjoint_case_set_coupling_scalar`). It is kept whether or
+    ! not there is an adjoint scalar, which the state recovery does not
+    ! know.
     n_states = 4
     if (allocated(neko_case%scalars)) then
-       n_states = n_states + size(neko_case%scalars%scalar_fields)
+       n_states = n_states + 2 * size(neko_case%scalars%scalar_fields)
     end if
     if (present(extra_fields)) then
        n_states = n_states + extra_fields%size()
@@ -254,6 +260,12 @@ contains
     if (allocated(neko_case%scalars)) then
        do i = 1, size(neko_case%scalars%scalar_fields)
           si => neko_case%scalars%scalar_fields(i)%scalar%s
+          call this%state_list%assign(n_states + i, si)
+       end do
+       n_states = n_states + size(neko_case%scalars%scalar_fields)
+
+       do i = 1, size(neko_case%scalars%scalar_fields)
+          si => neko_case%scalars%scalar_fields(i)%scalar%slag%lf(1)
           call this%state_list%assign(n_states + i, si)
        end do
        n_states = n_states + size(neko_case%scalars%scalar_fields)

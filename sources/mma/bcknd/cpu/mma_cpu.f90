@@ -1063,7 +1063,7 @@ contains
             end do
             do i=1, this%m
                Hess(i,i) = Hess(i, i) - &
-                    max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
+                    max(-1.0e-4_rp*Hesstrace/real(this%m, kind=rp), 1.0e-7_rp)
             end do
 
             call DGESV(this%m , 1, Hess, this%m , ipiv, &

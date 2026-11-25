@@ -1,0 +1,248 @@
+!> @file unsteady_restart.pf
+!! pFUnit regression test asserting that an unsteady sensitivity is the same
+!! whether its run starts from the start time of the case or from a Neko
+!! checkpoint file of a later time.
+!!
+!! A run restarted from `case.restart_file` starts from the time of the file,
+!! while the start time of the case stays where the case file puts it, and it
+!! counts its time steps from zero as any other run does. The state recovery
+!! must size the run from the time steps it actually takes. Sized from the
+!! start time of the case, it expects more time steps than the run takes, so
+!! it never keeps the states of the last of them in RAM, and the adjoint run
+!! restores slots that were never written in their place.
+!!
+!! The checkpoint file holds the initial state of the case at the time
+!! `restart_steps` time steps after the start time. The reference run starts
+!! from the initial condition at the start time. Both runs take `n_steps`
+!! time steps from the same state, and only their clocks differ. Nothing in
+!! the case depends on the time, so their objective values and their
+!! sensitivities must agree to round-off.
+module unsteady_restart
+  use pfunit
+  use simulation_m, only: simulation_t
+  use brinkman_design, only: brinkman_design_t
+  use problem, only: problem_t
+  use neko, only: neko_init
+  use neko_top, only: neko_top_register_types
+  use json_module, only: json_file
+  use json_utils, only: json_get, json_get_or_default
+  use json_utils_ext, only: json_read_file
+  use registry, only: neko_registry
+  use scratch_registry, only: neko_scratch_registry
+  use file, only: file_t
+  use vector, only: vector_t
+  use device, only: device_memcpy, DEVICE_TO_HOST
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: glsc2, NEKO_EPS
+  use logger, only: neko_log
+  use num_types, only: rp, dp
+  implicit none
+
+  !> The case. It is run twice, for `n_steps` time steps each.
+  character(len=*), parameter :: case_file = &
+       'unsteady_brinkman_dissipation.case'
+  !> The checkpoint file the restarted run reads. A relative name, which
+  !! keeps Neko's log line of the restart short.
+  character(len=*), parameter :: restart_file = 'unsteady_restart.chkp'
+  !> The number of time steps each run takes.
+  integer, parameter :: n_steps = 10
+  !> The number of time steps after the start time that the restarted run
+  !! starts at.
+  integer, parameter :: restart_steps = 10
+  !> The number of states the state recovery keeps in RAM. The adjoint run
+  !! then restores the states of time steps 8 to 10 from RAM, those of time
+  !! steps 2 to 7 by restarting from the checkpoint files of time steps 2 and
+  !! 4, and that of time step 1 from its checkpoint file.
+  integer, parameter :: n_memory = 4
+  !> How far, as a fraction of a time step, a run may end from its end time.
+  real(kind=dp), parameter :: step_tolerance = 1.0e-6_dp
+  !> The tolerance of the relative differences between the two runs. They
+  !! take the same operations on the same data, so they agree to round-off.
+  real(kind=rp), parameter :: tolerance = 100.0_rp * NEKO_EPS
+
+  @TestCase
+  type, extends(MPITestCase) :: test_unsteady_restart_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_unsteady_restart_case
+
+  logical :: initialized = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_unsteady_restart_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+
+    call neko_init()
+    call neko_top_register_types()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_unsteady_restart_case), intent(inout) :: this
+  end subroutine tearDown
+
+  !> The restarted run must give the objective value and the sensitivity of
+  !! the reference run.
+  @test(npes=[1])
+  subroutine restart_matches_reference(this)
+    class(test_unsteady_restart_case), intent(inout) :: this
+    real(kind=rp), allocatable :: reference(:), restarted(:), difference(:)
+    real(kind=rp) :: value_reference, value_restarted
+    real(kind=rp) :: value_error, sensitivity_norm, sensitivity_error
+    logical :: reference_ok, restarted_ok
+    character(len=256) :: reference_msg, restarted_msg, msg
+
+    call run_case(.false., value_reference, reference, reference_ok, &
+         reference_msg)
+    call run_case(.true., value_restarted, restarted, restarted_ok, &
+         restarted_msg)
+
+    value_error = abs(value_restarted - value_reference) / &
+         max(abs(value_reference), NEKO_EPS)
+
+    difference = restarted - reference
+    sensitivity_norm = sqrt(glsc2(reference, reference, size(reference)))
+    sensitivity_error = sqrt(glsc2(difference, difference, &
+         size(difference))) / max(sensitivity_norm, NEKO_EPS)
+
+    write(msg, '(A,ES12.4,A,ES12.4)') 'Restarted against reference run, ' &
+         // 'relative difference of the objective value:', value_error, &
+         ', of the sensitivity:', sensitivity_error
+    call neko_log%message(trim(msg))
+
+    ! The runs must be the ones the test is about
+    @assertTrue(reference_ok, trim(reference_msg))
+    @assertTrue(restarted_ok, trim(restarted_msg))
+    msg = 'The reference sensitivity is zero, so the comparison cannot fail'
+    @assertTrue(sensitivity_norm .gt. 0.0_rp, trim(msg))
+
+    ! The forward run does not depend on the state recovery
+    write(msg, '(A,ES12.4)') 'The restarted forward run differs from ' // &
+         'the reference, relative difference of the objective value:', &
+         value_error
+    @assertTrue(value_error .le. tolerance, trim(msg))
+
+    write(msg, '(A,ES12.4)') 'The restarted adjoint run differs from ' // &
+         'the reference, relative difference of the sensitivity:', &
+         sensitivity_error
+    @assertTrue(sensitivity_error .le. tolerance, trim(msg))
+  end subroutine restart_matches_reference
+
+  !> Run the case forward and backward once and return its objective value
+  !! and sensitivity.
+  !! @param restart Whether the run is restarted from the checkpoint file.
+  !! Otherwise it starts from the start time of the case.
+  !! @param value The objective value.
+  !! @param sensitivity The sensitivity of the objective to the design.
+  !! @param run_ok Whether the run took `n_steps` time steps to its end time.
+  !! @param run_msg What the run did, for the assertion on `run_ok`.
+  subroutine run_case(restart, value, sensitivity, run_ok, run_msg)
+    logical, intent(in) :: restart
+    real(kind=rp), intent(out) :: value
+    real(kind=rp), allocatable, intent(out) :: sensitivity(:)
+    logical, intent(out) :: run_ok
+    character(len=*), intent(out) :: run_msg
+
+    type(json_file) :: parameters, design_parameters
+    type(simulation_t) :: sim
+    type(brinkman_design_t) :: des
+    type(problem_t) :: prob
+    type(vector_t) :: values
+    real(kind=dp) :: dt, start_time, restart_time, end_time
+    integer :: first_step
+    logical :: found
+
+    parameters = json_read_file(case_file)
+    call json_get(parameters, 'case.time.timestep', dt)
+    call json_get_or_default(parameters, 'case.time.start_time', start_time, &
+         0.0_dp)
+
+    if (restart) then
+       first_step = restart_steps
+    else
+       first_step = 0
+    end if
+    restart_time = start_time + real(restart_steps, kind=dp) * dt
+    end_time = start_time + real(first_step + n_steps, kind=dp) * dt
+    call parameters%update('case.time.end_time', end_time, found)
+    if (restart) then
+       call parameters%update('case.restart_file', restart_file, found)
+    end if
+
+    ! Keep the files of the state recovery and the output apart from those
+    ! of the other tests, which run in the same directory
+    call parameters%update('state_recovery.n_memory', n_memory, found)
+    call parameters%update('state_recovery.path', &
+         'unsteady_restart_checkpoints/', found)
+    call parameters%update('case.output_directory', 'unsteady_restart/', &
+         found)
+
+    call json_get(parameters, 'optimization.design', design_parameters)
+    call sim%init(parameters)
+    call des%init(design_parameters, sim)
+    call prob%init(parameters, des, sim)
+
+    if (restart) call write_restart_file(sim, restart_time)
+
+    call prob%compute(des, sim)
+
+    run_ok = sim%n_timesteps .eq. n_steps .and. &
+         abs(sim%neko_case%time%t - end_time) .le. step_tolerance * dt
+    write(run_msg, '(A,L1,A,I0,A,ES22.15,A,I0,A,ES22.15)') 'The run ' // &
+         'with restart = ', restart, ' took ', sim%n_timesteps, &
+         ' time steps to t = ', sim%neko_case%time%t, ', it must take ', &
+         n_steps, ' to t = ', end_time
+    call neko_log%message(trim(run_msg))
+
+    call prob%compute_sensitivity(des, sim)
+    call prob%get_objective_value(value)
+
+    call values%init(des%size())
+    call des%get_sensitivity(values)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(values%x, values%x_d, values%size(), &
+            DEVICE_TO_HOST, .true.)
+    end if
+    sensitivity = values%x
+    call values%free()
+
+    call prob%free()
+    call des%free()
+    call sim%free()
+
+    ! Clear the registries, in which the next run registers its fields
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+    call neko_registry%init()
+    call neko_scratch_registry%init()
+  end subroutine run_case
+
+  !> Write the checkpoint file the restarted run reads. It holds the initial
+  !! state of the case, which the reset sets, at a later time.
+  !! @param sim The simulation of the restarted run.
+  !! @param t The time of the checkpoint file.
+  subroutine write_restart_file(sim, t)
+    type(simulation_t), intent(inout) :: sim
+    real(kind=dp), intent(in) :: t
+    type(file_t) :: chkp_file
+    integer :: i
+
+    call sim%reset()
+
+    sim%neko_case%time%t = t
+    do i = 1, size(sim%neko_case%time%tlag)
+       sim%neko_case%time%tlag(i) = t - real(i, kind=dp) * &
+            sim%neko_case%time%dtlag(i)
+    end do
+
+    call sim%neko_case%chkp%sync_host()
+    call chkp_file%init(restart_file, overwrite = .true.)
+    call chkp_file%write(sim%neko_case%chkp, t)
+    call chkp_file%free()
+  end subroutine write_restart_file
+
+end module unsteady_restart

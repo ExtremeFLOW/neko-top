@@ -47,8 +47,12 @@ jobs:
       - name: Setup system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
-            ninja-build libblas-dev libopenmpi-dev
+          # setup.sh builds neko with autotools and everything with the
+          # OpenMPI wrappers, which use the default gfortran, gcc and g++.
+          sudo apt-get install -y --no-install-recommends \
+            gfortran gcc g++ cmake make ninja-build pkg-config \
+            autoconf automake libtool \
+            libopenblas-dev liblapack-dev libopenmpi-dev openmpi-bin python3
 
       # ---------------------------------------------------------------------- #
       # Run the setup and example execution scripts

@@ -18,7 +18,7 @@ program usrneko
   use neko, only: neko_init, neko_finalize, neko_solve
   use case, only: case_t
   use field, only: field_t
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use vector, only: vector_t
   use matrix, only: matrix_t
 
@@ -63,7 +63,7 @@ program usrneko
 
   integer :: nloc, i
   type(vector_t) :: initdesign
-  real(kind=rp) :: t_start, t_end
+  real(kind=dp) :: t_start, t_end
 
   !> Stress constraints
   character(len=20) :: index_str
@@ -283,7 +283,7 @@ subroutine finite_difference_validation(des, k_test, delta)
 
   ! Calculate error
   error = abs(fd_derivative - analytical_derivative)
-  if (abs(analytical_derivative) > 1e-12) then
+  if (abs(analytical_derivative) > 1.0e-12_rp) then
      rel_error = error / abs(analytical_derivative)
   else
      rel_error = error
