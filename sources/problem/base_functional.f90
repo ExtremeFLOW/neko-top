@@ -65,7 +65,7 @@ module base_functional
      character(len=:), allocatable :: name
 
      !> Value of the base_functional
-     real(kind=rp) :: value = 0.0_dp
+     real(kind=rp) :: value = 0.0_rp
      !> Sensitivity field
      type(vector_t) :: sensitivity
      !> containing a mask
@@ -256,8 +256,8 @@ contains
   subroutine functional_reset_value(this)
     class(base_functional_t), intent(inout) :: this
 
-    this%value = 0.0_dp
-    this%value_weight = 0.0_dp
+    this%value = 0.0_rp
+    this%value_weight = 0.0_xp
   end subroutine functional_reset_value
 
   !> Zero sensitivity of the function
@@ -265,7 +265,7 @@ contains
     class(base_functional_t), intent(inout) :: this
 
     call vector_rzero(this%sensitivity)
-    this%sensitivity_weight = 0.0_dp
+    this%sensitivity_weight = 0.0_xp
   end subroutine functional_reset_sensitivity
 
   !> Accumulate the value of the function
@@ -312,15 +312,25 @@ contains
   !! @param this The functional.
   !! @param design The design.
   !! @param time The current time state.
-  subroutine functional_accumulate_sensitivity(this, design, time)
+  !! @param count_time Whether the sample adds its time step to the time
+  !! sampled. Defaults to true. A sample that does not is added with the
+  !! weight of its time step in the time already sampled, which another
+  !! sample has already counted for it.
+  subroutine functional_accumulate_sensitivity(this, design, time, count_time)
     class(base_functional_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(time_state_t), intent(in) :: time
+    logical, intent(in), optional :: count_time
     real(kind=xp) :: weight_new, weight_old, dt
     type(vector_t), pointer :: sensitivity_new, sensitivity_old
     integer :: n, idx(2)
+    logical :: count_dt
 
     if (.not. this%in_window(time)) return
+
+    count_dt = .true.
+    if (present(count_time)) count_dt = count_time
+    if (.not. count_dt .and. this%sensitivity_weight .le. 0.0_xp) return
 
     n = this%sensitivity%size()
     call neko_scratch_registry%request(sensitivity_new, idx(1), n, .false.)
@@ -333,14 +343,20 @@ contains
 
     ! Compute the weights for the old and new sensitivities.
     dt = real(time%dt, kind=xp)
-    weight_new = dt / (this%sensitivity_weight + dt)
-    weight_old = this%sensitivity_weight / (this%sensitivity_weight + dt)
+    if (count_dt) then
+       weight_new = dt / (this%sensitivity_weight + dt)
+       weight_old = this%sensitivity_weight / (this%sensitivity_weight + dt)
+    else
+       weight_new = dt / this%sensitivity_weight
+       weight_old = 1.0_xp
+    end if
 
     ! Rectangle rule; could potentially use higher order trapezoidal/Simpson
     ! etc, but this should suffice.
     call vector_add3s2(this%sensitivity, &
-         sensitivity_new, sensitivity_old, weight_new, weight_old)
-    this%sensitivity_weight = this%sensitivity_weight + dt
+         sensitivity_new, sensitivity_old, real(weight_new, kind=rp), &
+         real(weight_old, kind=rp))
+    if (count_dt) this%sensitivity_weight = this%sensitivity_weight + dt
 
     nullify(sensitivity_new)
     nullify(sensitivity_old)
@@ -363,9 +379,9 @@ contains
     class(base_functional_t), intent(in) :: this
     type(time_state_t), intent(in) :: time
     logical :: inside
-    real(kind=rp) :: tol
+    real(kind=dp) :: tol
 
-    tol = 1.0e-6_rp * time%dt
+    tol = 1.0e-6_dp * time%dt
     inside = time%t .ge. this%start_time - tol .and. &
          time%t .le. this%end_time + tol
   end function functional_in_window

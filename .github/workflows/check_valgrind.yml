@@ -50,9 +50,10 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake gfortran gcc libopenblas-dev \
-            libopenmpi-dev openmpi-bin pkg-config liblapack-dev \
-            ninja-build python3 valgrind
+          sudo apt-get install -y --no-install-recommends \
+            gfortran gcc g++ cmake make ninja-build pkg-config \
+            libopenblas-dev liblapack-dev libopenmpi-dev openmpi-bin \
+            python3 valgrind
 
       - name: Get json-fortran
         id: get-json-fortran

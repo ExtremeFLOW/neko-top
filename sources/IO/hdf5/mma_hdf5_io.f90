@@ -44,6 +44,7 @@ submodule (mma) mma_hdf5_io
   use math, only: abscmp
   use comm, only: pe_size
   use hdf5_session, only: hdf5_session_init, hdf5_session_finalize
+  implicit none
 
 contains
 
@@ -346,19 +347,22 @@ contains
     class(mma_t), intent(inout) :: object
     character(len=*), intent(in) :: filename
     integer(hid_t) :: fapl_id, file_id, dset_id, attr_id, grp_id
-    integer(hid_t) :: str_type, filespace, memspace, xf_id
+    integer(hid_t) :: str_type, filespace, memspace, xf_id, space_id
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
-    integer :: ierr, info, mpi_comm
+    integer(hsize_t) :: n_stored
+    integer :: ierr, info, mpi_comm, mismatch
     integer :: n, n_global, m, max_iter, n_accum, n_array(pe_size)
     real(kind=rp) :: asyinit, asyincr, asydecr, epsimin, move_limit
     logical :: move_limit_exists
 
     character(len=*), parameter :: h5_group = '/MMA/checkpoint'
     character(len=12) :: bcknd, subsolver
+    character(len=128) :: msg
 
     ! Initialize reader values
     n = -1
+    n_global = -1
     m = -1
     max_iter = -1
     asyinit = -1.0_rp
@@ -451,22 +455,43 @@ contains
     call h5tclose_f(str_type, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    ! Read array attribute n
-    ddim(1) = pe_size
-    n_array = -1
-
+    ! Read array attribute n. The read fills the stored extent, one entry per
+    ! rank of the run that wrote the checkpoint, so it must match the rank
+    ! count. The extent is the same on every rank, so all of them stop here.
     call h5aopen_f(grp_id, 'n', attr_id, ierr)
+    if (ierr .ne. 0) then
+       call neko_error('mma: checkpoint has no attribute n')
+    end if
+    call h5aget_space_f(attr_id, space_id, ierr)
+    call h5sget_simple_extent_npoints_f(space_id, n_stored, ierr)
+    call h5sclose_f(space_id, ierr)
+    if (n_stored .ne. int(pe_size, hsize_t)) then
+       write(msg, '(A,I0,A,I0,A)') 'mma: checkpoint was written with a ' // &
+            'different number of ranks (', n_stored, ', this run has ', &
+            pe_size, ')'
+       call neko_error(trim(msg))
+    end if
+
+    n_array = -1
+    ddim(1) = int(pe_size, hsize_t)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Ensure the MMA object is allocated with the same configuration as the file
 
-    if (n_array(pe_rank + 1) .ne. object%n) then
-       call neko_error('mma: mismatch in n during HDF5 read')
-    end if
     if (n_global .ne. object%n_global) then
        call neko_error('mma: mismatch in n_global during HDF5 read')
+    end if
+
+    ! The local sizes differ per rank, so agree on the outcome before the
+    ! collective reads
+    mismatch = 0
+    if (n_array(pe_rank + 1) .ne. object%n) mismatch = 1
+    call MPI_Allreduce(MPI_IN_PLACE, mismatch, 1, MPI_INTEGER, MPI_MAX, &
+         NEKO_COMM, ierr)
+    if (mismatch .ne. 0) then
+       call neko_error('mma: mismatch in n during HDF5 read')
     end if
     if (m .ne. object%m) then
        call neko_error('mma: mismatch in m during HDF5 read')

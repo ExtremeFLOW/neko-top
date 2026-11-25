@@ -758,7 +758,8 @@ contains
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-              u, v, w, c_Xh%B, c_Xh%Blag, c_Xh%Blaglag, rho%x(1,1,1,1), dt, &
+              u, v, w, c_Xh%B, c_Xh%Blag, c_Xh%Blaglag, rho%x(1,1,1,1), &
+              real(dt, kind=rp), &
               ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
 
@@ -787,7 +788,7 @@ contains
            f_x, f_y, f_z, &
            c_Xh, msh, Xh, &
            mu, rho, ext_bdf%diffusion_coeffs%x(1), &
-           dt, dm_Xh%size())
+           real(dt, kind=rp), dm_Xh%size())
 
       call gs_Xh%op(u_res, GS_OP_ADD, event)
       call device_event_sync(event)
@@ -839,7 +840,7 @@ contains
            f_x, f_y, f_z, &
            c_Xh, gs_Xh, &
            this%bc_prs_surface, this%bc_sym_surface, &
-           Ax_prs, ext_bdf%diffusion_coeffs%x(1), dt, &
+           Ax_prs, ext_bdf%diffusion_coeffs%x(1), real(dt, kind=rp), &
            mu, rho, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present
@@ -1403,7 +1404,7 @@ contains
   !! @param tstep The current time-step
   subroutine power_iterations_compute(this, t, tstep)
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
-    real(kind=rp), intent(in) :: t
+    real(kind=dp), intent(in) :: t
     integer, intent(in) :: tstep
 
     ! Local variables
