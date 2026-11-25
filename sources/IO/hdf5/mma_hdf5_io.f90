@@ -279,47 +279,19 @@ contains
     call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
          ierr)
 
-    ! Write xmin
-    call h5dcreate_f(grp_id, 'xmin', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, object%xmin%x, ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    ! Write xmax
-    call h5dcreate_f(grp_id, 'xmax', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, object%xmax%x, ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    ! Write xold1
-    call h5dcreate_f(grp_id, 'xold1', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, object%xold1%x, ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    ! Write xold2
-    call h5dcreate_f(grp_id, 'xold2', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, object%xold2%x, ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    ! Write low
-    call h5dcreate_f(grp_id, 'low', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, object%low%x, ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    ! Write upp
-    call h5dcreate_f(grp_id, 'upp', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, object%upp%x, ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
+    ! Write the bounds, the previous designs and the asymptotes
+    call mma_write_dist(grp_id, 'xmin', object%xmin, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_write_dist(grp_id, 'xmax', object%xmax, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_write_dist(grp_id, 'xold1', object%xold1, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_write_dist(grp_id, 'xold2', object%xold2, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_write_dist(grp_id, 'low', object%low, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_write_dist(grp_id, 'upp', object%upp, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
 
     ! Close the spaces used
     call h5sclose_f(filespace, ierr)
@@ -569,35 +541,18 @@ contains
     call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
          ierr)
 
-    call h5dopen_f(grp_id, 'xmin', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, object%xmin%x, dcount, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    call h5dopen_f(grp_id, 'xmax', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, object%xmax%x, dcount, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    call h5dopen_f(grp_id, 'xold1', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, object%xold1%x, dcount, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    call h5dopen_f(grp_id, 'xold2', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, object%xold2%x, dcount, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    call h5dopen_f(grp_id, 'low', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, object%low%x, dcount, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
-
-    call h5dopen_f(grp_id, 'upp', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, object%upp%x, dcount, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
-    call h5dclose_f(dset_id, ierr)
+    call mma_read_dist(grp_id, 'xmin', object%xmin, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_read_dist(grp_id, 'xmax', object%xmax, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_read_dist(grp_id, 'xold1', object%xold1, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_read_dist(grp_id, 'xold2', object%xold2, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_read_dist(grp_id, 'low', object%low, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
+    call mma_read_dist(grp_id, 'upp', object%upp, H5T_NEKO_REAL, &
+         filespace, memspace, xf_id)
 
     ! Close transfer property list and dataspaces
     call h5pclose_f(xf_id, ierr)
@@ -618,5 +573,85 @@ contains
     call object%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine mma_load_checkpoint_hdf5
+
+  ! -------------------------------------------------------------------------- !
+  ! Private helpers
+
+  !> Write this rank's part of a distributed vector to a new dataset,
+  !! collectively.
+  !! @details A rank without design variables still takes part in the
+  !! collective write, with an empty selection and a placeholder buffer, since
+  !! the host array of an empty vector may be unallocated.
+  !! @param grp_id The group to create the dataset in.
+  !! @param name The name of the dataset.
+  !! @param vec The local part of the vector.
+  !! @param h5t_real The HDF5 type of the values.
+  !! @param filespace The file space, with this rank's part selected.
+  !! @param memspace The memory space of this rank's part.
+  !! @param xf_id The dataset transfer property list.
+  subroutine mma_write_dist(grp_id, name, vec, h5t_real, filespace, memspace, &
+       xf_id)
+    integer(hid_t), intent(in) :: grp_id, h5t_real, filespace, memspace, xf_id
+    character(len=*), intent(in) :: name
+    type(vector_t), intent(in) :: vec
+    integer(hid_t) :: dset_id
+    integer(hsize_t) :: dcount(1)
+    real(kind=rp) :: empty(1)
+    integer :: ierr
+
+    empty = 0.0_rp
+    dcount(1) = int(vec%size(), hsize_t)
+
+    call h5dcreate_f(grp_id, name, h5t_real, filespace, dset_id, ierr)
+    if (vec%size() .gt. 0) then
+       call h5dwrite_f(dset_id, h5t_real, vec%x, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    else
+       call h5dwrite_f(dset_id, h5t_real, empty, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    end if
+    call h5dclose_f(dset_id, ierr)
+
+  end subroutine mma_write_dist
+
+  !> Read this rank's part of a distributed vector from a dataset,
+  !! collectively.
+  !! @details A rank without design variables still takes part in the
+  !! collective read, with an empty selection and a placeholder buffer, since
+  !! the host array of an empty vector may be unallocated.
+  !! @param grp_id The group holding the dataset.
+  !! @param name The name of the dataset.
+  !! @param vec The local part of the vector, read into its host array.
+  !! @param h5t_real The HDF5 type of the values.
+  !! @param filespace The file space, with this rank's part selected.
+  !! @param memspace The memory space of this rank's part.
+  !! @param xf_id The dataset transfer property list.
+  subroutine mma_read_dist(grp_id, name, vec, h5t_real, filespace, memspace, &
+       xf_id)
+    integer(hid_t), intent(in) :: grp_id, h5t_real, filespace, memspace, xf_id
+    character(len=*), intent(in) :: name
+    type(vector_t), intent(inout) :: vec
+    integer(hid_t) :: dset_id
+    integer(hsize_t) :: dcount(1)
+    real(kind=rp) :: empty(1)
+    integer :: ierr
+
+    dcount(1) = int(vec%size(), hsize_t)
+
+    call h5dopen_f(grp_id, name, dset_id, ierr)
+    if (vec%size() .gt. 0) then
+       call h5dread_f(dset_id, h5t_real, vec%x, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    else
+       call h5dread_f(dset_id, h5t_real, empty, dcount, ierr, &
+            file_space_id = filespace, mem_space_id = memspace, &
+            xfer_prp = xf_id)
+    end if
+    call h5dclose_f(dset_id, ierr)
+
+  end subroutine mma_read_dist
 
 end submodule mma_hdf5_io
