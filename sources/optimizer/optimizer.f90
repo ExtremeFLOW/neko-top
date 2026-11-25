@@ -396,7 +396,10 @@ contains
     this%checkpoint_overwrite = .false.
 
     this%start_time = 0.0_dp
+    this%average_time = 0.0_dp
+    this%step_count = 0.0_dp
     this%current_iteration = 0
+    this%norm2_design_change = 0.0_rp
     call this%log_data%free()
     this%log_initialized = .false.
     this%log_extra_size = 0
@@ -624,7 +627,7 @@ contains
             this%max_iterations, ' iterations.'
        call neko_log%warning(msg)
     case (2)
-       write(msg, '(A,A,F8.2,A)') 'Optimizer stopped, design change ', &
+       write(msg, '(A,A,ES12.4,A)') 'Optimizer stopped, design change ', &
             'below threshold of: ', this%stop_design_change, '.'
        call neko_log%warning(msg)
     case (3)

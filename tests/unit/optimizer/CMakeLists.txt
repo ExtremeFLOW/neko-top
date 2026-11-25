@@ -56,6 +56,32 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
 endif()
 
 # ============================================================================ #
+# optimizer_reinit: an MMA optimizer freed and initialised again from JSON
+# must not carry over the runtime estimate or the design-change norm of its
+# first run. A stub design, so no mesh, case file or HDF5. A directory of its
+# own, since the optimizer looks for checkpoints to restart from.
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/optimizer_reinit)
+
+add_pfunit_ctest(optimizer_reinit
+    TEST_SOURCES optimizer_reinit.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/optimizer_reinit
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 1
+)
+add_dependencies(Unit optimizer_reinit)
+set_tests_properties(optimizer_reinit PROPERTIES
+    LABELS "unit;optimizer"
+    ENVIRONMENT "NEKO_LOG_FILE=optimizer_reinit.log"
+    TIMEOUT 120
+)
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(optimizer_reinit PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+# ============================================================================ #
 # Everything below this point requires HDF5: the pre-existing MMA
 # save/restart test, and the steepest-descent delta/xold1/xold2 checkpoint
 # test. CI most likely builds without HDF5, so anything placed below this

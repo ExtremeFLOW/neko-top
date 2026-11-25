@@ -140,6 +140,8 @@ contains
     call this%init_from_components(problem, design, max_iterations, tolerance, &
          enable_output, solver_parameters, simulation)
 
+    call solver_parameters%destroy()
+
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
