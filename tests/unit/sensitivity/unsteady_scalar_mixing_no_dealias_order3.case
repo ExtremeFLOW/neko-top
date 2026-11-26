@@ -176,6 +176,7 @@
         "objectives": [
             {
                 "type": "scalar_mixing",
+                "phi_ref": 0.5,
                 "weight": 1.0
             }
         ]

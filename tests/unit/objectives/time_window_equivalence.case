@@ -281,6 +281,7 @@
             {
                 "type": "scalar_mixing",
                 "name": "mixing start only",
+                "phi_ref": 0.5,
                 "weight": 1.0,
                 "start_time": 0.02,
                 "mask_name": "outlet_region"
@@ -288,6 +289,7 @@
             {
                 "type": "scalar_mixing",
                 "name": "mixing clipped",
+                "phi_ref": 0.5,
                 "weight": 1.0,
                 "start_time": 0.02,
                 "end_time": 0.06,
