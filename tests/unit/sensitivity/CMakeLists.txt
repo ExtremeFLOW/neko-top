@@ -6,16 +6,21 @@ set(test_list
     "volume.case"
     "volume_filtered.case"
     "viscous_dissipation.case"
+    "viscous_dissipation_continuation.case"
     "brinkman_dissipation_window.case"
     "brinkman_dissipation.case"
+    "viscous_dissipation_masked.case"
+    "brinkman_dissipation_continuation.case"
     "viscous_dissipation_variable_dt.case"
     "viscous_dissipation_variable_dt_weighted.case"
+    "unsteady_viscous_dissipation_masked.case"
     "unsteady_brinkman_dissipation.case"
     "unsteady_brinkman_dissipation_masked.case"
-    "viscous_dissipation_masked.case"
-    "unsteady_viscous_dissipation_masked.case"
     "unsteady_brinkman_dissipation_window.case"
     "unsteady_brinkman_dissipation_window_end.case"
+    "unsteady_scalar_mixing_no_dealias.case"
+    "unsteady_scalar_mixing_no_dealias_order3.case"
+    "unsteady_scalar_mixing_levels.case"
 )
 
 # Path to the common driver source
@@ -107,6 +112,40 @@ foreach(case_file ${test_list})
 endforeach()
 
 # ============================================================================ #
+# Guard against the `steady` simulation component on an unsteady problem. The
+# component drives a steady problem to convergence and freezes the fluid
+# there, which is the opposite of an unsteady problem, so the run must stop
+# at setup with a specific error. PASS_REGULAR_EXPRESSION makes that error the
+# test's pass condition instead of the process exit code, so an unrelated
+# crash is not mistaken for the guard firing.
+set(case_name "unsteady_steady_component")
+add_custom_target(
+    ${case_name}_case_file
+    COMMENT "Copying case file ${case_name}.case to the test directory"
+    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
+    COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/${case_name}.case
+        ${CMAKE_CURRENT_BINARY_DIR}/${case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+add_dependencies(sensitivity_test_prepare ${case_name}_case_file)
+
+add_test(NAME ${case_name}_sensitivity
+    COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_name}.case
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)
+set_tests_properties(${case_name}_sensitivity
+    PROPERTIES
+        LABELS "sensitivity;unit"
+        ENVIRONMENT "NEKO_LOG_FILE=${case_name}.log"
+        PASS_REGULAR_EXPRESSION
+            "The steady simulation component is not supported for unsteady problems"
+        TIMEOUT 300
+)
+
+# ============================================================================ #
 # A steady adjoint takes as many steps as the forward run, with time steps of
 # its own, so its clock can stop short of end_time. It must still count as
 # complete, and write no job-limit checkpoint.
@@ -146,3 +185,29 @@ set_tests_properties(${case_name}
 # ============================================================================ #
 # Final dependencies
 add_dependencies(Unit sensitivity_test_prepare)
+
+# ============================================================================ #
+# The unsteady sensitivity of a run restarted from a checkpoint file must be
+# that of the same run from the start time, see unsteady_restart.pf. It runs
+# unsteady_brinkman_dissipation.case, which the loop above copies here.
+add_pfunit_ctest(unsteady_restart_sensitivity
+    TEST_SOURCES unsteady_restart.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 1
+)
+
+# Disable treating pFUnit's generated variables as unused.
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(unsteady_restart_sensitivity PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+set_tests_properties(unsteady_restart_sensitivity PROPERTIES
+    LABELS "sensitivity;unit"
+    ENVIRONMENT "NEKO_LOG_FILE=unsteady_restart_sensitivity.log"
+    TIMEOUT 300
+)
+add_dependencies(Unit unsteady_restart_sensitivity)
+add_dependencies(unsteady_restart_sensitivity sensitivity_test_prepare)

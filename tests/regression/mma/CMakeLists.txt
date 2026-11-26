@@ -30,7 +30,7 @@ set_target_properties(reg_mma_bin
     PROPERTIES
         FOLDER "Tests/Regression/MMA"
         RUNTIME_OUTPUT_NAME "reg_mma_bin"
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 
 # Let the umbrella target trigger both build+prepare steps (if present)

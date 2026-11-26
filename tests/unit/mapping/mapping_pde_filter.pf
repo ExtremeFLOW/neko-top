@@ -38,7 +38,7 @@
 module mapping_pde_filter
   use mpi
   use pfunit
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use mesh, only: mesh_t
   use point, only: point_t
   use space, only: space_t, GLL
@@ -122,29 +122,29 @@ contains
     type(mesh_t), intent(inout) :: msh
     type(point_t) :: p(12)
 
-    call p(1)%init(0d0, 0d0, 0d0)
+    call p(1)%init(0.0_dp, 0.0_dp, 0.0_dp)
     call p(1)%set_id(1)
-    call p(2)%init(1d0, 0d0, 0d0)
+    call p(2)%init(1.0_dp, 0.0_dp, 0.0_dp)
     call p(2)%set_id(2)
-    call p(3)%init(0d0, 1d0, 0d0)
+    call p(3)%init(0.0_dp, 1.0_dp, 0.0_dp)
     call p(3)%set_id(3)
-    call p(4)%init(1d0, 1d0, 0d0)
+    call p(4)%init(1.0_dp, 1.0_dp, 0.0_dp)
     call p(4)%set_id(4)
-    call p(5)%init(2d0, 0d0, 0d0)
+    call p(5)%init(2.0_dp, 0.0_dp, 0.0_dp)
     call p(5)%set_id(5)
-    call p(6)%init(2d0, 1d0, 0d0)
+    call p(6)%init(2.0_dp, 1.0_dp, 0.0_dp)
     call p(6)%set_id(6)
-    call p(7)%init(0d0, 0d0, 1d0)
+    call p(7)%init(0.0_dp, 0.0_dp, 1.0_dp)
     call p(7)%set_id(7)
-    call p(8)%init(1d0, 0d0, 1d0)
+    call p(8)%init(1.0_dp, 0.0_dp, 1.0_dp)
     call p(8)%set_id(8)
-    call p(9)%init(1d0, 1d0, 1d0)
+    call p(9)%init(1.0_dp, 1.0_dp, 1.0_dp)
     call p(9)%set_id(9)
-    call p(10)%init(0d0, 1d0, 1d0)
+    call p(10)%init(0.0_dp, 1.0_dp, 1.0_dp)
     call p(10)%set_id(10)
-    call p(11)%init(2d0, 0d0, 1d0)
+    call p(11)%init(2.0_dp, 0.0_dp, 1.0_dp)
     call p(11)%set_id(11)
-    call p(12)%init(2d0, 1d0, 1d0)
+    call p(12)%init(2.0_dp, 1.0_dp, 1.0_dp)
     call p(12)%set_id(12)
 
     call msh%init(3, 2)

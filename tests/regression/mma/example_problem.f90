@@ -371,9 +371,8 @@ contains
     x_e = Le * real(this%global_element_index - 1, rp)
 
     ! Section properties
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
-    end if
+    call h%copy_from(DEVICE_TO_HOST, sync = .true.)
+
     I_e = b * h%x(this%local_index)**3 / 12.0_rp
     c_e = h%x(this%local_index) / 2.0_rp
 
@@ -427,9 +426,7 @@ contains
     x_e = Le * real(this%global_element_index - 1, rp)
 
     ! Section properties
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
-    end if
+    call h%copy_from(DEVICE_TO_HOST, sync = .true.)
     I_e = b * h%x(this%local_index)**3 / 12.0_rp
     c_e = h%x(this%local_index) / 2.0_rp
 

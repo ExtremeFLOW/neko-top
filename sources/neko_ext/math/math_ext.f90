@@ -158,7 +158,7 @@ contains
 
     tmp = 0.0_xp
     do i = 1, mask_size
-       tmp = tmp + a(mask(i)) * b(mask(i))
+       tmp = tmp + real(a(mask(i)), kind=xp) * real(b(mask(i)), kind=xp)
     end do
 
     call MPI_Allreduce(MPI_IN_PLACE, tmp, 1, &

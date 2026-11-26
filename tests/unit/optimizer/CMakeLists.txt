@@ -10,7 +10,7 @@ set(CMAKE_FOLDER "Tests/Unit/Optimizer")
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_kernels)
 
 add_pfunit_ctest(steepest_descent_kernels
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_kernels.pf
+    TEST_SOURCES steepest_descent_kernels.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_kernels
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
@@ -37,7 +37,7 @@ file(MAKE_DIRECTORY
     ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_convergence)
 
 add_pfunit_ctest(steepest_descent_convergence
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_convergence.pf
+    TEST_SOURCES steepest_descent_convergence.pf
     WORKING_DIRECTORY
         ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_convergence
     LINK_LIBRARIES Neko-TOP::neko-top
@@ -51,6 +51,32 @@ set_tests_properties(steepest_descent_convergence PROPERTIES
 )
 if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     target_compile_options(steepest_descent_convergence PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+# ============================================================================ #
+# optimizer_reinit: an MMA optimizer freed and initialised again from JSON
+# must not carry over the runtime estimate or the design-change norm of its
+# first run. A stub design, so no mesh, case file or HDF5. A directory of its
+# own, since the optimizer looks for checkpoints to restart from.
+
+file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/optimizer_reinit)
+
+add_pfunit_ctest(optimizer_reinit
+    TEST_SOURCES optimizer_reinit.pf
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/run/optimizer_reinit
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 1
+)
+add_dependencies(Unit optimizer_reinit)
+set_tests_properties(optimizer_reinit PROPERTIES
+    LABELS "unit;optimizer"
+    ENVIRONMENT "NEKO_LOG_FILE=optimizer_reinit.log"
+    TIMEOUT 120
+)
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(optimizer_reinit PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
 endif()
@@ -112,7 +138,7 @@ add_custom_target(optimizer_checkpoint_prepare
 # Define the test itself
 
 add_pfunit_ctest(optimizer_checkpoint
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/optimizer_checkpoint.pf
+    TEST_SOURCES optimizer_checkpoint.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
@@ -180,7 +206,7 @@ file(MAKE_DIRECTORY
     ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_checkpoint)
 
 add_pfunit_ctest(steepest_descent_checkpoint
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/steepest_descent_checkpoint.pf
+    TEST_SOURCES steepest_descent_checkpoint.pf
     WORKING_DIRECTORY
         ${CMAKE_CURRENT_BINARY_DIR}/run/steepest_descent_checkpoint
     LINK_LIBRARIES Neko-TOP::neko-top

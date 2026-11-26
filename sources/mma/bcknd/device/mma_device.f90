@@ -334,6 +334,9 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Computing bi as defined in page 5
 
+    ! A rank without design variables does not write bi, and must add zero
+    ! to the sum over the ranks below
+    call device_cfill(this%bi%x_d, 0.0_rp, this%m)
     call device_mma_gensub4(x, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
 
@@ -580,6 +583,9 @@ contains
           !--------------------------------------------------------------------!
           ! for MPI computation of bb
 
+          ! A rank without design variables does not write bb, and must add
+          ! zero to the sum over the ranks below
+          call device_cfill(bb%x_d, 0.0_rp, this%m + 1)
           call device_bb(bb%x_d, GG%x_d, delx%x_d, diagx%x_d, this%n, &
                this%m)
 

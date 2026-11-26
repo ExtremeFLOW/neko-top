@@ -1,0 +1,151 @@
+! An optimizer that is freed and initialised again must start afresh, as a new
+! one does. The MMA optimizer is initialised from JSON on a stub design, given
+! a runtime estimate and a design change, freed, and initialised again from
+! the same JSON. Its runtime estimate must then be built from the steps of the
+! new run alone, and its design-change norm must be zero.
+!
+! Run under Valgrind, the same test shows whether the initialisation from JSON
+! leaks the solver settings it reads.
+module optimizer_reinit
+  use pfunit
+  use num_types, only: rp
+  use json_module, only: json_file
+  use vector, only: vector_t
+  use design, only: design_t
+  use problem, only: problem_t
+  use mma_optimizer, only: mma_optimizer_t
+  use neko, only: neko_init
+  use device, only: HOST_TO_DEVICE
+
+  implicit none
+
+  logical :: initialized_lock = .false.
+
+  !> A stub design that only stores its values.
+  type, extends(design_t) :: stub_design_t
+     type(vector_t) :: values
+   contains
+     procedure, pass(this) :: init => stub_design_init
+     procedure, pass(this) :: free => stub_design_free
+     procedure, pass(this) :: get_values => stub_design_get_values
+     procedure, pass(this) :: update_design => stub_design_update_design
+     procedure, pass(this) :: map_forward => stub_design_map_forward
+     procedure, pass(this) :: map_backward => stub_design_map_backward
+     procedure, pass(this) :: write => stub_design_write
+  end type stub_design_t
+
+  @TestCase
+  type, extends(MPITestCase) :: test_optimizer_reinit
+     type(stub_design_t) :: des
+     type(problem_t) :: prob
+     type(mma_optimizer_t) :: opt
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_optimizer_reinit
+
+contains
+
+  subroutine setUp(this)
+    class(test_optimizer_reinit), intent(inout) :: this
+
+    if (initialized_lock) return
+    initialized_lock = .true.
+    call neko_init()
+  end subroutine setUp
+
+  !> Free whatever the test built, also if an assertion returned early.
+  subroutine tearDown(this)
+    class(test_optimizer_reinit), intent(inout) :: this
+
+    call this%opt%free()
+    call this%prob%free()
+    call this%des%free()
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! stub_design_t
+
+  subroutine stub_design_init(this, x0)
+    class(stub_design_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: x0(:)
+
+    call this%init_base('stub_design', size(x0))
+    this%values = x0
+  end subroutine stub_design_init
+
+  subroutine stub_design_free(this)
+    class(stub_design_t), intent(inout) :: this
+
+    call this%values%free()
+    call this%free_base()
+  end subroutine stub_design_free
+
+  subroutine stub_design_get_values(this, values)
+    class(stub_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
+
+    if (this%size() .gt. 0) values%x(1:this%size()) = this%values%x(:)
+    call values%copy_from(HOST_TO_DEVICE, .true.)
+  end subroutine stub_design_get_values
+
+  subroutine stub_design_update_design(this, values)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: values
+  end subroutine stub_design_update_design
+
+  subroutine stub_design_map_forward(this)
+    class(stub_design_t), intent(inout) :: this
+  end subroutine stub_design_map_forward
+
+  subroutine stub_design_map_backward(this, sensitivity)
+    class(stub_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: sensitivity
+  end subroutine stub_design_map_backward
+
+  subroutine stub_design_write(this, idx)
+    class(stub_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
+  end subroutine stub_design_write
+
+  ! ========================================================================== !
+  ! Tests
+
+  !> The runtime estimate and the design-change norm of a first run must not
+  !! carry over into a second one. With a run time of 100 s, a step of 1000 s
+  !! is out of time, and a single step of 1 s is not, unless it is averaged
+  !! with the step of the first run.
+  @test(npes=[1])
+  subroutine reinit_starts_afresh(this)
+    class(test_optimizer_reinit), intent(inout) :: this
+    type(json_file) :: parameters
+    logical :: out_of_time
+    character(len=80) :: msg
+
+    call this%des%init([0.25_rp, 0.5_rp, 0.75_rp])
+
+    call parameters%initialize()
+    call parameters%load_from_string('{"optimization": {"solver": ' // &
+         '{"type": "mma", "enable_output": false, "max_runtime": "100"}}}')
+    call this%prob%init(parameters, this%des)
+
+    ! The first run: one long step and a design change
+    call this%opt%init(parameters, this%prob, this%des)
+    out_of_time = this%opt%out_of_time(1000.0_rp)
+    msg = 'a 1000 s step must be out of a 100 s run time'
+    @assertTrue(out_of_time, msg)
+    this%opt%norm2_design_change = 1.0_rp
+
+    ! The second run, from the same settings
+    call this%opt%free()
+    call this%opt%init(parameters, this%prob, this%des)
+    call parameters%destroy()
+
+    msg = 'the design-change norm of the first run must not carry over'
+    @assertEqual(0.0_rp, this%opt%norm2_design_change, msg)
+    out_of_time = this%opt%out_of_time(1.0_rp)
+    msg = 'the runtime estimate of the first run must not carry over'
+    @assertFalse(out_of_time, msg)
+  end subroutine reinit_starts_afresh
+
+end module optimizer_reinit

@@ -65,8 +65,9 @@ module adjoint_mixing_scalar_source_term
   type, public, extends(source_term_t) :: adjoint_mixing_scalar_source_term_t
      !> The forward scalar field
      type(field_t), pointer :: s => null()
-     !> A scalaing factor
-     real(kind=rp) :: obj_scale
+     !> A scaling factor, the weight of the objective. Pointed to, so that
+     !! continuation updates of the weight reach the forcing.
+     real(kind=rp), pointer :: obj_scale => null()
      !> Scale of the forcing, owned by the objective. Zero switches the
      !! forcing off.
      real(kind=rp), pointer :: scale => null()
@@ -120,7 +121,8 @@ contains
   !! @param this The source term.
   !! @param f_s RHS of the adjoint scalar.
   !! @param s the forward scalar field.
-  !! @param obj_scale a scaling factor.
+  !! @param obj_scale a scaling factor, the weight of the objective. Must
+  !! stay valid while the term is computed.
   !! @param phi_ref target concentration.
   !! @param mask the mask for the source term.
   !! @param if_mask whether to use the mask.
@@ -134,7 +136,7 @@ contains
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_s
     type(field_t), intent(in), target :: s
-    real(kind=rp), intent(in) :: obj_scale
+    real(kind=rp), intent(in), target :: obj_scale
     real(kind=rp), intent(in) :: phi_ref
     class(point_zone_t), intent(in), pointer :: mask
     logical, intent(in) :: if_mask
@@ -157,7 +159,7 @@ contains
 
     ! point everything in the correct places
     this%s => s
-    this%obj_scale = obj_scale
+    this%obj_scale => obj_scale
     this%scale => scale
     this%phi_ref = phi_ref
     this%if_mask = if_mask
@@ -178,6 +180,7 @@ contains
     call this%free_base()
     nullify(this%s)
     nullify(this%mask)
+    nullify(this%obj_scale)
     nullify(this%scale)
 
   end subroutine adjoint_mixing_scalar_source_term_free

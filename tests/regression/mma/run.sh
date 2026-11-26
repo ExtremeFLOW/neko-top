@@ -20,13 +20,28 @@ function help() {
     echo -e "  -N#         Number of cells in the x and y direction (e.g. -N8)."
     echo -e "  -np=#       MPI ranks for mpirun -n (e.g. -np=4)."
     echo -e ""
+    echo -e " Environment:"
+    echo -e "  NEKO_TOP_BUILD_DIR  Build directory containing reg_mma_bin"
+    echo -e "                      (default: <repo root>/build)."
+    echo -e ""
     exit 0
 }
 
 CURRENT_DIR=$(pwd)
-WORKING_DIR=$(dirname "$0")
+WORKING_DIR=$(cd "$(dirname "$0")" && pwd)
+ROOT_DIR=$(realpath "${WORKING_DIR}/../../../")
+
+# The binary is built into the build tree (its RUNTIME_OUTPUT_DIRECTORY),
+# not next to this script, so it is not simply "./reg_mma_bin" any more.
+# Default to the conventional build directory created by `./setup.sh -t`,
+# overridable for a differently-named build directory. Resolved here, before
+# the cd below, so a relative NEKO_TOP_BUILD_DIR is taken relative to the
+# caller's own directory rather than silently reinterpreted relative to this
+# script's directory.
+BUILD_DIR=$(realpath -m "${NEKO_TOP_BUILD_DIR:-${ROOT_DIR}/build}")
+REG_MMA_BIN="${BUILD_DIR}/tests/regression/mma/reg_mma_bin"
+
 cd "$WORKING_DIR" || exit 1
-ROOT_DIR=$(realpath ${WORKING_DIR}/../../../)
 
 # Handle options
 NP=1
@@ -51,6 +66,13 @@ for arg in "$@"; do
     fi
 done
 
+if [[ ! -x "$REG_MMA_BIN" ]]; then
+    echo -e "reg_mma_bin not found or not executable: $REG_MMA_BIN" >&2
+    echo -e "Build Neko-TOP's tests first (e.g. ./setup.sh -t), or set" >&2
+    echo -e "NEKO_TOP_BUILD_DIR to the build directory used." >&2
+    exit 1
+fi
+
 # Clean up old files
 find . -maxdepth 1 -type f -name "*.csv" -delete
 find . -maxdepth 1 -type f -name "*.log" -delete
@@ -64,7 +86,7 @@ for case in ${cases[@]}; do
     case_name=$(basename "$case" | cut -f1 -d'.')
     export NEKO_LOG_FILE="neko_${case_name}.log"
     echo "Running ${case} with mpirun -n $NP"
-    mpirun -n "$NP" ./reg_mma_bin "${case}" || exit 1
+    mpirun -n "$NP" "$REG_MMA_BIN" "${case}" || exit 1
     mv optimization_data.csv optimization_data_${case_name}.csv
 done
 
@@ -72,8 +94,8 @@ if [[ -z "$VIRTUAL_ENV" && -f "${ROOT_DIR}/.venv/bin/activate" ]]; then
     source "${ROOT_DIR}/.venv/bin/activate"
 fi
 
-python plot_design.py all || exit 1
-python check.py || exit 1
+python3 plot_design.py all || exit 1
+python3 check.py || exit 1
 
 echo "MMA regression test passed"
 cd "$CURRENT_DIR" || exit 1

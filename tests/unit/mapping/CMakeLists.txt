@@ -19,21 +19,21 @@ set(CMAKE_FOLDER "Tests/Unit/Mapping")
 # Define the tests themselves
 
 add_pfunit_ctest(mapping_finite_difference
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mapping_finite_difference.pf
+    TEST_SOURCES mapping_finite_difference.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
 )
 
 add_pfunit_ctest(mapping_pde_filter
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mapping_pde_filter.pf
+    TEST_SOURCES mapping_pde_filter.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1
 )
 
 add_pfunit_ctest(mapping_pde_filter_convergence
-    TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/mapping_pde_filter_convergence.pf
+    TEST_SOURCES mapping_pde_filter_convergence.pf
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     LINK_LIBRARIES Neko-TOP::neko-top
     MAX_PES 1

@@ -71,7 +71,7 @@ module adjoint_scalar_pnpn
   use scratch_registry, only : neko_scratch_registry
   use time_state, only : time_state_t
   use bc, only : bc_t, BC_DIRICHLET
-  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_MAX
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_MAX, MPI_Allreduce
   implicit none
   private
 
@@ -335,6 +335,11 @@ contains
 
     call this%advs%free()
 
+    if (allocated(this%adv)) then
+       call this%adv%free()
+       deallocate(this%adv)
+    end if
+
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
@@ -438,7 +443,8 @@ contains
 
       ! Add the RHS contributions coming from the BDF scheme.
       call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, &
-           rho_cp, dt, ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
+           rho_cp, real(dt, kind=rp), ext_bdf%diffusion_coeffs%x, &
+           ext_bdf%ndiff, n)
       ! end if
 
       ! Source terms that must not be extrapolated in time are added as
@@ -457,7 +463,7 @@ contains
       call profiler_start_region('Adjoint_scalar_residual')
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
            lambda, rho_cp, ext_bdf%diffusion_coeffs%x(1), &
-           dt, dm_Xh%size())
+           real(dt, kind=rp), dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
 
