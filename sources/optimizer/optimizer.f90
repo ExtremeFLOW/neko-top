@@ -508,9 +508,6 @@ contains
     logical :: converged
     integer :: stop_flag
 
-    ! The checkpoint name is built from these settings
-    call optimizer_default_file_settings(this)
-
     ! Initialize variables
     stop_flag = 1
     converged = .false.
@@ -918,8 +915,6 @@ contains
     character(len=12) :: suffix
     logical :: exists, overwrite_flag
 
-    call optimizer_default_file_settings(this)
-
     call neko_log%section('Optimizer save checkpoint')
     call profiler_start_region('Optimizer save checkpoint')
 
@@ -1012,8 +1007,6 @@ contains
     character(len=:), allocatable :: file_full
     character(len=12) :: suffix
 
-    call optimizer_default_file_settings(this)
-
     call neko_log%section('Optimizer loading checkpoint')
     call profiler_start_region('Optimizer load checkpoint')
 
@@ -1023,8 +1016,7 @@ contains
          present(format) .or. present(iteration))) then
        call neko_error('optimizer: Cannot specify both filename and ' // &
             'path/basename/format/iteration for checkpoint loading.')
-    end if
-    if (present(filename)) then
+    else if (present(filename)) then
        file_full = trim(filename)
     else
        file_full = checkpoint_filename(this, path, basename, format, iteration)
