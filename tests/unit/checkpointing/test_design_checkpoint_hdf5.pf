@@ -1,0 +1,122 @@
+!> Unit test: an HDF5 design checkpoint must round-trip exactly when a rank
+!! owns no design variables.
+!!
+!! A rank without design variables still takes part in the collective write
+!! and read of the design values, with an empty selection, while the host
+!! array of its empty vector is unallocated. A build with runtime checks stops
+!! on such an array passed to HDF5, so the checkpoint must hand HDF5 a
+!! placeholder buffer instead. The test saves a design with every variable on
+!! one of two ranks, loads it into a design holding other values, and
+!! requires the loaded values to equal the saved ones exactly, once with each
+!! rank empty.
+module test_design_checkpoint_hdf5
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use neko, only: neko_init
+  use comm, only: NEKO_COMM, pe_rank, MPI_REAL_PRECISION
+  use checkpointing_test_utils, only: stored_design_t
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_design_checkpoint_case
+   contains
+     procedure :: setUp
+  end type test_design_checkpoint_case
+
+  logical :: initialized = .false.
+
+  !> Number of design variables, all on one rank.
+  integer, parameter :: n_owned = 3
+
+contains
+
+  subroutine setUp(this)
+    class(test_design_checkpoint_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  ! ========================================================================== !
+  ! The tests
+
+  @test(npes=[2])
+  subroutine round_trip_second_rank_empty(this)
+    class(test_design_checkpoint_case), intent(inout) :: this
+    real(kind=rp) :: max_diff
+
+    call round_trip(0, 'design_checkpoint_rank1_empty.h5', max_diff)
+    @assertEqual(0.0_rp, max_diff, message = "max |saved - loaded|")
+
+  end subroutine round_trip_second_rank_empty
+
+  @test(npes=[2])
+  subroutine round_trip_first_rank_empty(this)
+    class(test_design_checkpoint_case), intent(inout) :: this
+    real(kind=rp) :: max_diff
+
+    call round_trip(1, 'design_checkpoint_rank0_empty.h5', max_diff)
+    @assertEqual(0.0_rp, max_diff, message = "max |saved - loaded|")
+
+  end subroutine round_trip_first_rank_empty
+
+  ! ========================================================================== !
+  ! Helpers
+
+  !> Save a design whose variables all sit on one rank, load the checkpoint
+  !! into a design holding other values, and compare.
+  !! @param owner The rank that owns every design variable.
+  !! @param fname The checkpoint file.
+  !! @param max_diff The largest difference between the saved and the loaded
+  !! values over all ranks.
+  subroutine round_trip(owner, fname, max_diff)
+    integer, intent(in) :: owner
+    character(len=*), intent(in) :: fname
+    real(kind=rp), intent(out) :: max_diff
+    type(stored_design_t) :: saved, loaded
+    real(kind=rp), allocatable :: x_saved(:), x_loaded(:)
+    real(kind=rp) :: local_diff
+    integer :: n, i, file_unit, ierr
+    logical :: file_exists
+
+    n = 0
+    if (pe_rank .eq. owner) n = n_owned
+    allocate(x_saved(n), x_loaded(n))
+    do i = 1, n
+       x_saved(i) = 0.25_rp * real(i, kind=rp)
+       x_loaded(i) = -1.0_rp
+    end do
+
+    ! Start from a fresh file
+    inquire(file = fname, exist = file_exists)
+    if (file_exists .and. pe_rank .eq. 0) then
+       open(newunit = file_unit, file = fname, iostat = ierr)
+       close(unit = file_unit, status = 'delete', iostat = ierr)
+    end if
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
+
+    call saved%init(x_saved)
+    call saved%save_checkpoint(fname)
+
+    call loaded%init(x_loaded)
+    call loaded%load_checkpoint(fname)
+
+    local_diff = 0.0_rp
+    do i = 1, n
+       local_diff = max(local_diff, &
+            abs(loaded%values%x(i) - saved%values%x(i)))
+    end do
+    call MPI_Allreduce(local_diff, max_diff, 1, MPI_REAL_PRECISION%mpi_val, &
+         MPI_MAX, NEKO_COMM%mpi_val, ierr)
+
+    call saved%free()
+    call loaded%free()
+    deallocate(x_saved, x_loaded)
+
+  end subroutine round_trip
+
+end module test_design_checkpoint_hdf5

@@ -64,7 +64,7 @@
 ! because now I see one objective and one constraint
 !
 module viscous_dissipation_objective
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
        field_copy
@@ -151,14 +151,14 @@ contains
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
-    real(kind=rp) :: start_time, end_time
+    real(kind=dp) :: start_time, end_time
 
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Viscous dissipation")
-    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
+    call json_get_or_default(json, "start_time", start_time, 0.0_dp)
+    call json_get_or_default(json, "end_time", end_time, huge(0.0_dp))
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, start_time, end_time)
@@ -181,8 +181,8 @@ contains
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
-    real(kind=rp), intent(in) :: start_time
-    real(kind=rp), intent(in) :: end_time
+    real(kind=dp), intent(in) :: start_time
+    real(kind=dp), intent(in) :: end_time
 
     type(adjoint_viscous_dissipation_source_term_t) :: adjoint_forcing
     real(kind=rp) :: forcing_start, forcing_end
@@ -217,7 +217,7 @@ contains
          simulation%adjoint_fluid%f_adj_x, &
          simulation%adjoint_fluid%f_adj_y, &
          simulation%adjoint_fluid%f_adj_z, &
-         this%u, this%v, this%w, this%weight * this%viscosity, &
+         this%u, this%v, this%w, this%weight, this%viscosity, &
          this%mask, this%has_mask, &
          this%c_Xh, this%volume, forcing_start, forcing_end, &
          this%forcing_scale)

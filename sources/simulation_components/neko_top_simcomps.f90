@@ -39,6 +39,7 @@ submodule(neko_top) neko_top_simcomps
 
   ! Our user-defined simulation components
   use steady_simcomp, only: steady_simcomp_allocate
+  implicit none
 
 contains
 

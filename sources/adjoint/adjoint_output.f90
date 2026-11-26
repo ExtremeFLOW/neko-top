@@ -34,7 +34,7 @@
 !
 !> Defines an output for a adjoint
 module adjoint_output
-  use num_types, only: rp
+  use num_types, only: dp
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use scalar_scheme, only: scalar_scheme_t
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
@@ -156,20 +156,9 @@ contains
   !! @param[in] t The time.
   subroutine adjoint_output_sample(this, t)
     class(adjoint_output_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer :: i
+    real(kind=dp), intent(in) :: t
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-
-       associate(fields => this%adjoint%items)
-         do i = 1, size(fields)
-            call device_memcpy(fields(i)%ptr%x, fields(i)%ptr%x_d, &
-                 fields(i)%ptr%dof%size(), DEVICE_TO_HOST, &
-                 sync = (i .eq. size(fields))) ! Sync on the last field
-         end do
-       end associate
-
-    end if
+    call this%adjoint%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     select type (ft => this%file_%file_type)
        ! Only fld files have the option to write the mesh at command

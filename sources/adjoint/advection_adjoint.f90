@@ -34,7 +34,7 @@
 !
 !> Subroutines to add advection terms to the RHS of a transport equation.
 module advection_adjoint
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use space, only: space_t
   use field, only: field_t
   use coefs, only: coef_t
@@ -65,8 +65,8 @@ module advection_adjoint
      !! @param tlag The lagged times.
      !! @param time_scheme The bdf-ext time scheme used in the method.
      !! @param use_dummy If true, a dummy zero-valued advection type is
+     !! allocated. This is used when the primal has no advection term.
      !! @param slag The lagged scalar field.
-     !! allocated. This can be used to kill the advection term.
      !! @note The factory both allocates and initializes `object`.
      module subroutine advection_adjoint_factory(object, json, coef, &
           ulag, vlag, wlag, dtlag, tlag, time_scheme, use_dummy, slag)
@@ -74,8 +74,8 @@ module advection_adjoint
        type(json_file), intent(inout) :: json
        type(coef_t), intent(inout), target :: coef
        type(field_series_t), intent(in), target :: ulag, vlag, wlag
-       real(kind=rp), intent(in), target :: dtlag(10)
-       real(kind=rp), intent(in), target :: tlag(10)
+       real(kind=dp), intent(in), target :: dtlag(10)
+       real(kind=dp), intent(in), target :: tlag(10)
        type(time_scheme_controller_t), intent(in), target :: time_scheme
        logical, optional, intent(in) :: use_dummy
        type(field_series_t), target, optional, intent(in) :: slag

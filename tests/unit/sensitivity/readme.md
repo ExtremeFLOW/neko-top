@@ -28,10 +28,49 @@ The test is done through a few common files:
   smallest perturbation" — the two are different quantities and a value
   derived for one must never be carried over to the other. Each case's
   tolerance is derived from its *measured* bias, see "Tolerances of the four
-  unit cases" below. In a case without it, `fd_test_tolerance` bounds the
-  error at the smallest perturbation; for a PDE-coupled objective, match it
-  to the bias the discretisation and unconverged steady state leave
-  (determine this empirically per case, don't guess).
+  unit cases" below. In a case without it, the `fd_test_tolerance` key under
+  `optimization` (optional, JSON) overrides the default tolerance on the
+  error at the smallest perturbation — linear/state-independent functionals
+  (e.g. the volume constraint) can use a tight round-off tolerance;
+  PDE-coupled objectives need a looser one
+  matched to the bias their discretisation and unconverged steady state
+  leave, and to their noise floor. Determine it empirically per case, not
+  by guessing, from the FD check's error column `e`,
+  `(FD - adjoint) / |adjoint|` at the probed dof:
+
+  1. The model is `e = C + A m^p` with `m = |eps|` (the perturbation
+     magnitude; the harness may use negative perturbations). For two
+     points `a` (larger `m`) and `b`, Richardson extrapolation gives
+     `A = (e_a - e_b) / (m_a^p - m_b^p)` and `C = e_b - A m_b^p`.
+  2. Order the sweep by decreasing `m` and set `d_k = e_k - e_(k+1)`; the
+     order of the ratio `d_k / d_(k+1)` is the `p` solving
+     `d_k / d_(k+1) = (m_k^p - m_(k+1)^p) / (m_(k+1)^p - m_(k+2)^p)`
+     (the sweeps are not geometric; ratio `k` uses points `k`, `k+1`
+     and `k+2`). Take the longest (the first, if tied) run of at
+     least two consecutive ratios whose order lies within 0.1 of 1;
+     `p` is the median order over the run (for an even count, the
+     mean of the two middle values). A run's points are every point
+     used by one of its ratios; `C` and `A` come from the two
+     smallest of them, i.e. the last two points used by the run's
+     last ratio. Omit the Richardson term if there is no run.
+  3. Set `tol = max(2|e(m_min)|, 2(|C| + |A| m_min^p), tol_min)`,
+     rounded up to one significant figure, where `m_min` is the
+     smallest perturbation magnitude probed. `tol_min` is the
+     reachable-tolerance floor: `tol_min = sqrt(40 N |A1|)`, where `A1`
+     is the `m` coefficient of a least-squares fit
+     `e = c0 + A1 m + B m^2` over the four smallest points, and `N` is
+     the median of `|e - fit| m` over the six smallest points (every
+     point, if the sweep has fewer), `fit` being the same model
+     refitted to those points.
+  4. Read these from the last `perturbation,F,dFdx,error` block of
+     `FD_check_<case>.csv` (the file is appended per run); the
+     regression suite (`tests/regression/sensitivity`) applies the
+     same rule to its own `FD_check_<case>.csv` or its committed
+     `reference_data/ref_FD_check_<case>.csv`.
+
+  Re-derive the tolerance whenever the case's mesh resolution, rank
+  count, Neko version, linear-solver tolerance, steady-state tolerance,
+  polynomial order or perturbation sweep changes.
 - `CMakeLists.txt`: Defines the build process and, via the `test_list`
   variable, registers one CTest per case file.
 
@@ -388,6 +427,19 @@ Currently, we have added tests for the following components:
   this objective's own `update_sensitivity` is empty.
 - `brinkman_dissipation_objective_t` (`brinkman_dissipation.case`) — isolates
   the direct-partial-derivative sensitivity path.
+- `viscous_dissipation_objective_t` and `brinkman_dissipation_objective_t`
+  after a weight continuation step (`viscous_dissipation_continuation.case`,
+  `brinkman_dissipation_continuation.case`) — the same cases with the weight
+  given as `[10.0, 1.0]` (viscous) and `[1.0, 10.0]` (Brinkman). The
+  optional key `optimization.fd_test_continuation_iteration` makes the driver
+  advance the continuation scheduler to that iteration before
+  differentiating. The adjoint forcing must follow the weight: with it frozen
+  at the first value the error at the smallest perturbation was `-8.99e-1`
+  (viscous) and `-2.47e-2` (Brinkman). Following it, the viscous case
+  reproduces the plain case exactly, and the Brinkman case, at ten times the
+  weight, has the plain case's error of `4.26e-3`. The Brinkman case ends at
+  a weight other than 1, so it also fails if the forcing drops the weight
+  altogether.
 - `brinkman_dissipation_objective_t`, steady with a time window
   (`brinkman_dissipation_window.case`) — `brinkman_dissipation.case` with the
   objective's window starting at `t = 1`, after the run has ended at
@@ -435,6 +487,12 @@ Currently, we have added tests for the following components:
   without the `timestep` that caps its first step
   (`variable_timestep_without_timestep.case`). They are not in `test_list`:
   each passes only if the run stops with its error.
+- The guard against the `steady` simulation component in an unsteady problem
+  (`unsteady_steady_component.case`). The component drives a steady problem
+  to convergence and freezes the fluid there, so `simulation_t%init` rejects
+  it when `"unsteady": true`. The test is registered on its own and passes
+  only if the run stops with that error: against code without the check the
+  run completes its finite-difference sweep and exits 0, which fails it.
 - `brinkman_dissipation_objective_t`, unsteady
   (`unsteady_brinkman_dissipation.case`) — 20 time steps at polynomial order
   3, with a PDE filter and the objective's default over-integration. It checks
@@ -456,6 +514,52 @@ Currently, we have added tests for the following components:
   the mask only while its probe stays that close to the boundary. Whenever the
   case or the driver's probe selection changes, confirm again that the test
   fails with the mask removed from `update_sensitivity`.
+- `scalar_mixing_objective_t`, unsteady and unmasked, with `numerics.dealias`
+  set to `false` (`unsteady_scalar_mixing_no_dealias.case`) — 80 time steps of
+  `2.5e-4` at time order 1 and polynomial order 3, the flow starting at
+  `[1, 0, 0]` and a block of scalar starting mostly inside the Brinkman design.
+  The objective sees the design only through the scalar, and over the whole
+  domain its gradient nearly cancels, so any mismatch in the adjoint dominates
+  it. The term the adjoint scalar adds to the adjoint momentum equation is
+  integrated as the primal scalar advection is, here on the GLL points. Forward
+  step `n` advects the scalar of state `n - 1` with the new velocity of state
+  `n`, so the coupling term of the adjoint step after restoring state `m` reads
+  the scalar of state `m - 1`, which the state recovery keeps as the first lag
+  of the scalar, and the adjoint scalar is advected with the velocity of state
+  `m + 1`. The sensitivity also takes the sample of the initial velocity, which
+  the Brinkman force of the first step acts on. The error at the smallest
+  perturbation is `-3.56e-5`, which is first-order truncation (`-3.57e-4` at
+  `1e-3`). The tolerance of `1e-3` lies between that and the errors with a
+  level or the initial-velocity sample wrong: with the coupling term on the
+  restored scalar of state `m` the error was `-6.52e-3`, and without the
+  initial-velocity sample `+3.68e-2`. With the adjoint scalar advected with the
+  restored velocity of state `m` it was `-1.37e-3`, only just above the
+  tolerance; `unsteady_scalar_mixing_levels.case` is the guard for that level.
+- `scalar_mixing_objective_t`, unsteady at time order 3
+  (`unsteady_scalar_mixing_no_dealias_order3.case`) — the same case at time
+  order 3. A scalar step advects the scalar from before the step at every
+  order, and the adjoint's extrapolation of the coupling term is the transpose
+  of the forward extrapolation, not a shift of its level, so the coupling term
+  reads the first lag here too. The error at the smallest perturbation is
+  `-3.51e-5`, first-order truncation (`-3.53e-4` at `1e-3`), and the tolerance
+  is `1e-3`. With the coupling term on the restored scalar of state `m`, as
+  when the lag is read at time order 1 only, the error was `-6.97e-3`. With the
+  lag read but kept with the states at time order 1 only, so that restoring a
+  state leaves it stale, it was `-1.85e-1`. Keep its checkpoint `path` short:
+  one of over about 49 characters stops the run in the initialisation of the
+  state recovery.
+- `scalar_mixing_objective_t`, unsteady from rest
+  (`unsteady_scalar_mixing_levels.case`) — 20 steps of `1e-3` at time order 1
+  and polynomial order 3, without over-integration, the flow starting at rest
+  and the same block of scalar, with 4 states in RAM, so that the adjoint also
+  recomputes states from disk. The initial velocity is zero, so its sample adds
+  nothing, and the case isolates the time levels of the adjoint scalar: the
+  coupling term reads the scalar of state `m - 1` and the adjoint scalar is
+  advected with the velocity of state `m + 1`. The error at the smallest
+  perturbation is `-3.85e-5`, first-order truncation (`-3.83e-4` at `1e-3`),
+  and the tolerance is `1e-4`. With the coupling term on the restored scalar of
+  state `m` the error was `-1.71e-2`, and with the adjoint scalar advected with
+  the restored velocity of state `m` `-4.06e-3`.
 - `brinkman_dissipation_rejection` — checks the invalid mixed-dealias
   configuration directly through Neko's pFUnit error-redirection fixture. A
   mixed setting has no value its sensitivity is the gradient of, so the
@@ -473,37 +577,59 @@ Currently, we have added tests for the following components:
   `+1.62` (steady) and `+74.7` (unsteady, where the probed sensitivity even
   had the wrong sign); with the gradient of the value it is `+4.5e-4` and
   `-2.8e-5`, the latter first-order truncation. The tolerances, `1e-2` (the
-  smallest-perturbation tolerance `viscous_dissipation.case` had before it
-  moved to the strict criterion) and `1e-3`, lie between the two. Whenever
+  smallest-perturbation tolerance `viscous_dissipation.case` had before its
+  `end_time` was raised to 5.0 and it moved to the strict criterion) and
+  `1e-3`, lie between the two. Whenever
   the cases or the driver's probe selection change, confirm again that both
   fail with the masked full weak Laplacian as the forcing.
+- `unsteady_restart_sensitivity`, a pFUnit test (`unsteady_restart.pf`) on
+  `unsteady_brinkman_dissipation.case`, restarted through `case.restart_file`
+  from a Neko checkpoint file. A restarted run starts from the time of the
+  file but counts its time steps from zero, and the start time of the case
+  stays where it is. The test writes a checkpoint file holding the initial
+  state 10 time steps after the start time. The run restarted from it must
+  give the objective value and the sensitivity of the same 10 time steps
+  taken from the start time, to round-off. With `n_memory` set to 4, the
+  adjoint restores states from RAM, by restarting from the checkpoint files
+  of the run, and from a checkpoint file alone. When the state recovery sized
+  the run from the start time of the case, it kept none of the states in RAM,
+  the adjoint restored slots that were never written, and the sensitivity was
+  22% off.
 
-`scalar_mixing_objective_t` is not covered here: a dedicated case
-(`scalar_mixing.case`) was tried at unit-tier resolution but could not
-certify its gradient there (`TOLERANCE_UNREACHABLE` — the cell Peclet
-number at that resolution was ~12.5-25, well into the oscillatory regime
-for its Pe=200 advection-dominated transport, and its end_time left the
-scalar nowhere near equilibrated). It now lives in the regression tier
+`scalar_mixing_objective_t` is covered here by the unsteady cases above. A
+further case, `scalar_mixing.case`, was tried at unit-tier resolution but
+could not certify its gradient there (`TOLERANCE_UNREACHABLE` — the cell
+Peclet number at that resolution was ~12.5-25, well into the oscillatory
+regime for its Pe=200 advection-dominated transport, and its end_time left
+the scalar nowhere near equilibrated). It lives in the regression tier
 instead, at a resolution that can actually certify it — see
-`tests/regression/sensitivity/cases/scalar_mixing.case`, alongside
-`tests/regression/sensitivity/cases/passive_scalar.case` (which needed a
-Neko-core scalar-scheme fix first). The
-heavier, realistic (~1000-timestep) versions of these and other cases
-(`dissipation`, `dissipation_weights`, unsteady variants) live in
-`tests/regression/sensitivity/` instead — that suite is opt-in
-(`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`) and not part of the
-default/PR-blocking test budget, since it's too slow to gate every PR.
+`tests/regression/sensitivity/cases/scalar_mixing.case`.
+
+The higher-order, higher-Reynolds-number (and more tightly converged) versions
+of these and other cases (`dissipation`, `dissipation_weights`,
+`passive_scalar`, `scalar_mixing`, unsteady variants) live in
+`tests/regression/sensitivity/` instead. There the unsteady cases take seconds
+and run in a local `ctest` without opt-in, though no CI workflow runs them; the
+rest are opt-in (`NEKO_TOP_RUN_SENSITIVITY_REGRESSION=1`), since each takes
+minutes to half an hour.
 
 ## Adding New Tests
 
 Reuse the existing generic driver — you almost never need new Fortran code:
 
 1. Add a new `.case` file exercising the objective/constraint you want to
-   cover. Keep `time.end_time`/`time.timestep` short (a handful of steps, not
-   a physically converged run — see `volume.case` and
-   `viscous_dissipation.case` for the pattern) so the test stays fast; tune
-   this and `fd_test_tolerance` empirically by running the case and reading
-   the per-perturbation `error` output, not by guessing.
+   cover. For a linear, state-independent functional (e.g. the volume
+   constraint), keep `time.end_time`/`time.timestep` short — a handful of
+   steps, not a physically converged run (see `volume.case`) — so the test
+   stays fast. For a PDE-coupled objective (e.g. `viscous_dissipation.case`,
+   `brinkman_dissipation.case`), the finite-difference check needs the
+   fluid to have reached the same steady state the objective is evaluated
+   at, or the comparison is ill-posed; those two cases run to `end_time =
+   5.0` because their `steady` simulation component only freezes around
+   `t = 2.25` on the default mesh. Tune `end_time` by running the case and
+   confirming the fluid has reached steady state; derive `fd_test_tolerance`
+   from the per-perturbation `error` output using the rule above, not by
+   guessing.
 2. Add the case file name to the `test_list` variable in `CMakeLists.txt`:
    ```cmake
    set(test_list

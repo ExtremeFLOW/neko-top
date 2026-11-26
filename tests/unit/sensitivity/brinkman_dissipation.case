@@ -6,7 +6,12 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 0.1,
+            // end_time is 5.0, not 0.1: the steady simcomp only freezes
+            // around t = 2.25 on this mesh, and at 0.1 (20 steps) the
+            // velocity start residual is still about 6e-2 against the
+            // 1e-8 steady tolerance, so the run is still mid-transient
+            // and the finite-difference check would be ill-posed.
+            "end_time": 5.0,
             "timestep": 5.0e-3
         },
         "numerics": {

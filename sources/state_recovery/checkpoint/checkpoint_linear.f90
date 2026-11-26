@@ -44,9 +44,11 @@
 !! requires large amounts of memory and disk space.
 submodule (state_recover_checkpoint) checkpoint_linear
   use num_types, only: dp
+  use mpi_f08, only: MPI_Wtime
   use simulation, only: simulation_step, simulation_restart
   use time_step_controller, only: time_step_controller_t
   use profiler, only: profiler_start_region, profiler_end_region
+  implicit none
 
 contains
 
@@ -56,12 +58,11 @@ contains
   module subroutine checkpoint_save_linear(this)
     class(state_recover_checkpoint_t), intent(inout) :: this
     integer :: index, tstep, counter, n_total
-    real(kind=rp) :: time, start_time, end_time, dt
+    real(kind=dp) :: time, end_time, dt
 
     time = this%neko_case%time%t
     dt = this%neko_case%time%dt
     tstep = this%neko_case%time%tstep
-    start_time = this%neko_case%time%start_time
     end_time = this%neko_case%time%end_time
 
     ! We save to disc only every n_saves_memory time steps
@@ -81,11 +82,11 @@ contains
 
     ! Only save to RAM from the last disc checkpoint to the end of the forward
     ! simulation. With fixed timesteps, the total count and the last disc-save
-    ! timestep are known from the time object.
-    ! Note: the plus 0.5 is to round up to the next integer, as the division can
-    ! be slightly smaller than the actual number of steps due to floating point
-    ! errors.
-    n_total = int(((end_time - start_time) / dt) + 0.5_rp)
+    ! timestep are known from the time object: the count is the timesteps
+    ! taken so far plus those left to the end time.
+    ! Note: floor rounds down to the nearest integer, as the division can be
+    ! slightly off the actual number of steps due to floating point errors.
+    n_total = tstep + floor((end_time - time) / dt)
     if (tstep .ge. n_total - modulo(n_total, this%n_saves_memory)) then
        call this%save_data(index + 1)
     end if
@@ -103,7 +104,7 @@ contains
     real(kind=dp) :: loop_start
     integer :: k, previous_save, next_save, local_idx, counter
 
-    loop_start = MPI_WTIME()
+    loop_start = MPI_Wtime()
 
     ! Determine the nearest save states on both sides
     previous_save = tstep - modulo(tstep, this%n_saves_memory)

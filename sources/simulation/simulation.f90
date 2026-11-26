@@ -49,7 +49,7 @@ module simulation_m
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
   use json_file_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use num_types, only: rp, sp, dp
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start, profiler_stop, &
@@ -284,6 +284,16 @@ contains
                "for unsteady problems")
        end if
 
+       ! The `steady` component drives a steady problem to convergence and
+       ! freezes the fluid there, which an unsteady problem must not do.
+       if (has_steady_component(parameters)) then
+          call neko_error("The steady simulation component is not " // &
+               "supported for unsteady problems")
+       end if
+       ! The unsteady adjoint couples the adjoint scalar to the scalar from
+       ! before each step, see `adjoint_case_set_coupling_scalar`.
+       call this%adjoint_case%set_coupling_scalar(.true.)
+
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_factory(this%state_recover, this%neko_case, &
             state_recovery_params)
@@ -291,6 +301,30 @@ contains
 
 
   end subroutine simulation_initialize
+
+  !> Whether the case holds a `steady` simulation component.
+  !! @param parameters The case parameters.
+  !! @return `.true.` if `case.simulation_components` has a `steady` entry.
+  function has_steady_component(parameters) result(found_steady)
+    type(json_file), intent(inout) :: parameters
+    logical :: found_steady
+    type(json_file) :: component
+    character(len=:), allocatable :: component_type
+    integer :: n_components, i
+
+    found_steady = .false.
+    if (.not. parameters%valid_path('case.simulation_components')) return
+
+    call parameters%info('case.simulation_components', &
+         n_children = n_components)
+    do i = 1, n_components
+       call json_extract_item(parameters, 'case.simulation_components', i, &
+            component)
+       call json_get(component, 'type', component_type)
+       if (component_type .eq. 'steady') found_steady = .true.
+    end do
+    call component%destroy()
+  end function has_steady_component
 
   !> Free the simulation
   subroutine simulation_free(this)
@@ -372,7 +406,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     type(json_file) :: dt_params
     real(kind=dp) :: loop_start
-    real(kind=rp) :: cfl
+    real(kind=dp) :: cfl
     integer :: i
 
     call json_get(this%neko_case%params, 'case.time', dt_params)
@@ -445,8 +479,8 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_forward%sample(real(idx, kind=rp))
-    call this%output_adjoint%sample(real(idx, kind=rp))
+    call this%output_forward%sample(real(idx, kind=dp))
+    call this%output_adjoint%sample(real(idx, kind=dp))
 
   end subroutine simulation_write
 
@@ -455,7 +489,7 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_forward%sample(real(idx, kind=rp))
+    call this%output_forward%sample(real(idx, kind=dp))
 
   end subroutine simulation_write_forward
 
@@ -464,7 +498,7 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_adjoint%sample(real(idx, kind=rp))
+    call this%output_adjoint%sample(real(idx, kind=dp))
 
   end subroutine simulation_write_adjoint
 
