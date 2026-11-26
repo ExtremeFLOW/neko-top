@@ -132,8 +132,8 @@ contains
     integer, intent(in) :: design_size
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in), optional :: mask_name
-    real(kind=rp), intent(in), optional :: start_time
-    real(kind=rp), intent(in), optional :: end_time
+    real(kind=dp), intent(in), optional :: start_time
+    real(kind=dp), intent(in), optional :: end_time
 
     call this%free_base()
 
@@ -155,13 +155,13 @@ contains
     if (present(start_time)) then
        this%start_time = start_time
     else
-       this%start_time = 0.0_rp
+       this%start_time = 0.0_dp
     end if
 
     if (present(end_time)) then
        this%end_time = end_time
     else
-       this%end_time = huge(0.0_rp)
+       this%end_time = huge(0.0_dp)
     end if
 
   end subroutine objective_init_base
@@ -175,10 +175,10 @@ contains
     if (associated(this%forcing_scale)) deallocate(this%forcing_scale)
 
     this%value = 0.0_rp
-    this%value_weight = 0.0_rp
-    this%sensitivity_weight = 0.0_rp
-    this%start_time = 0.0_rp
-    this%end_time = huge(0.0_rp)
+    this%value_weight = 0.0_xp
+    this%sensitivity_weight = 0.0_xp
+    this%start_time = 0.0_dp
+    this%end_time = huge(0.0_dp)
     call this%sensitivity%free()
 
     this%has_mask = .false.

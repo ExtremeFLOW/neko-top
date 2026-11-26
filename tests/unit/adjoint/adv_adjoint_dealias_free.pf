@@ -1,0 +1,308 @@
+!> Unit tests for the destructor of the dealiased adjoint advection,
+!! adv_lin_dealias_t.
+!!
+!! free must release everything that init allocates: the work arrays and
+!! their device mappings, and the coefficients, space and interpolator of the
+!! dealiasing space. init must free a previous initialisation first, so that
+!! the object can be initialised again without a free in between. Both are
+!! checked over several init and free cycles.
+module adv_adjoint_dealias_free
+  use pfunit
+  use num_types, only: dp
+  use mesh, only: mesh_t
+  use point, only: point_t
+  use space, only: space_t, GLL
+  use dofmap, only: dofmap_t
+  use gather_scatter, only: gs_t
+  use coefs, only: coef_t
+  use adv_lin_dealias, only: adv_lin_dealias_t
+  use comm, only: comm_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_init, device_finalize
+  use, intrinsic :: iso_c_binding, only: c_associated
+  implicit none
+
+  !> Number of points per direction of the test space.
+  integer, parameter :: LX = 4
+
+  !> Number of points per direction of the dealiasing space.
+  integer, parameter :: LXD = 6
+
+  !> Number of init and free cycles.
+  integer, parameter :: n_cycles = 3
+
+  !> Number of work arrays, and of the checked arrays of the members.
+  integer, parameter :: n_work = 20, n_members = 14
+
+  @TestCase
+  type, extends(MPITestCase) :: test_adv_adjoint_dealias_free
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_adv_adjoint_dealias_free
+
+contains
+
+  !> Initialise the device (on device backends) and the communicator.
+  !! @param this The test case.
+  subroutine setUp(this)
+    class(test_adv_adjoint_dealias_free), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call comm_init
+  end subroutine setUp
+
+  !> Finalise the device (on device backends).
+  !! @param this The test case.
+  subroutine tearDown(this)
+    class(test_adv_adjoint_dealias_free), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+  end subroutine tearDown
+
+  !> free releases everything, and the object can then be initialised again.
+  @test(npes=[1])
+  subroutine free_releases_everything(this)
+    class(test_adv_adjoint_dealias_free), intent(inout) :: this
+    type(mesh_t), target :: msh
+    type(space_t), target :: Xh
+    type(dofmap_t), target :: dof
+    type(gs_t), target :: gs
+    type(coef_t), target :: coef
+    type(adv_lin_dealias_t), target :: adv
+    integer :: i
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+
+    do i = 1, n_cycles
+       call adv%init(LXD, coef)
+       call check_initialised(adv, i)
+       call adv%free()
+       call check_freed(adv, i)
+    end do
+
+    call free_fixture(msh, Xh, dof, gs, coef)
+
+  end subroutine free_releases_everything
+
+  !> init frees a previous initialisation, so that initialising twice in a
+  !! row neither fails nor leaves anything behind for free to miss.
+  @test(npes=[1])
+  subroutine init_frees_previous(this)
+    class(test_adv_adjoint_dealias_free), intent(inout) :: this
+    type(mesh_t), target :: msh
+    type(space_t), target :: Xh
+    type(dofmap_t), target :: dof
+    type(gs_t), target :: gs
+    type(coef_t), target :: coef
+    type(adv_lin_dealias_t), target :: adv
+    integer :: i
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+
+    call adv%init(LXD, coef)
+    do i = 1, n_cycles
+       call adv%init(LXD, coef)
+       call check_initialised(adv, i)
+    end do
+    call adv%free()
+    call check_freed(adv, n_cycles)
+
+    call free_fixture(msh, Xh, dof, gs, coef)
+
+  end subroutine init_frees_previous
+
+  ! ========================================================================== !
+  ! Helpers
+
+  !> Check that init has allocated the members, and on a device backend
+  !! mapped the work arrays, so that the checks after free are not vacuous.
+  !! @param adv The advection object.
+  !! @param i The cycle, for the messages.
+  subroutine check_initialised(adv, i)
+    type(adv_lin_dealias_t), intent(in) :: adv
+    integer, intent(in) :: i
+    character(len=80) :: msg
+
+    write(msg, '(A,I0)') "Members allocated after init, cycle ", i
+    @assertEqual(n_members, count(members_allocated(adv)), message = trim(msg))
+    write(msg, '(A,I0)') "Pointers to the GLL space set by init, cycle ", i
+    @assertTrue(associated(adv%Xh_GLL), message = trim(msg))
+    @assertTrue(associated(adv%coef_GLL), message = trim(msg))
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       write(msg, '(A,I0)') "Work arrays mapped after init, cycle ", i
+       @assertEqual(n_work, count(work_mapped(adv)), message = trim(msg))
+       write(msg, '(A,I0)') "Members mapped after init, cycle ", i
+       @assertEqual(n_members, count(members_mapped(adv)), message = trim(msg))
+    end if
+
+  end subroutine check_initialised
+
+  !> Check that nothing that init allocates is left after free.
+  !! @param adv The advection object.
+  !! @param i The cycle, for the messages.
+  subroutine check_freed(adv, i)
+    type(adv_lin_dealias_t), intent(in) :: adv
+    integer, intent(in) :: i
+    character(len=80) :: msg
+
+    write(msg, '(A,I0)') "Work arrays allocated after free, cycle ", i
+    @assertEqual(0, count(work_allocated(adv)), message = trim(msg))
+    write(msg, '(A,I0)') "Work arrays mapped after free, cycle ", i
+    @assertEqual(0, count(work_mapped(adv)), message = trim(msg))
+    write(msg, '(A,I0)') "Members allocated after free, cycle ", i
+    @assertEqual(0, count(members_allocated(adv)), message = trim(msg))
+    write(msg, '(A,I0)') "Members mapped after free, cycle ", i
+    @assertEqual(0, count(members_mapped(adv)), message = trim(msg))
+    write(msg, '(A,I0)') "Pointers to the GLL space after free, cycle ", i
+    @assertFalse(associated(adv%Xh_GLL), message = trim(msg))
+    @assertFalse(associated(adv%coef_GLL), message = trim(msg))
+
+  end subroutine check_freed
+
+  !> Allocation status of the work arrays.
+  !! @param adv The advection object.
+  function work_allocated(adv) result(status)
+    type(adv_lin_dealias_t), intent(in) :: adv
+    logical :: status(n_work)
+
+    status = [allocated(adv%temp), allocated(adv%tbf), &
+         allocated(adv%tx), allocated(adv%ty), allocated(adv%tz), &
+         allocated(adv%vr), allocated(adv%vs), allocated(adv%vt), &
+         allocated(adv%txb), allocated(adv%tyb), allocated(adv%tzb), &
+         allocated(adv%duxb), allocated(adv%duyb), allocated(adv%duzb), &
+         allocated(adv%dvxb), allocated(adv%dvyb), allocated(adv%dvzb), &
+         allocated(adv%dwxb), allocated(adv%dwyb), allocated(adv%dwzb)]
+
+  end function work_allocated
+
+  !> Association status of the device pointers of the work arrays.
+  !! @param adv The advection object.
+  function work_mapped(adv) result(status)
+    type(adv_lin_dealias_t), intent(in) :: adv
+    logical :: status(n_work)
+
+    status = [c_associated(adv%temp_d), c_associated(adv%tbf_d), &
+         c_associated(adv%tx_d), c_associated(adv%ty_d), &
+         c_associated(adv%tz_d), c_associated(adv%vr_d), &
+         c_associated(adv%vs_d), c_associated(adv%vt_d), &
+         c_associated(adv%txb_d), c_associated(adv%tyb_d), &
+         c_associated(adv%tzb_d), c_associated(adv%duxb_d), &
+         c_associated(adv%duyb_d), c_associated(adv%duzb_d), &
+         c_associated(adv%dvxb_d), c_associated(adv%dvyb_d), &
+         c_associated(adv%dvzb_d), c_associated(adv%dwxb_d), &
+         c_associated(adv%dwyb_d), c_associated(adv%dwzb_d)]
+
+  end function work_mapped
+
+  !> Allocation status of arrays of the coefficients, space and interpolator
+  !! of the dealiasing space.
+  !! @param adv The advection object.
+  function members_allocated(adv) result(status)
+    type(adv_lin_dealias_t), intent(in) :: adv
+    logical :: status(n_members)
+
+    status = [allocated(adv%coef_GL%drdx), allocated(adv%coef_GL%dsdx), &
+         allocated(adv%coef_GL%dtdx), allocated(adv%coef_GL%drdy), &
+         allocated(adv%coef_GL%dsdy), allocated(adv%coef_GL%dtdy), &
+         allocated(adv%coef_GL%drdz), allocated(adv%coef_GL%dsdz), &
+         allocated(adv%coef_GL%dtdz), allocated(adv%Xh_GL%zg), &
+         allocated(adv%Xh_GL%dx), allocated(adv%Xh_GL%w3), &
+         allocated(adv%GLL_to_GL%Xh_to_Yh), allocated(adv%GLL_to_GL%Yh_to_Xh)]
+
+  end function members_allocated
+
+  !> Association status of the device pointers of the arrays in
+  !! members_allocated.
+  !! @param adv The advection object.
+  function members_mapped(adv) result(status)
+    type(adv_lin_dealias_t), intent(in) :: adv
+    logical :: status(n_members)
+
+    status = [c_associated(adv%coef_GL%drdx_d), &
+         c_associated(adv%coef_GL%dsdx_d), c_associated(adv%coef_GL%dtdx_d), &
+         c_associated(adv%coef_GL%drdy_d), c_associated(adv%coef_GL%dsdy_d), &
+         c_associated(adv%coef_GL%dtdy_d), c_associated(adv%coef_GL%drdz_d), &
+         c_associated(adv%coef_GL%dsdz_d), c_associated(adv%coef_GL%dtdz_d), &
+         c_associated(adv%Xh_GL%zg_d), c_associated(adv%Xh_GL%dx_d), &
+         c_associated(adv%Xh_GL%w3_d), c_associated(adv%GLL_to_GL%Xh_Yh_d), &
+         c_associated(adv%GLL_to_GL%Yh_Xh_d)]
+
+  end function members_mapped
+
+  !> Build a single-element hex mesh, the unit cube.
+  !! @param msh The mesh to build.
+  subroutine gen_msh(msh)
+    type(mesh_t), intent(inout) :: msh
+    type(point_t) :: p(8)
+
+    call p(1)%init(0.0_dp, 0.0_dp, 0.0_dp)
+    call p(1)%set_id(1)
+    call p(2)%init(1.0_dp, 0.0_dp, 0.0_dp)
+    call p(2)%set_id(2)
+    call p(3)%init(0.0_dp, 1.0_dp, 0.0_dp)
+    call p(3)%set_id(3)
+    call p(4)%init(1.0_dp, 1.0_dp, 0.0_dp)
+    call p(4)%set_id(4)
+    call p(5)%init(0.0_dp, 0.0_dp, 1.0_dp)
+    call p(5)%set_id(5)
+    call p(6)%init(1.0_dp, 0.0_dp, 1.0_dp)
+    call p(6)%set_id(6)
+    call p(7)%init(0.0_dp, 1.0_dp, 1.0_dp)
+    call p(7)%set_id(7)
+    call p(8)%init(1.0_dp, 1.0_dp, 1.0_dp)
+    call p(8)%set_id(8)
+
+    call msh%init(3, 1)
+    call msh%add_element(1, 1, p(1), p(2), p(3), p(4), &
+         p(5), p(6), p(7), p(8))
+    call msh%generate_conn()
+
+  end subroutine gen_msh
+
+  !> Build the SEM chain mesh -> space -> dofmap -> gs -> coef.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  subroutine build_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), target, intent(inout) :: msh
+    type(space_t), target, intent(inout) :: Xh
+    type(dofmap_t), target, intent(inout) :: dof
+    type(gs_t), target, intent(inout) :: gs
+    type(coef_t), target, intent(inout) :: coef
+
+    call gen_msh(msh)
+    call Xh%init(GLL, LX, LX, LX)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+
+  end subroutine build_fixture
+
+  !> Free everything build_fixture created, in reverse order.
+  !! @param msh The mesh.
+  !! @param Xh The function space.
+  !! @param dof The dofmap.
+  !! @param gs The gather-scatter.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  subroutine free_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine free_fixture
+
+end module adv_adjoint_dealias_free

@@ -12,7 +12,7 @@
         "numerics": {
             "time_order": 3,
             "polynomial_order": 2,
-            "dealias": true
+            "dealias": false
         },
         "fluid": {
             "scheme": "pnpn",
@@ -108,8 +108,7 @@
             "initial_condition": {
                 "type": "uniform",
                 "value": 0.0
-            },
-            "dealias_coupling_term": false
+            }
         },
         "adjoint_fluid": {
             "initial_condition": {

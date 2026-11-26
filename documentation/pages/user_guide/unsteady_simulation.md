@@ -26,6 +26,12 @@ states one step at a time and assumes every step had the same `dt`, so a case
 that sets `case.time.variable_timestep` together with `"unsteady": true` stops
 with an error.
 
+Unsteady problems cannot use the `steady` simulation component. It drives a
+steady problem to convergence and then freezes the fluid, which is the
+opposite of an unsteady problem, so a case that lists a component of type
+`steady` under `case.simulation_components` together with `"unsteady": true`
+stops with an error at setup.
+
 ## Checkpoint based state recovery
 
 A straight forward approach is to simply store the entire forward state at each
@@ -44,9 +50,18 @@ The current checkpoint implementation supports the following algorithms:
 
 - Linear: Store a regular interval of restart capable checkpoints to disc.
 
-By default, Neko-TOP stores pressure, velocity, and scalar fields in the
-checkpoint, but users can specify extra fields to be included in the
-checkpoint.
+By default, Neko-TOP stores pressure, velocity, every scalar field, and every
+scalar field's first time lag in the checkpoint, and users can specify extra
+fields to be included as well. The lag is stored whenever the case has any
+scalar, whether or not an adjoint scalar runs, because the unsteady adjoint's
+scalar-velocity coupling term reads the scalar from the step before the one
+state recovery has just restored, which the lag holds (see \ref
+adjoint-scalar-time-levels "Time levels in the unsteady adjoint"). For the
+memory checkpoints, each scalar field therefore costs two stored fields rather
+than one: on top of the four fixed fields for pressure and velocity, a case
+with n scalars stores 2n extra fields per memory checkpoint. Neko's own disc
+checkpoint format already stored every scalar's first lag before this change,
+so a disc checkpoint's size is unaffected.
 
 ### Parameters
 

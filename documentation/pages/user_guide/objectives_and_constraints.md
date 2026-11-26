@@ -86,11 +86,9 @@ The two paths agree wherever they are asking the same question. Once a problem
 has reached a steady state, an unsteady objective averaged over a window inside
 the converged part of the run reports what the steady path reports for the same
 problem: the field no longer changes, so its average over the window is its
-converged value. `tests/unit/objectives/steady_unsteady_converged` is exactly
-this check, and it holds to the iterative solvers' own round-off. Note that
-`steady_simcomp` freezes the fluid on convergence but not the scalar, so set
-`scalar_coupled` when a scalar objective is involved, or the objective may be
-evaluated on a scalar that has not settled.
+converged value. The `steady` simulation component, which drives a steady
+problem to convergence and freezes the fluid there, belongs to the steady path
+alone: an unsteady problem that declares it stops with an error at setup.
 
 They also agree trivially at the end of any run, converged or not: an unsteady
 objective windowed to the final timestep alone reports exactly what the steady
@@ -116,6 +114,7 @@ For example,
 ```json
 {
     "type": "scalar_mixing",
+    "phi_ref": 0.5,
     "weight": 1.0,
     "start_time": 2.5,
     "end_time": 6.0

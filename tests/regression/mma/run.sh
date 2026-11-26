@@ -94,8 +94,8 @@ if [[ -z "$VIRTUAL_ENV" && -f "${ROOT_DIR}/.venv/bin/activate" ]]; then
     source "${ROOT_DIR}/.venv/bin/activate"
 fi
 
-python plot_design.py all || exit 1
-python check.py || exit 1
+python3 plot_design.py all || exit 1
+python3 check.py || exit 1
 
 echo "MMA regression test passed"
 cd "$CURRENT_DIR" || exit 1

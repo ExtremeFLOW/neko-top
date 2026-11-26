@@ -42,7 +42,7 @@ module optimizer
   use simulation_m, only: simulation_t
   use problem, only: problem_t
   use design, only: design_t
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use logger, only: neko_log, LOG_SIZE
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX, MPI_Bcast, &
@@ -94,7 +94,7 @@ module optimizer
 
      ! Variables for the runtime-based stopping criteria
      real(kind=rp), private :: max_runtime = -1.0_rp
-     real(kind=rp), private :: start_time = 0.0_rp
+     real(kind=dp), private :: start_time = 0.0_dp
      real(kind=rp), private :: average_time = 0.0_rp
      real(kind=rp), private :: step_count = 0.0_rp
 
@@ -395,8 +395,11 @@ contains
     this%checkpoint_interval = -1
     this%checkpoint_overwrite = .false.
 
-    this%start_time = 0.0_rp
+    this%start_time = 0.0_dp
+    this%average_time = 0.0_dp
+    this%step_count = 0.0_dp
     this%current_iteration = 0
+    this%norm2_design_change = 0.0_rp
     call this%log_data%free()
     this%log_initialized = .false.
     this%log_extra_size = 0
@@ -477,6 +480,7 @@ contains
     class(design_t), intent(inout) :: design
     type(simulation_t), optional, intent(inout) :: simulation
     real(kind=rp) :: iteration_time
+    real(kind=dp) :: iteration_start
     logical :: converged
     integer :: stop_flag
 
@@ -527,7 +531,7 @@ contains
        end if
 
        call profiler_start_region('Optimizer iteration')
-       iteration_time = MPI_Wtime()
+       iteration_start = MPI_Wtime()
 
        ! Update the parameters in continuation scheduler
        call nekotop_continuation%update(this%current_iteration)
@@ -538,7 +542,7 @@ contains
        converged = this%step(this%current_iteration, problem, design, &
             simulation)
 
-       iteration_time = MPI_Wtime() - iteration_time
+       iteration_time = real(MPI_Wtime() - iteration_start, kind=rp)
        call profiler_end_region('Optimizer iteration')
 
        ! Log the progress and outputs
@@ -623,7 +627,7 @@ contains
             this%max_iterations, ' iterations.'
        call neko_log%warning(msg)
     case (2)
-       write(msg, '(A,A,F8.2,A)') 'Optimizer stopped, design change ', &
+       write(msg, '(A,A,ES12.4,A)') 'Optimizer stopped, design change ', &
             'below threshold of: ', this%stop_design_change, '.'
        call neko_log%warning(msg)
     case (3)
@@ -666,7 +670,7 @@ contains
          this%average_time * old_avg_weight
 
     ! Determine if next iteration would exceed max runtime
-    elapsed = MPI_Wtime() - this%start_time
+    elapsed = real(MPI_Wtime() - this%start_time, kind=rp)
     out_of_time = (elapsed + this%average_time) .gt. 0.99_rp * this%max_runtime
 
   end function optimizer_out_of_time

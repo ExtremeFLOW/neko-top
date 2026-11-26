@@ -39,11 +39,17 @@ Brinkman source-term coupling.
 | `verbose_sensitivity` | bool | No | `false` | Write all backward sensitivity stages |
 | `output_precision` | string | No | `"sp"` | `"sp"` or `"dp"` for design/sensitivity field output |
 | `output_format` | string | No | `"fld"` | Field-output format, e.g. `"fld"`, `"vtkhdf"`, or `"adios2"` |
-| `mapping` | array | No | omitted | Mapping cascade definition, see [Mapping cascade](@ref mapping_cascade) |
+| `mapping` | array | No | empty cascade | Mapping cascade definition, see [Mapping cascade](@ref mapping_cascade) |
 | `initial_distribution` | object | No | omitted | Initial design field setup (details below) |
 
 The `verbose_*`, `output_precision`, and `output_format` options control the
 intermediate forward and backward fields written by the mapping cascade.
+
+Without `mapping` the cascade is empty: the Brinkman amplitude is the design
+made continuous, by averaging the values that neighbouring elements share,
+and the sensitivity is averaged the same way on its way back. For a
+continuous design, such as a uniform initial distribution, this is the
+identity.
 
 ### `initial_distribution` options {#design_types-brinkman-initial}
 

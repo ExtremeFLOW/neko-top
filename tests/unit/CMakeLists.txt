@@ -52,6 +52,7 @@ add_subdirectory(fd_criterion)
 add_subdirectory(fd_argmax_probe)
 add_subdirectory(mma)
 add_subdirectory(constraints)
+add_subdirectory(design)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
