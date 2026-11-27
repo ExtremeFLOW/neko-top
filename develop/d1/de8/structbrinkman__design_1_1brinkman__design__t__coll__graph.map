@@ -1,0 +1,7 @@
+<map id="brinkman_design::brinkman_design_t" name="brinkman_design::brinkman_design_t">
+<area shape="rect" id="Node000001" title="A topology optimization design variable." alt="" coords="61,123,264,168"/>
+<area shape="rect" id="Node000002" href="$da/d3b/structdesign_1_1design__t.html" title="An abstract design type." alt="" coords="5,14,133,42"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="90,51,148,122,142,123,87,56"/>
+<area shape="rect" id="Node000003" href="$d8/d0a/structmapping__handler_1_1mapping__handler__t.html" title="Abstract class for handling mapping_cascade." alt="" coords="157,5,357,50"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="232,61,182,124,178,120,227,63"/>
+</map>

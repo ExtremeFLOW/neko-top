@@ -1,0 +1,5 @@
+<map id="neko_ext::reset_adjoint" name="neko_ext::reset_adjoint">
+<area shape="rect" id="Node000001" title="Reset the adjoint case data structure." alt="" coords="5,14,179,42"/>
+<area shape="rect" id="Node000002" href="$d1/d89/namespaceneko__ext.html#afebd8ad06ff8d63cac161fd0642ea1e4" title="Set the coefficients of a time scheme from the lagged time steps." alt="" coords="227,5,372,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="179,25,214,27,208,28,179,30"/>
+</map>

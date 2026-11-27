@@ -1,0 +1,8 @@
+<map id="scalar_mixing_objective::scalar_mixing_init_json_sim" name="scalar_mixing_objective::scalar_mixing_init_json_sim">
+<area shape="rect" id="Node000001" title="The common constructor using a JSON object." alt="" coords="5,64,219,109"/>
+<area shape="rect" id="Node000002" href="$d1/d05/namespacemask__ops.html#ad16ef5096d0a625fc101945cf6b8caa2" title="Compute the volume of the domain contained within the mask." alt="" coords="267,29,477,74"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="218,69,254,67,248,68,220,75"/>
+<area shape="rect" id="Node000003" href="$d1/d89/namespaceneko__ext.html#af25c99c27f8627e3e69bd6f4557f33ed" title="get scalar indices" alt="" coords="294,99,450,143"/>
+<area shape="poly" id="edge3_Node000001_Node000003" title=" " alt="" coords="219,98,281,108,276,109,219,103"/>
+<area shape="poly" id="edge2_Node000002_Node000002" title=" " alt="" coords="323,27,321,19,329,10,346,5,372,3,400,5,418,14,413,14,399,10,372,8,347,10,332,15,326,21,327,30"/>
+</map>

@@ -1,0 +1,7 @@
+<map id="heaviside_mapping::heaviside_mapping_init_from_json" name="heaviside_mapping::heaviside_mapping_init_from_json">
+<area shape="rect" id="Node000001" title="Constructor from json." alt="" coords="5,44,182,106"/>
+<area shape="rect" id="Node000002" href="$de/d0b/namespaceheaviside__mapping__cpu.html#acc33555caf8562f2bae182692a608b22" title="Apply smooth Heaviside mapping chain rule on CPU." alt="" coords="245,5,444,67"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="182,59,232,53,227,55,183,64"/>
+<area shape="rect" id="Node000003" href="$de/d0b/namespaceheaviside__mapping__cpu.html#a0d9da5aaa09f8d2f4ff428c8b42e0c7d" title="Apply smooth Heaviside mapping on CPU." alt="" coords="230,91,459,136"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="182,86,217,93,212,94,182,91"/>
+</map>

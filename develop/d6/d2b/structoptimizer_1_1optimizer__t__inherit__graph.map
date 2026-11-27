@@ -1,0 +1,7 @@
+<map id="optimizer::optimizer_t" name="optimizer::optimizer_t">
+<area shape="rect" id="Node000001" title="Abstract optimizer class." alt="" coords="5,48,171,76"/>
+<area shape="rect" id="Node000002" href="$de/def/structmma__optimizer_1_1mma__optimizer__t.html" title=" " alt="" coords="248,5,414,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="186,46,250,39,245,40,187,51"/>
+<area shape="rect" id="Node000003" href="$da/dbb/structsteepest__descent__optimizer_1_1steepest__descent__optimizer__t.html" title="Steepest descent optimizer with move limits." alt="" coords="219,75,443,119"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="186,74,221,81,215,81,186,79"/>
+</map>

@@ -1,0 +1,14 @@
+<map id="steepest_descent_math::sd_direction" name="steepest_descent_math::sd_direction">
+<area shape="rect" id="Node000001" title="Bound&#45;projected steepest&#45;descent direction (Eq. D22)." alt="" coords="5,57,182,102"/>
+<area shape="rect" id="Node000002" href="$d4/dca/namespacedevice__steepest__descent.html#af1867a4ca26b6babcdc723767ded34c4" title="Bound&#45;projected steepest&#45;descent direction on the device (Eq. D22)." alt="" coords="230,22,415,67"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="182,63,217,60,212,62,183,68"/>
+<area shape="rect" id="Node000006" href="$d1/df4/namespacesteepest__descent__cpu.html#a12a3b97150b200f7aac0e380d7efc13c" title="Bound&#45;projected steepest&#45;descent direction on CPU (Eq. D22)." alt="" coords="240,92,405,136"/>
+<area shape="poly" id="edge6_Node000001_Node000006" title=" " alt="" coords="182,90,227,99,222,99,182,95"/>
+<area shape="rect" id="Node000003" href="$da/d18/steepest__descent_8cu.html#a4781196a8617f58950e2681f41fe984b" title=" " alt="" coords="463,5,601,33"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="415,31,451,29,445,30,416,36"/>
+<area shape="rect" id="Node000005" href="$de/d19/steepest__descent_8hip.html#aeda2b4459b057ad56bdf52f86990b2cb" title=" " alt="" coords="468,57,596,85"/>
+<area shape="poly" id="edge4_Node000002_Node000005" title=" " alt="" coords="415,54,456,61,451,61,415,59"/>
+<area shape="rect" id="Node000004" href="$d0/da1/cuda_2steepest__descent__kernel_8h.html#aacfded64682cf885609ecaf771e9534d" title=" " alt="" coords="649,32,797,60"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="602,26,637,33,631,33,602,32"/>
+<area shape="poly" id="edge5_Node000005_Node000004" title=" " alt="" coords="596,60,631,58,637,57,597,65"/>
+</map>

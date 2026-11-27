@@ -1,0 +1,7 @@
+<map id="ramp_mapping::ramp_mapping_init_from_json" name="ramp_mapping::ramp_mapping_init_from_json">
+<area shape="rect" id="Node000001" title="Constructor from json." alt="" coords="5,52,191,97"/>
+<area shape="rect" id="Node000002" href="$de/d87/namespaceramp__mapping__cpu.html#a2045422c194f41c3d722a877640571f5" title="Apply convex&#45;down RAMP chain rule on CPU." alt="" coords="254,5,465,67"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="191,58,241,53,236,55,192,64"/>
+<area shape="rect" id="Node000003" href="$de/d87/namespaceramp__mapping__cpu.html#ae68522cf26b1c08ea25a276c439e4545" title="Apply convex&#45;down RAMP forward mapping on CPU." alt="" coords="239,91,480,136"/>
+<area shape="poly" id="edge2_Node000001_Node000003" title=" " alt="" coords="191,86,226,93,221,94,191,91"/>
+</map>

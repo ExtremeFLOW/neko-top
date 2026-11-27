@@ -1,0 +1,9 @@
+<map id="cuda_sd_direction" name="cuda_sd_direction">
+<area shape="rect" id="Node000001" title=" " alt="" coords="724,14,863,42"/>
+<area shape="rect" id="Node000002" href="$d4/dca/namespacedevice__steepest__descent.html#af1867a4ca26b6babcdc723767ded34c4" title="Bound&#45;projected steepest&#45;descent direction on the device (Eq. D22)." alt="" coords="491,5,676,50"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="706,28,677,30,677,25,711,28"/>
+<area shape="rect" id="Node000003" href="$dc/db2/namespacesteepest__descent__math.html#ab328241169a84d2e2ea6d2bf263f2d0b" title="Bound&#45;projected steepest&#45;descent direction (Eq. D22)." alt="" coords="267,5,443,50"/>
+<area shape="poly" id="edge2_Node000002_Node000003" title=" " alt="" coords="473,28,443,30,443,25,478,28"/>
+<area shape="rect" id="Node000004" href="$d8/dc8/namespacesteepest__descent__optimizer.html#a671e84d7115b77290f9a363627a3c83c" title="Initialise the steepest descent optimizer from the case file." alt="" coords="5,5,219,50"/>
+<area shape="poly" id="edge3_Node000003_Node000004" title=" " alt="" coords="248,28,219,30,219,25,254,28"/>
+</map>

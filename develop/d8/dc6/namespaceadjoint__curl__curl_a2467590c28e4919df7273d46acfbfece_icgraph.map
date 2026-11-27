@@ -1,0 +1,5 @@
+<map id="adjoint_curl_curl::adjoint_curl_curl_check" name="adjoint_curl_curl::adjoint_curl_curl_check">
+<area shape="rect" id="Node000001" title="Stop with an error if the boundary conditions make the adjoint curl&#45;curl load differ from the transpo..." alt="" coords="214,14,387,58"/>
+<area shape="rect" id="Node000002" href="$dc/d5c/structadjoint__case_1_1adjoint__case__t.html#ae0301e54e1d01666c26257c3ed810597" title="Point the coupling term at the primal scalar or at its first lag." alt="" coords="5,5,166,67"/>
+<area shape="poly" id="edge1_Node000001_Node000002" title=" " alt="" coords="196,36,167,39,166,34,201,36"/>
+</map>
